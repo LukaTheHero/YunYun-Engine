@@ -153,7 +153,6 @@ const REPEAT_TRACK_END_GRACE_MS = 15_000;
 const REPEAT_TRACK_REPLAY_COOLDOWN_MS = 8_000;
 const MANUAL_CONTROL_REPEAT_SUPPRESS_MS = 15_000;
 const DJ_MARI_PLAYLIST_READY_TOAST_MS = 20_000;
-const DOTTOR_SUPPORT_GIF = "/sprites/dottore/dottore_jumping.gif";
 const MOBILE_WIDGET_COLLAPSED_SIZE = 48;
 const MOBILE_WIDGET_EXPANDED_MAX_WIDTH = 320;
 const MOBILE_WIDGET_EXPANDED_HORIZONTAL_GUTTER = 24;
@@ -554,12 +553,7 @@ export function SpotifyMiniPlayer({
     djMariToastRef.current = toast.custom(
       () => (
         <div className="flex max-w-[22rem] items-center gap-3 pr-1 text-[var(--foreground)]">
-          <img
-            src={DOTTOR_SUPPORT_GIF}
-            alt=""
-            className="h-14 w-14 shrink-0 rounded-lg object-contain"
-            draggable={false}
-          />
+          <Loader2 size="2rem" className="shrink-0 animate-spin text-[var(--muted-foreground)]" />
           <p className="text-sm font-medium leading-snug">DJ Mari is composing a playlist for you, hold on tight!</p>
           <button
             type="button"

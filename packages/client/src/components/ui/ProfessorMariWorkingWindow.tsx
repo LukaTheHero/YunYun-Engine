@@ -1,8 +1,5 @@
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { cn } from "../../lib/utils";
-
-const DOTTOR_SUPPORT_GIF = "/sprites/dottore/dottore_jumping.gif";
 
 interface ProfessorMariWorkingWindowProps {
   visible: boolean;
@@ -11,14 +8,6 @@ interface ProfessorMariWorkingWindowProps {
 }
 
 export function ProfessorMariWorkingWindow({ visible, onDismiss, className }: ProfessorMariWorkingWindowProps) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setImageFailed(false);
-    }
-  }, [visible]);
-
   if (!visible) return null;
 
   return (
@@ -30,14 +19,7 @@ export function ProfessorMariWorkingWindow({ visible, onDismiss, className }: Pr
       role="status"
       aria-live="polite"
     >
-      {!imageFailed && (
-        <img
-          src={DOTTOR_SUPPORT_GIF}
-          alt=""
-          className="h-10 w-10 shrink-0 object-contain [image-rendering:pixelated]"
-          onError={() => setImageFailed(true)}
-        />
-      )}
+      <Loader2 size="1.5rem" className="shrink-0 animate-spin text-[var(--muted-foreground)]" />
       <p className={cn("min-w-0 text-xs font-medium leading-relaxed text-[var(--foreground)]", onDismiss && "pr-6")}>
         Prof Mari is working...
       </p>
