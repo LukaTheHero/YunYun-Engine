@@ -33,6 +33,7 @@ import {
   wrapConversationInstructions,
   NARRATIVE_DIRECTOR_SECRET_PLOT_PROMPT,
   findKnownModel,
+  LOCAL_SIDECAR_CONNECTION_ID,
   normalizeTextForMatch,
   type APIProvider,
 } from "@marinara-engine/shared";
@@ -65,7 +66,7 @@ import { createCustomStickersStorage } from "../services/storage/custom-stickers
 import { createCharacterGalleryStorage } from "../services/storage/character-gallery.storage.js";
 import { createPersonaGalleryStorage } from "../services/storage/persona-gallery.storage.js";
 import { localEmbed, isLocalEmbedderAvailable } from "../services/local-embedder.js";
-import { cosineSimilarity } from "../services/lorebook/embeddings.js";
+import { buildLorebookSemanticEmbeddingsById, cosineSimilarity } from "../services/lorebook/embeddings.js";
 import { applyRegexScriptsToPromptMessages } from "../services/regex/regex-application.js";
 import { createPromptOverridesStorage } from "../services/storage/prompt-overrides.storage.js";
 import { resolveConversationSelfieSystemPrompt } from "../services/conversation/selfie-prompt.js";
@@ -77,6 +78,7 @@ import {
 import { lorebookEntryPassesContextFilters, type GameStateForScanning } from "../services/lorebook/keyword-scanner.js";
 import { injectAtDepth } from "../services/lorebook/prompt-injector.js";
 import { createLLMProvider } from "../services/llm/provider-registry.js";
+import { getLocalSidecarProvider } from "../services/llm/local-sidecar.js";
 import { resolveChatSummaryConnection } from "../services/chat-summary/connection-resolution.js";
 import { resolveConnectionImageDefaults } from "../services/image/image-generation-defaults.js";
 import { loadImageGenerationUserSettings } from "../services/image/image-generation-settings.js";
@@ -97,7 +99,7 @@ import {
   type AssemblerInput,
 } from "../services/prompt/index.js";
 import { wrapContent } from "../services/prompt/format-engine.js";
-import { yieldToEventLoop, type ChatMessage, type LLMUsage } from "../services/llm/base-provider.js";
+import { yieldToEventLoop, type BaseLLMProvider, type ChatMessage, type LLMUsage } from "../services/llm/base-provider.js";
 import { executeToolCalls } from "../services/tools/tool-executor.js";
 import { createAgentPipeline, type ResolvedAgent, type AgentInjection } from "../services/agents/agent-pipeline.js";
 import { DATA_DIR } from "../utils/data-dir.js";
@@ -137,6 +139,7 @@ import {
 } from "../services/conversation/character-commands.js";
 import {
   ILLUSTRATOR_TEXT_NEGATIVE_PROMPT,
+  isNovelAiImageConnection,
   resolveIllustratorCharacterReferences,
 } from "./generate/illustrator-references.js";
 import {
@@ -165,6 +168,7 @@ import {
   toZonedWallClockDate,
 } from "../services/conversation/timezone.js";
 import {
+  countUserMessagesAfterSummaryAnchor,
   formatConversationDateKey,
   generateMissingConversationSummaries,
   parseConversationDateKey,
@@ -198,10 +202,12 @@ import {
   findTrackerContextInsertIndex,
   appendReadableAttachmentsToContent,
   extractFileAttachmentInputs,
+  getAttachmentFilename,
+  buildGenerationGuideInstruction,
   buildUserMessageRegenerationPromptFromSource,
-  buildUserMessageRegenerationSourceMessage,
   buildLockedPlayerStatsArrayPatch,
   buildLockedPersonaTrackerPatch,
+  createLocalSidecarGenerationConnection,
   extractImageAttachmentDataUrls,
   appendNonLeadingSystemMessagesToLastUser,
   appendSeparateAgentInjectionMessage,
@@ -236,6 +242,7 @@ import {
   shouldAbortOnPassiveGenerationDisconnect,
   shouldEnableAgentsForGeneration,
   shouldInjectIdentityFallback,
+  escapeXmlAttribute,
   type PromptAttachment,
   type SimpleMessage,
 } from "./generate/generate-route-utils.js";
@@ -269,6 +276,7 @@ import {
 import { normalizeContextInjections } from "./generate/agent-normalizers.js";
 import {
   buildGenerationPromptPresetCandidates,
+  resolveGenerationPromptPresetChoices,
   type PromptPresetCandidateSource,
 } from "./generate/prompt-preset-selection.js";
 import {
@@ -378,7 +386,6 @@ import {
   resolveStoredModelContextLimit,
 } from "../services/generation/model-access-policy.js";
 import { resolveAgentPipelineAgents } from "../services/generation/agent-resolution.js";
-import { applyImmersiveHtmlPromptInjection } from "../services/generation/immersive-html-injection.js";
 import { resolveGenerationTools } from "../services/generation/tool-resolution-runtime.js";
 import {
   buildCharacterMacroProfilesById,
@@ -398,6 +405,7 @@ import {
 import { findLastUserMessageIdBefore } from "../services/generation/message-history.js";
 import {
   getTextRewritePendingState,
+  isBuiltInTextRewriteAgentType,
   mergePairedBuiltInRewriteAgents,
   PROSE_GUARDIAN_PENDING_MESSAGE,
   shouldHoldForProseGuardianRewrite,
@@ -499,63 +507,6 @@ function resolvePresetModePrompt(
   return mode === "conversation"
     ? presetStringField(preset, "conversationPrompt")
     : presetStringField(preset, "gamePrompt");
-}
-
-type PromptChoiceBlockRow = {
-  variableName: string;
-  options: unknown;
-  multiSelect?: unknown;
-  randomPick?: unknown;
-  separator?: unknown;
-};
-
-function parseModePromptChoiceOptions(value: unknown): Array<{ value: string }> {
-  try {
-    const parsed = typeof value === "string" ? JSON.parse(value) : value;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((option) => {
-      if (!option || typeof option !== "object" || Array.isArray(option)) return [];
-      const rawValue = (option as Record<string, unknown>).value;
-      return typeof rawValue === "string" ? [{ value: rawValue }] : [];
-    });
-  } catch {
-    return [];
-  }
-}
-
-function resolveModePromptChoiceVariables(
-  choiceBlocks: PromptChoiceBlockRow[],
-  chatChoices: Record<string, string | string[]>,
-): Record<string, string> {
-  const variables: Record<string, string> = {};
-  for (const block of choiceBlocks) {
-    const options = parseModePromptChoiceOptions(block.options);
-    const optionValues = new Set(options.map((option) => option.value));
-    const fallback = options[0]?.value ?? "";
-    const selected = chatChoices[block.variableName];
-    const isMulti = block.multiSelect === true || block.multiSelect === "true";
-    const isRandom = block.randomPick === true || block.randomPick === "true";
-    const separator = typeof block.separator === "string" ? block.separator : ", ";
-
-    if (isMulti) {
-      const selectedValues = Array.isArray(selected)
-        ? selected.filter((value) => optionValues.has(value))
-        : typeof selected === "string" && optionValues.has(selected)
-          ? [selected]
-          : [];
-      if (selectedValues.length === 0) {
-        variables[block.variableName] = fallback;
-      } else if (isRandom) {
-        variables[block.variableName] = selectedValues[Math.floor(Math.random() * selectedValues.length)] ?? "";
-      } else {
-        variables[block.variableName] = selectedValues.join(separator);
-      }
-      continue;
-    }
-
-    variables[block.variableName] = typeof selected === "string" && optionValues.has(selected) ? selected : fallback;
-  }
-  return variables;
 }
 
 const DIRECTOR_SECRET_PLOT_DEFAULT_RUN_INTERVAL = 8;
@@ -736,13 +687,6 @@ function withoutRetiredChatSummaryAgentIds(chatMetadata: Record<string, unknown>
   });
 }
 
-function countUserMessagesAfterAnchor(messages: Array<{ id: string; role: string }>, anchorMessageId: string | null) {
-  if (!anchorMessageId) return Number.POSITIVE_INFINITY;
-  const anchorIndex = messages.findIndex((message) => message.id === anchorMessageId);
-  if (anchorIndex < 0) return Number.POSITIVE_INFINITY;
-  return messages.slice(anchorIndex + 1).filter((message) => message.role === "user").length;
-}
-
 function resolveChatSummaryPromptFromMetadata(chatMetadata: Record<string, unknown>): string {
   const selectedId =
     typeof chatMetadata.activeSummaryPromptTemplateId === "string"
@@ -866,6 +810,8 @@ function getConversationCommandKey(command: CharacterCommand): ConversationComma
       return "scene";
     case "uno":
       return "uno";
+    case "chess":
+      return "chess";
     case "spotify":
     case "youtube":
       return "music";
@@ -1078,6 +1024,209 @@ function conversationPromptHistoryContent(
     }
   }
   return typeof message.content === "string" ? message.content : "";
+}
+
+type ImageCaptionConnection = {
+  id?: string | null;
+  name?: string | null;
+  provider: string;
+  apiKey: string;
+  model: string;
+  maxContext?: number | null;
+  openrouterProvider?: string | null;
+  maxTokensOverride?: number | null;
+  claudeFastMode?: string | null;
+  treatAsLocalEndpoint?: string | null;
+  enableCaching?: string | null;
+  anthropicExtendedCacheTtl?: string | null;
+  cachingAtDepth?: number | null;
+};
+
+type ImageCaptioningRuntime = {
+  enabled: boolean;
+  connectionId: string | null;
+  connection: ImageCaptionConnection | null;
+  provider: BaseLLMProvider | null;
+};
+
+type PromptAttachmentResolution = {
+  content: string;
+  images: string[];
+  files: Array<{ type: string; data: string; filename: string }>;
+  updatedAttachments: PromptAttachment[] | null;
+};
+
+const DISABLED_IMAGE_CAPTIONING: ImageCaptioningRuntime = {
+  enabled: false,
+  connectionId: null,
+  connection: null,
+  provider: null,
+};
+const IMAGE_CAPTION_MAX_TOKENS = 700;
+const IMAGE_CAPTION_MAX_CHARS = 4_000;
+
+function normalizePromptAttachments(extra: unknown): PromptAttachment[] | undefined {
+  const rawAttachments = parseExtra(extra).attachments;
+  if (!Array.isArray(rawAttachments)) return undefined;
+  const attachments = rawAttachments.filter(
+    (attachment): attachment is PromptAttachment =>
+      !!attachment && typeof attachment === "object" && !Array.isArray(attachment),
+  );
+  return attachments.length ? attachments : undefined;
+}
+
+function normalizeImageCaptionText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value
+    .replace(/^```(?:\w+)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  if (!text) return null;
+  return text.length > IMAGE_CAPTION_MAX_CHARS ? `${text.slice(0, IMAGE_CAPTION_MAX_CHARS).trim()}...` : text;
+}
+
+function readCachedImageCaption(
+  attachment: PromptAttachment,
+  imageCaptioning: ImageCaptioningRuntime,
+): string | null {
+  const caption = normalizeImageCaptionText(attachment.imageCaption);
+  if (!caption || !imageCaptioning.connection) return null;
+  if (attachment.imageCaptionConnectionId !== imageCaptioning.connectionId) return null;
+  if (attachment.imageCaptionModel !== imageCaptioning.connection.model) return null;
+  if (attachment.imageCaptionProvider !== imageCaptioning.connection.provider) return null;
+  return caption;
+}
+
+function formatImageCaptionBlock(attachment: PromptAttachment, caption: string): string {
+  const name = getAttachmentFilename(attachment);
+  const type = typeof attachment.type === "string" && attachment.type.trim() ? attachment.type.trim() : "image";
+  return [
+    `<attached_image name="${escapeXmlAttribute(name)}" type="${escapeXmlAttribute(type)}">`,
+    caption,
+    `</attached_image>`,
+  ].join("\n");
+}
+
+function appendImageCaptionBlocksToContent(content: string, blocks: string[]): string {
+  if (blocks.length === 0) return content;
+  return `${content}${content.trim() ? "\n\n" : ""}${blocks.join("\n\n")}`;
+}
+
+async function generateImageCaptionForAttachment(
+  attachment: PromptAttachment,
+  imageDataUrl: string,
+  imageCaptioning: ImageCaptioningRuntime,
+  signal: AbortSignal,
+): Promise<string | null> {
+  if (!imageCaptioning.provider || !imageCaptioning.connection) return null;
+  const filename = getAttachmentFilename(attachment);
+  try {
+    const result = await imageCaptioning.provider.chatComplete(
+      [
+        {
+          role: "system",
+          content:
+            "You describe image attachments for a downstream chat model that may not support vision. " +
+            "Write a faithful, concise description of the visible content, including readable text, subjects, setting, style, and any details important for conversation continuity. " +
+            "Do not answer the chat and do not add speculation beyond what is visible.",
+        },
+        {
+          role: "user",
+          content: `Describe this image attachment named "${filename}" for use inside a chat prompt. Return only the description.`,
+          images: [imageDataUrl],
+        },
+      ],
+      {
+        model: imageCaptioning.connection.model,
+        temperature: 0.2,
+        maxTokens: applyProviderMaxTokensOverride(imageCaptioning.provider, IMAGE_CAPTION_MAX_TOKENS),
+        enableCaching: imageCaptioning.connection.enableCaching === "true",
+        anthropicExtendedCacheTtl: imageCaptioning.connection.anthropicExtendedCacheTtl === "true",
+        cachingAtDepth: imageCaptioning.connection.cachingAtDepth ?? 5,
+        stream: false,
+        signal,
+      },
+    );
+    return normalizeImageCaptionText(result.content);
+  } catch (error) {
+    if (signal.aborted) throw error;
+    logger.warn(error, "[image-captioning] Failed to caption image attachment %s", filename);
+    return null;
+  }
+}
+
+async function resolvePromptAttachmentInputs(args: {
+  content: string;
+  attachments: PromptAttachment[] | undefined;
+  imageCaptioning: ImageCaptioningRuntime;
+  signal: AbortSignal;
+}): Promise<PromptAttachmentResolution> {
+  const { attachments, imageCaptioning, signal } = args;
+  const files = extractFileAttachmentInputs(attachments);
+  let content = appendReadableAttachmentsToContent(args.content, attachments);
+
+  if (!imageCaptioning.enabled || !imageCaptioning.provider || !imageCaptioning.connection) {
+    return {
+      content,
+      images: extractImageAttachmentDataUrls(attachments),
+      files,
+      updatedAttachments: null,
+    };
+  }
+
+  const captionBlocks: string[] = [];
+  const fallbackImages: string[] = [];
+  let updatedAttachments: PromptAttachment[] | null = null;
+  const sourceAttachments = attachments ?? [];
+  const captionConnection = imageCaptioning.connection;
+  const resolvedImages = await Promise.all(
+    sourceAttachments.map(async (attachment, index) => {
+      const imageDataUrl = extractImageAttachmentDataUrls([attachment])[0];
+      if (!imageDataUrl) return null;
+
+      let caption = readCachedImageCaption(attachment, imageCaptioning);
+      let updatedAttachment: PromptAttachment | null = null;
+      if (!caption) {
+        caption = await generateImageCaptionForAttachment(attachment, imageDataUrl, imageCaptioning, signal);
+        if (caption) {
+          updatedAttachment = {
+            ...attachment,
+            imageCaption: caption,
+            imageCaptionConnectionId: imageCaptioning.connectionId,
+            imageCaptionModel: captionConnection.model,
+            imageCaptionProvider: captionConnection.provider,
+            imageCaptionedAt: new Date().toISOString(),
+          };
+        }
+      }
+
+      return { index, attachment, imageDataUrl, caption, updatedAttachment };
+    }),
+  );
+
+  for (const result of resolvedImages) {
+    if (!result) continue;
+    const { index, attachment, imageDataUrl, caption, updatedAttachment } = result;
+    if (updatedAttachment) {
+      updatedAttachments ??= sourceAttachments.map((item) => ({ ...item }));
+      updatedAttachments[index] = updatedAttachment;
+    }
+    if (caption) {
+      captionBlocks.push(
+        formatImageCaptionBlock(updatedAttachment ?? updatedAttachments?.[index] ?? attachment, caption),
+      );
+    } else {
+      fallbackImages.push(imageDataUrl);
+    }
+  }
+
+  content = appendImageCaptionBlocksToContent(content, captionBlocks);
+  return {
+    content,
+    images: fallbackImages,
+    files,
+    updatedAttachments,
+  };
 }
 
 /**
@@ -1388,7 +1537,9 @@ export async function generateRoutes(app: FastifyInstance) {
 
       // Store attachments in message extra if present
       if (input.attachments?.length && userMsg?.id) {
-        await chats.updateMessageExtra(userMsg.id, { attachments: input.attachments }).catch(releaseActiveGenerationAndRethrow);
+        await chats
+          .updateMessageExtra(userMsg.id, { attachments: input.attachments })
+          .catch(releaseActiveGenerationAndRethrow);
       }
 
       // Snapshot persona info for per-message persona tracking
@@ -1443,7 +1594,12 @@ export async function generateRoutes(app: FastifyInstance) {
       releaseActiveGeneration();
       return reply.status(400).send({ error: "No API connection configured for this chat" });
     }
-    let conn = await connections.getWithKey(connId).catch(releaseActiveGenerationAndRethrow);
+    const resolveGenerationConnection = async (connectionId: string) =>
+      connectionId === LOCAL_SIDECAR_CONNECTION_ID
+        ? createLocalSidecarGenerationConnection()
+        : await connections.getWithKey(connectionId).catch(releaseActiveGenerationAndRethrow);
+
+    let conn = await resolveGenerationConnection(connId);
     if (!conn && impersonateConnectionOverride && connId === impersonateConnectionOverride && fallbackConnectionId) {
       logger.warn(
         "[generate] Impersonate connection override %s was not found; falling back to chat/request connection",
@@ -1459,7 +1615,7 @@ export async function generateRoutes(app: FastifyInstance) {
         const picked = pool[Math.floor(Math.random() * pool.length)];
         connId = picked.id;
       }
-      conn = connId ? await connections.getWithKey(connId).catch(releaseActiveGenerationAndRethrow) : null;
+      conn = connId ? await resolveGenerationConnection(connId) : null;
     }
     if (!conn) {
       releaseActiveGeneration();
@@ -1477,6 +1633,71 @@ export async function generateRoutes(app: FastifyInstance) {
       normalizePromptTimeZone(chatMeta.promptTimeZone) ?? normalizePromptTimeZone(input.userTimeZone);
     const promptNow = toZonedWallClockDate(new Date(), promptTimeZone);
     const excludePastReasoning = chatMeta.excludePastReasoning !== false;
+    const imageCaptioningRuntime: ImageCaptioningRuntime = await (async () => {
+      if (chatMeta.imageCaptioningEnabled !== true) return DISABLED_IMAGE_CAPTIONING;
+      try {
+        const configuredConnectionId =
+          typeof chatMeta.imageCaptioningConnectionId === "string" && chatMeta.imageCaptioningConnectionId.trim()
+            ? chatMeta.imageCaptioningConnectionId.trim()
+            : null;
+        const fallbackCaptionConnectionId = configuredConnectionId ?? connId;
+        if (!fallbackCaptionConnectionId) return DISABLED_IMAGE_CAPTIONING;
+        let captionConnectionId = fallbackCaptionConnectionId;
+        if (captionConnectionId === "random") {
+          const pool = await connections.listRandomPool();
+          if (!pool.length) {
+            logger.warn("[image-captioning] Random captioning connection requested but random pool is empty");
+            return DISABLED_IMAGE_CAPTIONING;
+          }
+          const randomCaptionConnectionId = pool[Math.floor(Math.random() * pool.length)]?.id;
+          if (!randomCaptionConnectionId) {
+            logger.warn("[image-captioning] Random captioning connection resolved without an id");
+            return DISABLED_IMAGE_CAPTIONING;
+          }
+          captionConnectionId = randomCaptionConnectionId;
+        }
+
+        const captionConnection =
+          captionConnectionId === LOCAL_SIDECAR_CONNECTION_ID
+            ? createLocalSidecarGenerationConnection()
+            : await connections.getWithKey(captionConnectionId);
+        if (!captionConnection?.model) {
+          logger.warn("[image-captioning] Captioning connection %s was not found", captionConnectionId);
+          return DISABLED_IMAGE_CAPTIONING;
+        }
+
+        let captionProvider: BaseLLMProvider;
+        if (captionConnectionId === LOCAL_SIDECAR_CONNECTION_ID) {
+          captionProvider = getLocalSidecarProvider();
+        } else {
+          const captionBaseUrl = resolveBaseUrl(captionConnection);
+          if (!captionBaseUrl) {
+            logger.warn("[image-captioning] Captioning connection %s has no base URL", captionConnectionId);
+            return DISABLED_IMAGE_CAPTIONING;
+          }
+          captionProvider = createLLMProvider(
+            captionConnection.provider,
+            captionBaseUrl,
+            captionConnection.apiKey,
+            captionConnection.maxContext,
+            captionConnection.openrouterProvider,
+            captionConnection.maxTokensOverride,
+            captionConnection.claudeFastMode === "true",
+            captionConnection.treatAsLocalEndpoint === "true",
+          );
+        }
+
+        return {
+          enabled: true,
+          connectionId: captionConnectionId,
+          connection: captionConnection,
+          provider: captionProvider,
+        };
+      } catch (error) {
+        logger.warn(error, "[image-captioning] Failed to resolve captioning connection; sending images normally");
+        return DISABLED_IMAGE_CAPTIONING;
+      }
+    })();
     let memoryRecallEmbeddingSource: Awaited<ReturnType<typeof resolveMemoryRecallEmbeddingSource>> | null = null;
     try {
       memoryRecallEmbeddingSource = await resolveMemoryRecallEmbeddingSource(app.db, {
@@ -1510,8 +1731,10 @@ export async function generateRoutes(app: FastifyInstance) {
     let generationComplete = false;
     let clientDisconnected = false;
     const originalSseWrite = reply.raw.write.bind(reply.raw);
+    const canWriteSse = () =>
+      !clientDisconnected && !reply.raw.destroyed && !reply.raw.writableEnded && !reply.raw.writableFinished;
     reply.raw.write = ((chunk: any, encodingOrCallback?: any, callback?: any) => {
-      if (clientDisconnected || reply.raw.destroyed) return false;
+      if (!canWriteSse()) return false;
       try {
         return originalSseWrite(chunk, encodingOrCallback, callback);
       } catch {
@@ -1521,8 +1744,8 @@ export async function generateRoutes(app: FastifyInstance) {
     const stopSseKeepalive = startSseKeepalive(reply);
 
     const onClose = () => {
-      if (generationComplete) return;
       clientDisconnected = true;
+      if (generationComplete) return;
       if (!shouldAbortOnPassiveGenerationDisconnect({ chatMode: requestChatMode, impersonate: input.impersonate })) {
         logger.info("[generate] Conversation client disconnected; generation will continue for chat: %s", input.chatId);
         return;
@@ -1624,7 +1847,30 @@ export async function generateRoutes(app: FastifyInstance) {
           return;
         }
         if (regenMsg.role === "user") {
-          regenerateUserSourceMessage = buildUserMessageRegenerationSourceMessage(regenMsg);
+          const attachments = normalizePromptAttachments(regenMsg.extra);
+          const attachmentInputs = await resolvePromptAttachmentInputs({
+            content: typeof regenMsg.content === "string" ? regenMsg.content : "",
+            attachments,
+            imageCaptioning: imageCaptioningRuntime,
+            signal: abortController.signal,
+          });
+          if (typeof regenMsg.id === "string" && attachmentInputs.updatedAttachments) {
+            try {
+              await chats.updateMessageExtra(regenMsg.id, { attachments: attachmentInputs.updatedAttachments });
+              regenMsg.extra = {
+                ...parseExtra(regenMsg.extra),
+                attachments: attachmentInputs.updatedAttachments,
+              };
+            } catch (error) {
+              logger.warn(error, "[image-captioning] Failed to cache image captions for message %s", regenMsg.id);
+            }
+          }
+          regenerateUserSourceMessage = {
+            role: "user",
+            content: attachmentInputs.content,
+            ...(attachmentInputs.images.length ? { images: attachmentInputs.images } : {}),
+            ...(attachmentInputs.files.length ? { files: attachmentInputs.files } : {}),
+          };
         }
         chatMessages = chatMessages.filter((m: any) => m.id !== input.regenerateMessageId);
         lorebookKeeperMessages = lorebookKeeperMessages.filter((m: any) => m.id !== input.regenerateMessageId);
@@ -1659,12 +1905,20 @@ export async function generateRoutes(app: FastifyInstance) {
       }
 
       const isGoogleProvider = conn.provider === "google" || conn.provider === "google_vertex";
-
-      const mappedMessages = chatMessages.map((m: any) => {
+      const persistPromptAttachmentCaptions = async (
+        messageId: string | null,
+        updatedAttachments: PromptAttachment[] | null,
+      ) => {
+        if (!messageId || !updatedAttachments) return;
+        try {
+          await chats.updateMessageExtra(messageId, { attachments: updatedAttachments });
+        } catch (error) {
+          logger.warn(error, "[image-captioning] Failed to cache image captions for message %s", messageId);
+        }
+      };
+      const mapChatHistoryMessageForPrompt = async (m: any): Promise<GenerationPromptMessage> => {
         const extra = parseExtra(m.extra);
-        const attachments = extra.attachments as PromptAttachment[] | undefined;
-        const images = extractImageAttachmentDataUrls(attachments);
-        const files = extractFileAttachmentInputs(attachments);
+        const attachments = normalizePromptAttachments(m.extra);
         const providerMetadata: Record<string, unknown> = {};
         // For Google connections, carry stored Gemini parts (thought signatures) on assistant messages
         if (!excludePastReasoning && isGoogleProvider && m.role === "assistant" && extra.geminiParts) {
@@ -1684,7 +1938,17 @@ export async function generateRoutes(app: FastifyInstance) {
         // so the model is aware it sent a photo in prior turns.
         // Skip illustration/selfie attachments (type "image") — those are generated
         // by agents and should be invisible to the main model.
-        let content = appendReadableAttachmentsToContent(conversationPromptHistoryContent(m, chatMode), attachments);
+        const attachmentInputs = await resolvePromptAttachmentInputs({
+          content: conversationPromptHistoryContent(m, chatMode),
+          attachments,
+          imageCaptioning: imageCaptioningRuntime,
+          signal: abortController.signal,
+        });
+        await persistPromptAttachmentCaptions(
+          typeof m.id === "string" ? m.id : null,
+          attachmentInputs.updatedAttachments,
+        );
+        let content = attachmentInputs.content;
         const userUploadedImages = attachments?.filter((a) => a.type?.startsWith("image/"));
         if (m.role === "assistant" && userUploadedImages?.length) {
           const photoName = userUploadedImages[0]?.filename ?? userUploadedImages[0]?.name;
@@ -1692,19 +1956,25 @@ export async function generateRoutes(app: FastifyInstance) {
         }
 
         return {
+          id: typeof m.id === "string" ? m.id : null,
           role: m.role === "narrator" ? ("system" as const) : (m.role as "user" | "assistant" | "system"),
           content,
           contextKind: "history" as const,
           characterId: typeof m.characterId === "string" && m.characterId ? m.characterId : null,
-          ...(images?.length ? { images } : {}),
-          ...(files.length ? { files } : {}),
+          ...(attachmentInputs.images.length ? { images: attachmentInputs.images } : {}),
+          ...(attachmentInputs.files.length ? { files: attachmentInputs.files } : {}),
           ...(Object.keys(providerMetadata).length ? { providerMetadata } : {}),
         };
-      });
+      };
+
+      const mappedMessages: GenerationPromptMessage[] = [];
+      for (const message of chatMessages) {
+        mappedMessages.push(await mapChatHistoryMessageForPrompt(message));
+      }
 
       // Attach current request's provider inputs to the last user message (they're already saved in extra,
       // but the message was just created and may be the last in mappedMessages)
-      if (input.attachments?.length && !input.impersonate) {
+      if (!imageCaptioningRuntime.enabled && input.attachments?.length && !input.impersonate) {
         const imageAttachments = extractImageAttachmentDataUrls(input.attachments);
         const fileAttachments = extractFileAttachmentInputs(input.attachments);
         if (imageAttachments.length || fileAttachments.length) {
@@ -1814,12 +2084,15 @@ export async function generateRoutes(app: FastifyInstance) {
         }
       }
       const selectedPresetDiffersFromChat = !!resolvedPreset && !!presetId && presetId !== chatPromptPresetId;
-      const overrideDefaultChoices =
-        selectedPresetDiffersFromChat && presetSource !== "chat"
-          ? (parsePromptPresetChoices((resolvedPreset as { defaultChoices?: unknown }).defaultChoices) ?? {})
-          : null;
+      const resolvedPresetDefaultChoices =
+        resolvedPreset ? (parsePromptPresetChoices((resolvedPreset as { defaultChoices?: unknown }).defaultChoices) ?? {}) : {};
       const chatChoices: Record<string, string | string[]> =
-        overrideDefaultChoices ?? ((chatMeta.presetChoices ?? {}) as Record<string, string | string[]>);
+        resolveGenerationPromptPresetChoices({
+          presetSource,
+          selectedPresetDiffersFromChat,
+          presetDefaultChoices: resolvedPresetDefaultChoices,
+          chatPresetChoices: (chatMeta.presetChoices ?? {}) as Record<string, string | string[]>,
+        });
       let groupHistoryCharacterNamesByIdPromise: Promise<Map<string, string>> | null = null;
       const getGroupHistoryCharacterNamesById = () => {
         groupHistoryCharacterNamesByIdPromise ??= resolveCharacterNameMap(allCharacterIds, (id) => chars.getById(id));
@@ -1987,21 +2260,13 @@ export async function generateRoutes(app: FastifyInstance) {
           chatMode !== "conversation" &&
           chatMode !== "game" &&
           promptGroupChatMode === "individual";
-        const modePromptChoiceBlocks =
-          presetId && resolvedPreset && (chatMode === "conversation" || chatMode === "game")
-            ? await presets.listChoiceBlocksForPreset(presetId)
-            : [];
-        const modePromptVariables = resolveModePromptChoiceVariables(
-          modePromptChoiceBlocks as PromptChoiceBlockRow[],
-          chatChoices,
-        );
         const promptMacroContext = await buildPromptMacroContext({
           db: app.db,
           characterIds: promptCharacterIds,
           personaName,
           personaDescription,
           personaFields,
-          variables: modePromptVariables,
+          variables: {},
           groupScenarioOverrideText:
             typeof chatMeta.groupScenarioText === "string" && (chatMeta.groupScenarioText as string).trim()
               ? (chatMeta.groupScenarioText as string).trim()
@@ -2041,13 +2306,15 @@ export async function generateRoutes(app: FastifyInstance) {
         if (followUpIteration === 0) {
           const regexScripts = await getPromptRegexScripts();
           applyRegexScriptsToPromptMessages(mappedMessages, regexScripts, {
-            resolveMacros: (value) => resolveMacros(value, promptMacroContext, { trimResult: false }),
+            resolveMacros: (value, randomSeed) =>
+              resolveMacros(value, promptMacroContext, { trimResult: false, randomSeed }),
             targetCharacterId: promptTargetCharacterId,
           });
           if (regenerateUserSourceMessage) {
             const sourceMessages = [regenerateUserSourceMessage];
             applyRegexScriptsToPromptMessages(sourceMessages, regexScripts, {
-              resolveMacros: (value) => resolveMacros(value, promptMacroContext, { trimResult: false }),
+              resolveMacros: (value, randomSeed) =>
+                resolveMacros(value, promptMacroContext, { trimResult: false, randomSeed }),
               targetCharacterId: promptTargetCharacterId,
             });
           }
@@ -2132,33 +2399,37 @@ export async function generateRoutes(app: FastifyInstance) {
         sendProgress("embedding");
         const _tEmbed = Date.now();
         let chatContextEmbedding: number[] | null = null;
+        let lorebookSemanticEmbeddingsById: Map<string, number[] | null> | undefined;
         const knowledgeRouterActivatedLorebookEntryIds = new Set<string>();
         const knowledgeRouterExcludedLorebookEntryIds = new Set<string>();
         let knowledgeRouterActivationPassCompleted = false;
         try {
-          const activeEntries = (await lorebooksStore.listActiveEntries({
+          const lorebookScopeFilters = {
             chatId: input.chatId,
             characterIds: promptCharacterIds,
             personaId,
             activeLorebookIds: chatActiveLorebookIds,
             excludedLorebookIds: lorebookScopeExclusions.excludedLorebookIds,
             excludedSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
+          };
+          const activeEntries = (await lorebooksStore.listActiveEntries({
+            ...lorebookScopeFilters,
           })) as LorebookEntry[];
           const hasVectorizedEntries = activeEntries.some(
             (entry) => Array.isArray(entry.embedding) && entry.embedding.length > 0,
           );
           if (hasVectorizedEntries && memoryRecallVectorizerAvailable) {
-            const recentMsgs = currentInputMessages()
-              .slice(-10)
-              .map((m) => m.content)
-              .join("\n");
-            if (recentMsgs.trim()) {
-              const embeddings = await embedMemoryRecallTexts([recentMsgs], {
-                embeddingSource: memoryRecallEmbeddingSource,
-                signal: abortController.signal,
-              });
-              chatContextEmbedding = embeddings[0] ?? null;
-            }
+            const allLorebooks = (await lorebooksStore.list()) as unknown as Lorebook[];
+            const relevantLorebooks = filterRelevantLorebooks(allLorebooks, lorebookScopeFilters) as Lorebook[];
+            const semanticEmbeddings = await buildLorebookSemanticEmbeddingsById({
+              lorebooks: relevantLorebooks,
+              entries: activeEntries,
+              scanMessages: toLorebookScanMessages(),
+              embeddingSource: memoryRecallEmbeddingSource,
+              signal: abortController.signal,
+            });
+            chatContextEmbedding = semanticEmbeddings.defaultEmbedding;
+            lorebookSemanticEmbeddingsById = semanticEmbeddings.embeddingsByLorebookId;
           }
         } catch {
           // Embedding generation is optional — if it fails, fall back to keyword-only matching
@@ -2236,6 +2507,7 @@ export async function generateRoutes(app: FastifyInstance) {
             excludedLorebookSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
             lorebookTokenBudget: resolveLorebookTokenBudget(chatMeta),
             chatEmbedding: chatContextEmbedding,
+            semanticEmbeddingsByLorebookId: lorebookSemanticEmbeddingsById,
             entryStateOverrides:
               (chatMeta.entryStateOverrides as Record<string, { ephemeral?: number | null; enabled?: boolean }>) ??
               undefined,
@@ -2513,20 +2785,10 @@ export async function generateRoutes(app: FastifyInstance) {
               if (contextMessageLimit && contextMessageLimit > 0 && chatMessages.length > contextMessageLimit) {
                 chatMessages = chatMessages.slice(-contextMessageLimit);
               }
-              finalMessages = chatMessages.map((m: any) => {
-                const ex = parseExtra(m.extra);
-                const att = ex.attachments as PromptAttachment[] | undefined;
-                const imgs = extractImageAttachmentDataUrls(att);
-                const files = extractFileAttachmentInputs(att);
-                return {
-                  role: m.role === "narrator" ? ("system" as const) : (m.role as "user" | "assistant" | "system"),
-                  content: appendReadableAttachmentsToContent(conversationPromptHistoryContent(m, chatMode), att),
-                  contextKind: "history" as const,
-                  characterId: typeof m.characterId === "string" && m.characterId ? m.characterId : null,
-                  ...(imgs?.length ? { images: imgs } : {}),
-                  ...(files.length ? { files } : {}),
-                };
-              });
+              finalMessages = [];
+              for (const message of chatMessages) {
+                finalMessages.push(await mapChatHistoryMessageForPrompt(message));
+              }
               finalMessages = resolveHistoryMessageMacros(finalMessages);
             }
             // Send "typing" event — client switches to "X is typing..."
@@ -2680,7 +2942,7 @@ export async function generateRoutes(app: FastifyInstance) {
           const hasNewSummaries =
             Object.keys(summaryRun.newlyGeneratedDays).length > 0 ||
             Object.keys(summaryRun.newlyConsolidatedWeeks).length > 0;
-          if (hasNewSummaries) {
+          if (hasNewSummaries || summaryRun.summaryFailureMetadataChanged) {
             await chats.patchMetadata(input.chatId, (freshMeta) => {
               const existingDaySummaries = (freshMeta.daySummaries as Record<string, unknown> | undefined) ?? {};
               const existingWeekSummaries = (freshMeta.weekSummaries as Record<string, unknown> | undefined) ?? {};
@@ -2688,6 +2950,7 @@ export async function generateRoutes(app: FastifyInstance) {
                 ...freshMeta,
                 daySummaries: { ...existingDaySummaries, ...summaryRun.newlyGeneratedDays },
                 weekSummaries: { ...existingWeekSummaries, ...summaryRun.newlyConsolidatedWeeks },
+                conversationSummaryFailures: summaryRun.summaryFailures,
               };
             });
             chatMeta.daySummaries = {
@@ -2698,6 +2961,7 @@ export async function generateRoutes(app: FastifyInstance) {
               ...((chatMeta.weekSummaries as Record<string, unknown> | undefined) ?? {}),
               ...summaryRun.newlyConsolidatedWeeks,
             };
+            chatMeta.conversationSummaryFailures = summaryRun.summaryFailures;
           }
 
           const daySummaries = summaryRun.daySummaries;
@@ -3025,22 +3289,33 @@ export async function generateRoutes(app: FastifyInstance) {
                 `   - You invite {{user}} somewhere and they accept → trigger a scene for that activity.`,
                 `   - A plan is made (date, trip, hangout, confrontation) and the moment arrives → trigger a scene.`,
                 `   Do NOT wait for {{user}} to explicitly ask for a scene. If the conversation implies you and {{user}} are about to DO something together, initiate the scene yourself.`,
-                `   EXCEPTION: Do NOT start a scene for playing UNO, cards, or other board/table games — those have their own [uno] command. Use [uno], not [scene], for a game of UNO.`,
+                `   EXCEPTION: Do NOT start a scene for playing UNO, chess, cards, or other board/table games — those have their own commands. Use [uno] for UNO and [chess] for chess, not [scene].`,
               );
             }
 
-            // UNO turn-game — conversation mode only, when no game is running yet
+            // Turn-games — conversation mode only, when no game is running yet
             // and at least one other character is present to play with.
-            if (
+            const unoAdvertisable =
+              chatMode === "conversation" && isConversationCommandEnabled(chatMeta, "uno") && characterIds.length >= 1;
+            const chessAdvertisable =
               chatMode === "conversation" &&
-              isConversationCommandEnabled(chatMeta, "uno") &&
-              characterIds.length >= 1 &&
-              !(await getActiveTurnGame(app.db, input.chatId))
-            ) {
+              isConversationCommandEnabled(chatMeta, "chess") &&
+              characterIds.length >= 1;
+            // One lookup shared by both game commands (only when a game could be offered).
+            const noActiveTurnGame =
+              (unoAdvertisable || chessAdvertisable) && !(await getActiveTurnGame(app.db, input.chatId));
+            if (unoAdvertisable && noActiveTurnGame) {
               addCommandLines(
                 `- [uno] - start a game of UNO at the table. Include this ONLY when ${personaName} proposes playing UNO (or cards) and you are willing to play right now. The system deals the cards and runs the game — you do NOT narrate dealing or describe the hands.`,
                 `   If you are busy, tired, or simply don't feel like it, just say so in character and do NOT include [uno]. Agreeing to play IS including [uno].`,
                 `   Example: ${personaName} says "anyone up for a round of uno?" and you're in → "Oh, you're SO on. [uno]"`,
+              );
+            }
+            if (chessAdvertisable && noActiveTurnGame) {
+              addCommandLines(
+                `- [chess] - start a one-on-one chess game against ${personaName}. Include this ONLY when ${personaName} proposes playing chess and YOU are willing to play right now. Chess seats exactly two players: ${personaName} and you — whichever character includes [chess] takes the opponent's seat. The system sets up the board and runs the game — you do NOT describe the board or narrate setup.`,
+                `   If you'd rather not play, say so in character and do NOT include [chess]. Agreeing to play IS including [chess].`,
+                `   Example: ${personaName} says "up for a game of chess?" and you're in → "Prepare to lose your queen. [chess]"`,
               );
             }
 
@@ -3488,6 +3763,7 @@ export async function generateRoutes(app: FastifyInstance) {
               excludedSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
               tokenBudget: resolveLorebookTokenBudget(chatMeta),
               chatEmbedding: chatContextEmbedding,
+              semanticEmbeddingsByLorebookId: lorebookSemanticEmbeddingsById,
               entryStateOverrides:
                 (chatMeta.entryStateOverrides as Record<string, { ephemeral?: number | null; enabled?: boolean }>) ??
                 undefined,
@@ -3545,6 +3821,7 @@ export async function generateRoutes(app: FastifyInstance) {
             excludedSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
             tokenBudget: resolveLorebookTokenBudget(chatMeta),
             chatEmbedding: chatContextEmbedding,
+            semanticEmbeddingsByLorebookId: lorebookSemanticEmbeddingsById,
             entryStateOverrides:
               (chatMeta.entryStateOverrides as Record<string, { ephemeral?: number | null; enabled?: boolean }>) ??
               undefined,
@@ -3720,7 +3997,8 @@ export async function generateRoutes(app: FastifyInstance) {
             customThinkingTags = normalizeThinkingTagPairs(params.customThinkingTags);
           }
           customParameters = mergeCustomParameters(customParameters, params.customParameters);
-          if (params.enabledParameters) enabledParameters = { ...(enabledParameters ?? {}), ...params.enabledParameters };
+          if (params.enabledParameters)
+            enabledParameters = { ...(enabledParameters ?? {}), ...params.enabledParameters };
           if (Array.isArray(params.stopSequences)) {
             stopSequences = params.stopSequences.map((value) => value.trim()).filter((value) => value.length > 0);
           }
@@ -3839,16 +4117,19 @@ export async function generateRoutes(app: FastifyInstance) {
         const providerTopK = resolveProviderTopK(conn.provider, topK);
 
         // Create provider
-        const provider = createLLMProvider(
-          conn.provider,
-          baseUrl,
-          conn.apiKey,
-          conn.maxContext,
-          conn.openrouterProvider,
-          conn.maxTokensOverride,
-          conn.claudeFastMode === "true",
-          conn.treatAsLocalEndpoint === "true",
-        );
+        const provider =
+          connId === LOCAL_SIDECAR_CONNECTION_ID
+            ? getLocalSidecarProvider()
+            : createLLMProvider(
+                conn.provider,
+                baseUrl,
+                conn.apiKey,
+                conn.maxContext,
+                conn.openrouterProvider,
+                conn.maxTokensOverride,
+                conn.claudeFastMode === "true",
+                conn.treatAsLocalEndpoint === "true",
+              );
 
         const chatConnectionMaxParallelJobs = Number(conn.maxParallelJobs) || 1;
         const chatConnectionKnownModel = findKnownModel(conn.provider as APIProvider, conn.model.trim());
@@ -3869,6 +4150,9 @@ export async function generateRoutes(app: FastifyInstance) {
           chatCustomParameters: connectionParams?.customParameters ?? {},
           chatMaxOutputTokens: chatConnectionMaxOutputTokens,
           chatMaxParallelJobs: chatConnectionMaxParallelJobs,
+          chatEnableCaching: conn.enableCaching === "true",
+          chatAnthropicExtendedCacheTtl: conn.anthropicExtendedCacheTtl === "true",
+          chatCachingAtDepth: conn.cachingAtDepth ?? 5,
           activeMusicPlayerSource,
           chatMetadata: chatMeta,
           resolveBaseUrl,
@@ -4232,6 +4516,7 @@ export async function generateRoutes(app: FastifyInstance) {
                 excludedSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
                 tokenBudget: resolveLorebookTokenBudget(chatMeta),
                 chatEmbedding: chatContextEmbedding,
+                semanticEmbeddingsByLorebookId: lorebookSemanticEmbeddingsById,
                 entryStateOverrides:
                   (chatMeta.entryStateOverrides as Record<string, { ephemeral?: number | null; enabled?: boolean }>) ??
                   undefined,
@@ -4381,6 +4666,7 @@ export async function generateRoutes(app: FastifyInstance) {
             contextLimit: suppressModelParameters ? undefined : (effectiveMaxContext ?? connectionMaxContext),
             sendProgress,
             signal: abortController.signal,
+            resolveMacros: (value) => resolveMacros(value, promptMacroContext, { trimResult: false }),
           });
         }
 
@@ -4427,10 +4713,7 @@ export async function generateRoutes(app: FastifyInstance) {
 
         if (input.continueMessageId) {
           finalMessages.push({ role: "user" as const, content: CONTINUE_ASSISTANT_MESSAGE_PROMPT });
-          logger.debug(
-            "[generate] Injected continuation prompt for assistant message %s",
-            input.continueMessageId,
-          );
+          logger.debug("[generate] Injected continuation prompt for assistant message %s", input.continueMessageId);
         }
 
         // ── Group chat processing ──
@@ -5199,7 +5482,7 @@ export async function generateRoutes(app: FastifyInstance) {
           baseToolExecutionContext,
           updateChatMetadataForTools,
         } = await resolveGenerationTools({
-          requestBody: req.body as Record<string, unknown>,
+          requestBody: input as Record<string, unknown>,
           chatId: input.chatId,
           chatMetadata: chatMeta,
           chats,
@@ -5675,18 +5958,23 @@ export async function generateRoutes(app: FastifyInstance) {
                   r.agentType !== "knowledge-router" &&
                   r.agentType !== "secret-plot-driver",
               );
-              const failedRegen = regenPreGenResults.filter((r) => !r.success);
-              if (failedRegen.length > 0) {
-                const failedNames = failedRegen.map((r) => r.agentType).join(", ");
-                const firstError = failedRegen[0]!.error ?? "unknown error";
+              const criticalFailedRegen = regenPreGenResults.filter((r) => !r.success && r.type === "secret_plot");
+              const nonCriticalFailedRegen = regenPreGenResults.filter((r) => !r.success && r.type !== "secret_plot");
+              if (criticalFailedRegen.length > 0) {
+                const failedNames = criticalFailedRegen.map((r) => r.agentType).join(", ");
+                const firstError = criticalFailedRegen[0]!.error ?? "unknown error";
                 logger.error(
-                  `[pre-gen] FATAL: ${failedRegen.length} agent(s) failed on regen (${failedNames}) — aborting generation`,
+                  `[pre-gen] FATAL: critical agent(s) failed on regen (${failedNames}) — aborting generation`,
                 );
                 sendSseEvent(reply, {
                   type: "error",
-                  data: `Pre-generation agent${failedRegen.length > 1 ? "s" : ""} failed (${failedNames}): ${firstError}. Please try again.`,
+                  data: `Critical pre-generation agent failed (${failedNames}): ${firstError}. Please try again.`,
                 });
                 return;
+              }
+              if (nonCriticalFailedRegen.length > 0) {
+                const failedNames = nonCriticalFailedRegen.map((r) => r.agentType).join(", ");
+                logger.warn(`[pre-gen] Non-critical agent(s) failed on regen (${failedNames}) — continuing generation`);
               }
             }
           }
@@ -5745,19 +6033,6 @@ export async function generateRoutes(app: FastifyInstance) {
           }
         }
 
-        // Static injection: Immersive HTML is a prompt directive, not a runtime LLM agent.
-        const immersiveHtmlResult = await applyImmersiveHtmlPromptInjection({
-          chatMode,
-          enableAgents: chatEnableAgents,
-          activeAgentIds: chatActiveAgentIds,
-          wrapFormat,
-          messages: finalMessages,
-          getHtmlAgentConfig: () => agentsStore.getByType("html"),
-        });
-        if (immersiveHtmlResult) {
-          trySendSseEvent(reply, { type: "agent_result", data: immersiveHtmlResult });
-        }
-
         // ── Early exit if client disconnected during knowledge retrieval / injection ──
         if (abortController.signal.aborted) return;
 
@@ -5774,7 +6049,7 @@ export async function generateRoutes(app: FastifyInstance) {
             customPrompt: input.impersonatePromptTemplate || chatMeta.impersonatePrompt,
             direction: input.userMessage,
             personaName,
-            personaDescription,
+            personaDescription: resolvePromptMacros(personaDescription),
           });
           finalMessages.push({ role: "user", content: impersonateInstruction });
         }
@@ -5800,6 +6075,7 @@ export async function generateRoutes(app: FastifyInstance) {
         let fullThinking = "";
         let providerThinking = "";
         let allResponses: string[] = [];
+        let continuedMessageRewriteSource: string | null = null;
         const generatedExpressionTargetIds = new Set<string>();
         const recordExpressionTarget = (savedMsg: any, fallbackCharacterId: string | null) => {
           const savedRole =
@@ -6016,10 +6292,20 @@ export async function generateRoutes(app: FastifyInstance) {
             );
           } catch (error) {
             if (abortController.signal.aborted) return [];
-            logger.warn({ err: error, chatId: input.chatId }, "[group-smart] Selector failed; aborting generation");
+            logger.warn({ err: error, chatId: input.chatId }, "[group-smart] Selector failed; using fallback");
           }
 
           return [];
+        };
+
+        const selectFallbackSmartGroupResponder = (): string[] => {
+          const lastAssistantCharacterId = [...chatMessages]
+            .reverse()
+            .find((message: any) => message.role === "assistant" && typeof message.characterId === "string")
+            ?.characterId as string | undefined;
+          const fallback =
+            charInfo.find((character) => character.id !== lastAssistantCharacterId)?.id ?? charInfo[0]?.id ?? null;
+          return fallback ? [fallback] : [];
         };
 
         // ── Determine characters to generate for ──
@@ -6036,10 +6322,22 @@ export async function generateRoutes(app: FastifyInstance) {
               )
             : [];
 
-        const smartResponseQueue =
+        const needsSmartResponseQueue = useIndividualLoop && groupResponseOrder === "smart" && !input.forCharacterId;
+        let smartResponseQueue =
           useIndividualLoop && groupResponseOrder === "smart" && !input.forCharacterId
             ? await selectSmartGroupResponders()
             : null;
+
+        if (needsSmartResponseQueue && (!smartResponseQueue || smartResponseQueue.length === 0)) {
+          smartResponseQueue = selectFallbackSmartGroupResponder();
+          if (smartResponseQueue.length > 0) {
+            logger.warn(
+              "[group-smart] Falling back to %s for chat %s after selector produced no queue",
+              charInfo.find((character) => character.id === smartResponseQueue?.[0])?.name ?? smartResponseQueue[0],
+              input.chatId,
+            );
+          }
+        }
 
         if (smartResponseQueue && smartResponseQueue.length > 0) {
           sendSseEvent(reply, {
@@ -6115,7 +6413,8 @@ export async function generateRoutes(app: FastifyInstance) {
               : scopedMessagesForGen;
           if (!promptTargetCharacterId && targetCharId) {
             applyRegexScriptsToPromptMessages(targetScopedMessagesForGen, await getPromptRegexScripts(), {
-              resolveMacros: (value) => resolveMacros(value, promptMacroContext, { trimResult: false }),
+              resolveMacros: (value, randomSeed) =>
+                resolveMacros(value, promptMacroContext, { trimResult: false, randomSeed }),
               targetCharacterId: targetCharId,
               targetedOnly: true,
             });
@@ -6342,6 +6641,7 @@ export async function generateRoutes(app: FastifyInstance) {
                   stop: stopSequences.length ? stopSequences : undefined,
                   tools: toolDefs,
                   enableCaching: conn.enableCaching === "true",
+                  anthropicExtendedCacheTtl: conn.anthropicExtendedCacheTtl === "true",
                   cachingAtDepth: conn.cachingAtDepth ?? 5,
                   enableThinking,
                   captureReasoning,
@@ -6497,6 +6797,7 @@ export async function generateRoutes(app: FastifyInstance) {
                   minP: minP || undefined,
                   stop: stopSequences.length ? stopSequences : undefined,
                   enableCaching: conn.enableCaching === "true",
+                  anthropicExtendedCacheTtl: conn.anthropicExtendedCacheTtl === "true",
                   cachingAtDepth: conn.cachingAtDepth ?? 5,
                   enableThinking,
                   captureReasoning,
@@ -6553,6 +6854,7 @@ export async function generateRoutes(app: FastifyInstance) {
               stop: stopSequences.length ? stopSequences : undefined,
               stream: input.streaming,
               enableCaching: conn.enableCaching === "true",
+              anthropicExtendedCacheTtl: conn.anthropicExtendedCacheTtl === "true",
               cachingAtDepth: conn.cachingAtDepth ?? 5,
               enableThinking,
               captureReasoning,
@@ -6592,7 +6894,10 @@ export async function generateRoutes(app: FastifyInstance) {
                 result = await gen.next();
               }
               // Generator return value contains usage
-              if (result.value) usage = result.value;
+              if (result.value) {
+                usage = result.value;
+                finishReason = usage.finishReason ?? finishReason;
+              }
             } catch (err) {
               if (abortController.signal.aborted || isAbortLikeError(err)) {
                 return null;
@@ -6717,8 +7022,7 @@ export async function generateRoutes(app: FastifyInstance) {
             // Merged group conversations carry multiple characters' turns in one
             // response; attribute each command to its speaker so e.g. a [selfie]
             // renders the character that took it, not always the first one.
-            const useSpeakerAttribution =
-              isGroupChat && groupChatMode === "merged" && chatMode === "conversation";
+            const useSpeakerAttribution = isGroupChat && groupChatMode === "merged" && chatMode === "conversation";
             const speakerParse = useSpeakerAttribution
               ? parseCharacterCommandsBySpeaker(fullResponse, charInfo, targetCharId)
               : null;
@@ -6932,7 +7236,7 @@ export async function generateRoutes(app: FastifyInstance) {
                 generationComplete = true;
               }
               if (chatMode === "conversation" && !input.regenerateMessageId) {
-                recordAssistantActivity(input.chatId, targetCharId ?? undefined);
+                recordAssistantActivity(input.chatId, input.autonomous ? (targetCharId ?? undefined) : undefined);
                 conversationAssistantSaved = true;
               }
               await recordSavedAutonomousGeneration(targetCharId);
@@ -6954,15 +7258,19 @@ export async function generateRoutes(app: FastifyInstance) {
 
           // Save assistant message (or user message for impersonate)
           let savedMsg: any;
+          let savedSwipeIndex: number | null = null;
           if (input.regenerateMessageId) {
-            savedMsg = await chats.addSwipe(input.regenerateMessageId, fullResponse);
+            const createdSwipe = await chats.addSwipe(input.regenerateMessageId, fullResponse);
+            savedSwipeIndex = createdSwipe.index;
             savedMsg = await chats.getMessage(input.regenerateMessageId);
           } else if (input.continueMessageId) {
             const targetMessage = (await chats.getMessage(input.continueMessageId)) ?? continueTargetMessage;
-            savedMsg = await chats.updateMessageContent(
-              input.continueMessageId,
-              appendContinuationMessageContent(targetMessage?.content, fullResponse),
-            );
+            continuedMessageRewriteSource = appendContinuationMessageContent(targetMessage?.content, fullResponse);
+            savedMsg = await chats.updateMessageContent(input.continueMessageId, continuedMessageRewriteSource);
+            savedSwipeIndex =
+              typeof savedMsg?.activeSwipeIndex === "number" && Number.isInteger(savedMsg.activeSwipeIndex)
+                ? savedMsg.activeSwipeIndex
+                : 0;
           } else {
             savedMsg = await chats.createMessage({
               chatId: input.chatId,
@@ -6970,12 +7278,13 @@ export async function generateRoutes(app: FastifyInstance) {
               characterId: input.impersonate ? null : targetCharId,
               content: fullResponse,
             });
+            savedSwipeIndex = 0;
           }
           if (markGenerationCommitted && savedMsg?.id) {
             generationComplete = true;
           }
           if (chatMode === "conversation" && !input.impersonate && !input.regenerateMessageId) {
-            recordAssistantActivity(input.chatId, targetCharId ?? undefined);
+            recordAssistantActivity(input.chatId, input.autonomous ? (targetCharId ?? undefined) : undefined);
             await recordSavedAutonomousGeneration(targetCharId);
             conversationAssistantSaved = true;
           }
@@ -7011,6 +7320,7 @@ export async function generateRoutes(app: FastifyInstance) {
             else extraUpdate.thinking = null;
             // Store Gemini response parts (thought signatures + summaries) for multi-turn continuity
             if (geminiResponseParts) extraUpdate.geminiParts = geminiResponseParts;
+            else extraUpdate.geminiParts = null;
             // Store Chat Completions reasoning fields for providers that require replay (DeepSeek/OpenRouter)
             if (chatCompletionsReasoning) extraUpdate.chatCompletionsReasoning = chatCompletionsReasoning;
             else extraUpdate.chatCompletionsReasoning = null;
@@ -7032,12 +7342,10 @@ export async function generateRoutes(app: FastifyInstance) {
             extraUpdate.chatSummaryFingerprint = fingerprintChatSummary(chatMeta.summary);
             const persistentAttachments = resolveUserRegenerationPersistentAttachments(regenMsg ?? {});
             if (persistentAttachments) extraUpdate.attachments = persistentAttachments;
-            await chats.updateMessageExtra(savedMsg.id, extraUpdate);
-            // Also persist on the active swipe so switching swipes preserves per-swipe extras
-            const refreshedMsg = await chats.getMessage(savedMsg.id);
-            if (refreshedMsg) {
-              await chats.updateSwipeExtra(savedMsg.id, refreshedMsg.activeSwipeIndex, extraUpdate);
-            }
+            const refreshedMsg =
+              savedSwipeIndex !== null
+                ? await chats.updateMessageExtraForSwipe(savedMsg.id, savedSwipeIndex, extraUpdate)
+                : await chats.updateMessageExtra(savedMsg.id, extraUpdate);
 
             const savedMessagePayload =
               holdForProseGuardianRewrite && !input.impersonate
@@ -7172,20 +7480,7 @@ export async function generateRoutes(app: FastifyInstance) {
         // (firstSavedMsg/lastSavedMsg/collectedCommands/collectedOocMessages
         // are declared above the follow-up loop so they survive iterations.)
 
-        const rawGenerationGuide = typeof input.generationGuide === "string" ? input.generationGuide.trim() : "";
-        const normalizedGenerationGuide = rawGenerationGuide
-          ? resolveMacros(
-              rawGenerationGuide,
-              {
-                ...promptMacroContext,
-                variables: { ...promptMacroContext.variables },
-              },
-              { trimResult: false },
-            ).trim()
-          : "";
-        const generationGuideInstruction = normalizedGenerationGuide
-          ? `Take the following into special consideration for your next message: ${normalizedGenerationGuide}`
-          : null;
+        const generationGuideInstruction = buildGenerationGuideInstruction(input.generationGuide, promptMacroContext);
         const filterManualTargetProfileBlocks = (messages: typeof finalMessages, targetCharId: string) => {
           if (groupResponseOrder !== "manual") return messages;
           const otherNames = charInfo.filter((c) => c.id !== targetCharId).map((c) => c.name);
@@ -7260,12 +7555,22 @@ export async function generateRoutes(app: FastifyInstance) {
             collectedOocMessages.push(...genResult.oocMessages);
 
             // Add this character's response to the running context for the next character
-            runningMessages.push({
+            const inTurnMessage = {
               role: "assistant",
               content: genResult.response,
               contextKind: "history",
               characterId: charId,
-            });
+            } as const;
+            if (shouldPrefixGroupHistorySpeakers) {
+              const characterNamesById = await getGroupHistoryCharacterNamesById();
+              const [prefixed] = prefixGroupIndividualHistorySpeakers([inTurnMessage], {
+                personaName,
+                characterNamesById,
+              });
+              runningMessages.push(prefixed ?? inTurnMessage);
+            } else {
+              runningMessages.push(inTurnMessage);
+            }
           }
         } else {
           // Single/merged: one generation
@@ -7415,7 +7720,10 @@ export async function generateRoutes(app: FastifyInstance) {
             typeof chatMeta.lastAutomaticSummaryMessageId === "string" && chatMeta.lastAutomaticSummaryMessageId.trim()
               ? chatMeta.lastAutomaticSummaryMessageId.trim()
               : null;
-          const messagesSinceLastSummary = countUserMessagesAfterAnchor(freshMessages, lastAutomaticSummaryMessageId);
+          const messagesSinceLastSummary = countUserMessagesAfterSummaryAnchor(
+            freshMessages,
+            lastAutomaticSummaryMessageId,
+          );
           const interval = clampRoleplaySummaryInterval(chatMeta.summaryRunInterval);
           if (messagesSinceLastSummary < interval) return;
 
@@ -8104,8 +8412,7 @@ export async function generateRoutes(app: FastifyInstance) {
                 }
                 try {
                   if (Object.keys(exprMap).length > 0) {
-                    await chats.updateMessageExtra(messageId, { spriteExpressions: exprMap });
-                    await chats.updateSwipeExtra(messageId, targetSwipeIndex, { spriteExpressions: exprMap });
+                    await chats.updateMessageExtraForSwipe(messageId, targetSwipeIndex, { spriteExpressions: exprMap });
                   }
                   if (Object.keys(personaExprMap).length > 0) {
                     const personaMessageId =
@@ -8125,8 +8432,9 @@ export async function generateRoutes(app: FastifyInstance) {
               const cyoaData = result.data as { choices?: Array<{ label: string; text: string }> };
               if (cyoaData.choices && cyoaData.choices.length > 0) {
                 try {
-                  await chats.updateMessageExtra(messageId, { cyoaChoices: cyoaData.choices });
-                  await chats.updateSwipeExtra(messageId, targetSwipeIndex, { cyoaChoices: cyoaData.choices });
+                  await chats.updateMessageExtraForSwipe(messageId, targetSwipeIndex, {
+                    cyoaChoices: cyoaData.choices,
+                  });
                 } catch {
                   /* non-critical */
                 }
@@ -8882,9 +9190,7 @@ export async function generateRoutes(app: FastifyInstance) {
                 const savedNegativePrompt = ((illustratorAgent?.settings?.imageNegativePrompt as string) ?? "").trim();
                 const chatGameImageConnectionId =
                   typeof chatMeta.gameImageConnectionId === "string" ? chatMeta.gameImageConnectionId.trim() : "";
-                const agentImageConnectionId = (
-                  (illustratorAgent?.settings?.imageConnectionId as string) ?? ""
-                ).trim();
+                const agentImageConnectionId = ((illustratorAgent?.settings?.imageConnectionId as string) ?? "").trim();
                 const imageConnectionOverride = chatGameImageConnectionId || agentImageConnectionId;
                 let imgConnFull = imageConnectionOverride
                   ? await connections.getWithKey(imageConnectionOverride)
@@ -8912,6 +9218,12 @@ export async function generateRoutes(app: FastifyInstance) {
                       const imgApiKey = imgConnFull.apiKey || "";
                       const imgSource = (imgConnFull as any).imageGenerationSource || imgModel;
                       const imgServiceHint = imgConnFull.imageService || imgSource;
+                      const suppressReferencePromptLine = isNovelAiImageConnection({
+                        model: imgModel,
+                        baseUrl: imgBaseUrl,
+                        imageService: imgServiceHint,
+                        imageGenerationSource: imgSource,
+                      });
                       const imageDefaults = resolveConnectionImageDefaults(imgConnFull);
                       const imageSettings = await loadImageGenerationUserSettings(app.db);
                       const styleProfileId =
@@ -8939,8 +9251,8 @@ export async function generateRoutes(app: FastifyInstance) {
 
                       logger.debug(`[illustrator] Starting image generation (${imgWidth}x${imgHeight})...`);
 
-                      // Collect optional character visual context. Prefer full-body
-                      // sprites for references, then fall back to avatar portraits.
+                      // Collect optional character visual context. Prefer avatar
+                      // portraits for references, then fall back to full-body sprites.
                       const useAvatarRefs =
                         typeof chatMeta.illustratorUseAvatarReferences === "boolean"
                           ? chatMeta.illustratorUseAvatarReferences
@@ -8985,7 +9297,7 @@ export async function generateRoutes(app: FastifyInstance) {
                         }
                         if (useAvatarRefs && referenceResolution.referenceImages.length > 0) {
                           illustratorRefImages = referenceResolution.referenceImages;
-                          if (referenceResolution.referenceLine)
+                          if (referenceResolution.referenceLine && !suppressReferencePromptLine)
                             fullPrompt += `\n\n${referenceResolution.referenceLine}`;
                           logger.debug(
                             "[illustrator] Sending %d character reference(s) for: %s",
@@ -9118,8 +9430,8 @@ export async function generateRoutes(app: FastifyInstance) {
 
           // ── Text rewrite/editing agents: run after ALL other agents ──
           if (textRewriteRunAgents.length > 0 && messageId && !abortController.signal.aborted) {
-            let currentResponseForRewrite = combinedResponse;
-            const originalResponseBeforeRewrite = combinedResponse;
+            let currentResponseForRewrite = continuedMessageRewriteSource ?? combinedResponse;
+            const originalResponseBeforeRewrite = currentResponseForRewrite;
             let textRewriteApplied = false;
 
             for (const textRewriteAgent of textRewriteRunAgents) {
@@ -9174,8 +9486,7 @@ export async function generateRoutes(app: FastifyInstance) {
                     ? (edData.changes as Array<{ description: string }>)
                     : [{ description: "Rewrote the assistant response." }];
                   const editNeededValue = edData.editNeeded;
-                  const strictEditNeeded =
-                    editorResult.agentType === "prose-guardian" || editorResult.agentType === "continuity";
+                  const strictEditNeeded = isBuiltInTextRewriteAgentType(editorResult.agentType);
                   const rewriteAllowed =
                     editNeededValue === false ? false : strictEditNeeded ? editNeededValue === true : true;
                   const droppedProtectedMarkup =
@@ -9456,6 +9767,12 @@ export async function generateRoutes(app: FastifyInstance) {
 
                       const imagePrompt = (promptResult.content ?? "").trim();
                       if (imagePrompt) {
+                        const suppressReferencePromptLine = isNovelAiImageConnection({
+                          model: imgConnFull.model,
+                          baseUrl: imgConnFull.baseUrl,
+                          imageService: imgConnFull.imageService,
+                          imageGenerationSource: (imgConnFull as any).imageGenerationSource,
+                        });
                         let finalSelfiePrompt = selfiePositivePrompt
                           ? `${imagePrompt}, ${selfiePositivePrompt}`
                           : imagePrompt;
@@ -9484,7 +9801,7 @@ export async function generateRoutes(app: FastifyInstance) {
                           });
                           if (referenceResolution.referenceImages.length > 0) {
                             selfieReferenceImages = referenceResolution.referenceImages;
-                            if (referenceResolution.referenceLine) {
+                            if (referenceResolution.referenceLine && !suppressReferencePromptLine) {
                               finalSelfiePrompt += `\n\n${referenceResolution.referenceLine}`;
                             }
                             logger.debug(
@@ -9839,10 +10156,14 @@ export async function generateRoutes(app: FastifyInstance) {
                           .trim()
                           .slice(0, 4000)
                       : "";
-                    const ensureSourceUserMessage = async (targetChatId: string, dedupePerTarget: boolean) => {
+                    const ensureSourceUserMessage = async (
+                      targetChatId: string,
+                      dedupePerTarget: boolean,
+                      chatStorage: typeof chats = chats,
+                    ) => {
                       if (!sourceUserMessage?.id || !sourceUserText) return null;
 
-                      const targetMessages = await chats.listMessages(targetChatId);
+                      const targetMessages = await chatStorage.listMessages(targetChatId);
                       const alreadyMirrored = targetMessages.some((m: any) => {
                         const extra = parseExtra(m.extra) as Record<string, unknown>;
                         if (
@@ -9855,14 +10176,14 @@ export async function generateRoutes(app: FastifyInstance) {
                       });
                       if (alreadyMirrored) return null;
 
-                      const userMsg = await chats.createMessage({
+                      const userMsg = await chatStorage.createMessage({
                         chatId: targetChatId,
                         role: "user",
                         characterId: null,
                         content: sourceUserText,
                       });
                       if (userMsg?.id) {
-                        await chats.updateMessageExtra(userMsg.id, {
+                        await chatStorage.updateMessageExtra(userMsg.id, {
                           roleplayDmSourceChatId: input.chatId,
                           roleplayDmSourceUserMessageId: sourceUserMessage.id,
                           roleplayDmTargetCharacterId: targetCharId,
@@ -9923,6 +10244,7 @@ export async function generateRoutes(app: FastifyInstance) {
                       return parseChatCharacterIdsForDm(candidate.characterIds).includes(targetCharId);
                     });
 
+                    const createdNewChat = !existingDmChat;
                     const targetChat =
                       existingDmChat ??
                       (await chats.create({
@@ -9936,24 +10258,43 @@ export async function generateRoutes(app: FastifyInstance) {
                       }));
                     if (!targetChat) throw new Error("Failed to create DM conversation");
 
-                    await chats.patchMetadata(targetChat.id, {
-                      dmOriginChatId: input.chatId,
-                      dmOriginChatName: chat.name ?? null,
-                      dmOriginMessageId: messageId || null,
-                      dmSourceUserMessageId: sourceUserMessage?.id ?? null,
-                      dmTargetCharacterId: targetCharId,
-                      roleplayDmThread: true,
-                    });
-                    const sourceUserDmMessage = await ensureSourceUserMessage(targetChat.id, true);
-                    const dmMessage = await chats.createMessage({
-                      chatId: targetChat.id,
-                      role: "assistant",
-                      characterId: targetCharId,
-                      content: messageText,
-                    });
-                    recordAssistantActivity(targetChat.id, targetCharId);
-
-                    const createdNewChat = !existingDmChat;
+                    let sourceUserDmMessage: Awaited<ReturnType<typeof chats.createMessage>> | null = null;
+                    let dmMessage: Awaited<ReturnType<typeof chats.createMessage>> | null = null;
+                    try {
+                      await chats.patchMetadata(targetChat.id, {
+                        dmOriginChatId: input.chatId,
+                        dmOriginChatName: chat.name ?? null,
+                        dmOriginMessageId: messageId || null,
+                        dmSourceUserMessageId: sourceUserMessage?.id ?? null,
+                        dmTargetCharacterId: targetCharId,
+                        roleplayDmThread: true,
+                      });
+                      sourceUserDmMessage = await ensureSourceUserMessage(targetChat.id, true);
+                      dmMessage = await chats.createMessage({
+                        chatId: targetChat.id,
+                        role: "assistant",
+                        characterId: targetCharId,
+                        content: messageText,
+                      });
+                      recordAssistantActivity(targetChat.id, targetCharId);
+                    } catch (dmWriteErr) {
+                      if (createdNewChat) {
+                        try {
+                          await chats.remove(targetChat.id);
+                          logger.warn(
+                            "[commands] Removed incomplete Roleplay DM conversation %s after failed setup",
+                            targetChat.id,
+                          );
+                        } catch (cleanupErr) {
+                          logger.error(
+                            cleanupErr,
+                            "[commands] Failed to remove incomplete Roleplay DM conversation %s",
+                            targetChat.id,
+                          );
+                        }
+                      }
+                      throw dmWriteErr;
+                    }
 
                     reply.raw.write(
                       `data: ${JSON.stringify({
@@ -10158,6 +10499,46 @@ export async function generateRoutes(app: FastifyInstance) {
                     }
                   } catch (unoErr) {
                     logger.error(unoErr, "[commands] UNO start failed");
+                  }
+                }
+
+                if (command.type === "chess") {
+                  // ── Chess: a character accepted a one-on-one challenge — set up the board ──
+                  try {
+                    const existingGame = await getActiveTurnGame(app.db, input.chatId);
+                    if (existingGame) {
+                      logger.info("[commands] chess requested but a game is already active in chat %s", input.chatId);
+                    } else if (!characterId) {
+                      logger.warn("[commands] chess requested without an agreeing character in chat %s", input.chatId);
+                    } else {
+                      // Chess seats exactly two players: the human persona and the
+                      // character who agreed (no schedule sweep — nobody else plays).
+                      const outcome = await startTurnGame(app.db, input.chatId, {
+                        gameType: "chess",
+                        botCharacterIds: [characterId],
+                        humanFirst: true,
+                      });
+                      if (outcome.ok) {
+                        reply.raw.write(
+                          `data: ${JSON.stringify({ type: "turn_game_state_patch", data: outcome.view })}\n\n`,
+                        );
+                        logger.info("[commands] chess started in chat %s against %s", input.chatId, characterId);
+                        // The default config assigns colors randomly from the seed — when the
+                        // bot drew white, play its opening move now instead of stalling.
+                        await runTurnGameBotTurns({
+                          db: app.db,
+                          chatId: input.chatId,
+                          conn,
+                          baseUrl,
+                          reply,
+                          signal: abortController.signal,
+                        });
+                      } else {
+                        logger.warn("[commands] chess start failed in chat %s: %s", input.chatId, outcome.error ?? "");
+                      }
+                    }
+                  } catch (chessErr) {
+                    logger.error(chessErr, "[commands] chess start failed");
                   }
                 }
 
@@ -10955,7 +11336,8 @@ export async function generateRoutes(app: FastifyInstance) {
               characterId: null,
             };
             applyRegexScriptsToPromptMessages([newMariMsg], await regexScriptsStore.list(), {
-              resolveMacros: (value) => resolveMacros(value, promptMacroContext, { trimResult: false }),
+              resolveMacros: (value, randomSeed) =>
+                resolveMacros(value, promptMacroContext, { trimResult: false, randomSeed }),
             });
             newMariMsg.content = newMariMsg.content.replace(/\n([ \t]*\n){2,}/g, "\n\n");
             runningMessagesForFollowUp.push(resolveHistoryMessageMacros([newMariMsg])[0] ?? newMariMsg);
@@ -11015,9 +11397,10 @@ export async function generateRoutes(app: FastifyInstance) {
           logger.info(
             `[generate] Posted ${collectedOocMessages.length} OOC message(s) to conversation ${chat.connectedChatId}`,
           );
-          reply.raw.write(
-            `data: ${JSON.stringify({ type: "ooc_posted", data: { chatId: chat.connectedChatId, count: collectedOocMessages.length } })}\n\n`,
-          );
+          trySendSseEvent(reply, {
+            type: "ooc_posted",
+            data: { chatId: chat.connectedChatId, count: collectedOocMessages.length },
+          });
         } catch (oocErr) {
           logger.error(oocErr, "[generate] Failed to post OOC messages");
         }
@@ -11058,7 +11441,7 @@ export async function generateRoutes(app: FastifyInstance) {
       stopSseKeepalive();
       reply.raw.off("close", onClose);
       releaseActiveGeneration();
-      if (!clientDisconnected && !reply.raw.destroyed) {
+      if (canWriteSse()) {
         reply.raw.end();
       }
     }

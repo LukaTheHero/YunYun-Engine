@@ -836,6 +836,8 @@ export function AgentEditor() {
   const isProseGuardianAgent = agentDetailId === "prose-guardian" || dbConfig?.type === "prose-guardian";
   // Continuity Checker agent — shares the rewrite reveal timing control.
   const isContinuityAgent = agentDetailId === "continuity" || dbConfig?.type === "continuity";
+  // Immersive HTML agent — shares the rewrite reveal timing control.
+  const isHtmlAgent = agentDetailId === "html" || dbConfig?.type === "html";
 
   // Detect when both knowledge agents are configured. Actual activation is
   // chat-scoped, but saving both with overlapping sources can still bloat the
@@ -1075,7 +1077,7 @@ export function AgentEditor() {
               holdForRewrite: localProseGuardianHoldForRewrite,
             }
           : {}),
-        ...(isContinuityAgent ? { holdForRewrite: localProseGuardianHoldForRewrite } : {}),
+        ...(isContinuityAgent || isHtmlAgent ? { holdForRewrite: localProseGuardianHoldForRewrite } : {}),
         ...(isDirectorAgent
           ? {
               directorMode: localDirectorMode,
@@ -1161,6 +1163,7 @@ export function AgentEditor() {
     isIllustratorAgent,
     isProseGuardianAgent,
     isContinuityAgent,
+    isHtmlAgent,
     isDirectorAgent,
     isMusicAgent,
     isKnowledgeRetrievalAgent,
@@ -1254,7 +1257,7 @@ export function AgentEditor() {
             holdForRewrite: localProseGuardianHoldForRewrite,
           }
         : {}),
-      ...(isContinuityAgent ? { holdForRewrite: localProseGuardianHoldForRewrite } : {}),
+      ...(isContinuityAgent || isHtmlAgent ? { holdForRewrite: localProseGuardianHoldForRewrite } : {}),
       ...(isDirectorAgent
         ? {
             directorMode: localDirectorMode,
@@ -2194,6 +2197,28 @@ export function AgentEditor() {
             </FieldGroup>
           )}
 
+          {isHtmlAgent && (
+            <FieldGroup
+              label="Immersive HTML Defaults"
+              icon={<FileText size="0.875rem" className="text-[var(--primary)]" />}
+              help="Choose whether Immersive HTML should hold the raw response until its post-processing rewrite pass finishes. Chat settings can override this for one chat."
+            >
+              <EditorSwitchRow
+                label="Hold message until rewrite"
+                checked={localProseGuardianHoldForRewrite}
+                onChange={() => {
+                  setLocalProseGuardianHoldForRewrite((value) => !value);
+                  markDirty();
+                }}
+                description={
+                  localProseGuardianHoldForRewrite
+                    ? "Show the working state, then reveal the HTML-enhanced message."
+                    : "Show the original response first, then replace it if Immersive HTML edits it."
+                }
+              />
+            </FieldGroup>
+          )}
+
           {/* ── Triggers After (Chat Summary agent) ── */}
           {(isCustomAgent || isNewCustomAgent) && customRunIntervalMeta && (
             <FieldGroup
@@ -2499,7 +2524,7 @@ export function AgentEditor() {
                 description={
                   localInjectAsSection
                     ? `"${localName}" appears as a section option in prompt presets`
-                    : "Agent output is not injected into prompts"
+                    : "Agent output won't be available as a marker in the preset editor."
                 }
                 labelClassName="text-sm"
               />

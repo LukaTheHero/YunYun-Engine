@@ -26,14 +26,14 @@ Install **Termux** from [F-Droid](https://f-droid.org/en/packages/com.termux/). 
 Open Termux and run:
 
 ```bash
-pkg update && pkg install -y git nodejs-lts && git clone https://github.com/Pasta-Devs/Marinara-Engine.git && cd Marinara-Engine && chmod +x start-termux.sh && ./start-termux.sh
+pkg update -y && pkg install -y git nodejs-lts && ([ -d "$HOME/Marinara-Engine/.git" ] || git clone https://github.com/Pasta-Devs/Marinara-Engine.git "$HOME/Marinara-Engine") && cd "$HOME/Marinara-Engine" && chmod +x start-termux.sh && ./start-termux.sh
 ```
 
 This one-liner:
 
 1. Updates Termux packages
 2. Installs Git and Node.js. Marinara requires Node.js 24 LTS or newer; after installation, run `node -v` to confirm Termux installed `v24` or newer.
-3. Clones the Marinara Engine repo
+3. Clones the Marinara Engine repo if it is not already installed
 4. Makes the launcher executable
 5. Runs the Termux launcher for the first time
 
@@ -73,7 +73,7 @@ The Termux launcher binds to `0.0.0.0` by default, so the app is already reachab
 
 The `start-termux.sh` launcher automatically updates Marinara Engine on each run:
 
-1. Fetches the latest code from GitHub into `origin/main`, then fast-forwards normal clones or moves detached release checkouts to that commit
+1. Fetches the latest code for the current update branch, then fast-forwards normal clones or moves detached release checkouts to that commit. Local `staging` branches follow `origin/staging`; all other launcher checkouts follow stable `origin/main`.
 2. Detects whether the checkout changed
 3. Temporarily stashes tracked local changes if needed, then reapplies them
 4. Reinstalls dependencies and rebuilds when needed

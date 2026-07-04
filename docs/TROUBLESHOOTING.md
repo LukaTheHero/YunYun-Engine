@@ -16,6 +16,21 @@ If you see an error like `EPERM: operation not permitted, open 'C:\Program Files
 
 ---
 
+## Linux: `ERR_PNPM_ENAMETOOLONG` During Install
+
+If Linux fails while adding a package tarball to pnpm's store, the dependency tree may have been created with an older, longer virtual-store path. Current Marinara checkouts keep pnpm's store in `.pnpm-store/` and its virtual store in `.pnpm/` with shorter package directory names.
+
+From the Marinara repo root, clear the partial install and run the launcher again:
+
+```bash
+rm -rf node_modules .pnpm .pnpm-store
+./start.sh
+```
+
+If you run commands manually, use `pnpm install` again after removing those folders.
+
+---
+
 ## Data Seems Missing After an Update
 
 If your chats or presets appear to be missing after updating, **do not delete any data folders yet**. Marinara v1.5.7 stores live user data in `DATA_DIR/storage`, and older installs may also have a legacy `marinara-engine.db` file that can be imported.
@@ -62,8 +77,15 @@ If the APK stays on the connection screen:
 Manual fallback:
 
 1. Open Termux.
-2. Go to the Marinara Engine folder.
-3. Run `./start-termux.sh`.
+2. If Marinara is not installed yet, paste:
+   ```bash
+   pkg update -y && pkg install -y git nodejs-lts && ([ -d "$HOME/Marinara-Engine/.git" ] || git clone https://github.com/Pasta-Devs/Marinara-Engine.git "$HOME/Marinara-Engine") && cd "$HOME/Marinara-Engine" && chmod +x start-termux.sh && ./start-termux.sh
+   ```
+3. If Marinara is already installed, run:
+   ```bash
+   cd "$HOME/Marinara-Engine"
+   ./start-termux.sh
+   ```
 4. Wait for the launcher to finish and start the server.
 5. Open the APK again.
 

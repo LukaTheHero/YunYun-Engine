@@ -20,7 +20,7 @@ Close Marinara Engine and run:
 ./start.sh
 ```
 
-The launcher fetches `origin/main`, fast-forwards normal clones or moves detached release checkouts to the released code, reinstalls dependencies when needed, rebuilds, and starts v2.0.0.
+The launcher fetches the current update branch, fast-forwards normal clones or moves detached release checkouts to the released code, reinstalls dependencies when needed, rebuilds, and starts v2.0.0. Local `staging` branches follow `origin/staging`; all other launcher checkouts follow stable `origin/main`.
 
 If it says Node.js is too old, install Node.js 24 LTS or newer, then run `./start.sh` again.
 
@@ -56,6 +56,8 @@ The Termux launcher updates the repo, upgrades Node.js through `nodejs-lts` when
 5. Approve **Run commands in Termux environment** if Android asks.
 6. If Termux blocks external commands, paste the copied `allow-external-apps` command into Termux once, then tap **Install / Start Marinara** again.
 7. Wait for Termux to finish installing/building, then return to Marinara Engine. The APK keeps retrying until the local server is ready.
+
+If Android blocks the Termux setup launch completely, the APK copies a full Marinara setup command. Open Termux, paste that copied command, wait for it to start the server, then return to the APK.
 
 Android does not allow an ordinary APK to silently install Termux or run Termux commands without user confirmation. The v2.0.0 APK reduces the setup to taps and Android permission prompts, but those prompts cannot be removed.
 

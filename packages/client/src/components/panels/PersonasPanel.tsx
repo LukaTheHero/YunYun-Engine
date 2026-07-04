@@ -4,7 +4,9 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import {
-  usePersonas,
+  fetchAllPersonaPages,
+  flattenPersonaPages,
+  usePersonaPages,
   useDeletePersona,
   useActivatePersona,
   useUploadPersonaAvatar,
@@ -126,7 +128,6 @@ function useTouchSafePersonaDragMode() {
 }
 
 export function PersonasPanel() {
-  const { data: personas, isLoading } = usePersonas();
   const deletePersona = useDeletePersona();
   const duplicatePersona = useDuplicatePersona();
   const updatePersona = useUpdatePersona();
@@ -154,6 +155,18 @@ export function PersonasPanel() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedPersonaIds, setSelectedPersonaIds] = useState<Set<string>>(new Set());
   const [exportingSelected, setExportingSelected] = useState(false);
+  const clientOnlyPersonaFilterActive = favFilter !== "all" || activeTag !== null;
+  const [completeFilteredPersonas, setCompleteFilteredPersonas] = useState<PersonaRow[] | null>(null);
+  const [completePersonasLoading, setCompletePersonasLoading] = useState(false);
+  const personaPages = usePersonaPages({ search, sort });
+  const pagedPersonas = useMemo(() => flattenPersonaPages(personaPages.data), [personaPages.data]);
+  const personas = useMemo(
+    () => (clientOnlyPersonaFilterActive ? (completeFilteredPersonas ?? []) : pagedPersonas),
+    [clientOnlyPersonaFilterActive, completeFilteredPersonas, pagedPersonas],
+  );
+  const isLoading =
+    personaPages.isLoading ||
+    (clientOnlyPersonaFilterActive && completePersonasLoading && completeFilteredPersonas === null);
 
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editGroupName, setEditGroupName] = useState("");
@@ -164,6 +177,36 @@ export function PersonasPanel() {
   const nativePersonaDragEnabled = !touchSafePersonaDragMode;
 
   const isActive = (p: PersonaRow) => p.isActive === true || p.isActive === "true";
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!clientOnlyPersonaFilterActive) {
+      setCompleteFilteredPersonas(null);
+      setCompletePersonasLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setCompletePersonasLoading(true);
+    fetchAllPersonaPages({ search, sort })
+      .then((rows) => {
+        if (!cancelled) setCompleteFilteredPersonas(rows as PersonaRow[]);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCompleteFilteredPersonas(null);
+          toast.error("Failed to load all matching personas");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCompletePersonasLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientOnlyPersonaFilterActive, search, sort]);
 
   const handleCreate = () => {
     openModal("create-persona");
@@ -225,7 +268,8 @@ export function PersonasPanel() {
         return;
       }
       try {
-        const affected = rawList.filter((p) => parseTags(p).includes(tag));
+        const allPersonas = (await fetchAllPersonaPages({ sort })) as PersonaRow[];
+        const affected = allPersonas.filter((p) => parseTags(p).includes(tag));
         for (const p of affected) {
           const newTags = parseTags(p).filter((t) => t !== tag);
           await updatePersona.mutateAsync({ id: p.id, tags: JSON.stringify(newTags) });
@@ -235,7 +279,7 @@ export function PersonasPanel() {
         toast.error("Failed to remove tag from some personas");
       }
     },
-    [rawList, updatePersona, activeTag],
+    [sort, updatePersona, activeTag],
   );
 
   const personaMap = useMemo(() => {
@@ -580,7 +624,7 @@ export function PersonasPanel() {
             New Folder
           </button>
         </div>
-        {parsedGroups.length > 0 && <p className="mari-folder-helper">Drag and drop personas to folders</p>}
+        {parsedGroups.length > 0 && <p className="mari-folder-helper">Drag and drop personas to folders, double-click or double-tap to rename</p>}
       </div>
 
       {/* Filters */}
@@ -691,8 +735,8 @@ export function PersonasPanel() {
                 role="button"
                 tabIndex={0}
                 aria-expanded={isExpanded}
-                aria-label={`${isExpanded ? "Collapse" : "Expand"} folder ${group.name}. Press F2 to rename.`}
-                title="Double-click or press F2 to rename."
+                aria-label={`${isExpanded ? "Collapse" : "Expand"} folder ${group.name}. Double-tap or press F2 to rename.`}
+                title="Double-click, double-tap, or press F2 to rename."
                 className="group relative flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 transition-all hover:bg-[var(--sidebar-accent)]/40"
                 onClick={(event) =>
                   handleFolderRenameGesture(group.id, event, {
@@ -1029,7 +1073,7 @@ export function PersonasPanel() {
                     to the rounded-xl shape). The wrapper can't be the button itself
                     because the active-indicator star and the camera-hover overlay live
                     outside the avatar bounds via negative offsets / absolute inset-0. */}
-                <div className="relative h-full w-full overflow-hidden rounded-xl">
+                <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl">
                   {persona.avatarPath ? (
                     <img
                       src={persona.avatarPath}
@@ -1053,7 +1097,7 @@ export function PersonasPanel() {
               </button>
 
               {/* Info */}
-              <div className="min-w-0 flex-1">
+              <div className={cn("min-w-0 flex-1", !selectionMode && "pr-24")}>
                 <div className="truncate text-sm font-medium">{persona.name}</div>
                 {persona.comment && (
                   <div className="truncate text-[0.625rem] italic text-[var(--muted-foreground)]">
@@ -1123,6 +1167,17 @@ export function PersonasPanel() {
           );
         })}
       </div>
+
+      {!clientOnlyPersonaFilterActive && personaPages.hasNextPage && (
+        <button
+          type="button"
+          onClick={() => void personaPages.fetchNextPage()}
+          disabled={personaPages.isFetchingNextPage}
+          className="mari-chrome-control mari-chrome-control--primary justify-center text-xs"
+        >
+          {personaPages.isFetchingNextPage ? "Loading..." : `Load more (${rawList.length} loaded)`}
+        </button>
+      )}
 
       {selectionMode && (
         <SelectionActionBar

@@ -58,6 +58,7 @@ interface ConversationMessageProps {
   messageStyle?: ConversationMessageStyle;
   contentParts?: string[];
   visiblePartCount?: number;
+  visibleSegmentCount?: number;
   bubbleGroupPosition?: "single" | "first" | "middle" | "last";
   originalContent?: string;
   onDelete?: (messageId: string) => void;
@@ -97,6 +98,7 @@ export const ConversationMessage = memo(function ConversationMessage({
   messageStyle = "classic",
   contentParts,
   visiblePartCount,
+  visibleSegmentCount,
   bubbleGroupPosition = "single",
   originalContent,
   onDelete,
@@ -385,30 +387,32 @@ export const ConversationMessage = memo(function ConversationMessage({
   const segmentCount = groupedSegments?.length ?? 0;
   const prevContentRef = useRef(renderedContent);
   const initialRenderRef = useRef(true);
-  const [visibleSegments, setVisibleSegments] = useState(segmentCount);
+  const [internalVisibleSegments, setInternalVisibleSegments] = useState(segmentCount);
 
   useEffect(() => {
     if (initialRenderRef.current) {
       initialRenderRef.current = false;
-      setVisibleSegments(segmentCount);
+      setInternalVisibleSegments(segmentCount);
       prevContentRef.current = renderedContent;
       return;
     }
     if (renderedContent !== prevContentRef.current && segmentCount > 1) {
       prevContentRef.current = renderedContent;
-      setVisibleSegments(1);
+      setInternalVisibleSegments(1);
       let count = 1;
       const reveal = () => {
         count++;
-        setVisibleSegments(count);
+        setInternalVisibleSegments(count);
       };
       const timers: ReturnType<typeof setTimeout>[] = [];
       for (let i = 1; i < segmentCount; i++) timers.push(setTimeout(reveal, i * 1500));
       return () => timers.forEach(clearTimeout);
     }
-    setVisibleSegments(segmentCount);
+    setInternalVisibleSegments(segmentCount);
     prevContentRef.current = renderedContent;
   }, [renderedContent, segmentCount]);
+  const visibleSegments =
+    segmentCount > 0 ? Math.max(1, Math.min(visibleSegmentCount ?? internalVisibleSegments, segmentCount)) : 0;
 
   // ── Hidden from AI ──
   const isHiddenExpanded =
@@ -451,11 +455,11 @@ export const ConversationMessage = memo(function ConversationMessage({
       setEditing(false);
       return;
     }
-    const val = formatTextQuotes(editValueRef.current.trim(), quoteFormat);
-    if (val !== editSourceContent) onEdit?.(message.id, val);
+    const val = formatTextQuotes(editValueRef.current, quoteFormat);
+    if (val.trim().length > 0 && val !== formattedEditSourceContent) onEdit?.(message.id, val);
     editSwipeIndexRef.current = null;
     setEditing(false);
-  }, [editSourceContent, message.activeSwipeIndex, message.id, onEdit, quoteFormat]);
+  }, [formattedEditSourceContent, message.activeSwipeIndex, message.id, onEdit, quoteFormat]);
 
   const handleCancelEdit = useCallback(() => {
     editSwipeIndexRef.current = null;

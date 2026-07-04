@@ -168,40 +168,77 @@ restore_stashed_changes() {
     return 1
 }
 
+has_git_worktree_changes() {
+    ! git diff --quiet 2>/dev/null \
+        || ! git diff --cached --quiet 2>/dev/null \
+        || [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]
+}
+
 # ── Auto-update from Git ──
 if [ "$SKIP_UPDATE" = "1" ]; then
     echo "  [OK] Skipping update check; starting the current local install."
 elif [ -d ".git" ]; then
     echo "  [..] Checking for updates..."
     OLD_HEAD=$(git rev-parse HEAD 2>/dev/null)
-    if ! git fetch origin +refs/heads/main:refs/remotes/origin/main --quiet 2>/dev/null; then
+    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)
+    TARGET_BRANCH="main"
+    if [ "$CURRENT_BRANCH" = "staging" ]; then
+        TARGET_BRANCH="staging"
+    elif [ -z "$CURRENT_BRANCH" ]; then
+        git fetch origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/staging:refs/remotes/origin/staging" \
+            --quiet 2>/dev/null || true
+        if git merge-base --is-ancestor HEAD origin/staging 2>/dev/null \
+            && ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+            TARGET_BRANCH="staging"
+        fi
+    fi
+    TARGET_REF="origin/${TARGET_BRANCH}"
+    if ! git fetch origin "+refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" --quiet 2>/dev/null; then
         echo "  [WARN] Could not check for updates (no internet?). Continuing with current version."
-    elif [ "$OLD_HEAD" = "$(git rev-parse origin/main 2>/dev/null || true)" ]; then
+    elif [ "$OLD_HEAD" = "$(git rev-parse "$TARGET_REF" 2>/dev/null || true)" ]; then
         echo "  [OK] Already up to date"
     else
-        TARGET_HEAD=$(git rev-parse origin/main 2>/dev/null || true)
-        CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)
-        # Stash any tracked local changes (e.g. pnpm install modifying package.json) so the update doesn't fail
+        TARGET_HEAD=$(git rev-parse "$TARGET_REF" 2>/dev/null || true)
+        # Stash local changes, including untracked non-ignored files, so the update doesn't fail
         STASHED=0
         STASH_REF=""
-        if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-            if git stash push -q -m "auto-stash before update" 2>/dev/null; then
+        SKIP_UPDATE_FOR_LOCAL_CHANGES=0
+        if has_git_worktree_changes; then
+            if git stash push -u -q -m "auto-stash before update" 2>/dev/null; then
                 STASHED=1
                 STASH_REF=$(git stash list -1 --format=%gd 2>/dev/null || true)
+            else
+                SKIP_UPDATE_FOR_LOCAL_CHANGES=1
+                echo "  [WARN] Could not stash local changes. Skipping auto-update to avoid overwriting them."
             fi
         fi
-        if [ -z "$CURRENT_BRANCH" ]; then
-            UPDATE_COMMAND=(git checkout --detach "$TARGET_HEAD")
-        else
-            UPDATE_COMMAND=(git merge --ff-only origin/main)
+        UPDATE_LOG=$(mktemp "${TMPDIR:-/tmp}/marinara-update.XXXXXX")
+        UPDATED_TO_TARGET=0
+        if [ "$SKIP_UPDATE_FOR_LOCAL_CHANGES" = "1" ]; then
+            UPDATED_TO_TARGET=0
+        elif [ -z "$CURRENT_BRANCH" ]; then
+            if git checkout --detach "$TARGET_HEAD" >"$UPDATE_LOG" 2>&1; then
+                UPDATED_TO_TARGET=1
+            elif git reset --hard "$TARGET_HEAD" >"$UPDATE_LOG" 2>&1; then
+                UPDATED_TO_TARGET=1
+            fi
+        elif git merge --ff-only "$TARGET_REF" >"$UPDATE_LOG" 2>&1; then
+            UPDATED_TO_TARGET=1
+        elif [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ] || [ "$CURRENT_BRANCH" = "staging" ]; then
+            echo "  [..] Fast-forward failed; resetting the installed checkout to the latest ${TARGET_BRANCH} commit..."
+            if git reset --hard "$TARGET_HEAD" >"$UPDATE_LOG" 2>&1; then
+                UPDATED_TO_TARGET=1
+            fi
         fi
-        if "${UPDATE_COMMAND[@]}" 2>/dev/null; then
+        if [ "$UPDATED_TO_TARGET" = "1" ]; then
             NEW_HEAD=$(git rev-parse HEAD 2>/dev/null)
             if [ "$STASHED" = "1" ]; then
                 restore_stashed_changes || true
             fi
             if [ "$NEW_HEAD" != "$TARGET_HEAD" ]; then
-                echo "  [WARN] Update did not land on origin/main. Continuing with current version."
+                echo "  [WARN] Update did not land on ${TARGET_REF}. Continuing with current version."
             else
                 echo "  [OK] Updated to $(git log -1 --format='%h %s' 2>/dev/null)"
                 echo "  [..] Reinstalling dependencies..."
@@ -209,12 +246,17 @@ elif [ -d ".git" ]; then
                 rm -rf packages/shared/dist packages/server/dist packages/client/dist
                 rm -f packages/shared/tsconfig.tsbuildinfo packages/server/tsconfig.tsbuildinfo packages/client/tsconfig.tsbuildinfo
             fi
-        else
-            echo "  [WARN] Could not update to origin/main. Continuing with current version."
+        elif [ "$SKIP_UPDATE_FOR_LOCAL_CHANGES" != "1" ]; then
+            echo "  [WARN] Could not update to ${TARGET_REF}. Continuing with current version."
+            if [ -s "$UPDATE_LOG" ]; then
+                echo "         Git reported:"
+                sed 's/^/         /' "$UPDATE_LOG"
+            fi
             if [ "$STASHED" = "1" ]; then
                 restore_stashed_changes || true
             fi
         fi
+        rm -f "$UPDATE_LOG"
     fi
 fi
 

@@ -4,7 +4,9 @@
 import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef, type UIEvent } from "react";
 import { toast } from "sonner";
 import {
-  useCharacters,
+  fetchAllCharacterPages,
+  flattenCharacterPages,
+  useCharacterPages,
   useDeleteCharacter,
   useCharacterGroups,
   useCreateGroup,
@@ -81,6 +83,15 @@ function getCharacterTags(char: ParsedCharacterRow): string[] {
   return Array.isArray(char.parsed.tags) ? (char.parsed.tags as string[]).filter(Boolean) : [];
 }
 
+function parseCharacterRow(char: CharacterRow): ParsedCharacterRow {
+  try {
+    const parsed = typeof char.data === "string" ? JSON.parse(char.data) : char.data;
+    return { ...char, parsed: (parsed as ParsedCharacterRow["parsed"]) ?? {} };
+  } catch {
+    return { ...char, parsed: { name: "Unknown", description: "" } };
+  }
+}
+
 function parseCharacterSearchQuery(value: string) {
   const excludedTags: string[] = [];
   const text = value
@@ -141,7 +152,6 @@ function usePanelMobileOverlay() {
 }
 
 export function CharactersPanel() {
-  const { data: characters, isLoading } = useCharacters();
   const { data: groups } = useCharacterGroups();
   const deleteCharacter = useDeleteCharacter();
   const duplicateCharacter = useDuplicateCharacter();
@@ -171,6 +181,10 @@ export function CharactersPanel() {
   const favFilter = useUIStore((s) => s.characterPanelFavoriteFilter);
   const setFavFilter = useUIStore((s) => s.setCharacterPanelFavoriteFilter);
   const setCharacterPanelScrollTop = useUIStore((s) => s.setCharacterPanelScrollTop);
+  const serverSearch = useMemo(() => parseCharacterSearchQuery(search).text, [search]);
+  const characterPages = useCharacterPages({ search: serverSearch, sort });
+  const characters = useMemo(() => flattenCharacterPages(characterPages.data), [characterPages.data]);
+  const isLoading = characterPages.isLoading;
 
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   // Right-click "Quick Start" menu for a character row (roleplay / conversation),
@@ -214,14 +228,7 @@ export function CharactersPanel() {
   // Parse character data and filter by search
   const parsedCharacters = useMemo(() => {
     if (!characters) return [];
-    return (characters as CharacterRow[]).map((char) => {
-      try {
-        const parsed = typeof char.data === "string" ? JSON.parse(char.data) : char.data;
-        return { ...char, parsed };
-      } catch {
-        return { ...char, parsed: { name: "Unknown", description: "" } };
-      }
-    });
+    return (characters as CharacterRow[]).map(parseCharacterRow);
   }, [characters]) as ParsedCharacterRow[];
 
   const charMap = useMemo(() => {
@@ -312,7 +319,10 @@ export function CharactersPanel() {
         return;
       }
       try {
-        const affected = parsedCharacters.filter((c) => getCharacterTags(c).includes(tag));
+        const allCharacters = (await fetchAllCharacterPages({ sort })).map((char) =>
+          parseCharacterRow(char as CharacterRow),
+        );
+        const affected = allCharacters.filter((c) => getCharacterTags(c).includes(tag));
         for (const c of affected) {
           const newTags = getCharacterTags(c).filter((t) => t !== tag);
           await updateCharacter.mutateAsync({ id: c.id, data: { tags: newTags } });
@@ -332,7 +342,7 @@ export function CharactersPanel() {
       }
     },
     [
-      parsedCharacters,
+      sort,
       updateCharacter,
       includedTags,
       excludedTags,
@@ -788,7 +798,7 @@ export function CharactersPanel() {
             New Folder
           </button>
         </div>
-        {parsedGroups.length > 0 && <p className="mari-folder-helper">Drag and drop characters to folders</p>}
+        {parsedGroups.length > 0 && <p className="mari-folder-helper">Drag and drop characters to folders, double-click or double-tap to rename</p>}
       </div>
 
       {/* Filters */}
@@ -900,8 +910,8 @@ export function CharactersPanel() {
                 role="button"
                 tabIndex={0}
                 aria-expanded={isExpanded}
-                aria-label={`${isExpanded ? "Collapse" : "Expand"} folder ${group.name}. Press F2 to rename.`}
-                title="Double-click or press F2 to rename."
+                aria-label={`${isExpanded ? "Collapse" : "Expand"} folder ${group.name}. Double-tap or press F2 to rename.`}
+                title="Double-click, double-tap, or press F2 to rename."
                 className="group relative flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 transition-all hover:bg-[var(--sidebar-accent)]/40"
                 onClick={(event) =>
                   handleFolderRenameGesture(group.id, event, {
@@ -1323,7 +1333,7 @@ export function CharactersPanel() {
               </div>
 
               {/* Info */}
-              <div className="min-w-0 flex-1">
+              <div className={cn("min-w-0 flex-1", !selectionMode && "pr-16")}>
                 <div
                   className="truncate text-sm font-medium"
                   style={
@@ -1424,6 +1434,17 @@ export function CharactersPanel() {
           );
         })}
       </div>
+
+      {characterPages.hasNextPage && (
+        <button
+          type="button"
+          onClick={() => void characterPages.fetchNextPage()}
+          disabled={characterPages.isFetchingNextPage}
+          className="mari-chrome-control mari-chrome-control--primary justify-center text-xs"
+        >
+          {characterPages.isFetchingNextPage ? "Loading..." : `Load more (${parsedCharacters.length} loaded)`}
+        </button>
+      )}
 
       {selectionMode && (
         <SelectionActionBar

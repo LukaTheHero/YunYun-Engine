@@ -124,6 +124,21 @@ function booleanText(value: unknown): boolean {
   return value === true || value === "true" || value === "1" || value === 1;
 }
 
+function booleanFalseText(value: unknown): boolean {
+  return value === false || value === "false" || value === "0" || value === 0;
+}
+
+function isSpotifyMusicAgent(agent: ResolvedAgent): boolean {
+  const settings = parseSettings(agent.settings);
+  return (
+    agent.type === "spotify" &&
+    settings.musicProvider !== "youtube" &&
+    settings.musicPlayerSource !== "youtube" &&
+    settings.musicProvider !== "custom" &&
+    settings.musicPlayerSource !== "custom"
+  );
+}
+
 function stringRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const out: Record<string, string> = {};
@@ -164,7 +179,9 @@ function buildCustomToolHiddenContext(args: {
   const personaName = args.agentContext.persona?.name ?? null;
   const primaryCharacterName = primaryCharacterId ? (characterNamesById.get(primaryCharacterId) ?? null) : null;
   const primaryCharacter =
-    (primaryCharacterId ? args.agentContext.characters.find((character) => character.id === primaryCharacterId) : null) ??
+    (primaryCharacterId
+      ? args.agentContext.characters.find((character) => character.id === primaryCharacterId)
+      : null) ??
     args.agentContext.characters[0] ??
     null;
   const personaFields = args.agentContext.persona
@@ -240,14 +257,17 @@ function validateToolSchema(schema: unknown): Record<string, unknown> {
   if (schemaType !== undefined && schemaType !== "object") {
     throw new Error('parametersSchema root "type" must be "object"');
   }
+  if (schemaType === undefined) {
+    schemaObject.type = "object";
+  }
   if (
     schemaProperties !== undefined &&
     (!schemaProperties || typeof schemaProperties !== "object" || Array.isArray(schemaProperties))
   ) {
     throw new Error('parametersSchema "properties" must be an object');
   }
-  if (schemaType === undefined && (!schemaProperties || typeof schemaProperties !== "object")) {
-    throw new Error('parametersSchema must define root "type": "object" or include object "properties"');
+  if (schemaProperties === undefined) {
+    schemaObject.properties = {};
   }
   if (
     schemaRequired !== undefined &&
@@ -255,8 +275,43 @@ function validateToolSchema(schema: unknown): Record<string, unknown> {
   ) {
     throw new Error('parametersSchema "required" must be an array of strings');
   }
+  const normalizedProperties = schemaObject.properties as Record<string, unknown>;
+  for (const [name, prop] of Object.entries(normalizedProperties)) {
+    validateParameterProperty(prop, `properties.${name}`);
+  }
 
   return schemaObject;
+}
+
+const VALID_PARAMETER_TYPES = new Set(["string", "number", "integer", "boolean", "array", "object", "null"]);
+
+function validateParameterProperty(prop: unknown, path: string): void {
+  if (!prop || typeof prop !== "object" || Array.isArray(prop)) {
+    throw new Error(`parametersSchema ${path} must be an object`);
+  }
+  const record = prop as Record<string, unknown>;
+  if (record.type !== undefined && (typeof record.type !== "string" || !VALID_PARAMETER_TYPES.has(record.type))) {
+    throw new Error(`parametersSchema ${path}.type must be a valid JSON Schema primitive type`);
+  }
+  if (record.enum !== undefined && !Array.isArray(record.enum)) {
+    throw new Error(`parametersSchema ${path}.enum must be an array`);
+  }
+  if (record.required !== undefined) {
+    if (!Array.isArray(record.required) || record.required.some((entry) => typeof entry !== "string")) {
+      throw new Error(`parametersSchema ${path}.required must be an array of strings`);
+    }
+  }
+  if (record.items !== undefined) {
+    validateParameterProperty(record.items, `${path}.items`);
+  }
+  if (record.properties !== undefined) {
+    if (!record.properties || typeof record.properties !== "object" || Array.isArray(record.properties)) {
+      throw new Error(`parametersSchema ${path}.properties must be an object`);
+    }
+    for (const [name, nested] of Object.entries(record.properties as Record<string, unknown>)) {
+      validateParameterProperty(nested, `${path}.properties.${name}`);
+    }
+  }
 }
 
 async function loadToolDefinitions(args: {
@@ -264,7 +319,11 @@ async function loadToolDefinitions(args: {
   resolveTools: boolean;
   enableChatTools: boolean;
   activeToolIds: string[];
-}): Promise<{ toolDefs: LLMToolDefinition[] | undefined; allToolDefs: LLMToolDefinition[]; customToolDefs: CustomToolDef[] }> {
+}): Promise<{
+  toolDefs: LLMToolDefinition[] | undefined;
+  allToolDefs: LLMToolDefinition[];
+  customToolDefs: CustomToolDef[];
+}> {
   let toolDefs: LLMToolDefinition[] | undefined;
   const allToolDefs: LLMToolDefinition[] = [];
   const customToolDefs: CustomToolDef[] = [];
@@ -276,7 +335,9 @@ async function loadToolDefinitions(args: {
   for (const tool of BUILT_IN_TOOLS) {
     const existingSource = registeredToolSources.get(tool.name);
     if (existingSource) {
-      throw new Error(`Duplicate tool name "${tool.name}" from built-in tool collides with existing ${existingSource} tool`);
+      throw new Error(
+        `Duplicate tool name "${tool.name}" from built-in tool collides with existing ${existingSource} tool`,
+      );
     }
     registeredToolSources.set(tool.name, "built-in");
     allToolDefs.push({
@@ -495,6 +556,35 @@ function resetSpotifyAgentRuntime(agent: ResolvedAgent): void {
   spotifyAgent.__spotifyDevice = null;
 }
 
+async function attachSpotifyCurrentPlaybackContext(args: {
+  agentContext: AgentContext;
+  resolvedAgents: ResolvedAgent[];
+  spotify: { accessToken: string } | undefined;
+}): Promise<void> {
+  delete args.agentContext.memory._spotifyDjCurrentPlayback;
+  if (!args.spotify || !args.resolvedAgents.some(isSpotifyMusicAgent)) return;
+  try {
+    const results = await executeToolCalls(
+      [
+        {
+          id: "spotify-dj-current-playback",
+          type: "function",
+          function: { name: "spotify_get_current_playback", arguments: "{}" },
+        },
+      ],
+      { spotify: args.spotify },
+    );
+    const raw = results[0]?.result;
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      args.agentContext.memory._spotifyDjCurrentPlayback = parsed;
+    }
+  } catch (error) {
+    logger.debug(error, "[spotify] Failed to preload Music DJ current playback context");
+  }
+}
+
 export async function resolveGenerationTools({
   requestBody,
   chatId,
@@ -515,7 +605,17 @@ export async function resolveGenerationTools({
   agentContext,
   emitMetadataPatch,
 }: ResolveGenerationToolsArgs): Promise<ResolvedGenerationTools> {
-  const enableChatTools = requestBody.enableTools === true || chatMetadata.enableTools === true;
+  const chatToolsExplicitlyDisabled = booleanFalseText(chatMetadata.enableTools);
+  const enableChatTools =
+    requestBody.enableTools === true || (!chatToolsExplicitlyDisabled && booleanText(chatMetadata.enableTools));
+  const spotifyToolNames = new Set(DEFAULT_AGENT_TOOLS.spotify ?? []);
+  for (const agent of resolvedAgents) {
+    const agentSettings = parseSettings(agent.settings);
+    const agentEnabledNames = Array.isArray(agentSettings.enabledTools) ? (agentSettings.enabledTools as string[]) : [];
+    if (isSpotifyMusicAgent(agent) && agentEnabledNames.length === 0 && spotifyToolNames.size > 0) {
+      agent.settings = { ...agentSettings, enabledTools: [...spotifyToolNames] };
+    }
+  }
   const enableAgentTools = resolvedAgents.some((agent) => {
     const agentSettings = parseSettings(agent.settings);
     return (
@@ -535,8 +635,7 @@ export async function resolveGenerationTools({
   let toolDefs = loadedTools.toolDefs;
 
   const resolvedToolNames = new Set(allToolDefs.map((toolDef) => toolDef.function.name));
-  const chatResolvedToolNames = new Set((toolDefs ?? []).map((toolDef) => toolDef.function.name));
-  const spotifyToolNames = new Set(DEFAULT_AGENT_TOOLS.spotify ?? []);
+  let chatResolvedToolNames = new Set((toolDefs ?? []).map((toolDef) => toolDef.function.name));
   const agentResolvedSpotifyToolGroups = resolvedAgents.map((agent) => {
     const agentSettings = parseSettings(agent.settings);
     const agentEnabledNames = Array.isArray(agentSettings.enabledTools) ? (agentSettings.enabledTools as string[]) : [];
@@ -565,12 +664,13 @@ export async function resolveGenerationTools({
       : undefined;
   const spotifyToolsAvailable = Boolean(
     spotifyCredentials &&
-      "accessToken" in spotifyCredentials &&
-      spotifyHasScope(spotifyCredentials.scopes, "user-modify-playback-state"),
+    "accessToken" in spotifyCredentials &&
+    spotifyHasScope(spotifyCredentials.scopes, "user-modify-playback-state"),
   );
   if (!spotifyToolsAvailable && toolDefs) {
     const beforeCount = toolDefs.length;
     toolDefs = toolDefs.filter((toolDef) => !spotifyToolNames.has(toolDef.function.name));
+    chatResolvedToolNames = new Set((toolDefs ?? []).map((toolDef) => toolDef.function.name));
     if (beforeCount !== toolDefs.length && spotifyAvailabilityRequest.shouldLogUnavailableToolOmission) {
       logger.debug("[spotify] Omitted unavailable Spotify tools from main generation");
     }
@@ -667,6 +767,12 @@ export async function resolveGenerationTools({
     chatMeta: chatMetadata,
     onUpdateMetadata: updateChatMetadataForTools,
   };
+
+  await attachSpotifyCurrentPlaybackContext({
+    agentContext,
+    resolvedAgents,
+    spotify: spotifyCreds,
+  });
 
   for (const agent of resolvedAgents) {
     if (agent.toolContext) continue;

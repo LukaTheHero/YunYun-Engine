@@ -27,6 +27,7 @@ import { createWriteStream, existsSync, rmSync, unlinkSync } from "fs";
 import { normalizeTimestampOverrides } from "../services/import/import-timestamps.js";
 import { assertInsideDir, extensionFromImageMime, isAllowedImageBuffer } from "../utils/security.js";
 import { logger } from "../lib/logger.js";
+import { parseLibraryPageQuery } from "../utils/list-pagination.js";
 import { importSTLorebook } from "../services/import/st-lorebook.importer.js";
 import AdmZip from "adm-zip";
 import { extname } from "path";
@@ -66,12 +67,7 @@ function isValidCustomDimension(value: unknown, max: number): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= max;
 }
 
-function validateCustomTagPayload(
-  kind: "emoji" | "sticker" | null,
-  name: string,
-  width: unknown,
-  height: unknown,
-) {
+function validateCustomTagPayload(kind: "emoji" | "sticker" | null, name: string, width: unknown, height: unknown) {
   if (kind === null) return null;
   if (!CUSTOM_NAME_RE.test(name)) return "customName must use 1-32 lowercase letters, numbers, or underscores";
   const max = CUSTOM_KIND_MAX_DIMENSION[kind];
@@ -315,10 +311,29 @@ export async function charactersRoutes(app: FastifyInstance) {
 
   // ── Characters ──
 
-  app.get<{ Querystring: { includeBuiltIn?: string } }>("/", async (req) => {
-    const characters = await storage.list();
-    if (req.query.includeBuiltIn === "true") return characters;
-    return characters.filter((character) => character.id !== PROFESSOR_MARI_ID);
+  app.get<{ Querystring: { includeBuiltIn?: string; limit?: string; offset?: string; search?: string; sort?: string } }>(
+    "/",
+    async (req) => {
+      const includeBuiltIn = req.query.includeBuiltIn === "true";
+      const page = parseLibraryPageQuery(req.query);
+      if (page.hasPaging) {
+        return storage.listPage({
+          includeBuiltIn,
+          limit: page.limit,
+          offset: page.offset,
+          search: page.search,
+          sort: page.sort,
+        });
+      }
+      const characters = await storage.list();
+      if (includeBuiltIn) return characters;
+      return characters.filter((character) => character.id !== PROFESSOR_MARI_ID);
+    },
+  );
+
+  app.post<{ Body: { ids?: unknown } }>("/summaries", async (req) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter((id): id is string => typeof id === "string") : [];
+    return storage.listSummariesByIds(ids);
   });
 
   app.post("/avatar-generation/preview", async (req, reply) => {
@@ -831,8 +846,25 @@ export async function charactersRoutes(app: FastifyInstance) {
 
   // ── Personas ──
 
-  app.get("/personas/list", async () => {
-    return storage.listPersonas();
+  app.get<{ Querystring: { limit?: string; offset?: string; search?: string; sort?: string } }>(
+    "/personas/list",
+    async (req) => {
+      const page = parseLibraryPageQuery(req.query);
+      if (page.hasPaging) {
+        return storage.listPersonasPage({
+          limit: page.limit,
+          offset: page.offset,
+          search: page.search,
+          sort: page.sort,
+        });
+      }
+      return storage.listPersonas();
+    },
+  );
+
+  app.get("/personas/active", async () => {
+    const personas = await storage.listPersonas();
+    return personas.find((persona) => String(persona.isActive) === "true") ?? null;
   });
 
   app.get<{ Params: { id: string } }>("/personas/:id", async (req, reply) => {
@@ -856,14 +888,11 @@ export async function charactersRoutes(app: FastifyInstance) {
     },
   );
 
-  app.delete<{ Params: { id: string; versionId: string } }>(
-    "/personas/:id/versions/:versionId",
-    async (req, reply) => {
-      const deleted = await storage.deletePersonaVersion(req.params.id, req.params.versionId);
-      if (!deleted) return reply.status(404).send({ error: "Persona version not found" });
-      return reply.status(204).send();
-    },
-  );
+  app.delete<{ Params: { id: string; versionId: string } }>("/personas/:id/versions/:versionId", async (req, reply) => {
+    const deleted = await storage.deletePersonaVersion(req.params.id, req.params.versionId);
+    if (!deleted) return reply.status(404).send({ error: "Persona version not found" });
+    return reply.status(204).send();
+  });
 
   app.post("/personas", async (req) => {
     const { name, description, createdAt, updatedAt, ...extra } = req.body as {
@@ -922,8 +951,13 @@ export async function charactersRoutes(app: FastifyInstance) {
     return storage.updatePersona(req.params.id, { avatarPath }, { versionReason: "Avatar update" });
   });
 
-  app.put<{ Params: { id: string } }>("/personas/:id/activate", async (req) => {
-    await storage.setActivePersona(req.params.id);
+  app.put<{ Params: { id: string } }>("/personas/:id/activate", async (req, reply) => {
+    const { id } = req.params;
+    if (isUnsafePathSegment(id)) {
+      return reply.status(400).send({ error: "Invalid persona id" });
+    }
+    const activated = await storage.setActivePersona(id);
+    if (!activated) return reply.status(404).send({ error: "Persona not found" });
     return { success: true };
   });
 
@@ -1007,23 +1041,20 @@ export async function charactersRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get<{ Params: { id: string; filename: string } }>(
-    "/personas/:id/gallery/file/:filename",
-    async (req, reply) => {
-      const { id, filename } = req.params;
-      if (isUnsafePathSegment(id) || isUnsafePathSegment(filename)) {
-        return reply.status(400).send({ error: "Invalid path" });
-      }
+  app.get<{ Params: { id: string; filename: string } }>("/personas/:id/gallery/file/:filename", async (req, reply) => {
+    const { id, filename } = req.params;
+    if (isUnsafePathSegment(id) || isUnsafePathSegment(filename)) {
+      return reply.status(400).send({ error: "Invalid path" });
+    }
 
-      const galleryDir = assertInsideDir(PERSONA_GALLERY_ROOT, join(PERSONA_GALLERY_ROOT, id));
-      const filePath = assertInsideDir(galleryDir, join(galleryDir, filename));
-      if (!existsSync(filePath)) {
-        return reply.status(404).send({ error: "Not found" });
-      }
+    const galleryDir = assertInsideDir(PERSONA_GALLERY_ROOT, join(PERSONA_GALLERY_ROOT, id));
+    const filePath = assertInsideDir(galleryDir, join(galleryDir, filename));
+    if (!existsSync(filePath)) {
+      return reply.status(404).send({ error: "Not found" });
+    }
 
-      return reply.sendFile(filename, galleryDir);
-    },
-  );
+    return reply.sendFile(filename, galleryDir);
+  });
 
   app.delete<{ Params: { id: string; imageId: string } }>("/personas/:id/gallery/:imageId", async (req, reply) => {
     const { id, imageId } = req.params;

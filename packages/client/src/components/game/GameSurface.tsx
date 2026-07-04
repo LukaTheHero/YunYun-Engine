@@ -62,6 +62,7 @@ import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { spriteKeys, type SpriteInfo } from "../../hooks/use-characters";
 import { lorebookKeys } from "../../hooks/use-lorebooks";
 import { api, getJsonRepairRequest, type JsonRepairRequest } from "../../lib/api-client";
+import { useRenderTimer } from "../../lib/perf-diagnostics";
 import { showConfirmDialog } from "../../lib/app-dialogs";
 import { CHAT_FLOATING_UI_DISMISS_EVENT } from "../../lib/chat-floating-ui-events";
 import { cn, parseAvatarCropJson, type AvatarCrop, type LegacyAvatarCrop, type AvatarCropValue } from "../../lib/utils";
@@ -110,11 +111,12 @@ import type { SceneSegmentEffect } from "@marinara-engine/shared";
 import {
   PROFESSOR_MARI_ID,
   formatTextQuotes,
+  normalizeRpgStatPools,
   normalizeTextForMatch,
   scoreMusic,
   scoreAmbient,
 } from "@marinara-engine/shared";
-import { GameNarration, formatNarration } from "./GameNarration";
+import { GameNarration, formatNarration, parseNarrationSegments, type NarrationSegment } from "./GameNarration";
 import { GameInput } from "./GameInput";
 import { GameMapPanel, MobileMapButton } from "./GameMap";
 import { GamePartyBar } from "./GamePartyBar";
@@ -176,9 +178,12 @@ type JournalReadable = ReadableTag & {
 type GameAssetGenerationPayload = {
   chatId: string;
   backgroundTag?: string;
+  backgroundDescription?: string;
+  forceBackground?: boolean;
   npcsNeedingAvatars?: Array<{ name: string; description: string; gender?: string | null; pronouns?: string | null }>;
   forceNpcAvatarNames?: string[];
   illustration?: import("@marinara-engine/shared").SceneIllustrationRequest;
+  illustrationNarration?: string;
   useAvatarReferences?: boolean;
   includeCharacterAppearance?: boolean;
   forceIllustration?: boolean;
@@ -360,6 +365,17 @@ type GameTimeMeta = {
   day?: number;
   hour?: number;
   minute?: number;
+};
+
+type EditableGameTimePhase = "dawn" | "morning" | "afternoon" | "evening" | "night" | "midnight";
+
+const GAME_TIME_PHASE_HOURS: Record<EditableGameTimePhase, number> = {
+  dawn: 6,
+  morning: 8,
+  afternoon: 14,
+  evening: 18,
+  night: 21,
+  midnight: 0,
 };
 
 function normalizeGameDay(value: unknown): number {
@@ -1889,6 +1905,30 @@ function formatCombatLogContent(message: Message): string {
   return content.replace(/^\[(?:To the party|To the GM)]\s*/i, "").trim();
 }
 
+const EMPTY_GAME_SPEAKER_COLORS = new Map<string, string>();
+
+function formatNarrationSegmentForContext(segment: NarrationSegment, edit?: GameSegmentEdit): string {
+  const content =
+    segment.type === "readable"
+      ? (edit?.readableContent ?? edit?.content ?? segment.readableContent ?? segment.content)
+      : (edit?.content ?? segment.content);
+  const trimmed = content.trim();
+  if (!trimmed) return "";
+
+  if (segment.type === "dialogue") {
+    const speaker = edit?.speaker?.trim() || segment.speaker?.trim();
+    return speaker ? `${speaker}: ${trimmed}` : trimmed;
+  }
+
+  if (segment.type === "readable") {
+    const type = edit?.readableType ?? segment.readableType;
+    if (type === "book") return `Book: ${trimmed}`;
+    if (type === "note") return `Note: ${trimmed}`;
+  }
+
+  return trimmed;
+}
+
 function buildSegmentEditMap(chatMeta: Record<string, unknown>): Map<string, GameSegmentEdit> {
   const map = new Map<string, GameSegmentEdit>();
   for (const [key, value] of Object.entries(chatMeta)) {
@@ -1974,6 +2014,7 @@ function GameSurfaceComponent({
   selectedMessageIds,
   isMessagesLoading,
 }: GameSurfaceProps) {
+  useRenderTimer("game-surface"); // [#3104 diagnostic]
   // Sync game metadata → store
   useSyncGameState(activeChatId, chatMeta);
 
@@ -3182,10 +3223,22 @@ function GameSurfaceComponent({
     typeof latestAssistantMsg?.id === "string" &&
     narrationDoneMsgId === latestAssistantMsg.id;
 
-  const latestNarrationText = useMemo(
-    () => (latestAssistantMsg?.content ? parseGmTags(latestAssistantMsg.content).cleanContent.trim() : ""),
-    [latestAssistantMsg?.content],
-  );
+  const latestNarrationText = useMemo(() => {
+    if (!latestAssistantMsg?.content) return "";
+    const segments = parseNarrationSegments(latestAssistantMsg, EMPTY_GAME_SPEAKER_COLORS);
+    const visibleText: string[] = [];
+    for (let index = 0; index < segments.length; index++) {
+      const segment = segments[index]!;
+      if (segmentDeletes.has(`${latestAssistantMsg.id}:${index}`)) continue;
+      if (segment.partyType === "side" || segment.partyType === "extra") continue;
+      const text = formatNarrationSegmentForContext(
+        segment,
+        segmentEdits.get(`${latestAssistantMsg.id}:${index}`),
+      );
+      if (text) visibleText.push(text);
+    }
+    return visibleText.join("\n").trim();
+  }, [latestAssistantMsg, segmentDeletes, segmentEdits]);
 
   const combatLogEntries = useMemo(
     () =>
@@ -3262,12 +3315,14 @@ function GameSurfaceComponent({
     chatMeta.enableSpriteGeneration === true &&
     typeof chatMeta.gameImageConnectionId === "string" &&
     chatMeta.gameImageConnectionId.trim().length > 0;
+  const gameImageAutoGenerationEnabled =
+    gameImageGenerationEnabled && chatMeta.gameImageAutoGenerationEnabled !== false;
   const gameImageUseAvatarReferences = chatMeta.gameImageUseAvatarReferences !== false;
   const gameImageIncludeCharacterAppearance = chatMeta.gameImageIncludeCharacterAppearance !== false;
 
   const missingSceneAssetGeneration = useMemo(() => {
     return buildMissingSceneAssetGenerationPayload({
-      gameImageGenerationEnabled,
+      gameImageGenerationEnabled: gameImageAutoGenerationEnabled,
       activeChatId,
       currentBackground,
       savedSceneBackground: chatMeta.gameSceneBackground as string | undefined,
@@ -3282,7 +3337,7 @@ function GameSurfaceComponent({
     scopedAssetMap,
     chatMeta.gameSceneBackground,
     currentBackground,
-    gameImageGenerationEnabled,
+    gameImageAutoGenerationEnabled,
     failedNpcAvatarNames,
     npcAvatarLookup,
     npcsNeedingAvatars,
@@ -4171,13 +4226,13 @@ function GameSurfaceComponent({
       currentAmbient: useGameAssetStore.getState().currentAmbient,
       currentLocation: gameSnapshot?.location ?? null,
       currentWeather: gameSnapshot?.weather ?? null,
-      currentTimeOfDay: gameSnapshot?.time ?? null,
+      currentTimeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       genre: ((chatMeta.gameSetupConfig as Record<string, unknown> | undefined)?.genre as string | undefined) ?? null,
       setting:
         ((chatMeta.gameSetupConfig as Record<string, unknown> | undefined)?.setting as string | undefined) ?? null,
       worldOverview: (chatMeta.gameWorldOverview as string | undefined) ?? null,
-      canGenerateBackgrounds: !!chatMeta.enableSpriteGeneration && !!chatMeta.gameImageConnectionId,
-      canGenerateIllustrations: !!chatMeta.enableSpriteGeneration && !!chatMeta.gameImageConnectionId,
+      canGenerateBackgrounds: gameImageAutoGenerationEnabled,
+      canGenerateIllustrations: gameImageAutoGenerationEnabled,
       artStylePrompt:
         ((chatMeta.gameSetupConfig as Record<string, unknown> | undefined)?.artStylePrompt as string | undefined) ??
         null,
@@ -4310,7 +4365,7 @@ function GameSurfaceComponent({
     const scoredMusic = scoreMusic({
       state: sceneAnalysisState,
       weather: gameSnapshot?.weather ?? null,
-      timeOfDay: gameSnapshot?.time ?? null,
+      timeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       musicIntensity:
         sceneAnalysisState === "combat" ? "intense" : sceneAnalysisState === "travel_rest" ? "calm" : null,
       currentMusic: useGameAssetStore.getState().currentMusic,
@@ -4330,7 +4385,7 @@ function GameSurfaceComponent({
     const scoredAmbient = scoreAmbient({
       state: sceneAnalysisState,
       weather: gameSnapshot?.weather ?? null,
-      timeOfDay: gameSnapshot?.time ?? null,
+      timeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       currentAmbient: useGameAssetStore.getState().currentAmbient,
       availableAmbient: ambientTags,
       background: useGameAssetStore.getState().currentBackground,
@@ -4500,7 +4555,10 @@ function GameSurfaceComponent({
     [clearFailedNpcAvatars, fetchManifest, installGeneratedIllustration],
   );
 
-  async function applySceneResult(result: import("@marinara-engine/shared").SceneAnalysis, msg: { id: string }) {
+  async function applySceneResult(
+    result: import("@marinara-engine/shared").SceneAnalysis,
+    msg: { id: string; content?: string | null },
+  ) {
     setSceneAnalysisFailed(false);
     // NOTE: Game state transitions are owned exclusively by the GM model via [state: ...] tags.
     // The scene model no longer emits stateChange to avoid conflicting state flips.
@@ -4640,13 +4698,14 @@ function GameSurfaceComponent({
       // met yet — by the time the party encounters them their avatar is ready, and the
       // /generate-assets schema already caps this at 10 per turn so cost stays bounded.
       const pendingIllustration = result.generatedIllustration ? null : result.illustration;
-      if (gameImageGenerationEnabled && (unresolvedBg || pendingIllustration || npcsNeedingAvatars.length > 0)) {
+      if (gameImageAutoGenerationEnabled && (unresolvedBg || pendingIllustration || npcsNeedingAvatars.length > 0)) {
         const messageTags = "content" in msg && typeof msg.content === "string" ? parseGmTags(msg.content) : null;
         const combatTransitionTurn = !!(messageTags?.combatEncounter || messageTags?.stateChange === "combat");
         const assetPayload = {
           chatId: activeChatId,
           backgroundTag: unresolvedBg || undefined,
           illustration: pendingIllustration ?? undefined,
+          illustrationNarration: pendingIllustration && messageTags ? messageTags.cleanContent : undefined,
           npcsNeedingAvatars: npcsNeedingAvatars.length > 0 ? npcsNeedingAvatars : undefined,
           debugMode: useUIStore.getState().debugMode,
         };
@@ -4770,7 +4829,7 @@ function GameSurfaceComponent({
     const sceneDescription = [
       gameSnapshot?.location ? `Location: ${gameSnapshot.location}` : "Current game scene",
       gameSnapshot?.weather ? `Weather: ${gameSnapshot.weather}` : null,
-      gameSnapshot?.time ? `Time: ${gameSnapshot.time}` : null,
+      (gameSnapshot?.time ?? metaTime) ? `Time: ${gameSnapshot?.time ?? metaTime}` : null,
       setupConfig?.genre ? `Genre: ${String(setupConfig.genre)}` : null,
       setupConfig?.setting ? `Setting: ${String(setupConfig.setting)}` : null,
       chatMeta.gameWorldOverview ? `World: ${String(chatMeta.gameWorldOverview).slice(0, 220)}` : null,
@@ -4785,9 +4844,14 @@ function GameSurfaceComponent({
       return;
     }
 
+    const slugBase = backgroundOptionKey(
+      [gameSnapshot?.location || chat.name, msg?.id, Date.now().toString(36)].filter(Boolean).join("-"),
+    ).slice(0, 72);
     const assetPayload: GameAssetGenerationPayload = {
       chatId: activeChatId,
-      backgroundTag: sceneDescription,
+      backgroundTag: slugBase || `manual-background-${Date.now().toString(36)}`,
+      backgroundDescription: sceneDescription,
+      forceBackground: true,
       debugMode: useUIStore.getState().debugMode,
     };
 
@@ -4798,15 +4862,12 @@ function GameSurfaceComponent({
     try {
       const result = await runGameAssetGeneration(assetPayload, { allowPromptReview: true });
       setPendingAssetGeneration(null);
-      if (!result) return;
-      await applyGeneratedAssets(result);
-      if (result.generatedBackground) {
-        toast.success("Background generated.", { duration: 1800 });
-      } else if (result.fallbackBackground) {
-        toast.success("Scene background updated.", { duration: 1800 });
-      } else {
+      if (!result?.generatedBackground) {
         toast.error("Illustrator did not return a background for this scene.");
+        return;
       }
+      await applyGeneratedAssets(result);
+      toast.success("Background generated.", { duration: 1800 });
     } catch (error) {
       setAssetGenerationFailed(true);
       toast.error(error instanceof Error ? error.message : "Background generation failed.");
@@ -4819,11 +4880,13 @@ function GameSurfaceComponent({
     applyGeneratedAssets,
     chatMeta.gameSetupConfig,
     chatMeta.gameWorldOverview,
+    chat.name,
     gameImageGenerationEnabled,
     gameSnapshot?.location,
     gameSnapshot?.time,
     gameSnapshot?.weather,
     manualBackgroundGenerating,
+    metaTime,
     runGameAssetGeneration,
   ]);
 
@@ -4835,16 +4898,17 @@ function GameSurfaceComponent({
     }
 
     const msg = latestAssistantMsgRef.current;
-    const narration = msg?.content ? parseGmTags(msg.content).cleanContent.trim() : "";
-    if (!narration) {
+    const fullNarration = msg?.content ? parseGmTags(msg.content).cleanContent.trim() : "";
+    if (!fullNarration) {
       toast.error("The GM needs to write a scene before Illustrator can draw it.");
       return;
     }
+    const promptNarration = fullNarration.slice(0, 5000);
 
     const setupConfig = chatMeta.gameSetupConfig as Record<string, unknown> | null;
     const location = gameSnapshot?.location ? `Location: ${gameSnapshot.location}` : null;
     const weather = gameSnapshot?.weather ? `Weather: ${gameSnapshot.weather}` : null;
-    const time = gameSnapshot?.time ? `Time: ${gameSnapshot.time}` : null;
+    const time = (gameSnapshot?.time ?? metaTime) ? `Time: ${gameSnapshot?.time ?? metaTime}` : null;
     const visibleCharacters = sceneWrapCharacterNames.slice(0, 6);
     const trackedNpcNames = npcs
       .map((npc) => (typeof npc.name === "string" ? npc.name.trim() : ""))
@@ -4853,7 +4917,7 @@ function GameSurfaceComponent({
     const characters = visibleCharacters.length > 0 ? visibleCharacters : trackedNpcNames;
     const prompt = [
       "Create a cinematic game scene illustration for the current moment.",
-      `Narration: ${narration}`,
+      `Narration: ${promptNarration}`,
       location,
       weather,
       time,
@@ -4865,7 +4929,7 @@ function GameSurfaceComponent({
     ]
       .filter(Boolean)
       .join("\n")
-      .slice(0, 1200);
+      .slice(0, 5000);
     const slugBase = backgroundOptionKey(
       [gameSnapshot?.location, msg?.id, Date.now().toString(36)].filter(Boolean).join("-"),
     ).slice(0, 72);
@@ -4878,6 +4942,7 @@ function GameSurfaceComponent({
         reason: "Manual Gallery Illustrate request",
         slug: slugBase || undefined,
       },
+      illustrationNarration: fullNarration,
       forceIllustration: true,
       debugMode: useUIStore.getState().debugMode,
     };
@@ -4911,6 +4976,7 @@ function GameSurfaceComponent({
     gameSnapshot?.time,
     gameSnapshot?.weather,
     gameState,
+    metaTime,
     npcs,
     runGameAssetGeneration,
     sceneWrapCharacterNames,
@@ -5193,12 +5259,12 @@ function GameSurfaceComponent({
       currentAmbient: useGameAssetStore.getState().currentAmbient,
       currentLocation: gameSnapshot?.location ?? null,
       currentWeather: gameSnapshot?.weather ?? null,
-      currentTimeOfDay: gameSnapshot?.time ?? null,
+      currentTimeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       genre: (setupConfig?.genre as string | undefined) ?? null,
       setting: (setupConfig?.setting as string | undefined) ?? null,
       worldOverview: (chatMeta.gameWorldOverview as string | undefined) ?? null,
-      canGenerateBackgrounds: !!chatMeta.enableSpriteGeneration && !!chatMeta.gameImageConnectionId,
-      canGenerateIllustrations: !!chatMeta.enableSpriteGeneration && !!chatMeta.gameImageConnectionId,
+      canGenerateBackgrounds: gameImageAutoGenerationEnabled,
+      canGenerateIllustrations: gameImageAutoGenerationEnabled,
       artStylePrompt:
         ((chatMeta.gameSetupConfig as Record<string, unknown> | undefined)?.artStylePrompt as string | undefined) ??
         null,
@@ -5250,14 +5316,13 @@ function GameSurfaceComponent({
     }
   }, [
     activeChatId,
-    chatMeta.enableSpriteGeneration,
-    chatMeta.gameImageConnectionId,
     chatMeta.gameImagePromptInstructions,
     chatMeta.gameSceneConnectionId,
     chatMeta.gameSetupConfig,
     chatMeta.gameWorldOverview,
     currentBackground,
     fetchSpotifySceneCandidates,
+    gameImageAutoGenerationEnabled,
     gameSnapshot?.location,
     gameSnapshot?.time,
     gameSnapshot?.weather,
@@ -5265,6 +5330,7 @@ function GameSurfaceComponent({
     getScopedAssetMap,
     hudWidgets,
     isStreaming,
+    metaTime,
     npcs,
     playSpotifySceneTrack,
     sceneAnalysis,
@@ -5388,6 +5454,56 @@ function GameSurfaceComponent({
       }
     },
     [activeChatId, gameTimeMeta?.hour, gameTimeMeta?.minute, updateChatMetadata],
+  );
+
+  const handleGameTimeChange = useCallback(
+    async (timeOfDay: EditableGameTimePhase) => {
+      if (!activeChatId) return;
+
+      const snapshot = useGameStateStore.getState().current;
+      const nextTime = {
+        day: currentGameDay,
+        hour: GAME_TIME_PHASE_HOURS[timeOfDay],
+        minute: 0,
+      };
+      const formattedTime = formatGameTimeForHud(nextTime);
+
+      try {
+        await updateChatMetadata.mutateAsync({
+          id: activeChatId,
+          gameTime: nextTime,
+        });
+
+        if (snapshot?.chatId === activeChatId) {
+          useGameStateStore.getState().setGameState({
+            ...snapshot,
+            time: formattedTime,
+          });
+        } else {
+          useGameStateStore.getState().setGameState({
+            id: "",
+            chatId: activeChatId,
+            messageId: "",
+            swipeIndex: 0,
+            date: null,
+            time: formattedTime,
+            location: null,
+            weather: metaWeather,
+            temperature: null,
+            presentCharacters: [],
+            recentEvents: [],
+            playerStats: null,
+            personaStats: null,
+            createdAt: "",
+          });
+        }
+        api.patch(`/chats/${activeChatId}/game-state`, { time: formattedTime }).catch(() => {});
+        toast.success(`Set game time to ${getGameTimeOfDayLabel(nextTime.hour)}.`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to update game time.");
+      }
+    },
+    [activeChatId, currentGameDay, metaWeather, updateChatMetadata],
   );
 
   const handleJsonRepairApplied = useCallback(
@@ -6566,14 +6682,18 @@ function GameSurfaceComponent({
             }))
             .filter((enemy) => enemy.name && enemy.description)
             .slice(0, 10);
-          const shouldGenerateBossVisuals = !!visuals?.isBossFight && !!chatMeta.enableSpriteGeneration;
-          const shouldGenerateEnemyAvatars = !!chatMeta.enableSpriteGeneration && enemyAvatarRequests.length > 0;
+          const shouldGenerateBossVisuals = !!visuals?.isBossFight && gameImageAutoGenerationEnabled;
+          const shouldGenerateEnemyAvatars = gameImageAutoGenerationEnabled && enemyAvatarRequests.length > 0;
           if (
             (shouldGenerateBossVisuals && (visuals?.backgroundPrompt || visuals?.illustrationPrompt)) ||
             shouldGenerateEnemyAvatars
           ) {
             const illustrationPrompt = visuals?.illustrationPrompt?.trim() || "";
             const backgroundPrompt = visuals?.backgroundPrompt?.trim() || "";
+            const sourceNarration =
+              latestAssistantMsgRef.current?.id === messageId && latestAssistantMsgRef.current.content
+                ? parseGmTags(latestAssistantMsgRef.current.content).cleanContent.trim()
+                : "";
             const assetPayload = {
               chatId: activeChatId,
               backgroundTag: backgroundPrompt ? `boss fight: ${backgroundPrompt}` : undefined,
@@ -6589,6 +6709,7 @@ function GameSurfaceComponent({
                       ].slice(0, 6),
                     }
                   : undefined,
+              illustrationNarration: illustrationPrompt.length >= 40 && sourceNarration ? sourceNarration : undefined,
               npcsNeedingAvatars: shouldGenerateEnemyAvatars ? enemyAvatarRequests : undefined,
               debugMode: useUIStore.getState().debugMode,
             };
@@ -6634,8 +6755,8 @@ function GameSurfaceComponent({
     },
     [
       activeChatId,
-      chatMeta.enableSpriteGeneration,
       combatGenerationPending,
+      gameImageAutoGenerationEnabled,
       hydrateGeneratedCombatState,
       requestAssetGeneration,
     ],
@@ -7062,6 +7183,7 @@ function GameSurfaceComponent({
           rpgStats?: {
             attributes: Array<{ name: string; value: number }>;
             hp: { value: number; max: number };
+            pools?: import("@marinara-engine/shared").RPGStatPool[];
           };
         };
       }
@@ -7101,7 +7223,11 @@ function GameSurfaceComponent({
               weaknesses: (gc.weaknesses as string[]) || [],
               extra: (gc.extra as Record<string, string>) || {},
               rpgStats: gc.rpgStats as
-                | { attributes: Array<{ name: string; value: number }>; hp: { value: number; max: number } }
+                | {
+                    attributes: Array<{ name: string; value: number }>;
+                    hp: { value: number; max: number };
+                    pools?: import("@marinara-engine/shared").RPGStatPool[];
+                  }
                 | undefined,
             }
           : undefined,
@@ -7247,6 +7373,7 @@ function GameSurfaceComponent({
                       value: Math.max(0, Number(gameCard.rpgStats.hp.value) || 0),
                       max: Math.max(1, Number(gameCard.rpgStats.hp.max) || 1),
                     },
+                    pools: normalizeRpgStatPools(gameCard.rpgStats),
                   },
                 }
               : {}),
@@ -7522,7 +7649,7 @@ function GameSurfaceComponent({
     const locationType = gameSnapshot?.location?.trim() || "current location";
     const context = [
       `Location: ${gameSnapshot?.location ?? "Unknown"}`,
-      gameSnapshot?.time ? `Time: ${gameSnapshot.time}` : null,
+      (gameSnapshot?.time ?? metaTime) ? `Time: ${gameSnapshot?.time ?? metaTime}` : null,
       gameSnapshot?.weather ? `Weather: ${gameSnapshot.weather}` : null,
       latestNarrationText ? `Scene: ${latestNarrationText}` : null,
     ]
@@ -7543,6 +7670,7 @@ function GameSurfaceComponent({
     generateMap,
     isStreaming,
     latestNarrationText,
+    metaTime,
     sessionInteractive,
   ]);
 
@@ -8057,11 +8185,19 @@ function GameSurfaceComponent({
   const handleBranchMessage = useCallback(
     (messageId: string) => {
       if (!activeChatId || branchChat.isPending) return;
+      const branchToastId = toast.loading("Creating branch...");
       branchChat.mutate(
         { chatId: activeChatId, upToMessageId: messageId },
         {
           onSuccess: (newChat) => {
             if (newChat) useChatStore.getState().setActiveChatId(newChat.id);
+            toast.success("Branch created.");
+          },
+          onError: (error) => {
+            toast.error(error instanceof Error ? `Branch failed: ${error.message}` : "Branch failed.");
+          },
+          onSettled: () => {
+            toast.dismiss(branchToastId);
           },
         },
       );
@@ -8108,12 +8244,12 @@ function GameSurfaceComponent({
       currentAmbient: useGameAssetStore.getState().currentAmbient,
       currentLocation: gameSnapshot?.location ?? null,
       currentWeather: gameSnapshot?.weather ?? null,
-      currentTimeOfDay: gameSnapshot?.time ?? null,
+      currentTimeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       genre: (setupConfig?.genre as string | undefined) ?? null,
       setting: (setupConfig?.setting as string | undefined) ?? null,
       worldOverview: (chatMeta.gameWorldOverview as string | undefined) ?? null,
-      canGenerateBackgrounds: !!chatMeta.enableSpriteGeneration && !!chatMeta.gameImageConnectionId,
-      canGenerateIllustrations: !!chatMeta.enableSpriteGeneration && !!chatMeta.gameImageConnectionId,
+      canGenerateBackgrounds: gameImageAutoGenerationEnabled,
+      canGenerateIllustrations: gameImageAutoGenerationEnabled,
       artStylePrompt: (setupConfig?.artStylePrompt as string | undefined) ?? null,
       imagePromptInstructions:
         typeof chatMeta.gameImagePromptInstructions === "string" ? chatMeta.gameImagePromptInstructions : null,
@@ -8149,12 +8285,14 @@ function GameSurfaceComponent({
     hudWidgets,
     npcs,
     currentBackground,
+    gameImageAutoGenerationEnabled,
     gameSnapshot,
     chatMeta,
     activeChatId,
     sceneAnalysis,
     sceneWrapCharacterNames,
     sceneAnalysisEnabled,
+    metaTime,
   ]);
 
   // Remap legacy hud_bottom widgets to left/right (hud_bottom was removed)
@@ -9336,6 +9474,7 @@ function GameSurfaceComponent({
                       timeOfDay={gameSnapshot?.time ?? metaTime ?? null}
                       day={currentGameDay}
                       onDayChange={handleGameDayChange}
+                      onTimeChange={handleGameTimeChange}
                     />
                   </div>
                   {/* Desktop: inline minimap */}
@@ -9355,6 +9494,7 @@ function GameSurfaceComponent({
                       timeOfDay={gameSnapshot?.time ?? metaTime ?? null}
                       day={currentGameDay}
                       onDayChange={handleGameDayChange}
+                      onTimeChange={handleGameTimeChange}
                       chatId={activeChatId}
                       constraintsRef={hudSurfaceRef}
                     />
@@ -9374,11 +9514,11 @@ function GameSurfaceComponent({
                 </div>
 
                 {/* Dynamic weather effects from tracked game state */}
-                {weatherEffectsEnabled && (gameSnapshot?.weather || gameSnapshot?.time) && (
+                {weatherEffectsEnabled && (gameSnapshot?.weather || gameSnapshot?.time || metaTime) && (
                   <div className="pointer-events-none absolute inset-0 z-[1]">
                     <WeatherEffects
                       weather={gameSnapshot?.weather ?? null}
-                      timeOfDay={gameSnapshot?.time ?? null}
+                      timeOfDay={gameSnapshot?.time ?? metaTime ?? null}
                       showCelestial={false}
                     />
                   </div>
@@ -9853,6 +9993,7 @@ function GameSurfaceComponent({
                   onClose={handleCloseGalleryPanel}
                   anchor={galleryAnchor}
                   onIllustrate={handleManualSceneIllustration}
+                  onGenerateBackground={handleManualSceneBackground}
                 />
               </Suspense>
               <PinnedImageOverlay activeChatId={activeChatId} />

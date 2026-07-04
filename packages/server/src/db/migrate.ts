@@ -19,6 +19,7 @@ const CREATE_TABLES: string[] = [
     prompt_preset_id TEXT,
     connection_id TEXT,
     metadata TEXT NOT NULL DEFAULT '{}',
+    last_message_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
@@ -125,6 +126,9 @@ const CREATE_TABLES: string[] = [
     recursive_scanning TEXT NOT NULL DEFAULT 'false',
     max_recursion_depth INTEGER NOT NULL DEFAULT 3,
     exclude_from_vectorization TEXT NOT NULL DEFAULT 'true',
+    vector_query_depth INTEGER NOT NULL DEFAULT 10,
+    vector_score_threshold REAL NOT NULL DEFAULT 0.3,
+    vector_max_results INTEGER NOT NULL DEFAULT 10,
     character_id TEXT,
     persona_id TEXT,
     chat_id TEXT,
@@ -283,6 +287,7 @@ const CREATE_TABLES: string[] = [
     is_default TEXT NOT NULL DEFAULT 'false',
     use_for_random TEXT NOT NULL DEFAULT 'false',
     enable_caching TEXT NOT NULL DEFAULT 'false',
+    anthropic_extended_cache_ttl TEXT NOT NULL DEFAULT 'false',
     caching_at_depth INTEGER NOT NULL DEFAULT 5,
     prompt_preset_id TEXT,
     created_at TEXT NOT NULL,
@@ -343,6 +348,7 @@ const CREATE_TABLES: string[] = [
     script_body TEXT,
     include_hidden_context TEXT NOT NULL DEFAULT 'false',
     enabled TEXT NOT NULL DEFAULT 'true',
+    sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`,
@@ -399,6 +405,7 @@ const CREATE_TABLES: string[] = [
     placement TEXT NOT NULL DEFAULT '["ai_output"]',
     flags TEXT NOT NULL DEFAULT 'gi',
     prompt_only TEXT NOT NULL DEFAULT 'false',
+    apply_mode TEXT,
     target_character_ids TEXT NOT NULL DEFAULT '[]',
     "order" INTEGER NOT NULL DEFAULT 0,
     min_depth INTEGER,
@@ -531,8 +538,10 @@ const CREATE_TABLES: string[] = [
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
+    runtime TEXT NOT NULL DEFAULT 'client',
     css TEXT,
     js TEXT,
+    server_js TEXT,
     enabled TEXT NOT NULL DEFAULT 'true',
     installed_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -591,6 +600,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
   },
   {
     table: "api_connections",
+    column: "anthropic_extended_cache_ttl",
+    definition: "TEXT NOT NULL DEFAULT 'false'",
+  },
+  {
+    table: "api_connections",
     column: "caching_at_depth",
     definition: "INTEGER NOT NULL DEFAULT 5",
   },
@@ -633,6 +647,21 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     table: "lorebooks",
     column: "exclude_from_vectorization",
     definition: "TEXT NOT NULL DEFAULT 'true'",
+  },
+  {
+    table: "lorebooks",
+    column: "vector_query_depth",
+    definition: "INTEGER NOT NULL DEFAULT 10",
+  },
+  {
+    table: "lorebooks",
+    column: "vector_score_threshold",
+    definition: "REAL NOT NULL DEFAULT 0.3",
+  },
+  {
+    table: "lorebooks",
+    column: "vector_max_results",
+    definition: "INTEGER NOT NULL DEFAULT 10",
   },
   {
     table: "lorebooks",
@@ -720,6 +749,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "INTEGER NOT NULL DEFAULT 0",
   },
   {
+    table: "chats",
+    column: "last_message_at",
+    definition: "TEXT",
+  },
+  {
     table: "api_connections",
     column: "openrouter_provider",
     definition: "TEXT",
@@ -733,6 +767,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     table: "regex_scripts",
     column: "target_character_ids",
     definition: "TEXT NOT NULL DEFAULT '[]'",
+  },
+  {
+    table: "regex_scripts",
+    column: "apply_mode",
+    definition: "TEXT",
   },
   {
     table: "api_connections",
@@ -930,6 +969,11 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     definition: "TEXT NOT NULL DEFAULT 'false'",
   },
   {
+    table: "custom_tools",
+    column: "sort_order",
+    definition: "INTEGER NOT NULL DEFAULT 0",
+  },
+  {
     table: "choice_blocks",
     column: "display_mode",
     definition: "TEXT NOT NULL DEFAULT 'auto'",
@@ -938,6 +982,16 @@ const COLUMN_MIGRATIONS: ColumnMigration[] = [
     table: "choice_blocks",
     column: "option_sort",
     definition: "TEXT NOT NULL DEFAULT 'manual'",
+  },
+  {
+    table: "installed_extensions",
+    column: "runtime",
+    definition: "TEXT NOT NULL DEFAULT 'client'",
+  },
+  {
+    table: "installed_extensions",
+    column: "server_js",
+    definition: "TEXT",
   },
 ];
 
@@ -960,7 +1014,38 @@ export async function runMigrations(db: DB) {
     }
   }
 
+  const customToolOrderRows = await db.all<{ id: string; sort_order: number | null }>(
+    sql.raw(`SELECT id, sort_order FROM custom_tools ORDER BY sort_order ASC, updated_at DESC, id ASC`),
+  );
+  if (
+    customToolOrderRows.length > 1 &&
+    customToolOrderRows.every((row) => Number(row.sort_order ?? 0) === 0)
+  ) {
+    for (const [index, row] of customToolOrderRows.entries()) {
+      await db.run(sql`UPDATE custom_tools SET sort_order = ${(index + 1) * 10} WHERE id = ${row.id}`);
+    }
+  }
+
+  await db.run(
+    sql.raw(`
+      UPDATE chats
+      SET last_message_at = (
+        SELECT MAX(messages.created_at)
+        FROM messages
+        WHERE messages.chat_id = chats.id
+      )
+      WHERE (last_message_at IS NULL OR last_message_at = '')
+      AND EXISTS (
+        SELECT 1
+        FROM messages
+        WHERE messages.chat_id = chats.id
+      )
+    `),
+  );
+
   // 3. Create indexes if they don't exist
+  await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS idx_chats_last_message_at ON chats(last_message_at DESC)`));
+  await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS idx_messages_chat_created_at ON messages(chat_id, created_at DESC)`));
   await db.run(
     sql.raw(`CREATE INDEX IF NOT EXISTS idx_game_state_chat_id ON game_state_snapshots(chat_id, created_at DESC)`),
   );

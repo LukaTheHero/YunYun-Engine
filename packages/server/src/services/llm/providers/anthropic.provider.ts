@@ -17,12 +17,18 @@ import { logger } from "../../../lib/logger.js";
 
 const DEFAULT_CACHING_AT_DEPTH = 5;
 
+type AnthropicCacheControl = { type: "ephemeral"; ttl?: "1h" };
+
 function normalizeCachingAtDepth(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return DEFAULT_CACHING_AT_DEPTH;
   return Math.floor(value);
 }
 
-function resolveCacheControlMessageIndex(messages: ChatMessage[], cachingAtDepth: number): number {
+function buildAnthropicCacheControl(options: ChatOptions): AnthropicCacheControl {
+  return options.anthropicExtendedCacheTtl ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
+}
+
+function resolveCacheControlMessageIndex(messages: ArrayLike<unknown>, cachingAtDepth: number): number {
   if (messages.length === 0) return -1;
   return Math.max(0, messages.length - 1 - cachingAtDepth);
 }
@@ -226,6 +232,24 @@ function formatAnthropicPayloadMessages(messages: ChatMessage[]): AnthropicMessa
   return mergeAnthropicPayloadMessages(payload);
 }
 
+function applyCacheControlToPayloadMessage(
+  messages: AnthropicMessagePayload[],
+  messageIndex: number,
+  cacheControl: AnthropicCacheControl,
+): AnthropicMessagePayload[] {
+  if (messageIndex < 0 || messageIndex >= messages.length) return messages;
+  return messages.map((message, index) => {
+    if (index !== messageIndex || message.content.length === 0) return message;
+    const lastBlockIndex = message.content.length - 1;
+    return {
+      ...message,
+      content: message.content.map((block, blockIndex) =>
+        blockIndex === lastBlockIndex ? { ...block, cache_control: cacheControl } : block,
+      ),
+    };
+  });
+}
+
 /**
  * Anthropic rejects a final assistant turn whose content ends in whitespace
  * (HTTP 400: "final assistant content must not end with trailing whitespace"),
@@ -285,13 +309,28 @@ export class AnthropicProvider extends BaseLLMProvider {
 
     const url = `${this.baseUrl}/messages`;
     const systemMessages = messages.filter((m) => m.role === "system" && m.content?.trim());
-    const systemField = systemMessages.length > 0 ? systemMessages.map((m) => m.content).join("\n\n") : undefined;
+    const enableCaching = options.enableCaching ?? false;
+    const cacheControl = buildAnthropicCacheControl(options);
+    const systemField =
+      systemMessages.length > 0
+        ? enableCaching
+          ? systemMessages.map((m, i) => ({
+              type: "text" as const,
+              text: m.content,
+              ...(i === systemMessages.length - 1 ? { cache_control: cacheControl } : {}),
+            }))
+          : systemMessages.map((m) => m.content).join("\n\n")
+        : undefined;
+    const formattedMessages = formatAnthropicPayloadMessages(trimTrailingAssistantWhitespace(messages));
+    const cacheControlMessageIndex = enableCaching
+      ? resolveCacheControlMessageIndex(formattedMessages, normalizeCachingAtDepth(options.cachingAtDepth))
+      : -1;
 
     const body: Record<string, unknown> = {
       model: options.model,
       ...(this.shouldSendParameter(options, "maxTokens") ? { max_tokens: maxTokens } : {}),
       ...(systemField !== undefined ? { system: systemField } : {}),
-      messages: formatAnthropicPayloadMessages(trimTrailingAssistantWhitespace(messages)),
+      messages: applyCacheControlToPayloadMessage(formattedMessages, cacheControlMessageIndex, cacheControl),
       tools: formatAnthropicTools(options.tools),
       stream: false,
       ...(this.shouldSendParameter(options, "temperature") && options.temperature !== undefined
@@ -399,16 +438,17 @@ export class AnthropicProvider extends BaseLLMProvider {
 
     const enableCaching = options.enableCaching ?? false;
     const cachingAtDepth = normalizeCachingAtDepth(options.cachingAtDepth);
+    const cacheControl = buildAnthropicCacheControl(options);
 
     // Build system field — use content blocks with cache_control when caching is on
-    let systemField: string | Array<{ type: string; text: string; cache_control?: { type: string } }> | undefined;
+    let systemField: string | Array<{ type: string; text: string; cache_control?: AnthropicCacheControl }> | undefined;
     if (systemMessages.length > 0) {
       if (enableCaching) {
         // Array of content blocks with cache_control on the last one
         const blocks = systemMessages.map((m, i) => ({
           type: "text" as const,
           text: m.content,
-          ...(i === systemMessages.length - 1 && { cache_control: { type: "ephemeral" } }),
+          ...(i === systemMessages.length - 1 && { cache_control: cacheControl }),
         }));
         systemField = blocks;
       } else {
@@ -426,13 +466,16 @@ export class AnthropicProvider extends BaseLLMProvider {
       messages: mergedMessages.map((m, i) => {
         // Build content parts (documents + images + text)
         const parts: Array<Record<string, unknown>> = [...fileContentBlocks(m.files), ...imageContentBlocks(m.images)];
+        const isCacheBreakpoint = i === cacheControlMessageIndex;
         if (m.content) {
           const textBlock: Record<string, unknown> = { type: "text", text: m.content };
-          if (i === cacheControlMessageIndex) textBlock.cache_control = { type: "ephemeral" };
+          if (isCacheBreakpoint) textBlock.cache_control = cacheControl;
           parts.push(textBlock);
+        } else if (isCacheBreakpoint && parts.length > 0) {
+          parts[parts.length - 1] = { ...parts[parts.length - 1]!, cache_control: cacheControl };
         }
         // Use content array if we have attachments or cache control, otherwise string
-        if (m.images?.length || m.files?.length || i === cacheControlMessageIndex) {
+        if (m.images?.length || m.files?.length || isCacheBreakpoint) {
           return { role: m.role, content: parts };
         }
         return { role: m.role, content: m.content };
@@ -514,6 +557,7 @@ export class AnthropicProvider extends BaseLLMProvider {
     if (!options.stream) {
       const json = (await response.json()) as {
         content: Array<{ type: string; text?: string; thinking?: string }>;
+        stop_reason?: string | null;
         usage?: { input_tokens: number; output_tokens: number };
       };
       // Extract thinking content if present
@@ -531,6 +575,7 @@ export class AnthropicProvider extends BaseLLMProvider {
           promptTokens: json.usage.input_tokens,
           completionTokens: json.usage.output_tokens,
           totalTokens: json.usage.input_tokens + json.usage.output_tokens,
+          finishReason: normalizeAnthropicFinishReason(json.stop_reason),
         };
       }
       return;
@@ -555,6 +600,7 @@ export class AnthropicProvider extends BaseLLMProvider {
     let inputTokens = 0;
     let outputTokens = 0;
     let finishReason = "stop";
+    let sawStopReason = false;
     let emittedText = false;
 
     try {
@@ -598,6 +644,7 @@ export class AnthropicProvider extends BaseLLMProvider {
           }
           if (event.type === "message_delta" && typeof event.delta?.stop_reason === "string") {
             finishReason = normalizeAnthropicFinishReason(event.delta.stop_reason);
+            sawStopReason = true;
           }
           // Track block type (thinking vs text)
           if (event.type === "content_block_start" && event.content_block) {
@@ -612,7 +659,7 @@ export class AnthropicProvider extends BaseLLMProvider {
             }
           }
           if (event.type === "message_stop") {
-            if (!emittedText && !options.signal?.aborted) {
+            if (!emittedText && !sawStopReason && !options.signal?.aborted) {
               throw new Error(`Anthropic stream completed without text (finish reason: ${finishReason})`);
             }
             if (inputTokens || outputTokens) {
@@ -631,7 +678,7 @@ export class AnthropicProvider extends BaseLLMProvider {
     } finally {
       if (options.signal) options.signal.removeEventListener("abort", onAbort);
     }
-    if (!emittedText && !options.signal?.aborted) {
+    if (!emittedText && !sawStopReason && !options.signal?.aborted) {
       throw new Error(`Anthropic stream completed without text (finish reason: ${finishReason})`);
     }
     if (inputTokens || outputTokens) {

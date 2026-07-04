@@ -180,6 +180,34 @@ export function AppShell() {
   // Auto idle detection (10 min inactivity → idle, activity → active)
   useIdleDetection();
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const root = document.documentElement;
+    let frame = 0;
+    const updateVisualViewportHeight = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const height = window.visualViewport?.height ?? window.innerHeight;
+        root.style.setProperty("--mari-visual-viewport-height", `${Math.max(0, Math.round(height))}px`);
+      });
+    };
+
+    updateVisualViewportHeight();
+    window.visualViewport?.addEventListener("resize", updateVisualViewportHeight);
+    window.visualViewport?.addEventListener("scroll", updateVisualViewportHeight);
+    window.addEventListener("resize", updateVisualViewportHeight);
+    window.addEventListener("orientationchange", updateVisualViewportHeight);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.visualViewport?.removeEventListener("resize", updateVisualViewportHeight);
+      window.visualViewport?.removeEventListener("scroll", updateVisualViewportHeight);
+      window.removeEventListener("resize", updateVisualViewportHeight);
+      window.removeEventListener("orientationchange", updateVisualViewportHeight);
+      root.style.removeProperty("--mari-visual-viewport-height");
+    };
+  }, []);
+
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -767,7 +795,7 @@ export function AppShell() {
     <div
       data-component="AppShell"
       className={cn(
-        "mari-app mari-app-background-paint fixed inset-0 flex overflow-hidden max-md:h-screen max-md:max-h-screen max-md:pb-[env(safe-area-inset-bottom)] max-md:pt-[env(safe-area-inset-top)] supports-[height:100dvh]:max-md:h-[100dvh] supports-[height:100dvh]:max-md:max-h-[100dvh]",
+        "mari-app mari-app-background-paint fixed inset-0 flex overflow-hidden",
         showAmbientDecor && "retro-scanlines noise-bg geometric-grid",
       )}
     >
@@ -842,6 +870,8 @@ export function AppShell() {
         aria-label="Main content"
         className="@container mari-main mari-app-background-paint relative flex min-w-0 flex-1 flex-col overflow-hidden"
       >
+        {/* iOS safe area spacer — pushes TopBar below status bar and fills that gap with topbar bg */}
+        <div className="flex-shrink-0 md:hidden h-[env(safe-area-inset-top)] bg-[var(--marinara-topbar-surface)] backdrop-blur-sm" />
         <TopBar />
         <div className="mari-app-background-paint relative flex flex-1 flex-col overflow-hidden">
           {/* Bot Browser — kept mounted once opened so state persists across close/reopen */}

@@ -1,7 +1,7 @@
 // ──────────────────────────────────────────────
 // Storage: API Connections
 // ──────────────────────────────────────────────
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, ne } from "drizzle-orm";
 import type { DB } from "../../db/connection.js";
 import { apiConnections } from "../../db/schema/index.js";
 import { newId, now } from "../../utils/id-generator.js";
@@ -91,6 +91,7 @@ export function createConnectionsStorage(db: DB) {
         useForRandom: String(input.useForRandom ?? false),
         defaultForAgents: String(input.defaultForAgents ?? false),
         enableCaching: String(input.enableCaching ?? false),
+        anthropicExtendedCacheTtl: String(input.anthropicExtendedCacheTtl ?? false),
         cachingAtDepth: input.cachingAtDepth ?? 5,
         maxParallelJobs: input.maxParallelJobs ?? 1,
         embeddingModel: input.embeddingModel ?? "",
@@ -117,6 +118,10 @@ export function createConnectionsStorage(db: DB) {
 
       const effectiveProvider = data.provider ?? existing.provider;
       const updateFields: Record<string, unknown> = { updatedAt: now() };
+      const shouldClearDefault = data.isDefault === true;
+      const shouldClearAgentDefaults =
+        data.defaultForAgents === true ||
+        (data.defaultForAgents === undefined && data.provider !== undefined && existing.defaultForAgents === "true");
       if (data.name !== undefined) updateFields.name = data.name;
       if (data.provider !== undefined) updateFields.provider = data.provider;
       if (data.baseUrl !== undefined) updateFields.baseUrl = data.baseUrl;
@@ -125,37 +130,19 @@ export function createConnectionsStorage(db: DB) {
       if (data.imagePath !== undefined) updateFields.imagePath = data.imagePath;
       if (data.maxContext !== undefined) updateFields.maxContext = data.maxContext;
       if (data.isDefault !== undefined) {
-        if (data.isDefault) {
-          await db.update(apiConnections).set({ isDefault: "false" });
-        }
         updateFields.isDefault = String(data.isDefault);
       }
       if (data.useForRandom !== undefined) {
         updateFields.useForRandom = String(data.useForRandom);
       }
       if (data.defaultForAgents !== undefined) {
-        if (data.defaultForAgents) {
-          if (effectiveProvider === "image_generation") {
-            await db
-              .update(apiConnections)
-              .set({ defaultForAgents: "false" })
-              .where(and(eq(apiConnections.defaultForAgents, "true"), eq(apiConnections.provider, "image_generation")));
-          } else {
-            const existingDefaults = await db
-              .select()
-              .from(apiConnections)
-              .where(eq(apiConnections.defaultForAgents, "true"));
-            for (const row of existingDefaults) {
-              if (row.provider !== "image_generation") {
-                await db.update(apiConnections).set({ defaultForAgents: "false" }).where(eq(apiConnections.id, row.id));
-              }
-            }
-          }
-        }
         updateFields.defaultForAgents = String(data.defaultForAgents);
       }
       if (data.enableCaching !== undefined) {
         updateFields.enableCaching = String(data.enableCaching);
+      }
+      if (data.anthropicExtendedCacheTtl !== undefined) {
+        updateFields.anthropicExtendedCacheTtl = String(data.anthropicExtendedCacheTtl);
       }
       if (data.cachingAtDepth !== undefined) {
         updateFields.cachingAtDepth = data.cachingAtDepth;
@@ -199,7 +186,38 @@ export function createConnectionsStorage(db: DB) {
       if (data.treatAsLocalEndpoint !== undefined) {
         updateFields.treatAsLocalEndpoint = String(data.treatAsLocalEndpoint);
       }
-      await db.update(apiConnections).set(updateFields).where(eq(apiConnections.id, id));
+      await db.transaction(async (tx) => {
+        if (shouldClearDefault) {
+          await tx.update(apiConnections).set({ isDefault: "false" });
+        }
+        if (shouldClearAgentDefaults) {
+          if (effectiveProvider === "image_generation") {
+            await tx
+              .update(apiConnections)
+              .set({ defaultForAgents: "false" })
+              .where(
+                data.defaultForAgents === true
+                  ? and(eq(apiConnections.defaultForAgents, "true"), eq(apiConnections.provider, "image_generation"))
+                  : and(
+                      eq(apiConnections.defaultForAgents, "true"),
+                      eq(apiConnections.provider, "image_generation"),
+                      ne(apiConnections.id, id),
+                    ),
+              );
+          } else {
+            const existingDefaults = await tx
+              .select()
+              .from(apiConnections)
+              .where(eq(apiConnections.defaultForAgents, "true"));
+            for (const row of existingDefaults) {
+              if (row.provider !== "image_generation" && (data.defaultForAgents === true || row.id !== id)) {
+                await tx.update(apiConnections).set({ defaultForAgents: "false" }).where(eq(apiConnections.id, row.id));
+              }
+            }
+          }
+        }
+        await tx.update(apiConnections).set(updateFields).where(eq(apiConnections.id, id));
+      });
       return this.getById(id);
     },
 
@@ -222,6 +240,7 @@ export function createConnectionsStorage(db: DB) {
         useForRandom: "false",
         defaultForAgents: "false",
         enableCaching: source.enableCaching,
+        anthropicExtendedCacheTtl: source.anthropicExtendedCacheTtl,
         cachingAtDepth: source.cachingAtDepth,
         embeddingModel: source.embeddingModel,
         embeddingConnectionId: source.embeddingConnectionId,

@@ -101,12 +101,25 @@ goto :eof
 if not exist ".git" goto :skip_update
 echo  [..] Checking for updates...
 for /f "tokens=*" %%i in ('git rev-parse HEAD 2^>nul') do set "OLD_HEAD=%%i"
-git fetch origin "+refs/heads/main:refs/remotes/origin/main" --quiet >nul 2>&1
+set "CURRENT_BRANCH="
+for /f "tokens=*" %%i in ('git branch --show-current 2^>nul') do set "CURRENT_BRANCH=%%i"
+set "TARGET_BRANCH=main"
+if /I "!CURRENT_BRANCH!"=="staging" set "TARGET_BRANCH=staging"
+if "!CURRENT_BRANCH!"=="" (
+    git fetch origin "+refs/heads/main:refs/remotes/origin/main" "+refs/heads/staging:refs/remotes/origin/staging" --quiet >nul 2>&1
+    git merge-base --is-ancestor HEAD origin/staging >nul 2>&1
+    if not errorlevel 1 (
+        git merge-base --is-ancestor HEAD origin/main >nul 2>&1
+        if errorlevel 1 set "TARGET_BRANCH=staging"
+    )
+)
+set "TARGET_REF=origin/!TARGET_BRANCH!"
+git fetch origin "+refs/heads/!TARGET_BRANCH!:refs/remotes/origin/!TARGET_BRANCH!" --quiet >nul 2>&1
 if errorlevel 1 (
     echo  [WARN] Could not check for updates. Continuing with current version.
     goto :skip_update
 )
-for /f "tokens=*" %%i in ('git rev-parse origin/main 2^>nul') do set "TARGET_HEAD=%%i"
+for /f "tokens=*" %%i in ('git rev-parse !TARGET_REF! 2^>nul') do set "TARGET_HEAD=%%i"
 if /I "!OLD_HEAD!"=="!TARGET_HEAD!" (
     echo  [OK] Already up to date
     goto :skip_update
@@ -121,38 +134,69 @@ if exist "app-icon.ico" (
     if errorlevel 1 del /q "app-icon.ico" >nul 2>&1
 )
 
-:: Stash any tracked local changes so the update doesn't fail
+:: Stash local changes, including untracked non-ignored files, so the update doesn't fail
 set "STASHED=0"
 set "STASH_REF="
 set "DIRTY=0"
+set "STASH_FAILED=0"
 git diff --quiet >nul 2>&1
 if errorlevel 1 set "DIRTY=1"
 git diff --cached --quiet >nul 2>&1
 if errorlevel 1 set "DIRTY=1"
+set "UNTRACKED="
+for /f "tokens=*" %%i in ('git ls-files --others --exclude-standard 2^>nul') do if not defined UNTRACKED set "UNTRACKED=1"
+if defined UNTRACKED set "DIRTY=1"
 if "!DIRTY!"=="1" (
-    git stash push -q -m "auto-stash before update" >nul 2>&1 && set "STASHED=1"
+    git stash push -u -q -m "auto-stash before update" >nul 2>&1 && set "STASHED=1"
+    if not "!STASHED!"=="1" set "STASH_FAILED=1"
     if "!STASHED!"=="1" for /f "tokens=*" %%i in ('git stash list -1 --format^=%%gd 2^>nul') do set "STASH_REF=%%i"
 )
-set "CURRENT_BRANCH="
-for /f "tokens=*" %%i in ('git branch --show-current 2^>nul') do set "CURRENT_BRANCH=%%i"
 set "UPDATED_TO_TARGET=0"
-if "!CURRENT_BRANCH!"=="" (
-    git checkout --detach "!TARGET_HEAD!" >nul 2>&1 && set "UPDATED_TO_TARGET=1"
+set "ALLOW_DETACHED_FALLBACK=0"
+if /I "!CURRENT_BRANCH!"=="main" set "ALLOW_DETACHED_FALLBACK=1"
+if /I "!CURRENT_BRANCH!"=="master" set "ALLOW_DETACHED_FALLBACK=1"
+if /I "!CURRENT_BRANCH!"=="staging" set "ALLOW_DETACHED_FALLBACK=1"
+set "UPDATE_LOG=%TEMP%\marinara-update-!RANDOM!-!RANDOM!.log"
+if exist "!UPDATE_LOG!" del /q "!UPDATE_LOG!" >nul 2>&1
+if "!STASH_FAILED!"=="1" (
+    echo  [WARN] Could not stash local changes. Skipping auto-update to avoid overwriting them.
 ) else (
-    git merge --ff-only origin/main >nul 2>&1 && set "UPDATED_TO_TARGET=1"
+    if "!CURRENT_BRANCH!"=="" (
+        git checkout --detach "!TARGET_HEAD!" >"!UPDATE_LOG!" 2>&1 && set "UPDATED_TO_TARGET=1"
+        if not "!UPDATED_TO_TARGET!"=="1" git reset --hard "!TARGET_HEAD!" >"!UPDATE_LOG!" 2>&1 && set "UPDATED_TO_TARGET=1"
+    ) else (
+        git merge --ff-only "!TARGET_REF!" >"!UPDATE_LOG!" 2>&1 && set "UPDATED_TO_TARGET=1"
+        if not "!UPDATED_TO_TARGET!"=="1" if "!ALLOW_DETACHED_FALLBACK!"=="1" (
+            echo  [..] Fast-forward failed; resetting the installed checkout to the latest !TARGET_BRANCH! commit...
+            git reset --hard "!TARGET_HEAD!" >"!UPDATE_LOG!" 2>&1 && set "UPDATED_TO_TARGET=1"
+        )
+    )
 )
 if not "!UPDATED_TO_TARGET!"=="1" (
+    if "!STASH_FAILED!"=="1" (
+        if exist "!UPDATE_LOG!" del /q "!UPDATE_LOG!" >nul 2>&1
+        goto :skip_update
+    )
     if "!STASHED!"=="1" call :restore_stashed_changes
-    echo  [WARN] Could not update to origin/main. Continuing with current version.
+    echo  [WARN] Could not update to !TARGET_REF!. Continuing with current version.
+    if exist "!UPDATE_LOG!" (
+        for %%A in ("!UPDATE_LOG!") do if %%~zA GTR 0 (
+            echo         Git reported:
+            for /f "usebackq delims=" %%i in ("!UPDATE_LOG!") do echo         %%i
+        )
+        del /q "!UPDATE_LOG!" >nul 2>&1
+    )
     goto :skip_update
 )
 for /f "tokens=*" %%i in ('git rev-parse HEAD 2^>nul') do set "NEW_HEAD=%%i"
 if /I not "!NEW_HEAD!"=="!TARGET_HEAD!" (
     if "!STASHED!"=="1" call :restore_stashed_changes
-    echo  [WARN] Update did not land on origin/main. Continuing with current version.
+    echo  [WARN] Update did not land on !TARGET_REF!. Continuing with current version.
+    if exist "!UPDATE_LOG!" del /q "!UPDATE_LOG!" >nul 2>&1
     goto :skip_update
 )
 if "!STASHED!"=="1" call :restore_stashed_changes
+if exist "!UPDATE_LOG!" del /q "!UPDATE_LOG!" >nul 2>&1
 echo  [OK] Updated to latest version
 echo  [..] Reinstalling dependencies...
 call :run_pnpm install

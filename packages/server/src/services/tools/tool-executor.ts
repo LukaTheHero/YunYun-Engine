@@ -73,6 +73,10 @@ const MAX_LOREBOOK_ENTRY_KEYS = 24;
 const MAX_CHAT_VARIABLE_KEY_LENGTH = 128;
 const MAX_CHAT_VARIABLE_VALUE_BYTES = 64 * 1024;
 const MAX_CHAT_VARIABLES = 256;
+const WEB_SEARCH_MAX_QUERY_LENGTH = 400;
+const WEB_SEARCH_DEFAULT_LIMIT = 5;
+const WEB_SEARCH_MAX_LIMIT = 8;
+const WEB_SEARCH_RESPONSE_MAX_BYTES = 512 * 1024;
 const SPOTIFY_TRACK_INDEX_TTL_MS = 20 * 60_000;
 const SPOTIFY_TRACK_INDEX_CACHE_MAX = 24;
 const SPOTIFY_TRACK_INDEX_MAX_TRACKS = 2_500;
@@ -228,6 +232,8 @@ async function executeSingleTool(
       return triggerEvent(args);
     case "search_lorebook":
       return searchLorebook(args, context?.searchLorebook);
+    case "web_search":
+      return webSearch(args);
     case "save_lorebook_entry":
       return saveLorebookEntry(args, context?.saveLorebookEntry);
     case "edit_chat_message":
@@ -264,6 +270,7 @@ async function executeSingleTool(
           "set_expression",
           "trigger_event",
           "search_lorebook",
+          "web_search",
           "save_lorebook_entry",
           "edit_chat_message",
           "read_chat_summary",
@@ -284,7 +291,10 @@ async function executeSingleTool(
 
 // ── Custom Tool Execution ──
 
-function getCustomToolHiddenContext(tool: CustomToolDef, context?: ToolExecutionContext): CustomToolHiddenContext | undefined {
+function getCustomToolHiddenContext(
+  tool: CustomToolDef,
+  context?: ToolExecutionContext,
+): CustomToolHiddenContext | undefined {
   if (tool.includeHiddenContext !== true) return undefined;
   return context?.hiddenContext ?? {};
 }
@@ -335,29 +345,28 @@ async function executeCustomTool(
     case "script": {
       if (!isCustomToolScriptEnabled()) {
         return {
-          error: "Script custom tools are disabled. Set CUSTOM_TOOL_SCRIPT_ENABLED=true to allow local code execution.",
+          error:
+            "Script custom tools are disabled. Set CUSTOM_TOOL_SCRIPT_ENABLED=true to enable trusted in-process script tools.",
         };
       }
       if (!tool.scriptBody) return { error: "No script body configured" };
       try {
-        // Sandboxed execution using vm.runInNewContext
-        // The script only has access to the explicitly provided sandbox objects
-        const sandbox = {
-          args,
-          context: hiddenContext ?? null,
-          JSON: { parse: JSON.parse, stringify: JSON.stringify },
-          Math,
-          String,
-          Number,
-          Date,
-          Array,
-          parseInt,
-          parseFloat,
-          isNaN,
-          isFinite,
-          console: { log: () => {} },
-        };
-        const result = vm.runInNewContext(`"use strict"; (function() { ${tool.scriptBody} })()`, sandbox, {
+        // Keep host-realm objects out of the VM context. Script inputs cross the
+        // boundary as JSON so built-ins stay in the VM realm where process,
+        // require, Buffer, and native bindings are not exposed.
+        const sandbox = vm.createContext(Object.create(null));
+        (sandbox as Record<string, unknown>).__argsJson = JSON.stringify(args ?? {});
+        (sandbox as Record<string, unknown>).__ctxJson = JSON.stringify(hiddenContext ?? null);
+        const wrappedScript = [
+          `"use strict";`,
+          `globalThis.args = JSON.parse(__argsJson);`,
+          `globalThis.context = JSON.parse(__ctxJson);`,
+          `globalThis.console = { log: function () {} };`,
+          `(function() {`,
+          `${tool.scriptBody}`,
+          `})();`,
+        ].join("\n");
+        const result = vm.runInContext(wrappedScript, sandbox, {
           timeout: customToolTimeoutMs,
           breakOnSigint: true,
         });
@@ -564,17 +573,21 @@ async function writeChatVariable(
     return { error: "Chat metadata updates are not available in this context" };
   }
 
-  const existingVariables = normalizeAgentVariables(context.chatMeta?.agentVariables);
-  const existed = Object.prototype.hasOwnProperty.call(existingVariables, keyResult.key);
-  if (!existed && Object.keys(existingVariables).length >= MAX_CHAT_VARIABLES) {
-    return { error: `chat variable limit reached (${MAX_CHAT_VARIABLES})` };
-  }
-
   const value = trimToUtf8Bytes(args.value, MAX_CHAT_VARIABLE_VALUE_BYTES);
+  let existed = false;
+  let limitReached = false;
   const updated = await context.onUpdateMetadata((currentMeta) => {
     const variables = normalizeAgentVariables(currentMeta.agentVariables);
+    existed = Object.prototype.hasOwnProperty.call(variables, keyResult.key);
+    if (!existed && Object.keys(variables).length >= MAX_CHAT_VARIABLES) {
+      limitReached = true;
+      return {};
+    }
     return { agentVariables: { ...variables, [keyResult.key]: value } };
   });
+  if (limitReached) {
+    return { error: `chat variable limit reached (${MAX_CHAT_VARIABLES})` };
+  }
   const variables = normalizeAgentVariables(updated.agentVariables);
   return {
     key: keyResult.key,
@@ -620,18 +633,130 @@ async function searchLorebook(
   };
 }
 
+function clampInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
+function decodeHtmlEntities(value: string): string {
+  const named: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    nbsp: " ",
+    quot: '"',
+  };
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity[0] === "#") {
+      const isHex = entity[1]?.toLowerCase() === "x";
+      const codePoint = Number.parseInt(entity.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+      if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return match;
+      return String.fromCodePoint(codePoint);
+    }
+    return named[entity.toLowerCase()] ?? match;
+  });
+}
+
+function textFromHtml(value: string): string {
+  return decodeHtmlEntities(value.replace(/<[^>]*>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resolveDuckDuckGoResultUrl(href: string): string | null {
+  try {
+    const absolute = href.startsWith("//") ? `https:${href}` : new URL(href, "https://duckduckgo.com").toString();
+    const parsed = new URL(decodeHtmlEntities(absolute));
+    const redirectTarget =
+      parsed.hostname.endsWith("duckduckgo.com") && parsed.pathname === "/l/" ? parsed.searchParams.get("uddg") : null;
+    const resolved = redirectTarget ? new URL(redirectTarget) : parsed;
+    if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return null;
+    return resolved.toString();
+  } catch {
+    return null;
+  }
+}
+
+function parseDuckDuckGoLiteResults(html: string, limit: number) {
+  const matches = [...html.matchAll(/<a\b(?=[^>]*class=(["'])result-link\1)([^>]*)>([\s\S]*?)<\/a>/gi)];
+  const results: Array<{ title: string; url: string; snippet: string }> = [];
+  const seenUrls = new Set<string>();
+
+  for (let index = 0; index < matches.length && results.length < limit; index += 1) {
+    const match = matches[index]!;
+    const attrs = match[2] ?? "";
+    const hrefMatch = attrs.match(/\bhref=(["'])(.*?)\1/i);
+    const url = hrefMatch ? resolveDuckDuckGoResultUrl(hrefMatch[2] ?? "") : null;
+    if (!url || seenUrls.has(url)) continue;
+    const title = textFromHtml(match[3] ?? "");
+    if (!title) continue;
+
+    const nextIndex = matches[index + 1]?.index ?? html.length;
+    const chunk = html.slice((match.index ?? 0) + match[0].length, nextIndex);
+    const snippetMatch = chunk.match(/<td\b[^>]*class=(["'])result-snippet\1[^>]*>([\s\S]*?)<\/td>/i);
+    const snippet = snippetMatch ? textFromHtml(snippetMatch[2] ?? "") : "";
+    seenUrls.add(url);
+    results.push({ title, url, snippet });
+  }
+
+  return results;
+}
+
+async function webSearch(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const rawQuery = typeof args.query === "string" ? args.query.trim() : "";
+  if (!rawQuery) return { error: "web_search requires a non-empty query", results: [] };
+  const query = rawQuery.slice(0, WEB_SEARCH_MAX_QUERY_LENGTH);
+  const limit = clampInteger(args.limit, WEB_SEARCH_DEFAULT_LIMIT, 1, WEB_SEARCH_MAX_LIMIT);
+  const url = new URL("https://lite.duckduckgo.com/lite/");
+  url.searchParams.set("q", query);
+
+  try {
+    const res = await safeFetch(url, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": "Marinara Engine web_search tool",
+      },
+      signal: AbortSignal.timeout(10_000),
+      policy: { allowedProtocols: ["https:"], maxRedirects: 2 },
+      allowedContentTypes: ["text/html", "application/xhtml+xml"],
+      maxResponseBytes: WEB_SEARCH_RESPONSE_MAX_BYTES,
+    });
+    if (!res.ok) {
+      return { query, results: [], count: 0, error: `Web search failed (${res.status})` };
+    }
+    const html = await res.text();
+    const results = parseDuckDuckGoLiteResults(html, limit);
+    return {
+      query,
+      source: "DuckDuckGo Lite",
+      results,
+      count: results.length,
+      ...(results.length === 0 ? { note: "No web results were found." } : {}),
+    };
+  } catch (err) {
+    return {
+      query,
+      results: [],
+      count: 0,
+      error: err instanceof Error ? err.message : "Web search failed.",
+    };
+  }
+}
+
 function normalizeLorebookEntryKeys(value: unknown, fallbackName: string): string[] {
   const raw = Array.isArray(value) ? value : [];
-  const keys = raw
-    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-    .filter((entry) => entry.length > 0)
-    .slice(0, MAX_LOREBOOK_ENTRY_KEYS);
-  if (keys.length > 0) return Array.from(new Set(keys));
+  const keys = Array.from(
+    new Set(raw.map((entry) => (typeof entry === "string" ? entry.trim() : "")).filter((entry) => entry.length > 0)),
+  ).slice(0, MAX_LOREBOOK_ENTRY_KEYS);
+  if (keys.length > 0) return keys;
   return fallbackName ? [fallbackName] : [];
 }
 
-function normalizeLorebookWriteMode(value: unknown): "create" | "replace" | "append" {
-  return value === "create" || value === "append" || value === "replace" ? value : "replace";
+function normalizeLorebookWriteMode(value: unknown): "create" | "replace" | "append" | "invalid" {
+  if (value === undefined || value === null || value === "") return "replace";
+  return value === "create" || value === "append" || value === "replace" ? value : "invalid";
 }
 
 async function saveLorebookEntry(
@@ -655,6 +780,10 @@ async function saveLorebookEntry(
       ? trimToUtf8Bytes(args.description.trim(), MAX_LOREBOOK_ENTRY_DESCRIPTION_BYTES)
       : undefined;
   const tag = typeof args.tag === "string" && args.tag.trim() ? args.tag.trim().slice(0, 80) : undefined;
+  const mode = normalizeLorebookWriteMode(args.mode);
+  if (mode === "invalid") {
+    return { error: "save_lorebook_entry mode must be one of create|replace|append" };
+  }
 
   return saveFn({
     name,
@@ -662,7 +791,7 @@ async function saveLorebookEntry(
     description,
     keys: normalizeLorebookEntryKeys(args.keys, name),
     tag,
-    mode: normalizeLorebookWriteMode(args.mode),
+    mode,
   });
 }
 
@@ -682,7 +811,7 @@ async function editChatMessage(
 
   return replaceFn({
     messageId: args.messageId.trim(),
-    content: trimToUtf8Bytes(args.content.trim(), MAX_APPEND_BYTES),
+    content: args.content.trim(),
     reason: typeof args.reason === "string" ? args.reason.trim().slice(0, 240) : undefined,
   });
 }
@@ -736,6 +865,12 @@ async function spotifyGetCurrentPlayback(
         album?: { name?: string };
         duration_ms?: number;
       } | null;
+      context?: {
+        type?: string | null;
+        uri?: string | null;
+        href?: string | null;
+        external_urls?: { spotify?: string | null } | null;
+      } | null;
       device?: { id?: string | null; name?: string; type?: string; volume_percent?: number | null } | null;
     };
     const track = data.item
@@ -756,6 +891,14 @@ async function spotifyGetCurrentPlayback(
       repeat: normalizeSpotifyRepeatState(data.repeat_state),
       progressMs: data.progress_ms ?? null,
       track,
+      context: data.context
+        ? {
+            type: data.context.type ?? null,
+            uri: data.context.uri ?? null,
+            href: data.context.href ?? null,
+            externalUrl: data.context.external_urls?.spotify ?? null,
+          }
+        : null,
       device: data.device
         ? {
             id: data.device.id ?? null,
@@ -777,7 +920,7 @@ async function spotifyGetPlaylists(
   if (!creds?.accessToken) {
     return { error: "Spotify not configured. Please add your Spotify access token in the Music DJ agent settings." };
   }
-  const limit = Math.min(Number(args.limit ?? 20), 50);
+  const limit = clampNumber(args.limit ?? 20, 20, 1, 50);
 
   try {
     const res = await fetch(
@@ -886,7 +1029,9 @@ function getSpotifyRecentTrackUris(chatMeta?: Record<string, unknown>): string[]
   return recent;
 }
 
-function getSpotifyRecentTrackMetadataKey(chatMeta?: Record<string, unknown>): "spotifyRecentTracks" | "gameRecentSpotifyTracks" {
+function getSpotifyRecentTrackMetadataKey(
+  chatMeta?: Record<string, unknown>,
+): "spotifyRecentTracks" | "gameRecentSpotifyTracks" {
   return chatMeta?.gameUseSpotifyMusic === true || typeof chatMeta?.gameSpotifySourceType === "string"
     ? "gameRecentSpotifyTracks"
     : "spotifyRecentTracks";
@@ -1481,8 +1626,7 @@ async function spotifyGetPlaylistTracks(
         recentAvoidedCount: selection.recentAvoidedCount,
         candidateSample: selectionVariant,
         truncated: index.truncated,
-        hint:
-          "Server indexed the playlist and returned only selected candidates. Recently played tracks are suppressed when alternatives exist; avoid recentTrackUris unless no fitting non-recent candidate appears. Pick 3-5 URIs from this shortlist; do not request every page unless you truly need manual browsing.",
+        hint: "Server indexed the playlist and returned only selected candidates. Recently played tracks are suppressed when alternatives exist; avoid recentTrackUris unless no fitting non-recent candidate appears. Pick 3-5 URIs from this shortlist; do not request every page unless you truly need manual browsing.",
       };
     }
 
@@ -1528,7 +1672,7 @@ async function spotifySearch(
     return { error: "Spotify not configured. Please add your Spotify access token in the Music DJ agent settings." };
   }
   const query = normalizeSpotifySearchQuery(args.query);
-  const limit = Math.min(Number(args.limit ?? 5), 20);
+  const limit = clampNumber(args.limit ?? 5, 5, 1, 20);
 
   try {
     const res = await fetch(
@@ -1595,8 +1739,7 @@ async function spotifyPlay(
     const playDeviceId = beforePlayback?.deviceId ? null : targetDeviceId;
     if (!targetDeviceId) {
       return {
-        error:
-          "No active Spotify device is available. Open Spotify on the device you want to use, then try again.",
+        error: "No active Spotify device is available. Open Spotify on the device you want to use, then try again.",
       };
     }
     logger.debug(
@@ -1782,7 +1925,7 @@ async function spotifySetVolume(
   if (!creds?.accessToken) {
     return { error: "Spotify not configured. Please add your Spotify access token in the Music DJ agent settings." };
   }
-  const volume = Math.max(0, Math.min(100, Number(args.volume ?? 50)));
+  const volume = clampNumber(args.volume ?? 50, 50, 0, 100);
   const reason = String(args.reason ?? "");
 
   try {

@@ -1426,7 +1426,18 @@ async function readProfileEnvelopeFromArchive(zip: ProfileZipArchive) {
     zip.entries.find((entry) => !entry.isDirectory && entry.entryName.endsWith("/marinara-profile.json"));
 
   if (!profileEntry) {
-    throw new ProfileImportRequestError("Profile archive is missing marinara-profile.json.");
+    const sampleEntries = zip.entries
+      .filter((entry) => !entry.isDirectory)
+      .slice(0, 8)
+      .map((entry) => entry.entryName)
+      .join(", ");
+    throw new ProfileImportRequestError(
+      [
+        "Profile archive is missing marinara-profile.json.",
+        "Select a Marinara profile export or a full backup ZIP downloaded from Settings -> Advanced -> Backups.",
+        sampleEntries ? `This ZIP starts with: ${sampleEntries}` : "This ZIP did not contain any readable files.",
+      ].join(" "),
+    );
   }
 
   try {
@@ -2058,9 +2069,13 @@ export async function backupRoutes(app: FastifyInstance) {
                   category: lb.category ?? "uncategorized",
                   scanDepth: lb.scanDepth,
                   tokenBudget: lb.tokenBudget,
+                  entryLimit: lb.entryLimit,
                   recursiveScanning: lb.recursiveScanning,
                   maxRecursionDepth: lb.maxRecursionDepth,
                   excludeFromVectorization: lb.excludeFromVectorization ?? false,
+                  vectorQueryDepth: lb.vectorQueryDepth ?? 10,
+                  vectorScoreThreshold: lb.vectorScoreThreshold ?? 0.3,
+                  vectorMaxResults: lb.vectorMaxResults ?? 10,
                   enabled: lb.enabled ?? true,
                   characterId: lb.characterId ?? null,
                   characterIds: Array.isArray(lb.characterIds)

@@ -1,14 +1,16 @@
 // ──────────────────────────────────────────────
 // Storage: Lorebooks
 // ──────────────────────────────────────────────
-import { eq, desc, and, like, inArray, asc } from "drizzle-orm";
+import { eq, desc, and, like, inArray, asc, or } from "drizzle-orm";
 import type { DB } from "../../db/connection.js";
 import {
+  characters,
   lorebooks,
   lorebookCharacterLinks,
   lorebookEntries,
   lorebookFolders,
   lorebookPersonaLinks,
+  personas,
 } from "../../db/schema/index.js";
 import { newId, now } from "../../utils/id-generator.js";
 import {
@@ -22,6 +24,8 @@ import {
 } from "@marinara-engine/shared";
 import { collectEffectivelyDisabledFolderIds, collectFolderSubtreeIds } from "@marinara-engine/shared";
 import { normalizeTimestampOverrides, type TimestampOverrides } from "../import/import-timestamps.js";
+import { GAME_LOREBOOK_KEEPER_SOURCE_ID } from "../lorebook/game-lorebook-scope.js";
+import { toPaginatedList } from "../../utils/list-pagination.js";
 
 function normalizeLorebookEntryLimit(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -29,6 +33,27 @@ function normalizeLorebookEntryLimit(value: unknown): number {
   return Math.max(
     LIMITS.LOREBOOK_ENTRY_LIMIT_MIN,
     Math.min(LIMITS.LOREBOOK_ENTRY_LIMIT_MAX, Math.trunc(parsed)),
+  );
+}
+
+function normalizeLorebookVectorQueryDepth(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return LIMITS.LOREBOOK_VECTOR_QUERY_DEPTH_DEFAULT;
+  return Math.max(0, Math.min(LIMITS.LOREBOOK_VECTOR_QUERY_DEPTH_MAX, Math.trunc(parsed)));
+}
+
+function normalizeLorebookVectorScoreThreshold(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return LIMITS.LOREBOOK_VECTOR_SCORE_THRESHOLD_DEFAULT;
+  return Math.max(0, Math.min(1, parsed));
+}
+
+function normalizeLorebookVectorMaxResults(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return LIMITS.LOREBOOK_VECTOR_MAX_RESULTS_DEFAULT;
+  return Math.max(
+    LIMITS.LOREBOOK_VECTOR_MAX_RESULTS_MIN,
+    Math.min(LIMITS.LOREBOOK_VECTOR_MAX_RESULTS_MAX, Math.trunc(parsed)),
   );
 }
 
@@ -95,10 +120,12 @@ type LinkedLorebook = {
   personaId?: string | null;
   personaIds?: string[];
   chatId?: string | null;
+  sourceAgentId?: string | null;
 };
 
 function activeLorebookMatchesFilters(book: LinkedLorebook, filters: LorebookScopeFilters): boolean {
   if (!filters.activeLorebookIds?.includes(book.id)) return false;
+  if (book.sourceAgentId === GAME_LOREBOOK_KEEPER_SOURCE_ID) return true;
 
   const characterIds = resolveLinkIds(book.characterIds, book.characterId);
   if (characterIds.length > 0) return characterIds.some((id) => filters.characterIds?.includes(id));
@@ -120,6 +147,9 @@ function parseLorebookRow(row: Record<string, unknown>) {
     entryLimit: normalizeLorebookEntryLimit(row.entryLimit),
     maxRecursionDepth: typeof row.maxRecursionDepth === "number" ? row.maxRecursionDepth : 3,
     excludeFromVectorization: row.excludeFromVectorization === "true",
+    vectorQueryDepth: normalizeLorebookVectorQueryDepth(row.vectorQueryDepth),
+    vectorScoreThreshold: normalizeLorebookVectorScoreThreshold(row.vectorScoreThreshold),
+    vectorMaxResults: normalizeLorebookVectorMaxResults(row.vectorMaxResults),
     isGlobal: row.isGlobal === "true",
     enabled: row.enabled === "true",
     scope: parseLorebookScope(row.scope),
@@ -136,11 +166,12 @@ function parseLorebookRow(row: Record<string, unknown>) {
 }
 
 function parseStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  const normalize = (items: unknown[]) => items.map(String).map((item) => item.trim()).filter(Boolean);
+  if (Array.isArray(value)) return normalize(value);
   if (typeof value !== "string" || !value.trim()) return [];
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+    return Array.isArray(parsed) ? normalize(parsed) : [];
   } catch {
     return [];
   }
@@ -187,8 +218,51 @@ function parseFolderRow(row: Record<string, unknown>) {
 }
 
 type LorebookRow = typeof lorebooks.$inferSelect;
+type LorebookListPageOptions = {
+  limit: number;
+  offset: number;
+  search?: string;
+  sort?: string;
+  category?: string;
+  active?: {
+    lorebookIds: string[];
+    characterIds: string[];
+    personaId?: string | null;
+    chatId?: string | null;
+  };
+};
 
-async function hydrateLorebookRows(db: DB, rows: LorebookRow[]) {
+function likePattern(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? `%${trimmed}%` : "";
+}
+
+function lorebookOrder(sort: string | undefined) {
+  switch (sort) {
+    case "name-desc":
+      return [desc(lorebooks.name), asc(lorebooks.id)];
+    case "newest":
+      return [desc(lorebooks.createdAt), asc(lorebooks.id)];
+    case "oldest":
+      return [asc(lorebooks.createdAt), asc(lorebooks.id)];
+    case "tokens":
+      return [desc(lorebooks.tokenBudget), asc(lorebooks.id)];
+    case "name-asc":
+    default:
+      return [asc(lorebooks.name), asc(lorebooks.id)];
+  }
+}
+
+function parseCharacterName(row: typeof characters.$inferSelect) {
+  try {
+    const parsed = JSON.parse(row.data) as { name?: unknown };
+    return typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : "Unknown";
+  } catch {
+    return "Unknown";
+  }
+}
+
+async function hydrateLorebookRows(db: DB, rows: LorebookRow[], options: { includeLinkedNames?: boolean } = {}) {
   if (rows.length === 0) return [];
   const bookIds = rows.map((row) => row.id);
   const [characterRows, personaRows] = await Promise.all([
@@ -215,13 +289,36 @@ async function hydrateLorebookRows(db: DB, rows: LorebookRow[]) {
     ids.push(link.personaId);
     personaIdsByBook.set(link.lorebookId, ids);
   }
-  return rows.map((row) =>
-    parseLorebookRow({
+  const characterNameById = new Map<string, string>();
+  const personaNameById = new Map<string, string>();
+  if (options.includeLinkedNames) {
+    const characterIds = Array.from(new Set(characterRows.map((link) => link.characterId)));
+    const personaIds = Array.from(new Set(personaRows.map((link) => link.personaId)));
+    const [linkedCharacters, linkedPersonas] = await Promise.all([
+      characterIds.length > 0 ? db.select().from(characters).where(inArray(characters.id, characterIds)) : [],
+      personaIds.length > 0 ? db.select().from(personas).where(inArray(personas.id, personaIds)) : [],
+    ]);
+    for (const character of linkedCharacters) {
+      characterNameById.set(character.id, parseCharacterName(character));
+    }
+    for (const persona of linkedPersonas) {
+      personaNameById.set(persona.id, persona.comment ? `${persona.name} - ${persona.comment}` : persona.name);
+    }
+  }
+  return rows.map((row) => {
+    const characterIds = characterIdsByBook.get(row.id) ?? [];
+    const personaIds = personaIdsByBook.get(row.id) ?? [];
+    const hydratedRow: Record<string, unknown> = {
       ...(row as Record<string, unknown>),
-      characterIds: characterIdsByBook.get(row.id) ?? [],
-      personaIds: personaIdsByBook.get(row.id) ?? [],
-    }),
-  );
+      characterIds,
+      personaIds,
+    };
+    if (options.includeLinkedNames) {
+      hydratedRow.characterNames = characterIds.map((id) => characterNameById.get(id) ?? id);
+      hydratedRow.personaNames = personaIds.map((id) => personaNameById.get(id) ?? id);
+    }
+    return parseLorebookRow(hydratedRow);
+  });
 }
 
 async function syncLorebookLinks(
@@ -256,6 +353,18 @@ async function syncLorebookLinks(
 }
 
 export function createLorebooksStorage(db: DB) {
+  const assertFolderBelongsToLorebook = async (lorebookId: string, folderId: string | null | undefined) => {
+    if (folderId === null || folderId === undefined) return;
+    const folderRows = await db
+      .select({ lorebookId: lorebookFolders.lorebookId })
+      .from(lorebookFolders)
+      .where(eq(lorebookFolders.id, folderId));
+    const folderRow = folderRows[0];
+    if (!folderRow || folderRow.lorebookId !== lorebookId) {
+      throw new Error("folderId does not belong to this lorebook");
+    }
+  };
+
   return {
     // ── Lorebooks ──
 
@@ -271,6 +380,71 @@ export function createLorebooksStorage(db: DB) {
         .where(eq(lorebooks.category, category))
         .orderBy(desc(lorebooks.updatedAt));
       return hydrateLorebookRows(db, rows);
+    },
+
+    async listPage(options: LorebookListPageOptions) {
+      const clauses = [];
+      if (options.category) clauses.push(eq(lorebooks.category, options.category));
+      const pattern = likePattern(options.search);
+      if (pattern) {
+        clauses.push(
+          or(
+            like(lorebooks.name, pattern),
+            like(lorebooks.description, pattern),
+            like(lorebooks.category, pattern),
+            like(lorebooks.tags, pattern),
+            like(lorebooks.generatedBy, pattern),
+          ),
+        );
+      }
+
+      if (options.active) {
+        clauses.push(eq(lorebooks.enabled, "true"));
+        const activeLorebookIds = new Set(options.active.lorebookIds);
+        if (options.active.characterIds.length > 0) {
+          const linkedCharacters = await db
+            .select({ lorebookId: lorebookCharacterLinks.lorebookId })
+            .from(lorebookCharacterLinks)
+            .where(inArray(lorebookCharacterLinks.characterId, options.active.characterIds));
+          for (const link of linkedCharacters) activeLorebookIds.add(link.lorebookId);
+        }
+        if (options.active.personaId) {
+          const linkedPersonas = await db
+            .select({ lorebookId: lorebookPersonaLinks.lorebookId })
+            .from(lorebookPersonaLinks)
+            .where(eq(lorebookPersonaLinks.personaId, options.active.personaId));
+          for (const link of linkedPersonas) activeLorebookIds.add(link.lorebookId);
+        }
+        const activeClauses = [eq(lorebooks.isGlobal, "true")];
+        if (activeLorebookIds.size > 0) activeClauses.push(inArray(lorebooks.id, Array.from(activeLorebookIds)));
+        if (options.active.characterIds.length > 0) {
+          activeClauses.push(inArray(lorebooks.characterId, options.active.characterIds));
+        }
+        if (options.active.personaId) activeClauses.push(eq(lorebooks.personaId, options.active.personaId));
+        if (options.active.chatId) activeClauses.push(eq(lorebooks.chatId, options.active.chatId));
+        clauses.push(or(...activeClauses));
+      }
+
+      const whereClause = clauses.length > 0 ? and(...clauses) : undefined;
+      const rows = await (whereClause
+        ? db
+            .select()
+            .from(lorebooks)
+            .where(whereClause)
+            .orderBy(...lorebookOrder(options.sort))
+            .limit(options.limit + 1)
+            .offset(options.offset)
+        : db
+            .select()
+            .from(lorebooks)
+            .orderBy(...lorebookOrder(options.sort))
+            .limit(options.limit + 1)
+            .offset(options.offset));
+      const items = await hydrateLorebookRows(db, rows.slice(0, options.limit), { includeLinkedNames: true });
+      return {
+        ...toPaginatedList(rows, options.limit, options.offset),
+        items,
+      };
     },
 
     async listByCharacter(characterId: string) {
@@ -315,6 +489,9 @@ export function createLorebooksStorage(db: DB) {
           recursiveScanning: String(input.recursiveScanning ?? false),
           maxRecursionDepth: input.maxRecursionDepth ?? 3,
           excludeFromVectorization: String(input.excludeFromVectorization ?? true),
+          vectorQueryDepth: normalizeLorebookVectorQueryDepth(input.vectorQueryDepth),
+          vectorScoreThreshold: normalizeLorebookVectorScoreThreshold(input.vectorScoreThreshold),
+          vectorMaxResults: normalizeLorebookVectorMaxResults(input.vectorMaxResults),
           characterId: characterIds[0] ?? null,
           personaId: personaIds[0] ?? null,
           chatId: input.chatId ?? null,
@@ -345,6 +522,12 @@ export function createLorebooksStorage(db: DB) {
       if (input.maxRecursionDepth !== undefined) updates.maxRecursionDepth = input.maxRecursionDepth;
       if (input.excludeFromVectorization !== undefined)
         updates.excludeFromVectorization = String(input.excludeFromVectorization);
+      if (input.vectorQueryDepth !== undefined)
+        updates.vectorQueryDepth = normalizeLorebookVectorQueryDepth(input.vectorQueryDepth);
+      if (input.vectorScoreThreshold !== undefined)
+        updates.vectorScoreThreshold = normalizeLorebookVectorScoreThreshold(input.vectorScoreThreshold);
+      if (input.vectorMaxResults !== undefined)
+        updates.vectorMaxResults = normalizeLorebookVectorMaxResults(input.vectorMaxResults);
       const shouldUpdateCharacterLinks = input.characterIds !== undefined || input.characterId !== undefined;
       const shouldUpdatePersonaLinks = input.personaIds !== undefined || input.personaId !== undefined;
       const current = shouldUpdateCharacterLinks || shouldUpdatePersonaLinks ? ((await this.getById(id)) as any) : null;
@@ -510,21 +693,8 @@ export function createLorebooksStorage(db: DB) {
     async createEntry(input: CreateLorebookEntryInput) {
       const id = newId();
       const timestamp = now();
-      // If a folderId is supplied, the folder must exist AND live in the same
-      // lorebook. Without this check, the route layer accepts any string and
-      // we'd silently create orphaned entries that disappear from the editor's
-      // grouped view and bypass the disabled-folder activation gate.
       const requestedFolderId = input.folderId ?? null;
-      if (requestedFolderId !== null) {
-        const folderRows = await db
-          .select({ lorebookId: lorebookFolders.lorebookId })
-          .from(lorebookFolders)
-          .where(eq(lorebookFolders.id, requestedFolderId));
-        const folderRow = folderRows[0];
-        if (!folderRow || folderRow.lorebookId !== input.lorebookId) {
-          throw new Error("folderId does not belong to this lorebook");
-        }
-      }
+      await assertFolderBelongsToLorebook(input.lorebookId, requestedFolderId);
       await db.insert(lorebookEntries).values({
         id,
         lorebookId: input.lorebookId,
@@ -681,6 +851,9 @@ export function createLorebooksStorage(db: DB) {
     /** Bulk create entries (for imports and AI generation). */
     async bulkCreateEntries(lorebookId: string, entries: Omit<CreateLorebookEntryInput, "lorebookId">[]) {
       const results = [];
+      for (const entry of entries) {
+        await assertFolderBelongsToLorebook(lorebookId, entry.folderId ?? null);
+      }
       for (const entry of entries) {
         const result = await this.createEntry({ ...entry, lorebookId });
         results.push(result);

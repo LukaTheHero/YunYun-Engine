@@ -73,6 +73,9 @@ export * from "./features/turn-games/registry.js";
 export * from "./features/turn-games/uno/types.js";
 export * from "./features/turn-games/uno/tools.js";
 export { unoEngine, cardLabel } from "./features/turn-games/uno/engine.js";
+export * from "./features/turn-games/chess/types.js";
+export * from "./features/turn-games/chess/tools.js";
+export { chessEngine } from "./features/turn-games/chess/engine.js";
 
 // Utils
 export * from "./utils/macro-engine.js";
@@ -92,6 +95,7 @@ export * from "./utils/quest-state.js";
 export * from "./utils/quote-format.js";
 export * from "./utils/image-prompt-compiler.js";
 export * from "./utils/thinking-tags.js";
+export * from "./utils/rpg-stats.js";
 export * from "./utils/lorebook-folder-tree.js";
 export * from "./utils/text-matching.js";
 export * from "./utils/sprite-labels.js";

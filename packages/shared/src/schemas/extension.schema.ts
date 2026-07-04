@@ -2,11 +2,11 @@
 // Extension Zod Schemas
 // ──────────────────────────────────────────────
 import { z } from "zod";
+import { cssByteLimit, cssByteMessage } from "./css-size.js";
 
 // Generous-but-finite size caps. CSS and JS are stored as TEXT in SQLite
 // and emitted verbatim into the page, so an unbounded payload would be a
 // real DoS surface even past basicAuth.
-const MAX_EXTENSION_CSS_BYTES = 256 * 1024; // 256 KiB
 const MAX_EXTENSION_JS_BYTES = 1024 * 1024; // 1 MiB
 
 // `z.string().max(n)` counts UTF-16 code units, so a CSS file full of
@@ -29,34 +29,53 @@ function utf8ByteLength(value: string): number {
   return bytes;
 }
 
-const cssByteLimit = (value: string | null | undefined) =>
-  value == null || utf8ByteLength(value) <= MAX_EXTENSION_CSS_BYTES;
 const jsByteLimit = (value: string | null | undefined) =>
   value == null || utf8ByteLength(value) <= MAX_EXTENSION_JS_BYTES;
 
-const cssByteMessage = `CSS must be at most ${MAX_EXTENSION_CSS_BYTES} bytes`;
 const jsByteMessage = `JS must be at most ${MAX_EXTENSION_JS_BYTES} bytes`;
+const extensionRuntimeSchema = z.enum(["client", "server"]);
 
 export const createExtensionSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).default(""),
+  runtime: extensionRuntimeSchema.optional().default("client"),
   css: z.string().nullable().optional().refine(cssByteLimit, { message: cssByteMessage }),
   js: z.string().nullable().optional().refine(jsByteLimit, { message: jsByteMessage }),
+  serverJs: z.string().nullable().optional().refine(jsByteLimit, { message: jsByteMessage }),
   enabled: z.boolean().optional(),
   installedAt: z.string().datetime().optional(),
+}).superRefine((value, ctx) => {
+  if (value.runtime === "server" && !value.serverJs?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["serverJs"],
+      message: "Server extensions require serverJs",
+    });
+  }
 });
 
 export const updateExtensionSchema = z
   .object({
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional(),
+    runtime: extensionRuntimeSchema.optional(),
     css: z.string().nullable().optional().refine(cssByteLimit, { message: cssByteMessage }),
     js: z.string().nullable().optional().refine(jsByteLimit, { message: jsByteMessage }),
+    serverJs: z.string().nullable().optional().refine(jsByteLimit, { message: jsByteMessage }),
     enabled: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "Must update at least one field",
+  })
+  .superRefine((value, ctx) => {
+    if (value.runtime === "server" && !value.serverJs?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["serverJs"],
+        message: "Server extensions require serverJs",
+      });
+    }
   });
 
-export type CreateExtensionInput = z.infer<typeof createExtensionSchema>;
+export type CreateExtensionInput = z.input<typeof createExtensionSchema>;
 export type UpdateExtensionInput = z.infer<typeof updateExtensionSchema>;

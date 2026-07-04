@@ -50,6 +50,9 @@ type ResolveAgentPipelineAgentsArgs = {
   chatCustomParameters: Record<string, unknown>;
   chatMaxOutputTokens: number | null;
   chatMaxParallelJobs: number;
+  chatEnableCaching: boolean;
+  chatAnthropicExtendedCacheTtl: boolean;
+  chatCachingAtDepth: number;
   activeMusicPlayerSource?: "spotify" | "youtube" | "custom" | null;
   chatMetadata?: Record<string, unknown>;
   resolveBaseUrl(connection: { baseUrl: string | null; provider: string }): string;
@@ -61,6 +64,9 @@ type AgentProviderCacheEntry = {
   customParameters: Record<string, unknown>;
   maxOutputTokens: number | null;
   maxParallelJobs: number;
+  enableCaching: boolean;
+  anthropicExtendedCacheTtl: boolean;
+  cachingAtDepth: number;
 };
 
 type AgentConnectionResolution = {
@@ -69,6 +75,36 @@ type AgentConnectionResolution = {
   connectionName?: string;
 };
 
+function readTrimmedString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function resolveAgentConnectionRequest(args: {
+  agentType: string;
+  configuredConnectionId: string | null | undefined;
+  defaultAgentConnectionId: string | null | undefined;
+  chatMetadata?: Record<string, unknown>;
+  localSidecarAvailable: boolean;
+}): string | null | "skip-local-sidecar" {
+  if (args.agentType !== "illustrator") {
+    return resolveAgentConnectionId({
+      requestedConnectionId: args.configuredConnectionId,
+      defaultAgentConnectionId: args.defaultAgentConnectionId,
+      localSidecarAvailable: args.localSidecarAvailable,
+    });
+  }
+
+  const promptConnectionId = readTrimmedString(args.chatMetadata?.illustratorPromptConnectionId);
+  const configuredConnectionId = readTrimmedString(args.configuredConnectionId);
+  const requestedConnectionId = promptConnectionId ?? configuredConnectionId;
+
+  return resolveAgentConnectionId({
+    requestedConnectionId,
+    defaultAgentConnectionId: promptConnectionId ? null : configuredConnectionId ? args.defaultAgentConnectionId : null,
+    localSidecarAvailable: args.localSidecarAvailable,
+  });
+}
+
 export type ResolvedAgentPipelineAgents = {
   enabledConfigs: any[];
   resolvedAgents: ResolvedAgent[];
@@ -76,7 +112,7 @@ export type ResolvedAgentPipelineAgents = {
 };
 
 function resolveAgentRuntimePhase(agentType: string, configuredPhase: string): string {
-  if (agentType === "prose-guardian" || agentType === "continuity") return "post_processing";
+  if (agentType === "prose-guardian" || agentType === "continuity" || agentType === "html") return "post_processing";
   if (agentType === "echo-chamber") return "parallel";
   return configuredPhase;
 }
@@ -142,6 +178,9 @@ async function resolveAgentConnectionProvider(args: {
   fallbackCustomParameters: Record<string, unknown>;
   fallbackMaxOutputTokens: number | null;
   fallbackMaxParallelJobs: number;
+  fallbackEnableCaching: boolean;
+  fallbackAnthropicExtendedCacheTtl: boolean;
+  fallbackCachingAtDepth: number;
   resolveBaseUrl(connection: { baseUrl: string | null; provider: string }): string;
 }): Promise<AgentConnectionResolution> {
   if (!args.connectionId) {
@@ -152,6 +191,9 @@ async function resolveAgentConnectionProvider(args: {
         customParameters: args.fallbackCustomParameters,
         maxOutputTokens: args.fallbackMaxOutputTokens,
         maxParallelJobs: args.fallbackMaxParallelJobs,
+        enableCaching: args.fallbackEnableCaching,
+        anthropicExtendedCacheTtl: args.fallbackAnthropicExtendedCacheTtl,
+        cachingAtDepth: args.fallbackCachingAtDepth,
       },
     };
   }
@@ -195,6 +237,9 @@ async function resolveAgentConnectionProvider(args: {
     customParameters: resolveConnectionCustomParameters(agentConn),
     maxOutputTokens: resolveConnectionMaxOutputTokens({ provider: agentConn.provider, model }),
     maxParallelJobs: Number(agentConn.maxParallelJobs) || 1,
+    enableCaching: agentConn.enableCaching === "true",
+    anthropicExtendedCacheTtl: agentConn.anthropicExtendedCacheTtl === "true",
+    cachingAtDepth: Number(agentConn.cachingAtDepth) || 5,
   };
   args.agentProviderCache.set(args.connectionId, resolved);
   return { entry: resolved };
@@ -213,6 +258,9 @@ export async function resolveAgentPipelineAgents({
   chatCustomParameters,
   chatMaxOutputTokens,
   chatMaxParallelJobs,
+  chatEnableCaching,
+  chatAnthropicExtendedCacheTtl,
+  chatCachingAtDepth,
   activeMusicPlayerSource,
   chatMetadata,
   resolveBaseUrl,
@@ -241,6 +289,9 @@ export async function resolveAgentPipelineAgents({
       customParameters: {},
       maxOutputTokens: null,
       maxParallelJobs: 1,
+      enableCaching: false,
+      anthropicExtendedCacheTtl: false,
+      cachingAtDepth: 5,
     });
   }
 
@@ -288,6 +339,14 @@ export async function resolveAgentPipelineAgents({
     ) {
       settings.enabledTools = DEFAULT_AGENT_TOOLS.spotify ?? [];
     }
+    if (
+      cfg.type !== "spotify" &&
+      BUILT_IN_AGENTS.some((agent) => agent.id === cfg.type) &&
+      !Array.isArray(settings.enabledTools) &&
+      (DEFAULT_AGENT_TOOLS[cfg.type as string]?.length ?? 0) > 0
+    ) {
+      settings.enabledTools = [...DEFAULT_AGENT_TOOLS[cfg.type as string]!];
+    }
     let selectedPromptTemplate = resolveAgentPromptTemplate({
       agentType: cfg.type as string,
       promptTemplate: normalizeProseGuardianPromptTemplate(cfg.type as string, cfg.promptTemplate),
@@ -295,9 +354,11 @@ export async function resolveAgentPipelineAgents({
       settings,
       selectedPromptTemplateId: agentPromptTemplateSelections[cfg.type as string] ?? null,
     });
-    const effectiveConnectionId = resolveAgentConnectionId({
-      requestedConnectionId: cfg.connectionId as string | null,
+    const effectiveConnectionId = resolveAgentConnectionRequest({
+      agentType: cfg.type as string,
+      configuredConnectionId: cfg.connectionId as string | null,
       defaultAgentConnectionId: defaultAgentConn?.id ?? null,
+      chatMetadata,
       localSidecarAvailable: localSidecarAvailableForTrackers,
     });
 
@@ -320,6 +381,9 @@ export async function resolveAgentPipelineAgents({
       fallbackCustomParameters: chatCustomParameters,
       fallbackMaxOutputTokens: chatMaxOutputTokens,
       fallbackMaxParallelJobs: chatMaxParallelJobs,
+      fallbackEnableCaching: chatEnableCaching,
+      fallbackAnthropicExtendedCacheTtl: chatAnthropicExtendedCacheTtl,
+      fallbackCachingAtDepth: chatCachingAtDepth,
       resolveBaseUrl,
     });
     if (!resolvedProvider.entry) {
@@ -350,11 +414,10 @@ export async function resolveAgentPipelineAgents({
       customParameters: resolvedProvider.entry.customParameters,
       maxOutputTokens: resolvedProvider.entry.maxOutputTokens,
       maxParallelJobs: resolvedProvider.entry.maxParallelJobs,
+      enableCaching: resolvedProvider.entry.enableCaching,
+      anthropicExtendedCacheTtl: resolvedProvider.entry.anthropicExtendedCacheTtl,
+      cachingAtDepth: resolvedProvider.entry.cachingAtDepth,
     });
-  }
-
-  if (skippedLocalSidecarAgents.length > 0) {
-    agentConnectionWarnings.push(buildLocalSidecarUnavailableWarning(skippedLocalSidecarAgents));
   }
 
   const resolvedTypes = new Set(resolvedAgents.map((agent) => agent.type));
@@ -369,15 +432,36 @@ export async function resolveAgentPipelineAgents({
       : [];
 
   for (const builtIn of builtInFallbacks) {
+    const builtInConnectionId = resolveAgentConnectionRequest({
+      agentType: builtIn.id,
+      configuredConnectionId: null,
+      defaultAgentConnectionId: defaultAgentConn?.id ?? null,
+      chatMetadata,
+      localSidecarAvailable: localSidecarAvailableForTrackers,
+    });
+
+    if (builtInConnectionId === "skip-local-sidecar") {
+      skippedLocalSidecarAgents.push(builtIn.name);
+      logger.warn(
+        "[generate] Skipping built-in agent %s for chat %s because Local Model was requested but the sidecar is unavailable",
+        builtIn.id,
+        chatId,
+      );
+      continue;
+    }
+
     const builtInConnection = await resolveAgentConnectionProvider({
       connections,
       agentProviderCache,
-      connectionId: defaultAgentConn?.id ?? null,
+      connectionId: builtInConnectionId,
       fallbackProvider: chatProvider,
       fallbackModel: chatModel,
       fallbackCustomParameters: chatCustomParameters,
       fallbackMaxOutputTokens: chatMaxOutputTokens,
       fallbackMaxParallelJobs: chatMaxParallelJobs,
+      fallbackEnableCaching: chatEnableCaching,
+      fallbackAnthropicExtendedCacheTtl: chatAnthropicExtendedCacheTtl,
+      fallbackCachingAtDepth: chatCachingAtDepth,
       resolveBaseUrl,
     });
     if (!builtInConnection.entry) {
@@ -390,7 +474,7 @@ export async function resolveAgentPipelineAgents({
       );
       continue;
     }
-    if (defaultAgentConn) defaultAgentConnectionAgents.push(builtIn.name);
+    if (defaultAgentConn && builtInConnectionId === defaultAgentConn.id) defaultAgentConnectionAgents.push(builtIn.name);
     let builtInSettings = getDefaultBuiltInAgentSettings(builtIn.id);
     if (builtIn.id === "spotify") {
       builtInSettings = applyMusicPlayerSourceToMusicDjSettings(builtInSettings, activeMusicPlayerSource);
@@ -407,6 +491,13 @@ export async function resolveAgentPipelineAgents({
     ) {
       builtInSettings.enabledTools = DEFAULT_AGENT_TOOLS.spotify ?? [];
     }
+    if (
+      builtIn.id !== "spotify" &&
+      !Array.isArray(builtInSettings.enabledTools) &&
+      (DEFAULT_AGENT_TOOLS[builtIn.id]?.length ?? 0) > 0
+    ) {
+      builtInSettings.enabledTools = [...DEFAULT_AGENT_TOOLS[builtIn.id]!];
+    }
     let selectedPromptTemplate = resolveAgentPromptTemplate({
       agentType: builtIn.id,
       promptTemplate: "",
@@ -420,18 +511,25 @@ export async function resolveAgentPipelineAgents({
       name: builtIn.name,
       phase: resolveAgentRuntimePhase(builtIn.id, builtIn.phase),
       promptTemplate: selectedPromptTemplate,
-      connectionId: defaultAgentConn?.id ?? null,
+      connectionId: builtInConnectionId,
       settings: builtInSettings,
       provider: builtInConnection.entry.provider,
       model: builtInConnection.entry.model,
       customParameters: builtInConnection.entry.customParameters,
       maxOutputTokens: builtInConnection.entry.maxOutputTokens,
       maxParallelJobs: builtInConnection.entry.maxParallelJobs,
+      enableCaching: builtInConnection.entry.enableCaching,
+      anthropicExtendedCacheTtl: builtInConnection.entry.anthropicExtendedCacheTtl,
+      cachingAtDepth: builtInConnection.entry.cachingAtDepth,
     });
   }
 
   // Smart group response selection is hidden runtime infrastructure now. It uses
   // the main generation provider directly instead of resolving a public agent.
+
+  if (skippedLocalSidecarAgents.length > 0) {
+    agentConnectionWarnings.push(buildLocalSidecarUnavailableWarning(skippedLocalSidecarAgents));
+  }
 
   for (const warning of unavailableConnectionWarnings.values()) {
     agentConnectionWarnings.push(buildAgentConnectionUnavailableWarning(warning));
