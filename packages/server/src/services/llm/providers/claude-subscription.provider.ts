@@ -338,24 +338,14 @@ export class ClaudeSubscriptionProvider extends BaseLLMProvider {
   }
 
   async *chat(messages: ChatMessage[], options: ChatOptions): AsyncGenerator<string, LLMUsage | void, unknown> {
-    // Model IDs may carry a `[1m]` suffix mirroring the Claude CLI's "(1M
-    // context)" selector entries. The suffix isn't a real model string, so strip
-    // it to a plain ID the SDK accepts and enable the 1M-context beta below
-    // instead. Everything downstream (param suppression, resume JSONL, SDK model,
-    // downgrade detection) must use the resolved ID, never the suffixed one — the
-    // one exception is context-fit sizing, which keeps the suffixed ID so the
-    // `[1m]` model entry's 1M context window is used for trimming.
-    const oneMContext = options.model.endsWith("[1m]");
-    const model = oneMContext ? options.model.slice(0, -"[1m]".length) : options.model;
-
-    const suppressModelParameters = this.shouldSuppressModelParameters({ ...options, model });
+    const suppressModelParameters = this.shouldSuppressModelParameters(options);
     const configuredMaxTokens = this.applyMaxTokensCap(options.maxTokens ?? 4096);
     const contextFit = this.fitMessagesToContext(messages, { ...options, maxTokens: configuredMaxTokens });
-    this.logContextTrim(contextFit, model);
+    this.logContextTrim(contextFit, options.model);
 
     const { promptArg, systemPrompt, resumeSessionId, resumeCwd, sessionStore } = selectPromptPath(
       contextFit.messages,
-      model,
+      options.model,
     );
 
     const { query } = await loadSdk();
@@ -373,7 +363,7 @@ export class ClaudeSubscriptionProvider extends BaseLLMProvider {
     // Claude adaptive-only models reject sampling parameters; other models
     // accept temperature etc. but the Agent SDK doesn't expose those knobs
     // directly, so we skip them and rely on the SDK defaults.
-    const isAdaptiveOnly = isClaudeAdaptiveOnlyNoSamplingModel(model);
+    const isAdaptiveOnly = isClaudeAdaptiveOnlyNoSamplingModel(options.model);
 
     // Outbound-context strip strategy: this provider is a text-chat surface
     // (roleplay / character DM), not an agent runner. The SDK's default
@@ -407,7 +397,7 @@ export class ClaudeSubscriptionProvider extends BaseLLMProvider {
 
     const sdkOptions: Parameters<SdkModule["query"]>[0]["options"] = {
       abortController,
-      model,
+      model: options.model,
       includePartialMessages: options.stream ?? true,
       tools: [],
       skills: [],
@@ -422,12 +412,6 @@ export class ClaudeSubscriptionProvider extends BaseLLMProvider {
       settings: { fastMode: this.fastMode },
     };
     if (systemPrompt !== undefined) sdkOptions.systemPrompt = systemPrompt;
-
-    // 1M-context selections enable Anthropic's long-context beta. The plain
-    // model ID is already set above; the beta is what actually widens the
-    // window. The SDK rejects it with a clear error if the plan/model can't run
-    // it, so no extra gating is needed here.
-    if (oneMContext) sdkOptions.betas = ["context-1m-2025-08-07"];
 
     if (!suppressModelParameters && options.enableThinking) {
       sdkOptions.thinking = { type: "adaptive" };
@@ -600,7 +584,7 @@ export class ClaudeSubscriptionProvider extends BaseLLMProvider {
             const fastModeState = message.fast_mode_state;
             finalUsedModels = usedModels;
             finalFastModeState = fastModeState ?? null;
-            const billedDifferent = usedModels.length > 0 && !usedModels.includes(model);
+            const billedDifferent = usedModels.length > 0 && !usedModels.includes(options.model);
             if (billedDifferent) {
               logger.warn(
                 "[claude-subscription] Requested %s but SDK billed against %s (fast_mode_state=%s, session=%s) — check `claude` CLI fast mode / rate-limit cooldown",

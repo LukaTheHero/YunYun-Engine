@@ -231,25 +231,20 @@ export const ANTHROPIC_MODELS: KnownModel[] = [
 ];
 
 // ── Claude (Subscription via Claude Agent SDK) ──
-// Models reachable through the local `claude` CLI auth (Pro / Max). This mirrors
-// the Claude Code model selector — current models first, then `(Legacy)` ones —
-// so the picker matches what the signed-in CLI actually offers. Anthropic gates
-// which model IDs are available per plan tier; the SDK surfaces a clear error if
-// the signed-in plan can't run the requested model.
-//
-// The `[1m]` suffix is NOT a real model string — it mirrors the CLI's
-// "(1M context)" entries. `ClaudeSubscriptionProvider` strips it and enables the
-// SDK's `context-1m-2025-08-07` beta instead (see the provider's chat()).
+// Models reachable through the local `claude` CLI auth (Pro / Max). Anthropic
+// gates which model IDs are available per plan tier; the SDK surfaces a clear
+// error if the signed-in plan can't run the requested model. We keep this list
+// to the current tool-eligible families to avoid offering retired aliases that
+// the subscription path no longer accepts.
 export const CLAUDE_SUBSCRIPTION_MODELS: KnownModel[] = [
-  { id: "claude-fable-5", name: "Claude Fable 5", context: 200000, maxOutput: 64000 },
-  { id: "claude-fable-5[1m]", name: "Claude Fable 5 (1M context)", context: 1000000, maxOutput: 64000 },
-  { id: "claude-opus-4-8", name: "Claude Opus 4.8", context: 200000, maxOutput: 64000 },
-  { id: "claude-opus-4-8[1m]", name: "Claude Opus 4.8 (1M context)", context: 1000000, maxOutput: 64000 },
+  { id: "claude-fable-5", name: "Claude Fable 5", context: 1000000, maxOutput: 128000 },
+  { id: "claude-opus-4-8", name: "Claude Opus 4.8", context: 1000000, maxOutput: 128000 },
+  { id: "claude-opus-4-7", name: "Claude Opus 4.7", context: 1000000, maxOutput: 128000 },
+  { id: "claude-opus-4-6", name: "Claude Opus 4.6", context: 1000000, maxOutput: 32000 },
   { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", context: 1000000, maxOutput: 64000 },
-  { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", context: 200000, maxOutput: 32000 },
-  { id: "claude-opus-4-7", name: "Claude Opus 4.7 (Legacy)", context: 200000, maxOutput: 64000 },
-  { id: "claude-opus-4-7[1m]", name: "Claude Opus 4.7 (1M context, Legacy)", context: 1000000, maxOutput: 64000 },
-  { id: "claude-opus-4-6", name: "Claude Opus 4.6 (Legacy)", context: 200000, maxOutput: 32000 },
+  { id: "claude-opus-4-5", name: "Claude Opus 4.5", context: 1000000, maxOutput: 32000 },
+  { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", context: 1000000, maxOutput: 16000 },
+  { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", context: 200000, maxOutput: 64000 },
 ];
 
 // ── OpenAI (ChatGPT login via Codex auth) ──
