@@ -2,6 +2,7 @@
 // Database Schema — Barrel Export
 // ──────────────────────────────────────────────
 export * from "./chats.js";
+export * from "./conversation-calls.js";
 export * from "./chat-presets.js";
 export * from "./characters.js";
 export * from "./lorebooks.js";
@@ -12,8 +13,11 @@ export * from "./assets.js";
 export * from "./agents.js";
 export * from "./custom-tools.js";
 export * from "./game-state.js";
+export * from "./spatial-context.js";
 export * from "./game-engine-state.js";
 export * from "./checkpoints.js";
+export * from "./game-scene-videos.js";
+export * from "./game-storyboards.js";
 export * from "./regex-scripts.js";
 export * from "./gallery.js";
 export * from "./custom-emojis.js";
@@ -23,3 +27,4 @@ export * from "./extensions.js";
 export * from "./app-settings.js";
 export * from "./prompt-overrides.js";
 export * from "./achievements.js";
+export * from "./noodle.js";

@@ -15,15 +15,30 @@ import {
   ChevronUp,
   Plus,
   X,
+  Download,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { toast } from "sonner";
 import { useTTSConfig, useUpdateTTSConfig, useTTSVoices } from "../../../hooks/use-tts";
 import { useCharacters } from "../../../hooks/use-characters";
 import { ttsService } from "../../../lib/tts-service";
+import {
+  listCachedTTSAudioEntries,
+  listCachedTTSAudioMeta,
+  type CachedTTSAudioExportEntry,
+} from "../../../lib/tts-audio-cache";
 import { parseCharacterDisplayData } from "../../../lib/character-display";
-import type { TTSConfig, TTSSource, TTSVoiceAssignment, TTSVoiceMode, TTSAudioFormat } from "@marinara-engine/shared";
-import { ELEVENLABS_TTS_LANGUAGE_OPTIONS, TTS_API_KEY_MASK } from "@marinara-engine/shared";
+import type {
+  TTSConfig,
+  TTSSource,
+  TTSSourceProfile,
+  TTSSourceProfiles,
+  TTSVoiceAssignment,
+  TTSVoiceMode,
+  TTSAudioFormat,
+  TTSConversationCallAudioInputMode,
+} from "@marinara-engine/shared";
+import { ELEVENLABS_TTS_LANGUAGE_OPTIONS, TTS_API_KEY_MASK, ttsSourceProfileFromConfig } from "@marinara-engine/shared";
 import { HelpTooltip } from "../../ui/HelpTooltip";
 import { SettingsCheckbox, SettingsSwitch } from "./SettingControls";
 
@@ -41,8 +56,7 @@ function FieldRow({ label, help, children }: { label: string; help?: string; chi
   );
 }
 
-const INPUT_CLS =
-  "w-full rounded-xl bg-[var(--secondary)] px-3 py-2.5 text-sm ring-1 ring-[var(--border)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+const INPUT_CLS = "mari-chrome-field w-full px-3 py-2.5 text-sm placeholder:text-[var(--muted-foreground)]";
 
 const TTS_SOURCE_DEFAULTS: Record<
   TTSSource,
@@ -69,13 +83,42 @@ const TTS_SOURCE_DEFAULTS: Record<
     voice: "alba",
     idleText: "Local PocketTTS",
   },
+  xai: {
+    label: "xAI Voice",
+    baseUrl: "https://api.x.ai/v1",
+    model: "grok-tts",
+    voice: "eve",
+    idleText: "xAI Voice",
+  },
 };
 
 const TTS_SOURCE_OPTIONS: Array<{ value: TTSSource; label: string }> = [
   { value: "openai", label: "OpenAI-compatible" },
   { value: "elevenlabs", label: "ElevenLabs" },
   { value: "pockettts", label: "PocketTTS" },
+  { value: "xai", label: "xAI Voice" },
 ];
+
+function defaultSourceProfile(source: TTSSource): TTSSourceProfile {
+  const defaults = TTS_SOURCE_DEFAULTS[source];
+  return {
+    baseUrl: defaults.baseUrl,
+    apiKey: "",
+    voice: defaults.voice,
+    model: defaults.model,
+    speed: 1,
+    elevenLabsStability: 0.5,
+    elevenLabsLanguageCode: "",
+    voiceMode: "single",
+    voiceAssignments: [],
+    narratorVoiceEnabled: false,
+    narratorVoice: defaults.voice,
+    npcDefaultVoicesEnabled: false,
+    npcDefaultMaleVoices: [],
+    npcDefaultFemaleVoices: [],
+    audioFormat: "mp3",
+  };
+}
 
 const ELEVENLABS_TTS_MODELS = [
   "eleven_v3",
@@ -83,6 +126,18 @@ const ELEVENLABS_TTS_MODELS = [
   "eleven_flash_v2_5",
   "eleven_turbo_v2_5",
   "eleven_flash_v2",
+];
+
+const ELEVENLABS_DEFAULT_VOICE_OPTIONS: VoiceOption[] = [
+  { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel", category: "ElevenLabs default" },
+  { id: "AZnzlk1XvdvUeBnXmlld", name: "Domi", category: "ElevenLabs default" },
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Bella", category: "ElevenLabs default" },
+  { id: "ErXwobaYiN019PkySvjV", name: "Antoni", category: "ElevenLabs default" },
+  { id: "MF3mGyEYCl7XYWbV9V6O", name: "Elli", category: "ElevenLabs default" },
+  { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh", category: "ElevenLabs default" },
+  { id: "VR6AewLTigWG4xSOukaG", name: "Arnold", category: "ElevenLabs default" },
+  { id: "pNInz6obpgDQGcFmaJgB", name: "Adam", category: "ElevenLabs default" },
+  { id: "yoZ06aMxZJJ28mfd3POQ", name: "Sam", category: "ElevenLabs default" },
 ];
 
 type CharacterOption = {
@@ -108,6 +163,49 @@ function addSavedVoiceOption(options: VoiceOption[], voiceId: string): VoiceOpti
 function formatVoiceOptionLabel(option: VoiceOption): string {
   if (option.category === "saved") return `${option.id} (saved; not in current voice list)`;
   return option.name === option.id ? option.id : `${option.name} (${option.id})`;
+}
+
+function formatCacheBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function extensionForTTSBlob(blob: Blob): string {
+  const type = blob.type.toLowerCase();
+  if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
+  if (type.includes("wav")) return "wav";
+  if (type.includes("ogg")) return "ogg";
+  if (type.includes("webm")) return "webm";
+  if (type.includes("mp4") || type.includes("m4a")) return "m4a";
+  return "audio";
+}
+
+function safeTTSFileStem(value: string): string {
+  return (
+    value
+      .replace(/[^a-z0-9._-]+/gi, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 80) || "tts-clip"
+  );
+}
+
+function downloadTTSClip(entry: CachedTTSAudioExportEntry, index: number): void {
+  const url = URL.createObjectURL(entry.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${String(index + 1).padStart(3, "0")}-${safeTTSFileStem(entry.key)}.${extensionForTTSBlob(entry.blob)}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 const ELEVENLABS_DEFAULT_MALE_VOICE_NAMES = new Set([
@@ -286,7 +384,7 @@ function NpcDefaultVoicePool({
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-[var(--border)] px-2.5 py-2 text-[0.625rem] leading-relaxed text-[var(--muted-foreground)]">
-          No ElevenLabs voices loaded yet.
+          No provider voices loaded yet.
         </p>
       )}
       {note && <p className="text-[0.625rem] leading-relaxed text-[var(--muted-foreground)]">{note}</p>}
@@ -323,14 +421,24 @@ export function TTSConfigCard() {
   const [autoplayGame, setAutoplayGame] = useState(false);
   const [progressivePlayback, setProgressivePlayback] = useState(false);
   const [dialogueOnly, setDialogueOnly] = useState(false);
+  const [dialoguePauseMs, setDialoguePauseMs] = useState(300);
   const [audioFormat, setAudioFormat] = useState<TTSAudioFormat>("mp3");
+  const [callAudioEnabled, setCallAudioEnabled] = useState(false);
+  const [callAudioInputMode, setCallAudioInputMode] = useState<TTSConversationCallAudioInputMode>("local_whisper");
+  const [callVideoInputEnabled, setCallVideoInputEnabled] = useState(false);
+  const [callCharacterVideoEnabled, setCallCharacterVideoEnabled] = useState(false);
+  const [callAutomaticVideoClipsEnabled, setCallAutomaticVideoClipsEnabled] = useState(false);
+  const [callCustomVideoClipsEnabled, setCallCustomVideoClipsEnabled] = useState(false);
 
   const [expanded, setExpanded] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sourceProfilesRef = useRef<TTSSourceProfiles>({});
   const [ttsState, setTTSState] = useState(ttsService.getState());
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [ttsCacheSummary, setTtsCacheSummary] = useState({ count: 0, bytes: 0 });
+  const [exportingTtsCache, setExportingTtsCache] = useState(false);
 
   // Voice fetch — keyed on the *saved* baseUrl so it only refetches when saved
   const savedSource = savedConfig?.source ?? "openai";
@@ -369,7 +477,15 @@ export function TTSConfigCard() {
     setAutoplayGame(savedConfig.autoplayGame);
     setProgressivePlayback(savedConfig.progressivePlayback ?? false);
     setDialogueOnly(savedConfig.dialogueOnly ?? false);
+    setDialoguePauseMs(savedConfig.dialoguePauseMs ?? 300);
     setAudioFormat(savedConfig.audioFormat ?? "mp3");
+    setCallAudioEnabled(savedConfig.callAudioEnabled ?? false);
+    setCallAudioInputMode(savedConfig.callAudioInputMode ?? "local_whisper");
+    setCallVideoInputEnabled(savedConfig.callVideoInputEnabled ?? false);
+    setCallCharacterVideoEnabled(savedConfig.callCharacterVideoEnabled ?? false);
+    setCallAutomaticVideoClipsEnabled(savedConfig.callAutomaticVideoClipsEnabled ?? false);
+    setCallCustomVideoClipsEnabled(savedConfig.callCustomVideoClipsEnabled ?? false);
+    sourceProfilesRef.current = savedConfig.sourceProfiles ?? {};
     setSaveStatus("idle");
   }, [savedConfig]);
 
@@ -394,6 +510,21 @@ export function TTSConfigCard() {
     [],
   );
 
+  useEffect(() => {
+    if (!expanded) return;
+    let cancelled = false;
+    void listCachedTTSAudioMeta().then((entries) => {
+      if (cancelled) return;
+      setTtsCacheSummary({
+        count: entries.length,
+        bytes: entries.reduce((total, entry) => total + Math.max(0, entry.size || 0), 0),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, ttsState]);
+
   const buildPayload = (overrides?: Partial<TTSConfig>): TTSConfig => ({
     enabled,
     source,
@@ -416,9 +547,19 @@ export function TTSConfigCard() {
     autoplayGame,
     progressivePlayback,
     dialogueOnly,
+    dialoguePauseMs,
     audioFormat,
-    dialogueScope: "all",
-    dialogueCharacterName: "",
+    callAudioEnabled,
+    callSttConnectionId: "",
+    callSttModel: "",
+    callAudioInputMode,
+    callVideoInputEnabled,
+    callCharacterVideoEnabled,
+    callAutomaticVideoClipsEnabled,
+    callCustomVideoClipsEnabled,
+    // Soundboard is intentionally always-on for Conversation Calls. Saving this card also migrates old false values.
+    callSoundboardEnabled: true,
+    sourceProfiles: sourceProfilesRef.current,
     ...overrides,
   });
 
@@ -453,36 +594,35 @@ export function TTSConfigCard() {
   };
 
   const handleSourceChange = (nextSource: TTSSource) => {
-    const defaults = TTS_SOURCE_DEFAULTS[nextSource];
-    const nextApiKey = apiKey === TTS_API_KEY_MASK ? "" : apiKey;
+    if (nextSource === source) return;
+    const currentProfile = ttsSourceProfileFromConfig(buildPayload());
+    const sourceProfiles: TTSSourceProfiles = {
+      ...sourceProfilesRef.current,
+      [source]: currentProfile,
+    };
+    const nextProfile = sourceProfiles[nextSource] ?? defaultSourceProfile(nextSource);
+    sourceProfilesRef.current = sourceProfiles;
 
     setSource(nextSource);
-    setBaseUrl(defaults.baseUrl);
-    setApiKey(nextApiKey);
-    setModel(defaults.model);
-    setVoice(defaults.voice);
-    setVoiceMode("single");
-    setVoiceAssignments([]);
-    setNarratorVoiceEnabled(false);
-    setNarratorVoice(defaults.voice);
-    setNpcDefaultVoicesEnabled(false);
-    setNpcDefaultMaleVoices([]);
-    setNpcDefaultFemaleVoices([]);
-    setElevenLabsLanguageCode("");
+    setBaseUrl(nextProfile.baseUrl);
+    setApiKey(nextProfile.apiKey);
+    setModel(nextProfile.model);
+    setVoice(nextProfile.voice);
+    setVoiceMode(nextProfile.voiceMode);
+    setVoiceAssignments(nextProfile.voiceAssignments);
+    setNarratorVoiceEnabled(nextProfile.narratorVoiceEnabled);
+    setNarratorVoice(nextProfile.narratorVoice);
+    setNpcDefaultVoicesEnabled(nextProfile.npcDefaultVoicesEnabled);
+    setNpcDefaultMaleVoices(nextProfile.npcDefaultMaleVoices);
+    setNpcDefaultFemaleVoices(nextProfile.npcDefaultFemaleVoices);
+    setSpeed(nextProfile.speed);
+    setElevenLabsStability(nextProfile.elevenLabsStability);
+    setElevenLabsLanguageCode(nextProfile.elevenLabsLanguageCode);
+    setAudioFormat(nextProfile.audioFormat);
     mark({
       source: nextSource,
-      baseUrl: defaults.baseUrl,
-      apiKey: nextApiKey,
-      model: defaults.model,
-      voice: defaults.voice,
-      voiceMode: "single",
-      voiceAssignments: [],
-      narratorVoiceEnabled: false,
-      narratorVoice: defaults.voice,
-      npcDefaultVoicesEnabled: false,
-      npcDefaultMaleVoices: [],
-      npcDefaultFemaleVoices: [],
-      elevenLabsLanguageCode: "",
+      ...nextProfile,
+      sourceProfiles,
     });
   };
 
@@ -522,10 +662,36 @@ export function TTSConfigCard() {
     })();
   };
 
+  const handleExportCachedClips = async () => {
+    setExportingTtsCache(true);
+    try {
+      const entries = await listCachedTTSAudioEntries();
+      if (entries.length === 0) {
+        toast.info("No cached TTS clips to export yet.");
+        setTtsCacheSummary({ count: 0, bytes: 0 });
+        return;
+      }
+
+      entries.forEach((entry, index) => downloadTTSClip(entry, index));
+      setTtsCacheSummary({
+        count: entries.length,
+        bytes: entries.reduce((total, entry) => total + Math.max(0, entry.size || entry.blob.size), 0),
+      });
+      toast.success(`Exported ${entries.length} cached TTS clip${entries.length === 1 ? "" : "s"}.`);
+    } catch {
+      toast.error("Failed to export cached TTS clips.");
+    } finally {
+      setExportingTtsCache(false);
+    }
+  };
+
   const voices = voicesData?.voices ?? [];
   const fetchedVoiceOptions = voicesData?.voiceOptions ?? voices.map((v) => ({ id: v, name: v }));
   const voiceOptions = useMemo(() => {
-    let nextOptions = fetchedVoiceOptions;
+    let nextOptions = fetchedVoiceOptions.length > 0 ? fetchedVoiceOptions : [];
+    if (source === "elevenlabs" && nextOptions.length === 0) {
+      nextOptions = ELEVENLABS_DEFAULT_VOICE_OPTIONS;
+    }
     for (const savedVoice of [
       voice,
       narratorVoice,
@@ -536,7 +702,15 @@ export function TTSConfigCard() {
       nextOptions = addSavedVoiceOption(nextOptions, savedVoice);
     }
     return nextOptions;
-  }, [fetchedVoiceOptions, narratorVoice, npcDefaultFemaleVoices, npcDefaultMaleVoices, voice, voiceAssignments]);
+  }, [
+    fetchedVoiceOptions,
+    narratorVoice,
+    npcDefaultFemaleVoices,
+    npcDefaultMaleVoices,
+    source,
+    voice,
+    voiceAssignments,
+  ]);
   const voicesFromProvider = voicesData?.fromProvider ?? false;
   const elevenLabsMatchedMaleVoiceOptions = useMemo(
     () =>
@@ -566,19 +740,25 @@ export function TTSConfigCard() {
   }, [elevenLabsMatchedFemaleVoiceOptions, npcDefaultFemaleVoices, voiceOptions]);
   const maleNpcVoiceFallbackNote =
     voiceOptions.length > 0 && elevenLabsMatchedMaleVoiceOptions.length === 0
-      ? "No male-labeled defaults were detected, so choose male voices manually here."
+      ? "No male-labeled defaults were detected, so this pool uses the provider voice list."
       : undefined;
   const femaleNpcVoiceFallbackNote =
     voiceOptions.length > 0 && elevenLabsMatchedFemaleVoiceOptions.length === 0
-      ? "No female-labeled defaults were detected, so choose female voices manually here."
+      ? "No female-labeled defaults were detected, so this pool uses the provider voice list."
       : undefined;
   const defaultMaleVoiceIds = useMemo(
-    () => elevenLabsMatchedMaleVoiceOptions.map((option) => option.id),
-    [elevenLabsMatchedMaleVoiceOptions],
+    () =>
+      (elevenLabsMatchedMaleVoiceOptions.length > 0 ? elevenLabsMatchedMaleVoiceOptions : voiceOptions).map(
+        (option) => option.id,
+      ),
+    [elevenLabsMatchedMaleVoiceOptions, voiceOptions],
   );
   const defaultFemaleVoiceIds = useMemo(
-    () => elevenLabsMatchedFemaleVoiceOptions.map((option) => option.id),
-    [elevenLabsMatchedFemaleVoiceOptions],
+    () =>
+      (elevenLabsMatchedFemaleVoiceOptions.length > 0 ? elevenLabsMatchedFemaleVoiceOptions : voiceOptions).map(
+        (option) => option.id,
+      ),
+    [elevenLabsMatchedFemaleVoiceOptions, voiceOptions],
   );
   const characterOptions = useMemo<CharacterOption[]>(() => {
     return ((characters ?? []) as Array<{ id?: string; data?: unknown; comment?: string | null }>)
@@ -611,15 +791,17 @@ export function TTSConfigCard() {
   const selectedLanguage =
     ELEVENLABS_TTS_LANGUAGE_OPTIONS.find((option) => option.code === elevenLabsLanguageCode) ??
     ELEVENLABS_TTS_LANGUAGE_OPTIONS[0];
-  const speedMin = source === "elevenlabs" ? 0.7 : 0.25;
-  const speedMax = source === "elevenlabs" ? 1.2 : 4.0;
+  const speedMin = source === "elevenlabs" || source === "xai" ? 0.7 : 0.25;
+  const speedMax = source === "elevenlabs" ? 1.2 : source === "xai" ? 1.5 : 4.0;
   const speedHelp =
     source === "elevenlabs"
       ? "Playback speed. ElevenLabs supports 0.7×–1.2×; wider saved values are clamped when spoken."
-      : "Playback speed. 1.0 is normal; range is 0.25×–4.0×.";
+      : source === "xai"
+        ? "Playback speed. xAI Voice supports 0.7×–1.5×; wider saved values are clamped when spoken."
+        : "Playback speed. 1.0 is normal; range is 0.25×–4.0×.";
   const speedSliderValue = Math.min(speedMax, Math.max(speedMin, speed));
   const speedLabel =
-    source === "elevenlabs" && speedSliderValue !== speed
+    (source === "elevenlabs" || source === "xai") && speedSliderValue !== speed
       ? `Speed — ${speedSliderValue.toFixed(2)}× (clamped from ${speed.toFixed(2)}×)`
       : `Speed — ${speed.toFixed(2)}×`;
   const previewDisabled = !enabled || ttsState === "loading" || (source === "elevenlabs" && !previewVoice);
@@ -631,7 +813,6 @@ export function TTSConfigCard() {
         : ttsState === "playing"
           ? "Stop preview"
           : "Preview voice";
-
   const updateVoiceAssignments = (nextAssignments: TTSVoiceAssignment[]) => {
     setVoiceAssignments(nextAssignments);
     mark({ voiceAssignments: nextAssignments });
@@ -768,7 +949,7 @@ export function TTSConfigCard() {
 
       {/* ── Expanded body ── */}
       {expanded && (
-        <div className="mt-4 space-y-4">
+        <div className="mt-3 space-y-4 border-t border-sky-400/10 pt-3">
           {/* Source */}
           <FieldRow label="Source" help="Choose the provider used by the server-side TTS proxy.">
             <select
@@ -792,7 +973,9 @@ export function TTSConfigCard() {
                 ? "The ElevenLabs API root. Use the default unless you proxy ElevenLabs through another server."
                 : source === "pockettts"
                   ? "The PocketTTS server root. Start it with pocket-tts serve, then use http://localhost:8000 unless you changed the port."
-                  : "The OpenAI-compatible TTS API endpoint. Use the default for OpenAI or point to a self-hosted server."
+                  : source === "xai"
+                    ? "The xAI Voice API root. Use https://api.x.ai/v1 unless you proxy xAI through another server."
+                    : "The OpenAI-compatible TTS API endpoint. Use the default for OpenAI or point to a self-hosted server."
             }
           >
             <div className="relative">
@@ -840,7 +1023,9 @@ export function TTSConfigCard() {
                 ? "ElevenLabs model_id to use. Use eleven_v3 for Eleven v3 speech; eleven_ttv_v3 is a voice-design model and cannot generate TTS."
                 : source === "pockettts"
                   ? "PocketTTS selects its language/model when you start the local server. This field is kept for clarity and future compatible servers."
-                  : "TTS model to use. e.g. tts-1, tts-1-hd, gpt-4o-mini-tts, or any model your provider supports."
+                  : source === "xai"
+                    ? "xAI Voice currently uses the /tts endpoint; this is saved for compatibility with future model selection."
+                    : "TTS model to use. e.g. tts-1, tts-1-hd, gpt-4o-mini-tts, or any model your provider supports."
             }
           >
             <div className="relative">
@@ -902,8 +1087,10 @@ export function TTSConfigCard() {
                 source === "elevenlabs"
                   ? "ElevenLabs voices are fetched by name and saved by voice ID."
                   : source === "pockettts"
-                    ? "PocketTTS built-in voice name or a voice URL/path accepted by your PocketTTS server."
-                    : "Voice to use for synthesis. Fetched from your configured provider when available."
+                    ? "PocketTTS built-in or custom voice from your server, or a voice URL/path accepted by PocketTTS."
+                    : source === "xai"
+                      ? "xAI Voice ID. Built-ins include eve, ara, rex, sal, and leo; custom xAI voice IDs can be typed after saving."
+                      : "Voice to use for synthesis. Fetched from your configured provider when available."
               }
             >
               <div className="flex gap-2">
@@ -973,7 +1160,13 @@ export function TTSConfigCard() {
               )}
               {!voicesFromProvider && source === "pockettts" && voices.length > 0 && (
                 <p className="text-[0.625rem] text-[var(--muted-foreground)]">
-                  Showing PocketTTS built-in voices. You can type a custom voice URL or path accepted by your server.
+                  Showing PocketTTS built-in fallbacks. Save and refresh to load built-in and custom voices from your
+                  server.
+                </p>
+              )}
+              {!voicesFromProvider && source === "xai" && voices.length > 0 && (
+                <p className="text-[0.625rem] text-[var(--muted-foreground)]">
+                  Showing xAI built-in voices. Save with an API key, then refresh to load account/custom voices.
                 </p>
               )}
             </FieldRow>
@@ -981,7 +1174,7 @@ export function TTSConfigCard() {
 
           {voiceMode === "per-character" && (
             <FieldRow label="Character Voices" help="Assign voices to specific characters from your Characters tab.">
-              <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/40 p-2">
+              <div className="space-y-2 rounded-xl border border-sky-400/15 bg-sky-400/5 p-2">
                 <div className="grid gap-2 text-[0.625rem] font-semibold uppercase tracking-wide text-[var(--muted-foreground)] sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_auto]">
                   <span>Character</span>
                   <span>Voice</span>
@@ -1039,7 +1232,7 @@ export function TTSConfigCard() {
                 <button
                   type="button"
                   onClick={handleAddVoiceAssignment}
-                  disabled={voiceOptions.length === 0 || characterOptions.length === 0 || allCharactersAssigned}
+                  disabled={characterOptions.length === 0 || allCharactersAssigned}
                   className="mari-chrome-control w-full text-xs"
                 >
                   <Plus size="0.75rem" />
@@ -1058,7 +1251,7 @@ export function TTSConfigCard() {
             label="Narrator Voice"
             help="Use a separate voice for narrator messages, game narration, and roleplay narration outside speaker-tagged dialogue."
           >
-            <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/40 p-2">
+            <div className="space-y-2 rounded-xl border border-sky-400/15 bg-sky-400/5 p-2">
               <ToggleRow
                 label="Use separate narrator voice"
                 checked={narratorVoiceEnabled}
@@ -1144,46 +1337,44 @@ export function TTSConfigCard() {
             </FieldRow>
           )}
 
-          {source === "elevenlabs" && (
-            <FieldRow
-              label="Random NPC Voices"
-              help="When enabled, tracked game NPCs without a character-specific voice use a stable random ElevenLabs default voice matched to inferred male/female presentation."
-            >
-              <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/40 p-2">
-                <ToggleRow
-                  label="Use default voices for random NPCs"
-                  checked={npcDefaultVoicesEnabled}
-                  onChange={toggleNpcDefaultVoices}
-                />
-                {npcDefaultVoicesEnabled && (
-                  <div className="space-y-3 pt-1">
-                    <NpcDefaultVoicePool
-                      label="Male NPC defaults"
-                      options={elevenLabsNpcMaleVoiceOptions}
-                      selected={npcDefaultMaleVoices}
-                      onToggle={(voiceId, checked) => toggleNpcDefaultVoice("male", voiceId, checked)}
-                      note={maleNpcVoiceFallbackNote}
-                    />
-                    <NpcDefaultVoicePool
-                      label="Female NPC defaults"
-                      options={elevenLabsNpcFemaleVoiceOptions}
-                      selected={npcDefaultFemaleVoices}
-                      onToggle={(voiceId, checked) => toggleNpcDefaultVoice("female", voiceId, checked)}
-                      note={femaleNpcVoiceFallbackNote}
-                    />
-                    <p className="text-[0.625rem] leading-relaxed text-[var(--muted-foreground)]">
-                      NPCs with unclear gender use a stable pick from both pools. Assigned character voices still win.
+          <FieldRow
+            label="Random NPC Voices"
+            help="When enabled, tracked game NPCs without a character-specific voice use a stable random provider voice. If voice metadata is available, Marinara prefers matching male/female pools."
+          >
+            <div className="space-y-2 rounded-xl border border-sky-400/15 bg-sky-400/5 p-2">
+              <ToggleRow
+                label="Use default voices for random NPCs"
+                checked={npcDefaultVoicesEnabled}
+                onChange={toggleNpcDefaultVoices}
+              />
+              {npcDefaultVoicesEnabled && (
+                <div className="space-y-3 pt-1">
+                  <NpcDefaultVoicePool
+                    label="Male NPC defaults"
+                    options={elevenLabsNpcMaleVoiceOptions}
+                    selected={npcDefaultMaleVoices}
+                    onToggle={(voiceId, checked) => toggleNpcDefaultVoice("male", voiceId, checked)}
+                    note={maleNpcVoiceFallbackNote}
+                  />
+                  <NpcDefaultVoicePool
+                    label="Female NPC defaults"
+                    options={elevenLabsNpcFemaleVoiceOptions}
+                    selected={npcDefaultFemaleVoices}
+                    onToggle={(voiceId, checked) => toggleNpcDefaultVoice("female", voiceId, checked)}
+                    note={femaleNpcVoiceFallbackNote}
+                  />
+                  <p className="text-[0.625rem] leading-relaxed text-[var(--muted-foreground)]">
+                    NPCs with unclear gender use a stable pick from both pools. Assigned character voices still win.
+                  </p>
+                  {!voicesFromProvider && (
+                    <p className="text-[0.625rem] leading-relaxed text-amber-300/80">
+                      Save and enable this TTS provider, then refresh voices to load provider voice options.
                     </p>
-                    {!voicesFromProvider && (
-                      <p className="text-[0.625rem] leading-relaxed text-amber-300/80">
-                        Save the ElevenLabs connection and refresh voices to load the provider's default voice list.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </FieldRow>
-          )}
+                  )}
+                </div>
+              )}
+            </div>
+          </FieldRow>
 
           {/* Speed */}
           <FieldRow label={speedLabel} help={speedHelp}>
@@ -1300,9 +1491,52 @@ export function TTSConfigCard() {
               checked={dialogueOnly}
               onChange={(v) => {
                 setDialogueOnly(v);
-                mark({ dialogueOnly: v, dialogueScope: "all", dialogueCharacterName: "" });
+                mark({ dialogueOnly: v });
               }}
             />
+            {dialogueOnly && (
+              <FieldRow
+                label={`Pause between dialogues — ${dialoguePauseMs} ms`}
+                help="Adds silence between separate dialogue lines in the same message. It does not pause between chunks of the same long dialogue."
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={1500}
+                  step={50}
+                  value={dialoguePauseMs}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    setDialoguePauseMs(next);
+                    mark({ dialoguePauseMs: next });
+                  }}
+                  className="w-full accent-rose-400"
+                />
+                <div className="flex justify-between text-[0.6rem] text-[var(--muted-foreground)]">
+                  <span>No pause</span>
+                  <span>1500 ms</span>
+                </div>
+              </FieldRow>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border border-sky-400/15 bg-sky-400/5 px-2.5 py-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium">Cached clips</div>
+              <div className="truncate text-[0.625rem] text-[var(--muted-foreground)]">
+                {ttsCacheSummary.count} clip{ttsCacheSummary.count === 1 ? "" : "s"} ·{" "}
+                {formatCacheBytes(ttsCacheSummary.bytes)}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleExportCachedClips()}
+              disabled={exportingTtsCache || ttsCacheSummary.count === 0}
+              className="mari-chrome-control mari-chrome-control--small shrink-0 text-xs"
+              title="Export cached TTS clips"
+            >
+              {exportingTtsCache ? <Loader2 size="0.75rem" className="animate-spin" /> : <Download size="0.75rem" />}
+            </button>
           </div>
 
           {/* Actions */}

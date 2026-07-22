@@ -49,6 +49,11 @@ interface LoadedGame {
 }
 
 const HUMAN_FALLBACK_SEAT = "human";
+const CHARACTER_FALLBACK_NAME = "Character";
+
+function readTrimmedString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
 function humanSeatIdFromChat(chat: { personaId: string | null }): string {
   return chat.personaId || HUMAN_FALLBACK_SEAT;
@@ -61,13 +66,20 @@ async function resolveCharacterName(
   try {
     const row = await characters.getById(characterId);
     if (row?.data) {
-      const data = JSON.parse(row.data) as { name?: unknown };
-      if (typeof data.name === "string" && data.name.trim()) return data.name.trim();
+      try {
+        const data = JSON.parse(row.data) as Record<string, unknown>;
+        const name = readTrimmedString(data.name) ?? readTrimmedString(data.character_name) ?? readTrimmedString(data.displayName);
+        if (name) return name;
+      } catch {
+        // fall through to comment/fallback below
+      }
     }
+    const comment = readTrimmedString((row as { comment?: unknown } | null)?.comment);
+    if (comment) return comment;
   } catch {
-    // best-effort — fall through to the id
+    // best-effort — fall through to a displayable fallback
   }
-  return characterId;
+  return CHARACTER_FALLBACK_NAME;
 }
 
 async function resolveSeats(
@@ -285,8 +297,20 @@ export async function applyTurnGameMove(
     };
   }
 
+  let nextState = result.state;
+  let events = result.events;
+  const nextSeatId = engine.currentSeat(nextState);
+  if (engine.gameType === "rock-paper-scissors" && nextSeatId && nextSeatId !== viewer) {
+    const botMove = engine.pickFallbackMove(nextState, nextSeatId);
+    const botResult = engine.applyMove(nextState, nextSeatId, botMove);
+    if (botResult.ok) {
+      nextState = botResult.state;
+      events = [...(events ?? []), ...(botResult.events ?? [])];
+    }
+  }
+
   const storage = createGameEngineStateStorage(db);
-  const serialized = JSON.stringify(result.state);
+  const serialized = JSON.stringify(nextState);
   if (anchor?.messageId) {
     // Anchor to the latest visible assistant message so this state is what a read
     // (or a regenerate of the following turn) resolves to.
@@ -314,14 +338,14 @@ export async function applyTurnGameMove(
     });
   }
 
-  const terminal = engine.isTerminal(result.state);
+  const terminal = engine.isTerminal(nextState);
   return {
     ok: true,
-    view: engine.publicView(result.state, viewer),
-    events: result.events,
+    view: engine.publicView(nextState, viewer),
+    events,
     finished: terminal.done,
     winnerSeatId: terminal.winnerSeatId ?? null,
-    currentSeatId: engine.currentSeat(result.state),
+    currentSeatId: engine.currentSeat(nextState),
   };
 }
 
@@ -346,29 +370,78 @@ export async function getActiveTurnGame(db: DB, chatId: string): Promise<LoadedG
 }
 
 /**
- * A short context block telling conversation bots about the table's game so their
- * free-chat replies are game-aware. Covers both an in-progress game AND one that
- * just finished (until it's dismissed), so post-game banter stays connected to
- * what actually happened. Returns null when no game row exists for the chat.
+ * Load the chat's latest game snapshot regardless of terminal status — unlike
+ * `getActiveTurnGame`, this returns a FINISHED game too. Used by the bot-turn
+ * loop's post-loop announcement drain: a showdown/game_over event queued by the
+ * last bot move needs to be voiced even though the game is now finished (at
+ * which point `getActiveTurnGame` would return null and hide it).
  */
-export async function getTurnGameContextText(db: DB, chatId: string): Promise<string | null> {
+export async function loadTurnGameForDrain(db: DB, chatId: string): Promise<LoadedGame | null> {
+  return loadGame(db, chatId, null);
+}
+
+/**
+ * Load the chat's game once and return a per-seat context builder for it, so a
+ * multi-character generation pays the game load (message-anchor scan + state
+ * parse) once per request instead of once per responding character. Returns
+ * null when no game row exists. The builder tells conversation bots about the
+ * table's game so their free-chat replies are game-aware — covering both an
+ * in-progress game AND one that just finished (until it's dismissed). When
+ * `seatId` is one of the game's seats, the block is built from that seat's own
+ * perspective (their hand / color / last move); any other viewer gets the
+ * hand-free spectator text.
+ */
+export async function getTurnGameContextBuilder(
+  db: DB,
+  chatId: string,
+): Promise<((seatId?: string | null) => string | null) | null> {
   const loaded = await loadGame(db, chatId);
   if (!loaded) return null;
-  try {
-    const summary = loaded.engine.spectatorSummary(loaded.state);
-    if (!summary) return null;
-    const finished = loaded.engine.isTerminal(loaded.state).done;
-    const guidance = finished
-      ? `The game is over. Stay fully in character; you may talk about how it went — react to the result, ` +
-        `tease the winner, lament a bad beat, call for a rematch — drawing on the moves above. ` +
-        `Don't restate these stats verbatim.`
-      : `You are at this table. Stay fully in character; you may reference the game naturally when it's relevant, ` +
-        `but never restate these stats verbatim and never reveal anyone's specific cards.`;
-    return `${summary}\n${guidance}`;
-  } catch (err) {
-    logger.warn(err, "Failed to build turn-game context text for chat %s", chatId);
-    return null;
-  }
+  return (seatId?: string | null): string | null => {
+    try {
+      // Both engines keep seatNames keyed by seatId (the bot runner relies on the
+      // same shape), so this is the cheap game-agnostic "is this viewer seated" test.
+      const seated = Boolean(seatId && loaded.state?.seatNames?.[seatId]);
+      const summary = seated
+        ? loaded.engine.participantSummary(loaded.state, seatId!)
+        : loaded.engine.spectatorSummary(loaded.state);
+      if (!summary) return null;
+      const finished = loaded.engine.isTerminal(loaded.state).done;
+      const guidance = finished
+        ? `The game is over. Stay fully in character; you may talk about how it went — react to the result, ` +
+          `tease the winner, lament a bad beat, call for a rematch — drawing on the moves above. ` +
+          `Don't restate these stats verbatim.`
+        : seated
+          ? loaded.engine.hiddenInformation
+            ? `You are seated in this game — it is YOUR game: you know exactly what you played and how your hand feels. ` +
+              `You may bring up your own moves, react to opponents' plays, gloat, sulk, or bluff like a real player. ` +
+              `Your hand is PRIVATE — keeping it hidden is part of playing, and everyone can see how many cards you hold ` +
+              `but not what they are. Whether you deflect, tease, bluff, lie, or carelessly let something slip when asked ` +
+              `about your hand is up to your personality — a sharp player gives nothing away. Never recite these stats ` +
+              `verbatim, and never reveal other players' hidden information.`
+            : `You are seated in this game — it is YOUR game, and the board is open for everyone to see, so you may ` +
+              `discuss the position and your own moves as freely as suits your character. Your PLANS, though, are ` +
+              `the one thing your opponent cannot see — whether you share them honestly, deflect, or bluff and ` +
+              `misdirect about your intentions when asked is up to your personality; a sharp player keeps them ` +
+              `close. Never recite these stats verbatim.`
+          : `You are at this table. Stay fully in character; you may reference the game naturally when it's relevant, ` +
+            `but never restate these stats verbatim and never reveal anyone's specific cards.`;
+      return `${summary}\n${guidance}`;
+    } catch (err) {
+      logger.warn(err, "Failed to build turn-game context text for chat %s", chatId);
+      return null;
+    }
+  };
+}
+
+/**
+ * One-shot convenience wrapper over getTurnGameContextBuilder for single-seat
+ * callers (and tests). Prefer the builder when injecting for several
+ * characters in one request.
+ */
+export async function getTurnGameContextText(db: DB, chatId: string, seatId?: string | null): Promise<string | null> {
+  const build = await getTurnGameContextBuilder(db, chatId);
+  return build ? build(seatId) : null;
 }
 
 /** End and remove the game for a chat. */

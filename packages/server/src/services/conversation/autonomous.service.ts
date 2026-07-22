@@ -105,12 +105,15 @@ export function getAutonomousDailyBudget(
 
 function readAutonomousDailyCapOverride(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
-  return Math.max(1, Math.floor(value));
+  return Math.max(1, Math.min(8, Math.floor(value)));
 }
 
 export function dailyCapForCharacter(schedule: WeekSchedule | undefined, chatMeta?: Record<string, unknown>): number {
-  const override = chatMeta ? readAutonomousDailyCapOverride(chatMeta.autonomousDailyCapOverride) : null;
-  if (override != null) return override;
+  const chatCap = chatMeta ? readAutonomousDailyCapOverride(chatMeta.autonomousDailyCapOverride) : null;
+  const characterCap = readAutonomousDailyCapOverride(schedule?.autonomousDailyCapOverride);
+  if (chatCap != null && characterCap != null) return Math.min(chatCap, characterCap);
+  if (characterCap != null) return characterCap;
+  if (chatCap != null) return chatCap;
 
   const talkativeness = schedule?.talkativeness ?? 50;
   if (talkativeness >= 80) return 8;
@@ -118,6 +121,16 @@ export function dailyCapForCharacter(schedule: WeekSchedule | undefined, chatMet
   if (talkativeness >= 40) return 5;
   if (talkativeness >= 20) return 3;
   return 2;
+}
+
+export function isAutonomousDailyBudgetExhausted(
+  characterId: string,
+  schedule: WeekSchedule | undefined,
+  chatMeta: Record<string, unknown>,
+  now: Date = new Date(),
+): boolean {
+  const budget = getAutonomousDailyBudget(chatMeta, now);
+  return (budget.counts[characterId] ?? 0) >= dailyCapForCharacter(schedule, chatMeta);
 }
 
 export function buildAutonomousDailyBudgetPatch(
@@ -299,7 +312,12 @@ export function checkAutonomousMessaging(
   chatId: string,
   characterSchedules: Record<string, WeekSchedule>,
   isGroupChat: boolean,
-  opts: { maxFollowups?: number; statusOverrides?: Record<string, ConversationStatusOverride> } = {},
+  opts: {
+    maxFollowups?: number;
+    statusOverrides?: Record<string, ConversationStatusOverride>;
+    actualNow?: Date;
+    scheduleNow?: Date;
+  } = {},
 ): AutonomousCheckResult {
   const noTrigger: AutonomousCheckResult = {
     shouldTrigger: false,
@@ -337,9 +355,17 @@ export function checkAutonomousMessaging(
 
   // Maximum autonomous follow-ups before a character stops messaging
   const maxFollowups = Math.max(1, Math.min(3, Math.floor(opts.maxFollowups ?? 3)));
+  const actualNow = opts.actualNow ?? new Date();
+  const scheduleNow = opts.scheduleNow ?? actualNow;
 
   for (const [charId, schedule] of Object.entries(characterSchedules)) {
-    const { status } = getEffectiveCurrentStatus(schedule, opts.statusOverrides?.[charId]);
+    const { status } = getEffectiveCurrentStatus(
+      schedule,
+      opts.statusOverrides?.[charId],
+      actualNow,
+      "free time",
+      scheduleNow,
+    );
 
     // Can't send if offline or sleeping
     if (status === "offline") continue;
@@ -401,9 +427,12 @@ export function checkAutonomousMessaging(
   const reason: AutonomousCheckResult["reason"] = top.reactionDriven ? "user_reaction" : "user_inactivity";
 
   if (isGroupChat) {
-    // In group chats, potentially multiple characters can exchange
-    // but start with just the top character
-    return { shouldTrigger: true, characterIds: [top.id], reason, inactivityMs };
+    return {
+      shouldTrigger: true,
+      characterIds: eligibleCharacters.map((candidate) => candidate.id),
+      reason,
+      inactivityMs,
+    };
   }
 
   // In DMs, only one character
@@ -420,6 +449,8 @@ export function checkCharacterExchange(
   lastSpeakerCharId: string,
   characterSchedules: Record<string, WeekSchedule>,
   statusOverrides: Record<string, ConversationStatusOverride> = {},
+  now: Date = new Date(),
+  scheduleNow: Date = now,
 ): AutonomousCheckResult {
   const noTrigger: AutonomousCheckResult = {
     shouldTrigger: false,
@@ -447,7 +478,13 @@ export function checkCharacterExchange(
   for (const [charId, schedule] of Object.entries(characterSchedules)) {
     if (charId === lastSpeakerCharId) continue;
 
-    const { status } = getEffectiveCurrentStatus(schedule, statusOverrides[charId]);
+    const { status } = getEffectiveCurrentStatus(
+      schedule,
+      statusOverrides[charId],
+      now,
+      "free time",
+      scheduleNow,
+    );
     if (status === "offline") continue;
     if (status === "dnd") continue; // Busy characters don't join casual exchanges
 
@@ -459,13 +496,18 @@ export function checkCharacterExchange(
 
   // Probabilistic: roll dice weighted by talkativeness
   // A character with talkativeness 80 has an 80% chance of responding
-  const candidate = eligible[Math.floor(Math.random() * eligible.length)]!;
+  const shuffledEligible = [...eligible];
+  for (let index = shuffledEligible.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledEligible[index], shuffledEligible[swapIndex]] = [shuffledEligible[swapIndex]!, shuffledEligible[index]!];
+  }
+  const candidate = shuffledEligible[0]!;
   const roll = Math.random() * 100;
   if (roll > candidate.weight) return noTrigger;
 
   return {
     shouldTrigger: true,
-    characterIds: [candidate.id],
+    characterIds: shuffledEligible.map((entry) => entry.id),
     reason: "character_exchange",
     inactivityMs,
   };

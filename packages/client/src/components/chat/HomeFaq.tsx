@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, HelpCircle, Search, Sparkles, TriangleAlert, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, HelpCircle, Search, Sparkles, TriangleAlert, X } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useDocsIndex } from "../../hooks/use-docs";
+import { useUIStore } from "../../stores/ui.store";
+import { Modal } from "../ui/Modal";
 
 interface HomeFaqItem {
   id: string;
@@ -8,6 +11,24 @@ interface HomeFaqItem {
   question: string;
   answer: string;
   bullets?: string[];
+  /** Renders the on-disk docs path plus an "Open Documentation" button under the answer */
+  docsAccess?: boolean;
+}
+
+interface HomeFaqProps {
+  defaultExpanded?: boolean;
+  className?: string;
+  compact?: boolean;
+  expanded?: boolean;
+  onExpandedChange?: (v: boolean) => void;
+  openItemId?: string | null;
+  onOpenItemIdChange?: (v: string | null) => void;
+  /** Keeps the compact desktop FAQ inline while replacing it with a modal launcher below md. */
+  mobileModal?: boolean;
+  /** Renders the full FAQ body without a second card header inside a modal. */
+  headerless?: boolean;
+  /** Omits the introductory and pre-bug guidance so a modal can focus on the FAQ list. */
+  faqOnly?: boolean;
 }
 
 const QUICK_FIXES = [
@@ -65,6 +86,18 @@ const HOME_FAQ_ITEMS: HomeFaqItem[] = [
       "The sidecar is there for helpers and utility tasks, not to compete with your main model for VRAM.",
       "Treat it as a problem only if the sidecar never recovers or keeps crashing instead of settling on CPU fallback.",
     ],
+  },
+  {
+    id: "find-documentation",
+    category: "Setup",
+    question: "Where can I find documentation?",
+    answer:
+      "Marinara ships full guides with every install: installation, configuration, troubleshooting, macros, extensions, Game Mode, and more. You can read them without leaving the app.",
+    bullets: [
+      "Use the Open Documentation button below, or the Documentation button at the bottom of the home page, to browse every guide in-app.",
+      "The same guides live on disk as regular markdown files, at the folder path shown below.",
+    ],
+    docsAccess: true,
   },
   {
     id: "antivirus-installer",
@@ -295,7 +328,7 @@ const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     bullets: [
       "It edits the last model reply for banned words, repetition, prose slop, and your writing instructions without changing events or meaning.",
       "If no edit is needed, it should leave the message alone.",
-      "If it rewrites a message, use the shield action under that message to restore the original.",
+      "If it rewrites a message, use the persistent shield action under that message to switch between the original and rewritten versions.",
       "Continuity Checker can share the same rewrite pass when both are enabled.",
     ],
   },
@@ -362,7 +395,7 @@ const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     answer:
       "Choose an Illustrator prompt mode from that chat's agent menu, or edit the agent prompt from the Agents tab.",
     bullets: [
-      "Illustration, Comic Page, Colored Manga, B&W Manga, Background, and Selfie modes all tune the prompt differently.",
+      "Background is the default mode. Illustration, Comic Page, Colored Manga, B&W Manga, and Selfie remain selectable per chat.",
       "Use the default style from Style Profiles in Advanced settings when you want a shared image style.",
     ],
   },
@@ -464,6 +497,20 @@ const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     ],
   },
   {
+    id: "conversation-audio-calls",
+    category: "Misc",
+    question: "How do I set up Conversation audio calls?",
+    answer:
+      "Enable TTS first, then turn on Calls for the chat and pick how your microphone should be transcribed.",
+    bullets: [
+      "Open Connections > Text to Speech, enable a TTS provider, save it, and confirm the preview plays.",
+      "After installing Calls, open Connections > Local Model, expand the card, choose Whisper Tiny (Multilingual) or Whisper Base (Multilingual) under Local Speech Model, then click Download Whisper. Uninstalling Calls removes the downloaded model.",
+      "In the Conversation chat, open Chat Settings > Commands > Calls, enable Audio/Video Calls, then enable Call Audio Pipeline.",
+      "Use Mic recording + Local Whisper for Firefox or reliable local speech capture. Browser speech recognition depends on browser support.",
+      "The Calls command toggle only controls whether characters can ring you first; you can still call them when Audio/Video Calls is enabled.",
+    ],
+  },
+  {
     id: "translations",
     category: "Misc",
     question: "Can I chat in languages other than English? What about the UI?",
@@ -499,6 +546,38 @@ function getFaqSearchText(item: HomeFaqItem) {
   return [item.category, item.question, item.answer, ...(item.bullets ?? [])].join(" ").toLowerCase();
 }
 
+/** Only mounted while the docs FAQ entry is open, so the index fetch stays lazy. */
+function FaqDocsAccess({ compact }: { compact?: boolean }) {
+  const { data: index } = useDocsIndex();
+
+  return (
+    <div className="mt-2 space-y-2">
+      <div
+        className={cn(
+          "rounded-lg border border-[var(--border)]/55 bg-[var(--background)]/60 px-2.5 py-1.5",
+          compact ? "text-[0.625rem]" : "text-[0.65625rem]",
+        )}
+      >
+        <p className="text-[var(--muted-foreground)]/70">On disk at:</p>
+        <code className="block break-all text-[var(--foreground)]/85">
+          {index ? index.root : "the docs folder inside your Marinara install folder"}
+        </code>
+      </div>
+      <button
+        type="button"
+        onClick={() => useUIStore.getState().openModal("docs-viewer")}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-lg border border-[var(--primary)]/30 bg-[var(--primary)]/10 font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary)]/20",
+          compact ? "px-2 py-1 text-[0.625rem]" : "px-2.5 py-1.5 text-[0.6875rem]",
+        )}
+      >
+        <BookOpen size={compact ? "0.6875rem" : "0.75rem"} />
+        Open Documentation
+      </button>
+    </div>
+  );
+}
+
 export function HomeFaq({
   defaultExpanded = false,
   className,
@@ -507,18 +586,14 @@ export function HomeFaq({
   onExpandedChange,
   openItemId: openItemIdProp,
   onOpenItemIdChange,
-}: {
-  defaultExpanded?: boolean;
-  className?: string;
-  compact?: boolean;
-  expanded?: boolean;
-  onExpandedChange?: (v: boolean) => void;
-  openItemId?: string | null;
-  onOpenItemIdChange?: (v: string | null) => void;
-} = {}) {
+  mobileModal = false,
+  headerless = false,
+  faqOnly = false,
+}: HomeFaqProps = {}) {
   const [expandedInternal, setExpandedInternal] = useState(defaultExpanded);
   const [openItemIdInternal, setOpenItemIdInternal] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [mobileModalOpen, setMobileModalOpen] = useState(false);
 
   const expanded = expandedProp ?? expandedInternal;
   const setExpanded = (v: boolean) => {
@@ -538,37 +613,59 @@ export function HomeFaq({
   );
 
   if (compact) {
-    return (
-      <section className={cn("w-full", className)}>
-        <div className="overflow-hidden rounded-lg border border-[var(--border)]/60 bg-[var(--card)]/70">
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            aria-expanded={expanded}
-          >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--primary)]/25 bg-[linear-gradient(135deg,rgba(235,137,81,0.18),rgba(77,229,221,0.14))] text-[var(--primary)]">
-              <HelpCircle size="0.875rem" />
+    const compactHeaderContent = (
+      <>
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--primary)]/25 bg-[linear-gradient(135deg,rgba(235,137,81,0.18),rgba(77,229,221,0.14))] text-[var(--primary)]">
+          <HelpCircle size="0.875rem" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-xs font-semibold text-[var(--foreground)]">FAQ</p>
+            <span className="rounded-full border border-[var(--border)]/60 bg-black/5 px-1.5 py-0.5 text-[0.5rem] uppercase tracking-[0.12em] text-[var(--muted-foreground)]/80 dark:bg-white/6">
+              {HOME_FAQ_ITEMS.length}
+            </span>
+          </div>
+        </div>
+      </>
+    );
+    const compactFaq = (
+      <section
+        className={cn("w-full", expanded && "md:h-full", mobileModal && "hidden md:block", className)}
+        data-component="HomeFaq.Compact"
+      >
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg border border-[var(--border)]/60 bg-[var(--card)]/70",
+            expanded && "md:flex md:h-full md:min-h-0 md:flex-col",
+          )}
+        >
+          {mobileModal ? (
+            <div
+              className="flex w-full items-center gap-2 px-3 py-2 text-left"
+              data-component="HomeFaq.DesktopHeader"
+            >
+              {compactHeaderContent}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <p className="truncate text-xs font-semibold text-[var(--foreground)]">FAQ</p>
-                <span className="rounded-full border border-[var(--border)]/60 bg-black/5 px-1.5 py-0.5 text-[0.5rem] uppercase tracking-[0.12em] text-[var(--muted-foreground)]/80 dark:bg-white/6">
-                  {HOME_FAQ_ITEMS.length}
-                </span>
-              </div>
-            </div>
-            <ChevronDown
-              size="0.875rem"
-              className={cn(
-                "shrink-0 text-[var(--muted-foreground)] transition-transform duration-200",
-                expanded && "rotate-180 text-[var(--primary)]",
-              )}
-            />
-          </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              aria-expanded={expanded}
+            >
+              {compactHeaderContent}
+              <ChevronDown
+                size="0.875rem"
+                className={cn(
+                  "shrink-0 text-[var(--muted-foreground)] transition-transform duration-200",
+                  expanded && "rotate-180 text-[var(--primary)]",
+                )}
+              />
+            </button>
+          )}
 
           {expanded && (
-            <div className="border-t border-[var(--border)]/60 p-2">
+            <div className="border-t border-[var(--border)]/60 p-2 md:flex md:min-h-0 md:flex-1 md:flex-col">
               <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/70 px-2 py-1.5">
                 <Search size="0.75rem" className="shrink-0 text-[var(--muted-foreground)]" />
                 <input
@@ -590,7 +687,10 @@ export function HomeFaq({
                   </button>
                 ) : null}
               </div>
-              <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+              <div
+                className="max-h-64 space-y-1.5 overflow-y-auto pr-1 md:min-h-0 md:max-h-none md:flex-1"
+                data-component="HomeFaq.CompactList"
+              >
                 {visibleFaqItems.map((item) => {
                   const isOpen = openItemId === item.id;
 
@@ -643,6 +743,7 @@ export function HomeFaq({
                               ))}
                             </ul>
                           ) : null}
+                          {item.docsAccess ? <FaqDocsAccess compact /> : null}
                         </div>
                       )}
                     </div>
@@ -659,83 +760,140 @@ export function HomeFaq({
         </div>
       </section>
     );
+
+    if (!mobileModal) return compactFaq;
+
+    return (
+      <>
+        {compactFaq}
+        <section className={cn("w-full md:hidden", className)} data-component="HomeFaq.MobileLauncher">
+          <button
+            type="button"
+            onClick={() => setMobileModalOpen(true)}
+            className="flex w-full items-center gap-2 rounded-lg border border-[var(--border)]/60 bg-[var(--card)]/70 px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            aria-label="Open Professor Mari's FAQ"
+          >
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--primary)]/25 bg-[linear-gradient(135deg,rgba(235,137,81,0.18),rgba(77,229,221,0.14))] text-[var(--primary)]">
+              <HelpCircle size="0.875rem" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-xs font-semibold text-[var(--foreground)]">FAQ</p>
+                <span className="rounded-full border border-[var(--border)]/60 bg-black/5 px-1.5 py-0.5 text-[0.5rem] uppercase tracking-[0.12em] text-[var(--muted-foreground)]/80 dark:bg-white/6">
+                  {HOME_FAQ_ITEMS.length}
+                </span>
+              </div>
+            </div>
+          </button>
+        </section>
+
+        <Modal
+          open={mobileModalOpen}
+          onClose={() => setMobileModalOpen(false)}
+          title="Professor Mari's FAQ"
+          width="max-w-5xl"
+        >
+          <HomeFaq
+            headerless
+            faqOnly
+            expanded
+            openItemId={openItemId}
+            onOpenItemIdChange={setOpenItemId}
+            className="max-w-none"
+          />
+        </Modal>
+      </>
+    );
   }
 
   return (
-    <section className={cn("w-full max-w-md", className)}>
-      <div className="overflow-hidden rounded-[1rem] border border-[var(--border)]/60 bg-[var(--card)] shadow-[0_14px_38px_rgba(0,0,0,0.24)] backdrop-blur-xl dark:bg-[linear-gradient(180deg,rgba(18,14,23,0.92),rgba(11,10,16,0.86))]">
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-start gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 sm:items-center sm:gap-3 sm:px-4"
-          aria-expanded={expanded}
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--primary)]/25 bg-[linear-gradient(135deg,rgba(235,137,81,0.18),rgba(77,229,221,0.14))] text-[var(--primary)] shadow-[0_0_20px_rgba(235,137,81,0.1)]">
-            <HelpCircle size="1rem" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold tracking-tight text-[var(--foreground)]">Professor Mari&apos;s FAQ</p>
-              <span className="rounded-full border border-[var(--border)]/60 bg-black/5 px-2 py-0.5 text-[0.5625rem] uppercase tracking-[0.16em] text-[var(--muted-foreground)]/80 dark:bg-white/6">
-                {HOME_FAQ_ITEMS.length} answers
-              </span>
+    <section className={cn("w-full", headerless ? "max-w-none" : "max-w-md", className)}>
+      <div
+        className={cn(
+          !headerless &&
+            "overflow-hidden rounded-[1rem] border border-[var(--border)]/60 bg-[var(--card)] shadow-[0_14px_38px_rgba(0,0,0,0.24)] backdrop-blur-xl dark:bg-[linear-gradient(180deg,rgba(18,14,23,0.92),rgba(11,10,16,0.86))]",
+        )}
+      >
+        {!headerless && (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex w-full items-start gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 sm:items-center sm:gap-3 sm:px-4"
+            aria-expanded={expanded}
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--primary)]/25 bg-[linear-gradient(135deg,rgba(235,137,81,0.18),rgba(77,229,221,0.14))] text-[var(--primary)] shadow-[0_0_20px_rgba(235,137,81,0.1)]">
+              <HelpCircle size="1rem" />
             </div>
-            <p className="mt-0.5 text-[0.6875rem] leading-snug text-[var(--muted-foreground)]/80">
-              The recurring setup, model, Game Mode, image, and agent questions people keep asking.
-            </p>
-          </div>
-          <ChevronDown
-            size="1rem"
-            className={cn(
-              "shrink-0 text-[var(--muted-foreground)] transition-transform duration-200",
-              expanded && "rotate-180 text-[var(--primary)]",
-            )}
-          />
-        </button>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold tracking-tight text-[var(--foreground)]">
+                  Professor Mari&apos;s FAQ
+                </p>
+                <span className="rounded-full border border-[var(--border)]/60 bg-black/5 px-2 py-0.5 text-[0.5625rem] uppercase tracking-[0.16em] text-[var(--muted-foreground)]/80 dark:bg-white/6">
+                  {HOME_FAQ_ITEMS.length} answers
+                </span>
+              </div>
+              <p className="mt-0.5 text-[0.6875rem] leading-snug text-[var(--muted-foreground)]/80">
+                The recurring setup, model, Game Mode, image, and agent questions people keep asking.
+              </p>
+            </div>
+            <ChevronDown
+              size="1rem"
+              className={cn(
+                "shrink-0 text-[var(--muted-foreground)] transition-transform duration-200",
+                expanded && "rotate-180 text-[var(--primary)]",
+              )}
+            />
+          </button>
+        )}
 
-        {expanded && (
-          <div className="border-t border-[var(--border)]/60 px-4 pb-4 pt-3">
-            <div className="rounded-[1.1rem] border border-[var(--primary)]/20 bg-[linear-gradient(135deg,rgba(235,137,81,0.12),rgba(77,229,221,0.08))] p-3.5 shadow-[0_10px_26px_rgba(0,0,0,0.18)] sm:p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                <div className="mx-auto flex h-28 w-20 shrink-0 items-start justify-center overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--card)]/80 shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:mx-0 sm:h-32 sm:w-24">
-                  <img
-                    src="/sprites/mari/Mari_explaining.png"
-                    alt="Professor Mari"
-                    className="h-full w-full object-cover object-[center_14%]"
-                  />
-                </div>
-                <div className="min-w-0 text-center sm:text-left">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--muted)]/50 px-2.5 py-1 text-[0.5625rem] uppercase tracking-[0.18em] text-[var(--muted-foreground)]/85 dark:border-white/10 dark:bg-black/20">
-                    <Sparkles size="0.6875rem" />
-                    Professor Mari
+        {(expanded || headerless) && (
+          <div className={cn(!headerless && "border-t border-[var(--border)]/60 px-4 pb-4 pt-3")}>
+            {!faqOnly && (
+              <>
+                <div className="rounded-[1.1rem] border border-[var(--primary)]/20 bg-[linear-gradient(135deg,rgba(235,137,81,0.12),rgba(77,229,221,0.08))] p-3.5 shadow-[0_10px_26px_rgba(0,0,0,0.18)] sm:p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                    <div className="mx-auto flex h-28 w-20 shrink-0 items-start justify-center overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--card)]/80 shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:mx-0 sm:h-32 sm:w-24">
+                      <img
+                        src="/sprites/mari/Mari_explaining.png"
+                        alt="Professor Mari"
+                        className="h-full w-full object-cover object-[center_14%]"
+                      />
+                    </div>
+                    <div className="min-w-0 text-center sm:text-left">
+                      <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--muted)]/50 px-2.5 py-1 text-[0.5625rem] uppercase tracking-[0.18em] text-[var(--muted-foreground)]/85 dark:border-white/10 dark:bg-black/20">
+                        <Sparkles size="0.6875rem" />
+                        Professor Mari
+                      </div>
+                      <p className="mt-2 text-sm font-semibold tracking-tight text-[var(--foreground)]">
+                        Start here before you go hunting through Discord logs.
+                      </p>
+                      <p className="mt-1 text-[0.6875rem] leading-relaxed text-[var(--muted-foreground)]/85">
+                        The biggest repeat problems are Game Mode model choice, silent agent failures from low max
+                        output tokens, and confusion about the local sidecar using CPU instead of the GPU.
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-2 text-sm font-semibold tracking-tight text-[var(--foreground)]">
-                    Start here before you go hunting through Discord logs.
-                  </p>
-                  <p className="mt-1 text-[0.6875rem] leading-relaxed text-[var(--muted-foreground)]/85">
-                    The biggest repeat problems are Game Mode model choice, silent agent failures from low max output
-                    tokens, and confusion about the local sidecar using CPU instead of the GPU.
-                  </p>
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-3 rounded-[1.1rem] border border-amber-400/20 bg-amber-500/8 p-3">
-              <div className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-200/90">
-                <TriangleAlert size="0.875rem" />
-                Before You Post A Bug
-              </div>
-              <ul className="mt-2 space-y-1.5 text-[0.6875rem] leading-relaxed text-[var(--muted-foreground)]/88">
-                {QUICK_FIXES.map((fix) => (
-                  <li key={fix} className="flex gap-2">
-                    <span className="mt-[0.18rem] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500/75 dark:bg-amber-300/75" />
-                    <span>{fix}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                <div className="mt-3 rounded-[1.1rem] border border-amber-400/20 bg-amber-500/8 p-3">
+                  <div className="flex items-center gap-2 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-200/90">
+                    <TriangleAlert size="0.875rem" />
+                    Before You Post A Bug
+                  </div>
+                  <ul className="mt-2 space-y-1.5 text-[0.6875rem] leading-relaxed text-[var(--muted-foreground)]/88">
+                    {QUICK_FIXES.map((fix) => (
+                      <li key={fix} className="flex gap-2">
+                        <span className="mt-[0.18rem] h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500/75 dark:bg-amber-300/75" />
+                        <span>{fix}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
 
-            <div className="mt-3">
+            <div className={cn(!faqOnly && "mt-3")}>
               <div className="mb-2 flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <p className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-[var(--muted-foreground)]/65">
                   Frequently Asked Questions
@@ -819,6 +977,7 @@ export function HomeFaq({
                               ))}
                             </ul>
                           ) : null}
+                          {item.docsAccess ? <FaqDocsAccess /> : null}
                         </div>
                       )}
                     </div>

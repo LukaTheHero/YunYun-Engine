@@ -8,11 +8,14 @@ import {
   normalizeImageStyleProfileSettings,
   normalizeQuoteFormat,
   type ImageStyleProfileSettings,
+  type GenerateSpatialMapDraftResponse,
   type LorebookCategory,
   type QuoteFormat,
+  type ScenePromptPreferences,
 } from "@marinara-engine/shared";
 import { isCssGradient, RAINBOW_GRADIENT_PRESET } from "../lib/css-colors";
 import { announceChatFloatingUiDismiss } from "../lib/chat-floating-ui-events";
+import { detectConversationTimeZone, normalizeConversationTimeZone } from "../lib/conversation-time-zone";
 import { BASIC_PANEL_SORT_OPTIONS, normalizeBasicPanelSort, type BasicPanelSort } from "../lib/panel-sort";
 
 type Panel =
@@ -28,6 +31,7 @@ type Panel =
 export type ChatModeShortcut = "conversation" | "roleplay" | "game";
 export const CHARACTER_LIBRARY_SORT_OPTIONS = ["name-asc", "name-desc", "newest", "oldest", "favorites"] as const;
 export type CharacterLibrarySort = (typeof CHARACTER_LIBRARY_SORT_OPTIONS)[number];
+export type CardLibraryKind = "characters" | "personas";
 export const CHARACTER_PANEL_FAVORITE_FILTER_OPTIONS = ["all", "favorites", "non-favorites"] as const;
 export type CharacterPanelFavoriteFilter = (typeof CHARACTER_PANEL_FAVORITE_FILTER_OPTIONS)[number];
 export const LOREBOOK_PANEL_CATEGORY_OPTIONS = [
@@ -44,6 +48,14 @@ export const LOREBOOK_PANEL_SORT_OPTIONS = ["name-asc", "name-desc", "newest", "
 export type LorebookPanelSort = (typeof LOREBOOK_PANEL_SORT_OPTIONS)[number];
 export const RESOURCE_PANEL_SORT_OPTIONS = BASIC_PANEL_SORT_OPTIONS;
 export type ResourcePanelSort = BasicPanelSort;
+export const CONNECTION_PANEL_SORT_OPTIONS = [...BASIC_PANEL_SORT_OPTIONS, "custom"] as const;
+export type ConnectionPanelSort = (typeof CONNECTION_PANEL_SORT_OPTIONS)[number];
+
+function normalizeConnectionPanelSort(value: unknown): ConnectionPanelSort {
+  return CONNECTION_PANEL_SORT_OPTIONS.includes(value as ConnectionPanelSort)
+    ? (value as ConnectionPanelSort)
+    : "name-asc";
+}
 type FontSize = 12 | 14 | 16 | 17 | 19 | 22;
 export type VisualTheme = "default" | "sillytavern";
 export type ConversationMessageStyle = "classic" | "bubble";
@@ -78,6 +90,12 @@ export interface SummaryPopoverSettings {
 }
 export const APP_LANGUAGE_OPTIONS = [{ id: "en", label: "English" }] as const;
 export type AppLanguage = (typeof APP_LANGUAGE_OPTIONS)[number]["id"];
+
+export interface PendingSpatialMapDraftReview {
+  chatId: string;
+  result: GenerateSpatialMapDraftResponse;
+  source: "game_setup";
+}
 
 export interface GameSetupLearnedOptions {
   genres: string[];
@@ -152,6 +170,11 @@ const DEFAULT_SUMMARY_POPOVER_SETTINGS: SummaryPopoverSettings = {
   hideSummarisedMessages: false,
   collapseHiddenMessages: false,
 };
+const DEFAULT_SCENE_PROMPT_PREFERENCES: ScenePromptPreferences = {
+  pov: "third_person",
+  tense: "present",
+  extraInstructions: "",
+};
 
 function normalizeUserActivity(activity: string): string {
   return activity.replace(/\s+/g, " ").trim().slice(0, USER_ACTIVITY_MAX_LENGTH);
@@ -202,7 +225,12 @@ function normalizePanelText(value: unknown) {
 function normalizePanelStringArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return Array.from(
-    new Set(value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)),
+    new Set(
+      value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
   );
 }
 
@@ -302,6 +330,21 @@ function normalizeSummaryPopoverSettings(value: unknown): SummaryPopoverSettings
     hideSummarisedMessages: raw.hideSummarisedMessages === true,
     collapseHiddenMessages: raw.collapseHiddenMessages === true,
   };
+}
+
+export function normalizeScenePromptPreferences(value: unknown): ScenePromptPreferences {
+  const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  const pov =
+    raw.pov === "first_person" || raw.pov === "second_person" || raw.pov === "third_person"
+      ? raw.pov
+      : DEFAULT_SCENE_PROMPT_PREFERENCES.pov;
+  const tense =
+    raw.tense === "past" || raw.tense === "present" || raw.tense === "future"
+      ? raw.tense
+      : DEFAULT_SCENE_PROMPT_PREFERENCES.tense;
+  const extraInstructions =
+    typeof raw.extraInstructions === "string" ? raw.extraInstructions.trim().slice(0, 2000) : "";
+  return { pov, tense, extraInstructions };
 }
 
 export function normalizeConversationMessageStyle(value: unknown): ConversationMessageStyle {
@@ -442,6 +485,10 @@ interface UIState {
   personaDetailId: string | null;
   /** When set, the main area shows the full-page regex script editor */
   regexDetailId: string | null;
+  /** When set, the main area shows the hierarchical map editor for this chat */
+  spatialMapDetailChatId: string | null;
+  /** One-shot generated map preview handed from Game setup into the spatial editor. Never persisted. */
+  pendingSpatialMapDraftReview: PendingSpatialMapDraftReview | null;
   /** Pre-selected target characters for a NEW regex script opened via openRegexDetail("__new__") */
   regexDetailDefaultCharacterIds: string[] | null;
   /** Where to return when the regex editor closes — e.g. back to a character's Advanced tab */
@@ -452,12 +499,24 @@ interface UIState {
   botBrowserOpen: boolean;
   /** When true, the main area shows the game assets browser */
   gameAssetsBrowserOpen: boolean;
+  /** When true, the main area shows the Noodle social timeline */
+  noodleOpen: boolean;
+  /** Last persona selected inside Noodle, persisted per browser. */
+  noodleSelectedPersonaId: string | null;
   /** When true, the main area shows the full-page character library */
   characterLibraryOpen: boolean;
+  /** Which resource collection the shared full-page card library displays */
+  cardLibraryKind: CardLibraryKind;
+  /** When true, the main area shows the full-page downloadable agent catalog */
+  agentCatalogOpen: boolean;
   /** Last selected character card inside the full-page character library */
   characterLibrarySelectedId: string | null;
+  /** Last selected persona card inside the full-page card library */
+  personaLibrarySelectedId: string | null;
   /** Last selected sort order for character lists and the full-page character library */
   characterLibrarySort: CharacterLibrarySort;
+  /** Last selected sort order for the full-page persona library */
+  personaLibrarySort: ResourcePanelSort;
   /** Search text for the compact Characters panel */
   characterPanelSearch: string;
   /** Included tag filters for the compact Characters panel */
@@ -472,6 +531,8 @@ interface UIState {
   characterPanelScrollTop: number;
   /** Last scroll offset for the full-page Character Library list */
   characterLibraryScrollTop: number;
+  /** Last scroll offset for the full-page Persona Library list */
+  personaLibraryScrollTop: number;
   /** Selected category for the compact Lorebooks panel */
   lorebookPanelCategory: LorebookPanelCategory;
   /** Search text for the compact Lorebooks panel */
@@ -482,12 +543,12 @@ interface UIState {
   lorebookPanelActiveTag: string | null;
   /** Whether the compact Lorebooks panel tag/category shelf is expanded */
   lorebookPanelTagsExpanded: boolean;
-  /** Sort order for imported characters in the Browser panel */
+  /** Sort order for imported characters in the Card Browser panel */
   botBrowserPanelSort: ResourcePanelSort;
   /** Sort order for the compact Presets panel */
   presetPanelSort: ResourcePanelSort;
   /** Sort order for the compact Connections panel */
-  connectionPanelSort: ResourcePanelSort;
+  connectionPanelSort: ConnectionPanelSort;
   /** Sort order for the compact Agents panel */
   agentPanelSort: ResourcePanelSort;
   /** True when any open detail editor has unsaved changes */
@@ -523,7 +584,7 @@ interface UIState {
   gameAutoPlayDelay: number;
   /** When true, image generation requests are sent one at a time for providers that reject concurrent jobs. */
   queueImageGenerationRequests: boolean;
-  /** When true, generated game image prompts are shown for review before provider calls are sent. */
+  /** When true, generated image prompts are shown for review before supported provider calls are sent. */
   reviewImagePromptsBeforeSend: boolean;
   imageBackgroundWidth: number;
   imageBackgroundHeight: number;
@@ -561,8 +622,12 @@ interface UIState {
   trimIncompleteModelOutput: boolean;
   /** When true, chat inputs show a microphone button for browser speech-to-text dictation. */
   speechToTextEnabled: boolean;
+  /** User-set TTS line playback volume (0-100). */
+  ttsLineVolume: number;
   /** When true, allow the rare Chibi Professor Mari scroll toast. */
   chibiProfessorMariEnabled: boolean;
+  /** When true, Professor Mari shows generated suggestion chips and guided-plan options. */
+  professorMariSuggestionsEnabled: boolean;
   /** When true, achievements appear on Home and announce unlocks. Backend tracking stays silent either way. */
   achievementsEnabled: boolean;
   /** When true, show the global Music Player surface. */
@@ -577,9 +642,13 @@ interface UIState {
   youtubePlayerVolume: number;
   /** User-set local Custom music player volume (0–100). The DJ can also steer this. */
   localMusicPlayerVolume: number;
-  /** Mobile Spotify widget collapsed state. */
+  /** User-set Conversation Call character voice volume (0–100). */
+  conversationCallVoiceVolume: number;
+  /** When true, mute character voices in Conversation Calls. */
+  conversationCallVoiceMuted: boolean;
+  /** Mobile floating-widget collapsed state, shared by the Spotify, YouTube, and local-music players despite the spotify-prefixed name. */
   spotifyMobileWidgetCollapsed: boolean;
-  /** Mobile Spotify widget position in viewport pixels. */
+  /** Mobile floating-widget position in viewport pixels, shared by the Spotify, YouTube, and local-music players despite the spotify-prefixed name. */
   spotifyMobileWidgetPosition: FloatingWidgetPosition;
   /** When true, Roleplay and Conversation modes support arrow-key and touch-swipe navigation between message swipes. */
   intuitiveSwipeNavigation: boolean;
@@ -591,6 +660,8 @@ interface UIState {
   editMessageOnDoubleClick: boolean;
   /** Persisted controls shown in the Chat Summary popover settings window. */
   summaryPopoverSettings: SummaryPopoverSettings;
+  /** Last-used preferences for generating character/user-initiated roleplay scenes. */
+  scenePromptPreferences: ScenePromptPreferences;
 
   // ── Text Appearance ──
   /** Color for narrator text in RP mode (empty = default amber) */
@@ -635,6 +706,9 @@ interface UIState {
   gameNotificationSound: boolean;
   notificationSoundsOnlyWhenUnfocused: boolean;
   conversationBrowserNotifications: boolean;
+  conversationMobileNotifications: boolean;
+  generationBrowserNotifications: boolean;
+  generationMobileNotifications: boolean;
 
   // ── Custom Conversation Prompt ──
   /** User's custom default system prompt for new conversations (null = built-in default). */
@@ -643,6 +717,8 @@ interface UIState {
   // ── Schedule Generation Preferences ──
   /** Free-form user guidance injected into the conversation-mode schedule generation prompt (empty = unset). */
   scheduleGenerationPreferences: string;
+  /** IANA timezone used by every Conversation schedule. Defaults to the browser-detected timezone. */
+  conversationTimeZone: string;
   /** Custom Game setup chips learned from previous games. Synced so they follow the user. */
   learnedGameSetupOptions: GameSetupLearnedOptions;
   /** Last submitted free-text Game setup fields. Synced so new games can start from the previous setup. */
@@ -750,7 +826,9 @@ interface UIState {
   setDefaultRoleplayBackground: (url: string) => void;
   setChatBackgroundBlur: (v: number) => void;
   setCharacterLibrarySelectedId: (id: string | null) => void;
+  setPersonaLibrarySelectedId: (id: string | null) => void;
   setCharacterLibrarySort: (sort: CharacterLibrarySort) => void;
+  setPersonaLibrarySort: (sort: ResourcePanelSort) => void;
   setCharacterPanelSearch: (search: string) => void;
   setCharacterPanelIncludedTags: (tags: string[]) => void;
   setCharacterPanelExcludedTags: (tags: string[]) => void;
@@ -758,6 +836,7 @@ interface UIState {
   setCharacterPanelFavoriteFilter: (filter: CharacterPanelFavoriteFilter) => void;
   setCharacterPanelScrollTop: (scrollTop: number) => void;
   setCharacterLibraryScrollTop: (scrollTop: number) => void;
+  setPersonaLibraryScrollTop: (scrollTop: number) => void;
   setLorebookPanelCategory: (category: LorebookPanelCategory) => void;
   setLorebookPanelSearch: (search: string) => void;
   setLorebookPanelSort: (sort: LorebookPanelSort) => void;
@@ -765,7 +844,7 @@ interface UIState {
   setLorebookPanelTagsExpanded: (expanded: boolean) => void;
   setBotBrowserPanelSort: (sort: ResourcePanelSort) => void;
   setPresetPanelSort: (sort: ResourcePanelSort) => void;
-  setConnectionPanelSort: (sort: ResourcePanelSort) => void;
+  setConnectionPanelSort: (sort: ConnectionPanelSort) => void;
   setAgentPanelSort: (sort: ResourcePanelSort) => void;
   openCharacterDetail: (id: string, options?: { preserveCharacterLibrary?: boolean }) => void;
   closeCharacterDetail: () => void;
@@ -779,19 +858,29 @@ interface UIState {
   closeAgentDetail: () => void;
   openToolDetail: (id: string) => void;
   closeToolDetail: () => void;
-  openPersonaDetail: (id: string) => void;
+  openPersonaDetail: (id: string, options?: { preservePersonaLibrary?: boolean }) => void;
   closePersonaDetail: () => void;
   openRegexDetail: (
     id: string,
     options?: { defaultCharacterIds?: string[]; returnTo?: { characterId: string; tab?: string } },
   ) => void;
   closeRegexDetail: () => void;
+  openSpatialMapDetail: (chatId: string) => void;
+  openSpatialMapDraftReview: (review: PendingSpatialMapDraftReview) => void;
+  clearPendingSpatialMapDraftReview: () => void;
+  closeSpatialMapDetail: () => void;
   openCharacterLibrary: () => void;
+  openPersonaLibrary: () => void;
   closeCharacterLibrary: () => void;
+  openAgentCatalog: () => void;
+  closeAgentCatalog: () => void;
   openBotBrowser: () => void;
   closeBotBrowser: () => void;
   openGameAssetsBrowser: () => void;
   closeGameAssetsBrowser: () => void;
+  openNoodle: () => void;
+  closeNoodle: () => void;
+  setNoodleSelectedPersonaId: (id: string | null) => void;
 
   /** Returns true if any full-page detail editor is currently open */
   hasAnyDetailOpen: () => boolean;
@@ -840,7 +929,9 @@ interface UIState {
   setConvertLatexSymbols: (v: boolean) => void;
   setTrimIncompleteModelOutput: (v: boolean) => void;
   setSpeechToTextEnabled: (v: boolean) => void;
+  setTTSLineVolume: (v: number) => void;
   setChibiProfessorMariEnabled: (v: boolean) => void;
+  setProfessorMariSuggestionsEnabled: (v: boolean) => void;
   setAchievementsEnabled: (v: boolean) => void;
   setMusicPlayerEnabled: (v: boolean) => void;
   setMusicPlayerSource: (v: MusicPlayerSource) => void;
@@ -848,6 +939,8 @@ interface UIState {
   setYoutubePlayerEnabled: (v: boolean) => void;
   setYoutubePlayerVolume: (v: number) => void;
   setLocalMusicPlayerVolume: (v: number) => void;
+  setConversationCallVoiceVolume: (v: number) => void;
+  setConversationCallVoiceMuted: (v: boolean) => void;
   setSpotifyMobileWidgetCollapsed: (v: boolean) => void;
   setSpotifyMobileWidgetPosition: (position: FloatingWidgetPosition) => void;
   setIntuitiveSwipeNavigation: (v: boolean) => void;
@@ -855,6 +948,7 @@ interface UIState {
   setEditLastMessageOnArrowUp: (v: boolean) => void;
   setEditMessageOnDoubleClick: (v: boolean) => void;
   setSummaryPopoverSettings: (settings: Partial<SummaryPopoverSettings>) => void;
+  setScenePromptPreferences: (preferences: ScenePromptPreferences) => void;
   setNarrationFontColor: (v: string) => void;
   setNarrationOpacity: (v: number) => void;
   setChatFontColor: (v: string) => void;
@@ -878,8 +972,12 @@ interface UIState {
   setGameNotificationSound: (v: boolean) => void;
   setNotificationSoundsOnlyWhenUnfocused: (v: boolean) => void;
   setConversationBrowserNotifications: (v: boolean) => void;
+  setConversationMobileNotifications: (v: boolean) => void;
+  setGenerationBrowserNotifications: (v: boolean) => void;
+  setGenerationMobileNotifications: (v: boolean) => void;
   setCustomConversationPrompt: (v: string | null) => void;
   setScheduleGenerationPreferences: (v: string) => void;
+  setConversationTimeZone: (v: string) => void;
   rememberGameSetupOptions: (
     options: Partial<GameSetupLearnedOptions>,
     text?: Partial<GameSetupRememberedText>,
@@ -921,8 +1019,7 @@ interface UIState {
 }
 
 function getMobileDetailReturnState(state: UIState) {
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const useOverlayDetailReturn = isMobile || state.centerCompact;
+  const useOverlayDetailReturn = isMobileShellViewport();
   return {
     detailReturnRightPanel: useOverlayDetailReturn && state.rightPanelOpen ? state.rightPanel : null,
     ...(useOverlayDetailReturn && { rightPanelOpen: false }),
@@ -947,8 +1044,10 @@ function normalizePersistedMainSurface(persisted: Record<string, unknown>) {
     "characterDetailId",
     "lorebookDetailId",
     "characterLibraryOpen",
+    "agentCatalogOpen",
     "botBrowserOpen",
     "gameAssetsBrowserOpen",
+    "noodleOpen",
   ] as const;
   let found = false;
   for (const key of surfaceKeys) {
@@ -1039,7 +1138,9 @@ export function pickSyncedSettings(state: UIState) {
     convertLatexSymbols: state.convertLatexSymbols,
     trimIncompleteModelOutput: state.trimIncompleteModelOutput,
     speechToTextEnabled: state.speechToTextEnabled,
+    ttsLineVolume: state.ttsLineVolume,
     chibiProfessorMariEnabled: state.chibiProfessorMariEnabled,
+    professorMariSuggestionsEnabled: state.professorMariSuggestionsEnabled,
     achievementsEnabled: state.achievementsEnabled,
     musicPlayerEnabled: state.musicPlayerEnabled,
     musicPlayerSource: state.musicPlayerSource,
@@ -1047,6 +1148,8 @@ export function pickSyncedSettings(state: UIState) {
     youtubePlayerEnabled: state.youtubePlayerEnabled,
     youtubePlayerVolume: state.youtubePlayerVolume,
     localMusicPlayerVolume: state.localMusicPlayerVolume,
+    conversationCallVoiceVolume: state.conversationCallVoiceVolume,
+    conversationCallVoiceMuted: state.conversationCallVoiceMuted,
     spotifyMobileWidgetCollapsed: state.spotifyMobileWidgetCollapsed,
     spotifyMobileWidgetPosition: state.spotifyMobileWidgetPosition,
     intuitiveSwipeNavigation: state.intuitiveSwipeNavigation,
@@ -1054,6 +1157,7 @@ export function pickSyncedSettings(state: UIState) {
     editLastMessageOnArrowUp: state.editLastMessageOnArrowUp,
     editMessageOnDoubleClick: state.editMessageOnDoubleClick,
     summaryPopoverSettings: state.summaryPopoverSettings,
+    scenePromptPreferences: state.scenePromptPreferences,
     narrationFontColor: state.narrationFontColor,
     narrationOpacity: state.narrationOpacity,
     chatFontColor: state.chatFontColor,
@@ -1086,8 +1190,12 @@ export function pickSyncedSettings(state: UIState) {
     gameNotificationSound: state.gameNotificationSound,
     notificationSoundsOnlyWhenUnfocused: state.notificationSoundsOnlyWhenUnfocused,
     conversationBrowserNotifications: state.conversationBrowserNotifications,
+    conversationMobileNotifications: state.conversationMobileNotifications,
+    generationBrowserNotifications: state.generationBrowserNotifications,
+    generationMobileNotifications: state.generationMobileNotifications,
     customConversationPrompt: state.customConversationPrompt,
     scheduleGenerationPreferences: state.scheduleGenerationPreferences,
+    conversationTimeZone: state.conversationTimeZone,
     impersonatePromptTemplate: state.impersonatePromptTemplate,
     impersonateShowQuickButton: state.impersonateShowQuickButton,
     impersonateCyoaChoices: state.impersonateCyoaChoices,
@@ -1143,14 +1251,22 @@ export const useUIStore = create<UIState>()(
       toolDetailId: null,
       personaDetailId: null,
       regexDetailId: null,
+      spatialMapDetailChatId: null,
+      pendingSpatialMapDraftReview: null,
       regexDetailDefaultCharacterIds: null,
       regexDetailReturn: null,
       characterDetailInitialTab: null,
       botBrowserOpen: false,
       gameAssetsBrowserOpen: false,
+      noodleOpen: false,
+      noodleSelectedPersonaId: null,
       characterLibraryOpen: false,
+      cardLibraryKind: "characters" as CardLibraryKind,
+      agentCatalogOpen: false,
       characterLibrarySelectedId: null,
+      personaLibrarySelectedId: null,
       characterLibrarySort: "name-asc" as CharacterLibrarySort,
+      personaLibrarySort: "name-asc" as ResourcePanelSort,
       characterPanelSearch: "",
       characterPanelIncludedTags: [],
       characterPanelExcludedTags: [],
@@ -1158,6 +1274,7 @@ export const useUIStore = create<UIState>()(
       characterPanelFavoriteFilter: "all" as CharacterPanelFavoriteFilter,
       characterPanelScrollTop: 0,
       characterLibraryScrollTop: 0,
+      personaLibraryScrollTop: 0,
       lorebookPanelCategory: "all" as LorebookPanelCategory,
       lorebookPanelSearch: "",
       lorebookPanelSort: "name-asc" as LorebookPanelSort,
@@ -1165,7 +1282,7 @@ export const useUIStore = create<UIState>()(
       lorebookPanelTagsExpanded: false,
       botBrowserPanelSort: "name-asc" as ResourcePanelSort,
       presetPanelSort: "name-asc" as ResourcePanelSort,
-      connectionPanelSort: "name-asc" as ResourcePanelSort,
+      connectionPanelSort: "name-asc" as ConnectionPanelSort,
       agentPanelSort: "name-asc" as ResourcePanelSort,
       editorDirty: false,
       detailReturnRightPanel: null,
@@ -1214,7 +1331,9 @@ export const useUIStore = create<UIState>()(
       convertLatexSymbols: true,
       trimIncompleteModelOutput: false,
       speechToTextEnabled: false,
+      ttsLineVolume: 50,
       chibiProfessorMariEnabled: true,
+      professorMariSuggestionsEnabled: true,
       achievementsEnabled: true,
       musicPlayerEnabled: true,
       musicPlayerSource: "youtube" as MusicPlayerSource,
@@ -1222,6 +1341,8 @@ export const useUIStore = create<UIState>()(
       youtubePlayerEnabled: true,
       youtubePlayerVolume: 70,
       localMusicPlayerVolume: 70,
+      conversationCallVoiceVolume: 100,
+      conversationCallVoiceMuted: false,
       spotifyMobileWidgetCollapsed: true,
       spotifyMobileWidgetPosition: { x: 16, y: 96 },
       intuitiveSwipeNavigation: false,
@@ -1229,6 +1350,7 @@ export const useUIStore = create<UIState>()(
       editLastMessageOnArrowUp: true,
       editMessageOnDoubleClick: true,
       summaryPopoverSettings: DEFAULT_SUMMARY_POPOVER_SETTINGS,
+      scenePromptPreferences: DEFAULT_SCENE_PROMPT_PREFERENCES,
       narrationFontColor: "",
       narrationOpacity: 80,
       chatFontColor: "",
@@ -1252,8 +1374,12 @@ export const useUIStore = create<UIState>()(
       gameNotificationSound: true,
       notificationSoundsOnlyWhenUnfocused: false,
       conversationBrowserNotifications: false,
+      conversationMobileNotifications: false,
+      generationBrowserNotifications: false,
+      generationMobileNotifications: false,
       customConversationPrompt: null,
       scheduleGenerationPreferences: "",
+      conversationTimeZone: detectConversationTimeZone(),
       learnedGameSetupOptions: DEFAULT_GAME_SETUP_LEARNED_OPTIONS,
       rememberedGameSetupText: DEFAULT_GAME_SETUP_REMEMBERED_TEXT,
       enterToSendRP: false,
@@ -1269,7 +1395,7 @@ export const useUIStore = create<UIState>()(
       hasCompletedOnboarding: false,
       gameTutorialDisabled: false,
       linkApiBannerDismissed: false,
-      echoChamberOpen: false,
+      echoChamberOpen: true,
       echoChamberSide: "bottom-right" as EchoChamberSide,
       userStatusManual: "active" as const,
       userStatus: "active" as UserStatus,
@@ -1401,10 +1527,13 @@ export const useUIStore = create<UIState>()(
       setAppAccentRgbMode: (enabled) => set({ appAccentRgbMode: enabled }),
       setCustomCursorEnabled: (enabled) => set({ customCursorEnabled: enabled }),
       setChatBackground: (url) => set({ chatBackground: url }),
-      setDefaultRoleplayBackground: (url) => set({ defaultRoleplayBackground: normalizeDefaultRoleplayBackground(url) }),
+      setDefaultRoleplayBackground: (url) =>
+        set({ defaultRoleplayBackground: normalizeDefaultRoleplayBackground(url) }),
       setChatBackgroundBlur: (v) => set({ chatBackgroundBlur: Math.max(0, Math.min(24, Math.round(v))) }),
       setCharacterLibrarySelectedId: (id) => set({ characterLibrarySelectedId: id }),
+      setPersonaLibrarySelectedId: (id) => set({ personaLibrarySelectedId: id }),
       setCharacterLibrarySort: (sort) => set({ characterLibrarySort: normalizeCharacterLibrarySort(sort) }),
+      setPersonaLibrarySort: (sort) => set({ personaLibrarySort: normalizeBasicPanelSort(sort) }),
       setCharacterPanelSearch: (search) => set({ characterPanelSearch: normalizePanelText(search) }),
       setCharacterPanelIncludedTags: (tags) => set({ characterPanelIncludedTags: normalizePanelStringArray(tags) }),
       setCharacterPanelExcludedTags: (tags) => set({ characterPanelExcludedTags: normalizePanelStringArray(tags) }),
@@ -1413,6 +1542,7 @@ export const useUIStore = create<UIState>()(
         set({ characterPanelFavoriteFilter: normalizeCharacterPanelFavoriteFilter(filter) }),
       setCharacterPanelScrollTop: (scrollTop) => set({ characterPanelScrollTop: normalizeScrollTop(scrollTop) }),
       setCharacterLibraryScrollTop: (scrollTop) => set({ characterLibraryScrollTop: normalizeScrollTop(scrollTop) }),
+      setPersonaLibraryScrollTop: (scrollTop) => set({ personaLibraryScrollTop: normalizeScrollTop(scrollTop) }),
       setLorebookPanelCategory: (category) => set({ lorebookPanelCategory: normalizeLorebookPanelCategory(category) }),
       setLorebookPanelSearch: (search) => set({ lorebookPanelSearch: normalizePanelText(search) }),
       setLorebookPanelSort: (sort) => set({ lorebookPanelSort: normalizeLorebookPanelSort(sort) }),
@@ -1420,11 +1550,12 @@ export const useUIStore = create<UIState>()(
       setLorebookPanelTagsExpanded: (expanded) => set({ lorebookPanelTagsExpanded: expanded }),
       setBotBrowserPanelSort: (sort) => set({ botBrowserPanelSort: normalizeBasicPanelSort(sort) }),
       setPresetPanelSort: (sort) => set({ presetPanelSort: normalizeBasicPanelSort(sort) }),
-      setConnectionPanelSort: (sort) => set({ connectionPanelSort: normalizeBasicPanelSort(sort) }),
+      setConnectionPanelSort: (sort) => set({ connectionPanelSort: normalizeConnectionPanelSort(sort) }),
       setAgentPanelSort: (sort) => set({ agentPanelSort: normalizeBasicPanelSort(sort) }),
       openCharacterDetail: (id, options) =>
         set((s) => {
-          const preserveCharacterLibrary = options?.preserveCharacterLibrary ?? s.characterLibraryOpen;
+          const preserveCharacterLibrary =
+            options?.preserveCharacterLibrary ?? (s.characterLibraryOpen && s.cardLibraryKind === "characters");
           return {
             characterDetailId: id,
             characterDetailInitialTab: null,
@@ -1435,10 +1566,13 @@ export const useUIStore = create<UIState>()(
             toolDetailId: null,
             personaDetailId: null,
             regexDetailId: null,
+            spatialMapDetailChatId: null,
             characterLibraryOpen: preserveCharacterLibrary ? s.characterLibraryOpen : false,
+            agentCatalogOpen: false,
             characterLibrarySelectedId: preserveCharacterLibrary ? id : s.characterLibrarySelectedId,
             botBrowserOpen: false,
             gameAssetsBrowserOpen: false,
+            noodleOpen: false,
             ...getMobileDetailReturnState(s),
           };
         }),
@@ -1452,8 +1586,10 @@ export const useUIStore = create<UIState>()(
         set((s) => ({
           lorebookDetailId: id,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           characterDetailId: null,
           presetDetailId: null,
           connectionDetailId: null,
@@ -1461,6 +1597,7 @@ export const useUIStore = create<UIState>()(
           toolDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           ...getMobileDetailReturnState(s),
         })),
       closeLorebookDetail: () =>
@@ -1473,8 +1610,10 @@ export const useUIStore = create<UIState>()(
         set((s) => ({
           presetDetailId: id,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           characterDetailId: null,
           lorebookDetailId: null,
           connectionDetailId: null,
@@ -1482,6 +1621,7 @@ export const useUIStore = create<UIState>()(
           toolDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           ...getMobileDetailReturnState(s),
         })),
       closePresetDetail: () =>
@@ -1494,8 +1634,10 @@ export const useUIStore = create<UIState>()(
         set((s) => ({
           connectionDetailId: id,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           characterDetailId: null,
           lorebookDetailId: null,
           presetDetailId: null,
@@ -1503,6 +1645,7 @@ export const useUIStore = create<UIState>()(
           toolDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           ...getMobileDetailReturnState(s),
         })),
       closeConnectionDetail: () =>
@@ -1515,8 +1658,10 @@ export const useUIStore = create<UIState>()(
         set((s) => ({
           agentDetailId: agentType,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           characterDetailId: null,
           lorebookDetailId: null,
           presetDetailId: null,
@@ -1524,6 +1669,7 @@ export const useUIStore = create<UIState>()(
           toolDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           ...getMobileDetailReturnState(s),
         })),
       closeAgentDetail: () =>
@@ -1537,14 +1683,17 @@ export const useUIStore = create<UIState>()(
           toolDetailId: id,
           agentDetailId: null,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           characterDetailId: null,
           lorebookDetailId: null,
           presetDetailId: null,
           connectionDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           ...getMobileDetailReturnState(s),
         })),
       closeToolDetail: () =>
@@ -1553,21 +1702,29 @@ export const useUIStore = create<UIState>()(
           editorDirty: false,
           ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
         })),
-      openPersonaDetail: (id) =>
-        set((s) => ({
-          personaDetailId: id,
-          characterLibraryOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          regexDetailId: null,
-          ...getMobileDetailReturnState(s),
-        })),
+      openPersonaDetail: (id, options) =>
+        set((s) => {
+          const preservePersonaLibrary =
+            options?.preservePersonaLibrary ?? (s.characterLibraryOpen && s.cardLibraryKind === "personas");
+          return {
+            personaDetailId: id,
+            characterLibraryOpen: preservePersonaLibrary ? s.characterLibraryOpen : false,
+            personaLibrarySelectedId: preservePersonaLibrary ? id : s.personaLibrarySelectedId,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            ...getMobileDetailReturnState(s),
+          };
+        }),
       closePersonaDetail: () =>
         set((s) => ({
           personaDetailId: null,
@@ -1581,14 +1738,17 @@ export const useUIStore = create<UIState>()(
           regexDetailReturn: options?.returnTo ?? null,
           personaDetailId: null,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           characterDetailId: null,
           lorebookDetailId: null,
           presetDetailId: null,
           connectionDetailId: null,
           agentDetailId: null,
           toolDetailId: null,
+          spatialMapDetailChatId: null,
           ...getMobileDetailReturnState(s),
         })),
       closeRegexDetail: () =>
@@ -1612,9 +1772,9 @@ export const useUIStore = create<UIState>()(
             ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
           };
         }),
-      openCharacterLibrary: () =>
-        set({
-          characterLibraryOpen: true,
+      openSpatialMapDetail: (chatId) =>
+        set((s) => ({
+          spatialMapDetailChatId: chatId,
           characterDetailId: null,
           lorebookDetailId: null,
           presetDetailId: null,
@@ -1623,19 +1783,117 @@ export const useUIStore = create<UIState>()(
           toolDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
+          gameAssetsBrowserOpen: false,
+          noodleOpen: false,
+          ...getMobileDetailReturnState(s),
+        })),
+      openSpatialMapDraftReview: (review) =>
+        set((s) => ({
+          pendingSpatialMapDraftReview: review,
+          spatialMapDetailChatId: review.chatId,
+          characterDetailId: null,
+          lorebookDetailId: null,
+          presetDetailId: null,
+          connectionDetailId: null,
+          agentDetailId: null,
+          toolDetailId: null,
+          personaDetailId: null,
+          regexDetailId: null,
+          characterLibraryOpen: false,
+          agentCatalogOpen: false,
+          botBrowserOpen: false,
+          gameAssetsBrowserOpen: false,
+          noodleOpen: false,
+          ...getMobileDetailReturnState(s),
+        })),
+      clearPendingSpatialMapDraftReview: () => set({ pendingSpatialMapDraftReview: null }),
+      closeSpatialMapDetail: () =>
+        set((s) => ({
+          spatialMapDetailChatId: null,
+          pendingSpatialMapDraftReview: null,
+          editorDirty: false,
+          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+        })),
+      openCharacterLibrary: () =>
+        set((state) => ({
+          characterLibraryOpen: true,
+          cardLibraryKind: "characters",
+          agentCatalogOpen: false,
+          characterDetailId: null,
+          lorebookDetailId: null,
+          presetDetailId: null,
+          connectionDetailId: null,
+          agentDetailId: null,
+          toolDetailId: null,
+          personaDetailId: null,
+          regexDetailId: null,
+          spatialMapDetailChatId: null,
+          pendingSpatialMapDraftReview: null,
+          botBrowserOpen: false,
+          gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           editorDirty: false,
           detailReturnRightPanel: null,
-          rightPanelOpen: false,
-        }),
+          rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
+        })),
+      openPersonaLibrary: () =>
+        set((state) => ({
+          characterLibraryOpen: true,
+          cardLibraryKind: "personas",
+          agentCatalogOpen: false,
+          characterDetailId: null,
+          lorebookDetailId: null,
+          presetDetailId: null,
+          connectionDetailId: null,
+          agentDetailId: null,
+          toolDetailId: null,
+          personaDetailId: null,
+          regexDetailId: null,
+          spatialMapDetailChatId: null,
+          pendingSpatialMapDraftReview: null,
+          botBrowserOpen: false,
+          gameAssetsBrowserOpen: false,
+          noodleOpen: false,
+          editorDirty: false,
+          detailReturnRightPanel: null,
+          rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
+        })),
       closeCharacterLibrary: () => set({ characterLibraryOpen: false }),
+      openAgentCatalog: () =>
+        set((state) => ({
+          agentCatalogOpen: true,
+          characterLibraryOpen: false,
+          characterDetailId: null,
+          lorebookDetailId: null,
+          presetDetailId: null,
+          connectionDetailId: null,
+          agentDetailId: null,
+          toolDetailId: null,
+          personaDetailId: null,
+          regexDetailId: null,
+          spatialMapDetailChatId: null,
+          pendingSpatialMapDraftReview: null,
+          botBrowserOpen: false,
+          gameAssetsBrowserOpen: false,
+          noodleOpen: false,
+          editorDirty: false,
+          detailReturnRightPanel: null,
+          rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
+        })),
+      closeAgentCatalog: () => set({ agentCatalogOpen: false }),
       openBotBrowser: () =>
         set({
           botBrowserOpen: true,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           detailReturnRightPanel: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           personaDetailId: null,
           characterDetailId: null,
           lorebookDetailId: null,
@@ -1650,9 +1908,12 @@ export const useUIStore = create<UIState>()(
         set({
           gameAssetsBrowserOpen: true,
           botBrowserOpen: false,
+          noodleOpen: false,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           detailReturnRightPanel: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           personaDetailId: null,
           characterDetailId: null,
           lorebookDetailId: null,
@@ -1663,6 +1924,28 @@ export const useUIStore = create<UIState>()(
           ...(window.innerWidth < 768 && { rightPanelOpen: false }),
         }),
       closeGameAssetsBrowser: () => set({ gameAssetsBrowserOpen: false }),
+      openNoodle: () =>
+        set({
+          noodleOpen: true,
+          botBrowserOpen: false,
+          gameAssetsBrowserOpen: false,
+          characterLibraryOpen: false,
+          agentCatalogOpen: false,
+          detailReturnRightPanel: null,
+          regexDetailId: null,
+          spatialMapDetailChatId: null,
+          personaDetailId: null,
+          characterDetailId: null,
+          lorebookDetailId: null,
+          presetDetailId: null,
+          connectionDetailId: null,
+          agentDetailId: null,
+          toolDetailId: null,
+          editorDirty: false,
+          ...(window.innerWidth < 768 && { rightPanelOpen: false }),
+        }),
+      closeNoodle: () => set({ noodleOpen: false }),
+      setNoodleSelectedPersonaId: (id) => set({ noodleSelectedPersonaId: id }),
 
       hasAnyDetailOpen: () => {
         const s = get();
@@ -1675,9 +1958,12 @@ export const useUIStore = create<UIState>()(
           s.toolDetailId ||
           s.personaDetailId ||
           s.regexDetailId ||
+          s.spatialMapDetailChatId ||
           s.characterLibraryOpen ||
+          s.agentCatalogOpen ||
           s.botBrowserOpen ||
-          s.gameAssetsBrowserOpen
+          s.gameAssetsBrowserOpen ||
+          s.noodleOpen
         );
       },
       closeAllDetails: () =>
@@ -1690,9 +1976,12 @@ export const useUIStore = create<UIState>()(
           toolDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           editorDirty: false,
           detailReturnRightPanel: null,
         }),
@@ -1709,9 +1998,12 @@ export const useUIStore = create<UIState>()(
           toolDetailId: null,
           personaDetailId: null,
           regexDetailId: null,
+          spatialMapDetailChatId: null,
           characterLibraryOpen: false,
+          agentCatalogOpen: false,
           botBrowserOpen: false,
           gameAssetsBrowserOpen: false,
+          noodleOpen: false,
           editorDirty: false,
           detailReturnRightPanel: null,
           chatModeShortcutRequest: {
@@ -1776,7 +2068,9 @@ export const useUIStore = create<UIState>()(
       setConvertLatexSymbols: (v) => set({ convertLatexSymbols: v }),
       setTrimIncompleteModelOutput: (v) => set({ trimIncompleteModelOutput: v }),
       setSpeechToTextEnabled: (v) => set({ speechToTextEnabled: v }),
+      setTTSLineVolume: (v) => set({ ttsLineVolume: Math.max(0, Math.min(100, Math.round(v))) }),
       setChibiProfessorMariEnabled: (v) => set({ chibiProfessorMariEnabled: v }),
+      setProfessorMariSuggestionsEnabled: (v) => set({ professorMariSuggestionsEnabled: v }),
       setAchievementsEnabled: (v) => set({ achievementsEnabled: v }),
       setMusicPlayerEnabled: (v) =>
         set((state) => ({
@@ -1795,6 +2089,9 @@ export const useUIStore = create<UIState>()(
       setYoutubePlayerEnabled: (v) => set({ youtubePlayerEnabled: v }),
       setYoutubePlayerVolume: (v) => set({ youtubePlayerVolume: Math.max(0, Math.min(100, Math.round(v))) }),
       setLocalMusicPlayerVolume: (v) => set({ localMusicPlayerVolume: Math.max(0, Math.min(100, Math.round(v))) }),
+      setConversationCallVoiceVolume: (v) =>
+        set({ conversationCallVoiceVolume: Math.max(0, Math.min(100, Math.round(v))) }),
+      setConversationCallVoiceMuted: (v) => set({ conversationCallVoiceMuted: v }),
       setSpotifyMobileWidgetCollapsed: (v) => set({ spotifyMobileWidgetCollapsed: v }),
       setSpotifyMobileWidgetPosition: (position) =>
         set({
@@ -1814,6 +2111,8 @@ export const useUIStore = create<UIState>()(
             ...settings,
           }),
         })),
+      setScenePromptPreferences: (preferences) =>
+        set({ scenePromptPreferences: normalizeScenePromptPreferences(preferences) }),
       setNarrationFontColor: (v) => set({ narrationFontColor: v }),
       setNarrationOpacity: (v) => set({ narrationOpacity: Math.max(0, Math.min(100, v)) }),
       setChatFontColor: (v) => set({ chatFontColor: v }),
@@ -1891,8 +2190,12 @@ export const useUIStore = create<UIState>()(
       setGameNotificationSound: (v) => set({ gameNotificationSound: v }),
       setNotificationSoundsOnlyWhenUnfocused: (v) => set({ notificationSoundsOnlyWhenUnfocused: v }),
       setConversationBrowserNotifications: (v) => set({ conversationBrowserNotifications: v }),
+      setConversationMobileNotifications: (v) => set({ conversationMobileNotifications: v }),
+      setGenerationBrowserNotifications: (v) => set({ generationBrowserNotifications: v }),
+      setGenerationMobileNotifications: (v) => set({ generationMobileNotifications: v }),
       setCustomConversationPrompt: (v) => set({ customConversationPrompt: v }),
       setScheduleGenerationPreferences: (v) => set({ scheduleGenerationPreferences: v }),
+      setConversationTimeZone: (v) => set({ conversationTimeZone: normalizeConversationTimeZone(v) }),
       rememberGameSetupOptions: (options, text) =>
         set((state) => {
           const learned = state.learnedGameSetupOptions ?? DEFAULT_GAME_SETUP_LEARNED_OPTIONS;
@@ -1978,12 +2281,24 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: "marinara-engine-ui",
-      version: 67,
+      version: 76,
       // Debounce localStorage writes to avoid sync I/O on every state change
       storage: createJSONStorage(() => {
         let timer: ReturnType<typeof setTimeout> | null = null;
         let pendingName: string | null = null;
         let pendingValue: string | null = null;
+
+        const readCustomCursorPreference = (value: string | null): boolean | undefined => {
+          if (!value) return undefined;
+          try {
+            const parsed = JSON.parse(value) as { state?: { customCursorEnabled?: unknown } };
+            return typeof parsed.state?.customCursorEnabled === "boolean"
+              ? parsed.state.customCursorEnabled
+              : undefined;
+          } catch {
+            return undefined;
+          }
+        };
 
         const flush = () => {
           if (pendingName !== null && pendingValue !== null) {
@@ -2000,6 +2315,7 @@ export const useUIStore = create<UIState>()(
         // Flush pending writes before the tab closes
         if (typeof window !== "undefined") {
           window.addEventListener("beforeunload", flush);
+          window.addEventListener("pagehide", flush);
           document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "hidden") flush();
           });
@@ -2008,8 +2324,13 @@ export const useUIStore = create<UIState>()(
         return {
           getItem: (name: string) => localStorage.getItem(name),
           setItem: (name: string, value: string) => {
+            const previousValue = pendingValue ?? localStorage.getItem(name);
             pendingName = name;
             pendingValue = value;
+            if (readCustomCursorPreference(previousValue) !== readCustomCursorPreference(value)) {
+              flush();
+              return;
+            }
             if (timer) clearTimeout(timer);
             timer = setTimeout(flush, 1000);
           },
@@ -2313,6 +2634,18 @@ export const useUIStore = create<UIState>()(
         if (version <= 38 && persisted.conversationBrowserNotifications === undefined) {
           persisted.conversationBrowserNotifications = false;
         }
+        if (version <= 71 && persisted.conversationMobileNotifications === undefined) {
+          persisted.conversationMobileNotifications = false;
+        }
+        // v72 -> v73: separate manual-generation completion notifications from autonomous messages.
+        if (version <= 72) {
+          if (persisted.generationBrowserNotifications === undefined) {
+            persisted.generationBrowserNotifications = false;
+          }
+          if (persisted.generationMobileNotifications === undefined) {
+            persisted.generationMobileNotifications = false;
+          }
+        }
         // v39 -> v40: selectable Conversation message layout.
         persisted.conversationMessageStyle = normalizeConversationMessageStyle(persisted.conversationMessageStyle);
         // v40 -> v41: reconcile parallel v40 UI preference additions.
@@ -2344,6 +2677,23 @@ export const useUIStore = create<UIState>()(
         if (version <= 65 && persisted.includeReasoningInExports === undefined) {
           persisted.includeReasoningInExports = false;
         }
+        if (typeof persisted.conversationCallVoiceVolume !== "number") {
+          persisted.conversationCallVoiceVolume = 100;
+        }
+        persisted.conversationCallVoiceVolume = Math.max(
+          0,
+          Math.min(100, Math.round(persisted.conversationCallVoiceVolume)),
+        );
+        if (typeof persisted.conversationCallVoiceMuted !== "boolean") {
+          persisted.conversationCallVoiceMuted = false;
+        }
+        // v68 -> v69: persist message TTS line playback volume.
+        if (typeof persisted.ttsLineVolume !== "number") {
+          persisted.ttsLineVolume = 50;
+        }
+        persisted.ttsLineVolume = Math.max(0, Math.min(100, Math.round(persisted.ttsLineVolume)));
+        // v69 -> v70: remember scene prompt setup choices.
+        persisted.scenePromptPreferences = normalizeScenePromptPreferences(persisted.scenePromptPreferences);
         // v42 -> v44: reconcile parallel v43 UI preference additions.
         if (version <= 43 && persisted.youtubePlayerEnabled === undefined) {
           persisted.youtubePlayerEnabled = true;
@@ -2419,13 +2769,18 @@ export const useUIStore = create<UIState>()(
           persisted.appAccentColorBeforeRgbMode = null;
         }
         persisted.characterLibrarySort = normalizeCharacterLibrarySort(persisted.characterLibrarySort);
+        persisted.cardLibraryKind = persisted.cardLibraryKind === "personas" ? "personas" : "characters";
+        persisted.personaLibrarySort = normalizeBasicPanelSort(persisted.personaLibrarySort);
         persisted.characterPanelSearch = normalizePanelText(persisted.characterPanelSearch);
         persisted.characterPanelIncludedTags = normalizePanelStringArray(persisted.characterPanelIncludedTags);
         persisted.characterPanelExcludedTags = normalizePanelStringArray(persisted.characterPanelExcludedTags);
         persisted.characterPanelTagsExpanded = persisted.characterPanelTagsExpanded === true;
-        persisted.characterPanelFavoriteFilter = normalizeCharacterPanelFavoriteFilter(persisted.characterPanelFavoriteFilter);
+        persisted.characterPanelFavoriteFilter = normalizeCharacterPanelFavoriteFilter(
+          persisted.characterPanelFavoriteFilter,
+        );
         persisted.characterPanelScrollTop = normalizeScrollTop(persisted.characterPanelScrollTop);
         persisted.characterLibraryScrollTop = normalizeScrollTop(persisted.characterLibraryScrollTop);
+        persisted.personaLibraryScrollTop = normalizeScrollTop(persisted.personaLibraryScrollTop);
         persisted.lorebookPanelCategory = normalizeLorebookPanelCategory(persisted.lorebookPanelCategory);
         persisted.lorebookPanelSearch = normalizePanelText(persisted.lorebookPanelSearch);
         persisted.lorebookPanelSort = normalizeLorebookPanelSort(persisted.lorebookPanelSort);
@@ -2436,7 +2791,7 @@ export const useUIStore = create<UIState>()(
         persisted.lorebookPanelTagsExpanded = persisted.lorebookPanelTagsExpanded === true;
         persisted.botBrowserPanelSort = normalizeBasicPanelSort(persisted.botBrowserPanelSort);
         persisted.presetPanelSort = normalizeBasicPanelSort(persisted.presetPanelSort);
-        persisted.connectionPanelSort = normalizeBasicPanelSort(persisted.connectionPanelSort);
+        persisted.connectionPanelSort = normalizeConnectionPanelSort(persisted.connectionPanelSort);
         persisted.agentPanelSort = normalizeBasicPanelSort(persisted.agentPanelSort);
         normalizePersistedMainSurface(persisted);
         if (Array.isArray(persisted.recentUserActivities)) {
@@ -2466,8 +2821,23 @@ export const useUIStore = create<UIState>()(
         if (version <= 66 && persisted.customCursorEnabled === undefined) {
           persisted.customCursorEnabled = true;
         }
+        if (version <= 70 && persisted.professorMariSuggestionsEnabled === undefined) {
+          persisted.professorMariSuggestionsEnabled = true;
+        }
+        if (version <= 74) {
+          persisted.conversationTimeZone = normalizeConversationTimeZone(persisted.conversationTimeZone);
+        }
+        if (version <= 75) {
+          delete persisted.characterPanelSearch;
+          delete persisted.characterPanelIncludedTags;
+          delete persisted.characterPanelExcludedTags;
+          delete persisted.characterPanelTagsExpanded;
+          delete persisted.characterPanelFavoriteFilter;
+          delete persisted.characterPanelScrollTop;
+        }
         persisted.appAccentRgbMode = persisted.appAccentRgbMode === true;
         persisted.customCursorEnabled = persisted.customCursorEnabled !== false;
+        persisted.professorMariSuggestionsEnabled = persisted.professorMariSuggestionsEnabled !== false;
         persisted.includeReasoningInExports = persisted.includeReasoningInExports === true;
         persisted.chatChromeTextColor = normalizeChatChromeTextColor(persisted.chatChromeTextColor);
         persisted.defaultRoleplayBackground = normalizeDefaultRoleplayBackground(persisted.defaultRoleplayBackground);
@@ -2489,18 +2859,20 @@ export const useUIStore = create<UIState>()(
         toolDetailId: state.toolDetailId,
         personaDetailId: state.personaDetailId,
         regexDetailId: state.regexDetailId,
+        spatialMapDetailChatId: state.spatialMapDetailChatId,
         botBrowserOpen: state.botBrowserOpen,
         gameAssetsBrowserOpen: state.gameAssetsBrowserOpen,
+        noodleOpen: state.noodleOpen,
+        noodleSelectedPersonaId: state.noodleSelectedPersonaId,
         characterLibraryOpen: state.characterLibraryOpen,
+        cardLibraryKind: state.cardLibraryKind,
+        agentCatalogOpen: state.agentCatalogOpen,
         characterLibrarySelectedId: state.characterLibrarySelectedId,
+        personaLibrarySelectedId: state.personaLibrarySelectedId,
         characterLibrarySort: state.characterLibrarySort,
-        characterPanelSearch: state.characterPanelSearch,
-        characterPanelIncludedTags: state.characterPanelIncludedTags,
-        characterPanelExcludedTags: state.characterPanelExcludedTags,
-        characterPanelTagsExpanded: state.characterPanelTagsExpanded,
-        characterPanelFavoriteFilter: state.characterPanelFavoriteFilter,
-        characterPanelScrollTop: state.characterPanelScrollTop,
+        personaLibrarySort: state.personaLibrarySort,
         characterLibraryScrollTop: state.characterLibraryScrollTop,
+        personaLibraryScrollTop: state.personaLibraryScrollTop,
         lorebookPanelCategory: state.lorebookPanelCategory,
         lorebookPanelSearch: state.lorebookPanelSearch,
         lorebookPanelSort: state.lorebookPanelSort,
@@ -2577,7 +2949,9 @@ export const useUIStore = create<UIState>()(
         convertLatexSymbols: state.convertLatexSymbols,
         trimIncompleteModelOutput: state.trimIncompleteModelOutput,
         speechToTextEnabled: state.speechToTextEnabled,
+        ttsLineVolume: state.ttsLineVolume,
         chibiProfessorMariEnabled: state.chibiProfessorMariEnabled,
+        professorMariSuggestionsEnabled: state.professorMariSuggestionsEnabled,
         achievementsEnabled: state.achievementsEnabled,
         musicPlayerEnabled: state.musicPlayerEnabled,
         musicPlayerSource: state.musicPlayerSource,
@@ -2585,6 +2959,8 @@ export const useUIStore = create<UIState>()(
         youtubePlayerEnabled: state.youtubePlayerEnabled,
         youtubePlayerVolume: state.youtubePlayerVolume,
         localMusicPlayerVolume: state.localMusicPlayerVolume,
+        conversationCallVoiceVolume: state.conversationCallVoiceVolume,
+        conversationCallVoiceMuted: state.conversationCallVoiceMuted,
         spotifyMobileWidgetCollapsed: state.spotifyMobileWidgetCollapsed,
         spotifyMobileWidgetPosition: state.spotifyMobileWidgetPosition,
         intuitiveSwipeNavigation: state.intuitiveSwipeNavigation,
@@ -2592,6 +2968,7 @@ export const useUIStore = create<UIState>()(
         editLastMessageOnArrowUp: state.editLastMessageOnArrowUp,
         editMessageOnDoubleClick: state.editMessageOnDoubleClick,
         summaryPopoverSettings: state.summaryPopoverSettings,
+        scenePromptPreferences: state.scenePromptPreferences,
         narrationFontColor: state.narrationFontColor,
         narrationOpacity: state.narrationOpacity,
         chatFontColor: state.chatFontColor,
@@ -2630,8 +3007,12 @@ export const useUIStore = create<UIState>()(
         gameNotificationSound: state.gameNotificationSound,
         notificationSoundsOnlyWhenUnfocused: state.notificationSoundsOnlyWhenUnfocused,
         conversationBrowserNotifications: state.conversationBrowserNotifications,
+        conversationMobileNotifications: state.conversationMobileNotifications,
+        generationBrowserNotifications: state.generationBrowserNotifications,
+        generationMobileNotifications: state.generationMobileNotifications,
         customConversationPrompt: state.customConversationPrompt,
         scheduleGenerationPreferences: state.scheduleGenerationPreferences,
+        conversationTimeZone: state.conversationTimeZone,
         impersonatePromptTemplate: state.impersonatePromptTemplate,
         impersonateShowQuickButton: state.impersonateShowQuickButton,
         impersonateCyoaChoices: state.impersonateCyoaChoices,

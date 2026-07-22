@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq } from "../../db/file-query.js";
 import {
   BUILT_IN_AGENTS,
-  DEFAULT_AGENT_PROMPTS,
+  DEFAULT_AGENT_PROMPT_TEMPLATE_ID,
+  getDefaultAgentPrompt,
   getDefaultBuiltInAgentSettings,
   normalizeAgentPhaseForType,
   normalizeAgentPromptTemplateOptions,
@@ -45,6 +46,8 @@ const LEGACY_BUILT_IN_AGENT_DESCRIPTIONS: Record<string, readonly string[]> = {
   ],
 };
 
+const ILLUSTRATOR_DEFAULT_PROMPT_TEMPLATE_MIGRATION_VERSION = 2;
+
 function normalizedPromptHash(value: string): string {
   return createHash("sha256").update(value.trim().replace(/\r\n/g, "\n")).digest("hex");
 }
@@ -55,7 +58,7 @@ function normalizedText(value: string): string {
 
 function defaultPromptHashes(agentType: string, currentDefault?: string): Set<string> {
   const hashes = new Set(LEGACY_V1_DEFAULT_AGENT_PROMPT_HASHES[agentType] ?? []);
-  const current = currentDefault ?? DEFAULT_AGENT_PROMPTS[agentType];
+  const current = currentDefault ?? getDefaultAgentPrompt(agentType);
   if (current?.trim()) hashes.add(normalizedPromptHash(current));
   return hashes;
 }
@@ -103,7 +106,8 @@ function migratePromptTemplateOptions(agentType: string, settings: unknown) {
 
 export function buildLegacyDefaultAgentConfigUpdate(row: typeof agentConfigs.$inferSelect) {
   const update: Partial<typeof agentConfigs.$inferInsert> = {};
-  if (isKnownDefaultPrompt(row.type, row.promptTemplate)) {
+  const hasKnownDefaultPrompt = isKnownDefaultPrompt(row.type, row.promptTemplate);
+  if (hasKnownDefaultPrompt) {
     update.promptTemplate = "";
   }
 
@@ -112,15 +116,48 @@ export function buildLegacyDefaultAgentConfigUpdate(row: typeof agentConfigs.$in
 
   const builtIn = BUILT_IN_AGENTS.find((agent) => agent.id === row.type);
   if (builtIn) {
-    if (isKnownDefaultDescription(row.type, row.description, builtIn.description)) {
+    const hasKnownDefaultDescription = isKnownDefaultDescription(row.type, row.description, builtIn.description);
+    if (hasKnownDefaultDescription) {
       update.description = builtIn.description;
     }
 
-    const phase = normalizeAgentPhaseForType(builtIn.id, builtIn.phase);
-    if (row.phase !== phase) update.phase = phase;
+    const normalizedStoredPhase = normalizeAgentPhaseForType(row.type, row.phase);
+    if (row.phase !== normalizedStoredPhase) update.phase = normalizedStoredPhase;
+    if (row.type === "html" && hasKnownDefaultPrompt && hasKnownDefaultDescription && row.phase !== builtIn.phase) {
+      update.phase = builtIn.phase;
+    }
 
     const defaults = getDefaultBuiltInAgentSettings(builtIn.id);
     let settingsChanged = settingsMigration.changed;
+    // A staging release accidentally persisted Background as Illustrator's global
+    // default. Repair it once; the marker prevents later explicit user choices
+    // from being overwritten on every startup. Per-chat selections live in chat
+    // metadata and are intentionally unaffected.
+    if (
+      row.type === "illustrator" &&
+      settings.illustratorDefaultPromptTemplateMigrationVersion !==
+        ILLUSTRATOR_DEFAULT_PROMPT_TEMPLATE_MIGRATION_VERSION
+    ) {
+      settings = {
+        ...settings,
+        ...(settings.defaultPromptTemplateId === "background"
+          ? { defaultPromptTemplateId: DEFAULT_AGENT_PROMPT_TEMPLATE_ID }
+          : {}),
+        illustratorDefaultPromptTemplateMigrationVersion: ILLUSTRATOR_DEFAULT_PROMPT_TEMPLATE_MIGRATION_VERSION,
+      };
+      settingsChanged = true;
+    }
+    // Existing configs with a custom raw prompt remain on the legacy Default
+    // option unless the user selects another named prompt mode.
+    if (
+      row.type === "illustrator" &&
+      row.promptTemplate.trim() &&
+      !hasKnownDefaultPrompt &&
+      settings.defaultPromptTemplateId === undefined
+    ) {
+      settings = { ...settings, defaultPromptTemplateId: DEFAULT_AGENT_PROMPT_TEMPLATE_ID };
+      settingsChanged = true;
+    }
     for (const [key, value] of Object.entries(defaults)) {
       if (key === "promptTemplates") continue;
       if (key === "resultType") {

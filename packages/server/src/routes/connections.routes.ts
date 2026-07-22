@@ -8,16 +8,24 @@ import { extname, join } from "path";
 import {
   IMAGE_DEFAULTS_STORAGE_KEY,
   MODEL_LISTS,
+  VIDEO_DEFAULTS_STORAGE_KEY,
   createConnectionSchema,
+  createDefaultVideoGenerationProfile,
   generationParametersSchema,
   inferImageSource,
+  inferVideoSource,
+  isLocalAuthProvider,
+  localAuthProviderBaseUrl,
+  normalizeVideoGenerationProfile,
 } from "@marinara-engine/shared";
 import { createConnectionsStorage } from "../services/storage/connections.storage.js";
 import { resetMemoryRecallVectorizerCache } from "../services/memory-recall-embedding.js";
 import { createLLMProvider } from "../services/llm/provider-registry.js";
 import { fetchOpenAIChatGPTModels, getOpenAIChatGPTAuth } from "../services/llm/openai-chatgpt-auth.js";
+import { fetchGrokCliModels } from "../services/llm/providers/grok-subscription.provider.js";
 import { buildGoogleVertexModelUrl, googleAuthHeadersForVertex } from "../services/llm/providers/google.provider.js";
 import { resolveConnectionImageDefaults } from "../services/image/image-generation-defaults.js";
+import { buildVeniceApiUrl, normalizeVeniceImageModels } from "../services/image/venice-image.js";
 import { isImageLocalUrlsEnabled, isProviderLocalUrlsEnabled } from "../config/runtime-config.js";
 import { logDebugOverride } from "../lib/logger.js";
 import {
@@ -31,6 +39,16 @@ import { DATA_DIR } from "../utils/data-dir.js";
 
 const CONNECTION_TEST_ERROR_PREVIEW_CHARS = 2000;
 const CONNECTION_IMAGES_DIR = join(DATA_DIR, "connections", "images");
+const DEFAULT_GEMINI_OMNI_VIDEO_MODEL = "gemini-omni-flash-preview";
+const DEFAULT_GEMINI_OMNI_VIDEO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_GOOGLE_VEO_VIDEO_MODEL = "veo-3.1-generate-preview";
+const DEFAULT_GOOGLE_VEO_VIDEO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_XAI_VIDEO_MODEL = "grok-imagine-video-1.5";
+const DEFAULT_XAI_VIDEO_BASE_URL = "https://api.x.ai/v1";
+const DEFAULT_OPENROUTER_VIDEO_MODEL = "google/veo-3.1";
+const DEFAULT_OPENROUTER_VIDEO_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_SEEDANCE_VIDEO_MODEL = "seedance-2-0";
+const DEFAULT_SEEDANCE_VIDEO_BASE_URL = "https://api.seedance2.ai";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -94,6 +112,7 @@ function usesResponsesEndpointForTestMessage(provider: string, model: string): b
   if (!isOpenAICompatibleProvider(provider) || provider === "custom") return false;
   const normalized = model.toLowerCase();
   return (
+    normalized.startsWith("gpt-5.6") ||
     normalized.startsWith("gpt-5.5") ||
     normalized.startsWith("gpt-5.4") ||
     normalized.startsWith("codex-") ||
@@ -106,6 +125,7 @@ function usesResponsesEndpointForTestMessage(provider: string, model: string): b
 function describeTestMessageTarget(provider: string, baseUrl: string, model: string): string {
   if (provider === "claude_subscription") return "Claude Agent SDK";
   if (provider === "openai_chatgpt") return "local ChatGPT session";
+  if (provider === "grok_subscription") return "local Grok CLI session";
   if (!baseUrl) return "(no base URL)";
   if (provider === "google_vertex") return buildGoogleVertexModelUrl(baseUrl, model, "generateContent");
   if (isOpenAICompatibleProvider(provider)) {
@@ -121,26 +141,57 @@ function resolveImageGenerationSource(conn: Record<string, unknown>, baseUrl: st
   return inferImageSource(explicitSource || model, baseUrl);
 }
 
+function resolveVideoGenerationSource(conn: Record<string, unknown>, baseUrl: string): string {
+  const explicitSource = typeof conn.videoGenerationSource === "string" ? conn.videoGenerationSource : "";
+  const model = typeof conn.model === "string" ? conn.model : "";
+  return inferVideoSource(explicitSource || model, baseUrl);
+}
+
 function localUrlPolicyForProvider(provider: string, imageSource: string) {
   const isLocalImageBackend =
     provider === "image_generation" && (imageSource === "comfyui" || imageSource === "automatic1111");
   const isImage = provider === "image_generation";
+  const isVideo = provider === "video_generation";
   return {
-    allowLocal: isLocalImageBackend || (isImage && isImageLocalUrlsEnabled()) ? true : isProviderLocalUrlsEnabled(),
+    allowLocal: isVideo
+      ? false
+      : isLocalImageBackend || (isImage && isImageLocalUrlsEnabled())
+        ? true
+        : isProviderLocalUrlsEnabled(),
     allowLoopback: true,
-    allowMdns: provider !== "image_generation" || isLocalImageBackend || isImageLocalUrlsEnabled(),
+    allowMdns: !isVideo && (provider !== "image_generation" || isLocalImageBackend || isImageLocalUrlsEnabled()),
     allowedProtocols: ["https:", "http:"],
     flagName: isImage ? "IMAGE_LOCAL_URLS_ENABLED" : "PROVIDER_LOCAL_URLS_ENABLED",
   };
 }
 
 function normalizeConnectionTestBaseUrl(baseUrl: string, provider: string): string {
-  if (provider !== "image_generation") return baseUrl;
+  if (provider !== "image_generation") return baseUrl.replace(/\/+$/, "");
   try {
     return normalizeLoopbackUrl(baseUrl).replace(/\/+$/, "");
   } catch {
     return baseUrl;
   }
+}
+
+function getStoredVideoDefaults(raw: unknown) {
+  const root = parseDefaultParametersRoot(raw);
+  return normalizeVideoGenerationProfile(root[VIDEO_DEFAULTS_STORAGE_KEY]).profile;
+}
+
+function parseDefaultParametersRoot(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  let parsed: unknown = raw;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed) as unknown;
+    } catch {
+      return {};
+    }
+  }
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? { ...(parsed as Record<string, unknown>) }
+    : {};
 }
 
 function parseImageUpload(image: string): { buffer: Buffer; hintedExt: string } {
@@ -315,6 +366,9 @@ export async function connectionsRoutes(app: FastifyInstance) {
       if (Object.prototype.hasOwnProperty.call(rawRecord, IMAGE_DEFAULTS_STORAGE_KEY)) {
         params[IMAGE_DEFAULTS_STORAGE_KEY] = rawRecord[IMAGE_DEFAULTS_STORAGE_KEY];
       }
+      if (Object.prototype.hasOwnProperty.call(rawRecord, VIDEO_DEFAULTS_STORAGE_KEY)) {
+        params[VIDEO_DEFAULTS_STORAGE_KEY] = rawRecord[VIDEO_DEFAULTS_STORAGE_KEY];
+      }
     }
     await storage.updateDefaultParameters(req.params.id, params);
     resetMemoryRecallVectorizerCache();
@@ -360,6 +414,8 @@ export async function connectionsRoutes(app: FastifyInstance) {
           conn.openrouterProvider,
           conn.maxTokensOverride,
           conn.claudeFastMode === "true",
+          conn.treatAsLocalEndpoint === "true",
+          conn.defaultParameters,
         );
         let responseText = "";
         for await (const chunk of provider.chat([{ role: "user", content: "Reply with OK." }], {
@@ -385,6 +441,37 @@ export async function connectionsRoutes(app: FastifyInstance) {
           message: `ChatGPT login found via Codex auth${detail}. Requests will use the local ChatGPT session.`,
           latencyMs: Date.now() - start,
           modelName: conn.model,
+        };
+      }
+
+      if (conn.provider === "grok_subscription") {
+        const provider = createLLMProvider(
+          conn.provider,
+          // Grok CLI subscription auth is local-only: the CLI reads the
+          // cached `grok login` session, so API key/base URL are intentionally
+          // unused here and in normal generation.
+          "",
+          "",
+          conn.maxContext,
+          conn.openrouterProvider,
+          conn.maxTokensOverride,
+          conn.claudeFastMode === "true",
+          conn.treatAsLocalEndpoint === "true",
+          conn.defaultParameters,
+        );
+        let responseText = "";
+        for await (const chunk of provider.chat([{ role: "user", content: "Reply with OK." }], {
+          model: conn.model ?? "",
+          maxTokens: 32,
+          stream: false,
+        })) {
+          responseText += chunk;
+        }
+        return {
+          success: true,
+          message: `Grok CLI completed a real request: ${responseText.trim().slice(0, 120) || "OK"}`,
+          latencyMs: Date.now() - start,
+          modelName: conn.model || "Grok CLI default",
         };
       }
 
@@ -417,12 +504,24 @@ export async function connectionsRoutes(app: FastifyInstance) {
 
       const imageSource =
         conn.provider === "image_generation" ? resolveImageGenerationSource(conn as any, baseUrl) : "";
+      if (conn.provider === "video_generation") {
+        return {
+          success: true,
+          message: "Video generation connection configured. Use Test Video to verify MP4 generation.",
+          latencyMs: Date.now() - start,
+          modelName: conn.model,
+        };
+      }
       baseUrl = normalizeConnectionTestBaseUrl(baseUrl, conn.provider);
       // image_generation has no standard modelsEndpoint — use provider-specific checks
       let testUrl: string;
       if (conn.provider === "image_generation" && imageSource === "novelai") {
-        // NovelAI: validate the API key via the user subscription endpoint
-        testUrl = "https://api.novelai.net/user/subscription";
+        return {
+          success: true,
+          message: "NovelAI connection configured. Use 'Test Image' to verify generation works.",
+          latencyMs: Date.now() - start,
+          modelName: conn.model,
+        };
       } else if (conn.provider === "image_generation" && imageSource === "horde") {
         // Horde: heartbeat is the lightweight health endpoint for the public API.
         testUrl = buildHordeUrl(baseUrl, "status/heartbeat");
@@ -517,6 +616,16 @@ export async function connectionsRoutes(app: FastifyInstance) {
           // before the host has run `codex login`.
         }
         return { models: MODEL_LISTS.openai_chatgpt.map((m) => ({ id: m.id, name: m.name })) };
+      }
+
+      if (conn.provider === "grok_subscription") {
+        const models = await fetchGrokCliModels();
+        return { models };
+      }
+
+      if (conn.provider === "video_generation") {
+        const models = MODEL_LISTS.video_generation.map((m) => ({ id: m.id, name: m.name }));
+        return { models };
       }
 
       const { PROVIDERS } = await import("@marinara-engine/shared");
@@ -711,6 +820,31 @@ export async function connectionsRoutes(app: FastifyInstance) {
         return { models: normalizeModelsResponse("openrouter", json) };
       }
 
+      if (conn.provider === "image_generation" && imageSource === "venice") {
+        const res = await safeFetch(buildVeniceApiUrl(baseUrl, "models"), {
+          headers,
+          policy: localUrlPolicyForProvider(conn.provider, imageSource),
+          maxResponseBytes: 5 * 1024 * 1024,
+          decodeCompressedResponse: true,
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          return reply.status(502).send({
+            error: `Venice returned ${res.status}: ${sanitizeProviderBody(body)}`,
+          });
+        }
+        const text = await res.text();
+        let json: unknown;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          return reply.status(502).send({
+            error: `Failed to fetch models: ${sanitizeProviderBody(text)}`,
+          });
+        }
+        return { models: normalizeVeniceImageModels(json) };
+      }
+
       if (conn.provider === "image_generation" && imageSource === "horde") {
         const res = await safeFetch(`${buildHordeUrl(baseUrl, "status/models")}?type=image`, {
           headers: hordeHeaders(conn.apiKey),
@@ -842,13 +976,114 @@ export async function connectionsRoutes(app: FastifyInstance) {
     }
   });
 
+  // ── Test video generation — generates a short fixed MP4 ──
+  app.post<{ Params: { id: string } }>("/:id/test-video", async (req, reply) => {
+    const conn = await storage.getWithKey(req.params.id);
+    if (!conn) return reply.status(404).send({ error: "Connection not found" });
+    if (conn.provider !== "video_generation") {
+      return reply.status(400).send({ error: "Not a video generation connection" });
+    }
+
+    const { PROVIDERS } = await import("@marinara-engine/shared");
+    const providerDef = PROVIDERS[conn.provider as keyof typeof PROVIDERS];
+    const videoApiKey = conn.apiKey || "";
+    const defaults = conn.defaultParameters
+      ? getStoredVideoDefaults(conn.defaultParameters)
+      : createDefaultVideoGenerationProfile();
+    const inferredVideoSource = resolveVideoGenerationSource(conn as any, conn.baseUrl || "");
+    const explicitVideoSource = conn.videoGenerationSource || conn.videoService || "";
+    const videoSource =
+      explicitVideoSource || (inferredVideoSource !== "gemini_omni" ? inferredVideoSource : defaults.service);
+    const rawVideoServiceHint = conn.videoService || videoSource;
+    const videoServiceHint =
+      rawVideoServiceHint === "google_ai_studio"
+        ? inferVideoSource(conn.model || "", conn.baseUrl || "")
+        : rawVideoServiceHint;
+    const isXaiVideo = videoSource === "xai" || videoServiceHint === "xai";
+    const isGoogleVeoVideo = videoSource === "google_veo" || videoServiceHint === "google_veo";
+    const isOpenRouterVideo = videoSource === "openrouter" || videoServiceHint === "openrouter";
+    const isSeedanceVideo = videoSource === "seedance" || videoServiceHint === "seedance";
+    const baseUrl = (
+      conn.baseUrl ||
+      (isXaiVideo
+        ? DEFAULT_XAI_VIDEO_BASE_URL
+        : isGoogleVeoVideo
+          ? DEFAULT_GOOGLE_VEO_VIDEO_BASE_URL
+          : isOpenRouterVideo
+            ? DEFAULT_OPENROUTER_VIDEO_BASE_URL
+            : isSeedanceVideo
+              ? DEFAULT_SEEDANCE_VIDEO_BASE_URL
+              : providerDef?.defaultBaseUrl || DEFAULT_GEMINI_OMNI_VIDEO_BASE_URL)
+    ).replace(/\/+$/, "");
+    const videoModel =
+      conn.model ||
+      (isXaiVideo
+        ? DEFAULT_XAI_VIDEO_MODEL
+        : isGoogleVeoVideo
+          ? DEFAULT_GOOGLE_VEO_VIDEO_MODEL
+          : isOpenRouterVideo
+            ? DEFAULT_OPENROUTER_VIDEO_MODEL
+            : isSeedanceVideo
+              ? DEFAULT_SEEDANCE_VIDEO_MODEL
+              : DEFAULT_GEMINI_OMNI_VIDEO_MODEL);
+    const activeDefaults = isXaiVideo
+      ? defaults.xai
+      : isGoogleVeoVideo
+        ? defaults.googleVeo
+        : isOpenRouterVideo
+          ? defaults.openrouter
+          : isSeedanceVideo
+            ? defaults.seedance
+            : defaults.geminiOmni;
+
+    const prompt =
+      "Create a concise cinematic 16:9 game scene video: a plate of spaghetti with marinara sauce on a table, gentle steam rising, warm kitchen light, slow push-in camera, no text or logos.";
+
+    const start = Date.now();
+    try {
+      const { generateVideo } = await import("../services/video/video-generation.js");
+      const result = await generateVideo(videoSource, baseUrl, videoApiKey, videoServiceHint, {
+        prompt,
+        model: videoModel,
+        durationSeconds: activeDefaults.durationSeconds,
+        aspectRatio: activeDefaults.aspectRatio,
+        resolution: isXaiVideo
+          ? defaults.xai.resolution
+          : isGoogleVeoVideo
+            ? defaults.googleVeo.resolution
+            : isOpenRouterVideo
+              ? defaults.openrouter.resolution
+              : isSeedanceVideo
+                ? defaults.seedance.resolution
+                : undefined,
+      });
+      return {
+        success: true,
+        base64: result.base64,
+        mimeType: result.mimeType,
+        latencyMs: Date.now() - start,
+        prompt,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        base64: null,
+        mimeType: null,
+        latencyMs: Date.now() - start,
+        prompt,
+        error: err instanceof Error ? err.message : "Unknown error",
+      };
+    }
+  });
+
   // ── Diagnose Claude (Subscription) — verifies which model the SDK actually
   //    billed against. The Claude Agent SDK can silently route a request to a
   //    smaller model (fast mode, post-rate-limit `cooldown` state, account-tier
   //    gating) without surfacing the swap to the caller. We send a tiny prompt
-  //    through the SDK with fast mode forced off, then return the model(s) the
-  //    SDK reports in `modelUsage` plus its `fast_mode_state` so the UI can
-  //    show "you asked for X, the SDK billed Y." ──
+  //    through the SDK with the connection's own fast-mode setting (not
+  //    forced off), then return the model(s) the SDK reports in `modelUsage`
+  //    plus its `fast_mode_state` so the UI can show "you asked for X, the
+  //    SDK billed Y." ──
   app.post<{ Params: { id: string } }>("/:id/diagnose-claude-subscription", async (req, reply) => {
     const conn = await storage.getWithKey(req.params.id);
     if (!conn) return reply.status(404).send({ error: "Connection not found" });
@@ -938,7 +1173,11 @@ export async function connectionsRoutes(app: FastifyInstance) {
     const conn = await storage.getWithKey(req.params.id);
     if (!conn) return reply.status(404).send({ error: "Connection not found" });
 
-    if (!conn.model) {
+    if (conn.provider === "image_generation" || conn.provider === "video_generation") {
+      return reply.status(400).send({ error: "This provider does not support chat test messages." });
+    }
+
+    if (!conn.model && conn.provider !== "grok_subscription") {
       return reply.status(400).send({ error: "No model configured. Set a model first." });
     }
 
@@ -948,29 +1187,32 @@ export async function connectionsRoutes(app: FastifyInstance) {
 
     // Local subscription/session providers manage their own endpoint, so skip
     // the baseUrl precondition. Every HTTP provider still requires one.
-    if (!baseUrl && conn.provider !== "claude_subscription" && conn.provider !== "openai_chatgpt") {
+    if (!baseUrl && !isLocalAuthProvider(conn.provider)) {
       return reply.status(400).send({ error: "No base URL configured" });
     }
 
     const start = Date.now();
     const requestDebug = readDebugMode(req.body);
     const debugLog = (message: string, ...args: any[]) => logDebugOverride(requestDebug, message, ...args);
-    const targetUrl = describeTestMessageTarget(conn.provider, baseUrl, conn.model);
+    const model = conn.model ?? "";
+    const targetUrl = describeTestMessageTarget(conn.provider, baseUrl, model);
     try {
-      debugLog("[connections/test-message] provider=%s model=%s url=%s", conn.provider, conn.model, targetUrl);
+      debugLog("[connections/test-message] provider=%s model=%s url=%s", conn.provider, model, targetUrl);
       const provider = createLLMProvider(
         conn.provider,
-        baseUrl,
+        localAuthProviderBaseUrl(conn.provider) ?? baseUrl,
         conn.apiKey,
         conn.maxContext,
         conn.openrouterProvider,
         conn.maxTokensOverride,
         conn.claudeFastMode === "true",
+        conn.treatAsLocalEndpoint === "true",
+        conn.defaultParameters,
       );
 
       let fullResponse = "";
       for await (const chunk of provider.chat([{ role: "user", content: "hi" }], {
-        model: conn.model,
+        model,
         temperature: 0.7,
         maxTokens: 200,
         stream: false,
@@ -989,13 +1231,13 @@ export async function connectionsRoutes(app: FastifyInstance) {
         success: true,
         response: fullResponse.slice(0, 500),
         latencyMs,
-        model: conn.model,
+        model: model || "Grok CLI default",
       };
     } catch (err) {
       debugLog(
         "[connections/test-message] provider=%s model=%s url=%s failed: %s",
         conn.provider,
-        conn.model,
+        model,
         targetUrl,
         err instanceof Error ? err.message : "Unknown error",
       );
@@ -1004,7 +1246,7 @@ export async function connectionsRoutes(app: FastifyInstance) {
         response: "",
         latencyMs: Date.now() - start,
         error: err instanceof Error ? err.message : "Unknown error",
-        model: conn.model,
+        model: model || "Grok CLI default",
       };
     }
   });

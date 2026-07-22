@@ -6,12 +6,14 @@
 // ──────────────────────────────────────────────
 import type {
   ActivationCondition,
+  LorebookActivationSource,
   LorebookEntry,
   LorebookFilterMode,
   LorebookMatchingSource,
   LorebookSchedule,
 } from "@marinara-engine/shared";
 import { LIMITS, testPrimaryKeys, testSecondaryKeys } from "@marinara-engine/shared";
+import { calibrateLorebookSimilarity } from "./embeddings.js";
 import { vmRegexExecutor } from "./regex-timeout.js";
 
 /** Compute cosine similarity between two vectors. Returns 0 for empty/mismatched vectors. */
@@ -42,6 +44,8 @@ export interface ActivatedEntry {
   rawContent?: string;
   /** Which key(s) matched */
   matchedKeys: string[];
+  /** Every mechanism that activated this entry in this generation. */
+  activationSources: LorebookActivationSource[];
   /** True when a primary key matched the latest user message directly. */
   matchedLatestUserMessage?: boolean;
   /** Priority order for injection */
@@ -194,6 +198,33 @@ function passesActivationGate(
   if (!passesContextualActivationGate(entry, filterContext, gameState)) return false;
   if (!ignoreTiming && !checkTiming(entry, timingState)) return false;
   return true;
+}
+
+/** Apply non-keyword activation safeguards to an explicitly selected entry. */
+export function passesForcedEntryActivationGates(entry: LorebookEntry, options: ScanOptions = {}): boolean {
+  const filterContext: LorebookFilterValueContext = {
+    activeCharacterIds: makeValueSet(options.activeCharacterIds),
+    activeCharacterTags: makeValueSet(options.activeCharacterTags),
+    generationTriggers: makeValueSet(
+      options.generationTriggers && options.generationTriggers.length > 0 ? options.generationTriggers : ["chat"],
+    ),
+  };
+  if (
+    !passesActivationGate(
+      entry,
+      options.timingStates?.get(entry.id),
+      filterContext,
+      options.gameState ?? null,
+      options.ignoreTiming,
+    )
+  ) {
+    return false;
+  }
+  const existingDecision = options.probabilityDecisions?.get(entry.id);
+  if (existingDecision !== undefined) return existingDecision;
+  const passes = passesProbabilityGate(entry, options.random ?? Math.random);
+  options.probabilityDecisions?.set(entry.id, passes);
+  return passes;
 }
 
 function normalizeProbability(value: unknown): number | null {
@@ -386,6 +417,8 @@ export interface ScanOptions {
   semanticEmbeddingsByLorebookId?: ReadonlyMap<string, number[] | null>;
   /** Cosine similarity threshold for semantic matching (0-1, default 0.3). */
   semanticThreshold?: number;
+  /** Unrelated-text cosine floor used to calibrate clustered embedding models. */
+  semanticSimilarityBaseline?: number;
   /** Per-lorebook cosine similarity thresholds for semantic matching. */
   semanticThresholdByLorebookId?: ReadonlyMap<string, number>;
   /** Per-lorebook maximum semantic matches. */
@@ -398,6 +431,8 @@ export interface ScanOptions {
   generationTriggers?: string[];
   /** Extra source text entries may opt into scanning. */
   additionalMatchingSourceText?: Partial<Record<LorebookMatchingSource, string>>;
+  /** Opening messages that should remain scannable even when recent-message depth trims them out. */
+  pinnedScanMessages?: ScanMessage[];
   /** Ignore sticky/cooldown/delay runtime state for preview/debug scans. */
   ignoreTiming?: boolean;
   /** True while scanning content surfaced by a prior lorebook activation. */
@@ -425,12 +460,14 @@ export function scanForActivatedEntries(
     chatEmbedding = null,
     semanticEmbeddingsByLorebookId = new Map<string, number[] | null>(),
     semanticThreshold = 0.3,
+    semanticSimilarityBaseline = 0,
     semanticThresholdByLorebookId = new Map<string, number>(),
     semanticMaxMatchesByLorebookId = new Map<string, number>(),
     activeCharacterIds = [],
     activeCharacterTags = [],
     generationTriggers = ["chat"],
     additionalMatchingSourceText = {},
+    pinnedScanMessages = [],
     ignoreTiming = false,
     recursionPass = false,
     probabilityDecisions = new Map<string, boolean>(),
@@ -442,9 +479,18 @@ export function scanForActivatedEntries(
     generationTriggers: makeValueSet(generationTriggers.length > 0 ? generationTriggers : ["chat"]),
   };
 
+  const pinnedScanText = pinnedScanMessages
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+    .join("\n");
+  const appendPinnedScanText = (baseText: string, includePinned: boolean = true) => {
+    if (!includePinned || !pinnedScanText) return baseText;
+    return baseText ? `${baseText}\n${pinnedScanText}` : pinnedScanText;
+  };
+
   // Build the text to scan from recent messages
   const messagesToScan = scanDepth > 0 ? messages.slice(-scanDepth) : messages;
-  const combinedText = messagesToScan.map((m) => m.content).join("\n");
+  const combinedText = appendPinnedScanText(messagesToScan.map((m) => m.content).join("\n"));
   const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
   const latestUserText = latestUserMessage?.content ?? "";
 
@@ -464,12 +510,14 @@ export function scanForActivatedEntries(
     //   null = inherit the bounded global default (combinedText)
     const baseEntryScanText =
       entry.scanDepth === 0
-        ? messages.map((m) => m.content).join("\n")
+        ? appendPinnedScanText(messages.map((m) => m.content).join("\n"), false)
         : entry.scanDepth !== null && entry.scanDepth > 0
-          ? messages
-              .slice(-entry.scanDepth)
-              .map((m) => m.content)
-              .join("\n")
+          ? appendPinnedScanText(
+              messages
+                .slice(-entry.scanDepth)
+                .map((m) => m.content)
+                .join("\n"),
+            )
           : combinedText;
     const extraMatchingText = getAdditionalMatchingText(entry, additionalMatchingSourceText);
     return extraMatchingText ? `${baseEntryScanText}\n${extraMatchingText}` : baseEntryScanText;
@@ -487,6 +535,7 @@ export function scanForActivatedEntries(
         entry,
         matchedKeys: ["[sticky]"],
         injectionOrder: entry.order,
+        activationSources: ["sticky"],
         sticky: true,
       });
       activatedIds.add(entry.id);
@@ -503,6 +552,7 @@ export function scanForActivatedEntries(
         entry,
         matchedKeys: ["[constant]"],
         injectionOrder: entry.order,
+        activationSources: [recursionPass ? "recursive" : "constant"],
       });
       activatedIds.add(entry.id);
       continue;
@@ -535,6 +585,7 @@ export function scanForActivatedEntries(
       entry,
       matchedKeys,
       matchedLatestUserMessage,
+      activationSources: [recursionPass ? "recursive" : "keyword"],
       injectionOrder: entry.order,
     });
     activatedIds.add(entry.id);
@@ -549,9 +600,6 @@ export function scanForActivatedEntries(
 
     for (const entry of entries) {
       if (!entry.enabled || entry.constant || activatedIds.has(entry.id)) continue;
-      // Explicit primary keys mean the entry is keyword-gated. Vectorization is
-      // still useful for router/search flows, but it must not bypass those keys.
-      if (entry.keys.some((key) => key.trim().length > 0)) continue;
       if (entry.delayUntilRecursion && !recursionPass) continue;
       if (entry.excludeRecursion && recursionPass) continue;
       if (entry.excludeFromVectorization) continue;
@@ -562,7 +610,10 @@ export function scanForActivatedEntries(
       if (!passesActivationGate(entry, timingState, filterContext, gameState, ignoreTiming)) continue;
 
       const threshold = semanticThresholdByLorebookId.get(entry.lorebookId) ?? semanticThreshold;
-      const similarity = cosineSimilarity(queryEmbedding, entry.embedding);
+      const similarity = calibrateLorebookSimilarity(
+        cosineSimilarity(queryEmbedding, entry.embedding),
+        semanticSimilarityBaseline,
+      );
       if (similarity >= threshold) {
         const entryScanText = getEntryScanText(entry);
         const matchOptions = {
@@ -586,14 +637,14 @@ export function scanForActivatedEntries(
     const semanticCountsByLorebookId = new Map<string, number>();
     for (const candidate of semanticCandidates.sort((a, b) => b.similarity - a.similarity)) {
       const lorebookId = candidate.entry.lorebookId;
-      const maxMatches =
-        semanticMaxMatchesByLorebookId.get(lorebookId) ?? LIMITS.LOREBOOK_VECTOR_MAX_RESULTS_DEFAULT;
+      const maxMatches = semanticMaxMatchesByLorebookId.get(lorebookId) ?? LIMITS.LOREBOOK_VECTOR_MAX_RESULTS_DEFAULT;
       const selectedCount = semanticCountsByLorebookId.get(lorebookId) ?? 0;
       if (selectedCount >= maxMatches) continue;
       activated.push({
         entry: candidate.entry,
         matchedKeys: [`[semantic:${candidate.similarity.toFixed(3)}]`],
         injectionOrder: candidate.entry.order,
+        activationSources: [recursionPass ? "recursive" : "semantic"],
       });
       activatedIds.add(candidate.entry.id);
       semanticCountsByLorebookId.set(lorebookId, selectedCount + 1);
@@ -638,6 +689,7 @@ export function recursiveScan(
     const newMessages: ScanMessage[] = [{ role: "system", content: newContent }];
     const newActivated = scanForActivatedEntries(newMessages, remaining, {
       ...scanOptions,
+      pinnedScanMessages: [],
       chatEmbedding: null,
       recursionPass: true,
     });

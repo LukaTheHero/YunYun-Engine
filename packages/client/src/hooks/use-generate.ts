@@ -5,14 +5,19 @@ import { useCallback, useRef } from "react";
 import type { AvatarCropValue } from "../lib/utils";
 import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import { toast, type ExternalToast } from "sonner";
-import { api } from "../lib/api-client";
+import { api, ApiError } from "../lib/api-client";
 import { formatAgentFailuresToast, toAgentFailure, type AgentFailure } from "../lib/agent-failures";
 import { chatBackgroundMetadataToUrl } from "../lib/backgrounds";
 import { formatGenerationParameterError } from "../lib/generation-parameter-errors";
+import {
+  reconcileTypewriterReplacement,
+  shouldKeepStreamLiveThroughPostProcessing,
+} from "../lib/generation-stream-policy";
 import { requestChatScrollToBottom } from "../lib/chat-scroll-events";
+import { startSceneWithPromptPreferences } from "../lib/scene-generation";
 import { agentKeys } from "./use-agents";
 import { discardPendingGameStatePatch } from "./use-game-state-patcher";
-import { turnGameKeys } from "./turn-game-keys";
+import { spatialContextKeys } from "./use-spatial-context";
 import type { PendingAgentWriteApproval, PendingCardUpdate } from "../stores/agent.store";
 import type { DelayedCharacterInfo } from "../stores/chat.store";
 import {
@@ -22,10 +27,15 @@ import {
   createInlineThinkingStreamFilter,
   EDITABLE_CHARACTER_CARD_FIELDS,
   normalizeThinkingTagPairs,
+  resolveChatPersonaCandidate,
   type AgentWriteApprovalProposal,
   type AgentCallDebugEvent,
   type CharacterCardFieldUpdate,
   type EditableCharacterCardField,
+  type MariGuidedPlanStep,
+  type MariSuggestionChip,
+  type PendingSpatialTransition,
+  type SpatialContextResponse,
   type ThinkingTagPair,
 } from "@marinara-engine/shared";
 
@@ -33,6 +43,11 @@ type RetryAgentsOptions = {
   lorebookKeeperBackfill?: boolean;
   forMessageId?: string;
   secretPlotRerollMode?: "full" | "turn_only";
+  illustratorPromptReviewOverride?: {
+    resultData: Record<string, unknown>;
+    prompt: string;
+    negativePrompt?: string;
+  };
 };
 
 type RetryAgentsFn = (chatId: string, agentTypes: string[], options?: RetryAgentsOptions) => Promise<boolean>;
@@ -60,15 +75,39 @@ function showAgentFailuresError(failures: AgentFailure[], onRetry?: () => void) 
 }
 
 const shownAgentWarnings = new Set<string>();
-const BUILT_IN_AGENT_TYPE_SET = new Set(BUILT_IN_AGENTS.map((agent) => agent.id));
-const BUILT_IN_TRACKER_AGENT_TYPE_SET = new Set(
-  BUILT_IN_AGENTS.filter((agent) => agent.category === "tracker" && !agent.libraryHidden).map((agent) => agent.id),
-);
+const isBuiltInAgentType = (agentType: string) => BUILT_IN_AGENTS.some((agent) => agent.id === agentType);
+const isBuiltInTrackerAgentType = (agentType: string) =>
+  BUILT_IN_AGENTS.some((agent) => agent.id === agentType && agent.category === "tracker" && !agent.libraryHidden);
 
-function showAgentWarning(raw: unknown) {
-  const data = raw && typeof raw === "object" ? (raw as { code?: unknown; message?: unknown }) : null;
+type AgentWarningToastData = {
+  code?: unknown;
+  message?: unknown;
+  connectionId?: unknown;
+  connectionName?: unknown;
+  model?: unknown;
+};
+
+function readAgentWarningString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function getAgentWarningToastKey(data: AgentWarningToastData | null, chatId: string, message: string): string {
+  const code = readAgentWarningString(data?.code) ?? "agent_warning";
+
+  if (code === "default_agent_connection_active") {
+    const connectionSignature =
+      readAgentWarningString(data?.connectionId) ?? readAgentWarningString(data?.connectionName) ?? "unknown";
+    const modelSignature = readAgentWarningString(data?.model) ?? "unknown";
+    return `${chatId}:${code}:${connectionSignature}:${modelSignature}`;
+  }
+
+  return `${code}:${message}`;
+}
+
+function showAgentWarning(raw: unknown, chatId: string) {
+  const data = raw && typeof raw === "object" ? (raw as AgentWarningToastData) : null;
   const message = typeof data?.message === "string" ? data.message : "Agent warning";
-  const warningKey = `${typeof data?.code === "string" ? data.code : "agent_warning"}:${message}`;
+  const warningKey = getAgentWarningToastKey(data, chatId, message);
   console.warn("[Agent warning]", raw);
   if (shownAgentWarnings.has(warningKey)) return;
   shownAgentWarnings.add(warningKey);
@@ -114,6 +153,12 @@ function applyAgentFrontendStyle(chatId: string, raw: unknown) {
     const current = document.getElementById(id) as HTMLStyleElement | null;
     if (current?.dataset.agentStyleToken === token) current.remove();
   }, durationMs);
+}
+
+function isChatSurfaceVisible(chatId: string) {
+  const chatState = useChatStore.getState();
+  if (chatState.activeChatId !== chatId) return false;
+  return !useUIStore.getState().hasAnyDetailOpen();
 }
 
 const editableCharacterCardFieldSet = new Set<string>(EDITABLE_CHARACTER_CARD_FIELDS);
@@ -218,6 +263,68 @@ function latestAssistantMessage(messages: Iterable<Message>): Message | null {
   return latest;
 }
 
+function resolveNotifiedCharacterId(
+  message: Message | null,
+  forCharacterId: string | undefined,
+  fallbackCharacterId: string | null,
+): string | null {
+  return message?.characterId ?? forCharacterId ?? fallbackCharacterId;
+}
+
+function getCachedMessages(qc: QueryClient, chatId: string): Message[] {
+  return qc.getQueryData<InfiniteData<Message[]>>(chatKeys.messages(chatId))?.pages.flat() ?? [];
+}
+
+function assistantMessageFingerprint(message: Message): string {
+  return JSON.stringify([
+    message.content,
+    message.activeSwipeIndex,
+    message.swipeCount ?? null,
+    message.extra?.displayText ?? null,
+    message.extra?.proseGuardianRewrittenAt ?? null,
+  ]);
+}
+
+type AssistantMessageSnapshot = {
+  cacheWasLoaded: boolean;
+  fingerprints: ReadonlyMap<string, string>;
+};
+
+function snapshotAssistantMessages(qc: QueryClient, chatId: string): AssistantMessageSnapshot {
+  const cached = qc.getQueryData<InfiniteData<Message[]>>(chatKeys.messages(chatId));
+  return {
+    cacheWasLoaded: cached !== undefined,
+    fingerprints: new Map(
+      (cached?.pages.flat() ?? [])
+        .filter((message) => message.role === "assistant")
+        .map((message) => [message.id, assistantMessageFingerprint(message)]),
+    ),
+  };
+}
+
+function latestChangedAssistantMessage(
+  qc: QueryClient,
+  chatId: string,
+  snapshot: AssistantMessageSnapshot,
+): Message | null {
+  if (!snapshot.cacheWasLoaded) return null;
+  return latestAssistantMessage(
+    getCachedMessages(qc, chatId).filter(
+      (message) =>
+        message.role === "assistant" && snapshot.fingerprints.get(message.id) !== assistantMessageFingerprint(message),
+    ),
+  );
+}
+
+function replyNotificationTitle(mode: Chat["mode"] | undefined, characterName: string | null): string | undefined {
+  if (mode === "game") return "Game turn is ready";
+  if (characterName) return undefined;
+  if (mode === "roleplay") return "Roleplay reply is ready";
+  if (mode === "visual_novel") return "Visual Novel reply is ready";
+  if (mode === "conversation") return "New message is ready";
+  return "Reply is ready";
+}
+
 /**
  * Build one or more PendingCardUpdate batches from a character_card_update
  * agent result. Each batch is scoped to a single characterId so the approval
@@ -320,8 +427,7 @@ function readAgentWriteApprovalProposal(
       ? (envelope.approval as Record<string, unknown>)
       : envelope;
   if (!source) return null;
-  const kind =
-    source.kind === "lorebook_update" || source.kind === "summary_update" ? source.kind : null;
+  const kind = source.kind === "lorebook_update" || source.kind === "summary_update" ? source.kind : null;
   if (!kind) return null;
 
   const chatId =
@@ -377,8 +483,6 @@ import { useChatStore } from "../stores/chat.store";
 import { useAgentStore } from "../stores/agent.store";
 import { useGameModeStore } from "../stores/game-mode.store";
 import { useGameStateStore } from "../stores/game-state.store";
-import { useUnoGameStore } from "../stores/uno-game.store";
-import { useChessGameStore } from "../stores/chess-game.store";
 import { useTranslationStore } from "../stores/translation.store";
 import { useUIStore } from "../stores/ui.store";
 import {
@@ -386,13 +490,16 @@ import {
   chatKeys,
   forgetRecentMessageContentEdit,
   preserveRecentMessageContentEdit,
+  rememberRecentMessageContentEdit,
 } from "./use-chats";
 import { characterKeys } from "./use-characters";
 import { connectionKeys } from "./use-connections";
 import { lorebookKeys } from "./use-lorebooks";
 import { presetKeys } from "./use-presets";
 import { playConfiguredNotificationPing } from "../lib/notification-sound";
-import { messageHasPendingPostProcessing } from "../lib/chat-message-extra";
+import { showLocalMessageNotification, showNativeMessageNotification } from "../lib/local-notifications";
+import { dispatchCapabilityClientEvent } from "../lib/capability-client-events";
+import { messageHasPendingPostProcessing, parseMessageExtraRecord } from "../lib/chat-message-extra";
 import { stripGmTagsKeepReadables } from "../lib/game-tag-parser";
 import type { APIConnection, Chat, GameMap, Message } from "@marinara-engine/shared";
 
@@ -402,19 +509,6 @@ function sortMessagesByCreatedAt(messages: Message[]): Message[] {
     if (createdAtOrder !== 0) return createdAtOrder;
     return 0;
   });
-}
-
-function parseMessageExtraRecordForMerge(value: unknown): Record<string, unknown> {
-  if (!value) return {};
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-    } catch {
-      return {};
-    }
-  }
-  return typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function mergeCachedGeneratedMessage(existing: Message, incoming: Message): Message {
@@ -428,8 +522,8 @@ function mergeCachedGeneratedMessage(existing: Message, incoming: Message): Mess
   if (existingSwipeCount || incomingSwipeCount || activeSwipeFloor) {
     merged.swipeCount = Math.max(existingSwipeCount, incomingSwipeCount, activeSwipeFloor);
   }
-  const existingExtra = parseMessageExtraRecordForMerge(existing.extra);
-  const incomingExtra = parseMessageExtraRecordForMerge(incoming.extra);
+  const existingExtra = parseMessageExtraRecord(existing.extra);
+  const incomingExtra = parseMessageExtraRecord(incoming.extra);
   // The saved-message SSE snapshot can predate post-processing extras such as
   // expression avatars or illustration attachments already present in cache.
   if (Object.keys(existingExtra).length > 0 || Object.keys(incomingExtra).length > 0) {
@@ -757,6 +851,47 @@ function shouldRefreshGameStateAfterGeneration(qc: QueryClient, chatId: string) 
 
 const pendingVisibleGameStateRefreshes = new Map<string, Promise<void>>();
 const activeGenerateLocks = new Set<string>();
+const PASSIVE_STREAM_SETTLE_POLL_MS = 1_500;
+const PASSIVE_STREAM_SETTLE_MAX_WAIT_MS = 30 * 60_000;
+
+function wait(ms: number, signal?: AbortSignal) {
+  if (!signal) return new Promise<void>((resolve) => setTimeout(resolve, ms));
+  if (signal.aborted) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const timeout = window.setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(timeout);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+}
+
+async function waitForServerGenerationToSettle(chatId: string, signal: AbortSignal) {
+  const startedAt = Date.now();
+  while (!signal.aborted && Date.now() - startedAt < PASSIVE_STREAM_SETTLE_MAX_WAIT_MS) {
+    try {
+      const status = await api.get<{ active: boolean }>(`/generate/status/${encodeURIComponent(chatId)}`);
+      if (!status.active) return true;
+    } catch {
+      // The resumed browser may still be restoring network access; keep polling.
+    }
+    await wait(PASSIVE_STREAM_SETTLE_POLL_MS, signal);
+  }
+  return false;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function isPassiveStreamDisconnect(error: unknown, pageWasHiddenDuringStream: boolean, signal: AbortSignal) {
+  if (!pageWasHiddenDuringStream || signal.aborted || isAbortError(error) || error instanceof ApiError) return false;
+  return error instanceof Error;
+}
 
 async function refreshVisibleGameStateAfterGeneration(chatId: string) {
   const existing = pendingVisibleGameStateRefreshes.get(chatId);
@@ -882,6 +1017,7 @@ export function useGenerate() {
   const setMariPhase = useChatStore((s) => s.setMariPhase);
   const setStreamBuffer = useChatStore((s) => s.setStreamBuffer);
   const setStreamCommitted = useChatStore((s) => s.setStreamCommitted);
+  const setStreamedMessageId = useChatStore((s) => s.setStreamedMessageId);
   const clearStreamBuffer = useChatStore((s) => s.clearStreamBuffer);
   const appendThinkingBuffer = useChatStore((s) => s.appendThinkingBuffer);
   const clearThinkingBuffer = useChatStore((s) => s.clearThinkingBuffer);
@@ -897,9 +1033,13 @@ export function useGenerate() {
   const addDebugEntry = useAgentStore((s) => s.addDebugEntry);
   const addThoughtBubble = useAgentStore((s) => s.addThoughtBubble);
   const clearThoughtBubbles = useAgentStore((s) => s.clearThoughtBubbles);
-  const addEchoMessage = useAgentStore((s) => s.addEchoMessage);
+  const enqueueEchoMessages = useAgentStore((s) => s.enqueueEchoMessages);
   const setCyoaChoices = useAgentStore((s) => s.setCyoaChoices);
   const clearCyoaChoices = useAgentStore((s) => s.clearCyoaChoices);
+  const setMariChips = useAgentStore((s) => s.setMariChips);
+  const clearMariChips = useAgentStore((s) => s.clearMariChips);
+  const setMariPlan = useAgentStore((s) => s.setMariPlan);
+  const clearMariPlan = useAgentStore((s) => s.clearMariPlan);
   const setYoutubePlay = useAgentStore((s) => s.setYoutubePlay);
   const setYoutubeVolume = useAgentStore((s) => s.setYoutubeVolume);
   const setLocalMusicPlay = useAgentStore((s) => s.setLocalMusicPlay);
@@ -935,6 +1075,8 @@ export function useGenerate() {
       impersonatePromptTemplate?: string;
       /** When true, this generation drives the active turn-game's bot seats instead of a chat reply. */
       turnGameBots?: boolean;
+      /** Structured Roleplay/Game movement committed atomically with this owner turn. */
+      pendingSpatialTransition?: PendingSpatialTransition;
     }) => {
       // Prevent concurrent generations for the same chat. Different chats may
       // keep generating in the background while the user navigates elsewhere.
@@ -971,6 +1113,8 @@ export function useGenerate() {
         clearStreamBuffer(params.chatId);
         clearThoughtBubbles();
         clearCyoaChoices();
+        clearMariChips();
+        clearMariPlan();
         clearFailedAgentTypes(params.chatId);
         setRegenerateMessageId(params.regenerateMessageId ?? null);
       }
@@ -982,6 +1126,7 @@ export function useGenerate() {
       // message after it is upserted into the cache. Cancel early so the
       // post-save refresh owns the query lifecycle for this generation.
       await qc.cancelQueries({ queryKey: chatKeys.messages(params.chatId), exact: true });
+      const assistantMessagesBeforeGeneration = snapshotAssistantMessages(qc, params.chatId);
       if (params.regenerateMessageId) {
         forgetRecentMessageContentEdit(params.chatId, params.regenerateMessageId);
       }
@@ -989,7 +1134,7 @@ export function useGenerate() {
       const pendingAttachments = params.attachments ?? [];
 
       // Optimistically show the user message in the chat immediately
-      if ((params.userMessage || pendingAttachments.length > 0) && !params.impersonate) {
+      if ((params.userMessage || pendingAttachments.length > 0 || params.pendingSpatialTransition) && !params.impersonate) {
         // Build persona snapshot for per-message persona tracking
         const cachedPersonas = qc.getQueryData<
           Array<{
@@ -1012,9 +1157,10 @@ export function useGenerate() {
           qc.getQueryData<any>(chatKeys.detail(params.chatId)) ??
           (qc.getQueryData<any[]>(chatKeys.list()) ?? []).find((c: any) => c.id === params.chatId);
         const chatPersonaId = activeChat?.personaId as string | null | undefined;
+        // Roleplay may intentionally have no Persona. Keep optimistic snapshot
+        // stamping identical to the server's Conversation-only fallback policy.
         const snapshotPersona = cachedPersonas
-          ? ((chatPersonaId ? cachedPersonas.find((p) => p.id === chatPersonaId) : null) ??
-            cachedPersonas.find((p) => p.isActive === "true" || p.isActive === true))
+          ? resolveChatPersonaCandidate(cachedPersonas, chatPersonaId, activeChat?.mode)
           : null;
         const personaSnapshot = snapshotPersona
           ? {
@@ -1070,6 +1216,13 @@ export function useGenerate() {
       const chatModeForGeneration = getCachedChatMode(qc, params.chatId);
       const shouldDisplayRawStream =
         chatModeForGeneration !== "conversation" || !!params.regenerateMessageId || !!params.continueMessageId;
+      const keepStreamLiveThroughPostProcessing = shouldKeepStreamLiveThroughPostProcessing({
+        streamingEnabled,
+        shouldDisplayRawStream,
+        isGameGeneration,
+        isRegeneration: !!params.regenerateMessageId,
+        isContinuation: !!params.continueMessageId,
+      });
       const leadingSpeakerPrefixFilter = createLeadingSpeakerPrefixFilter([
         ...getCachedChatSpeakerNames(qc, params.chatId),
         ...(params.mentionedCharacterNames ?? []),
@@ -1080,6 +1233,9 @@ export function useGenerate() {
       let receivedThinking = false; // Whether provider-native thinking chunks were received
       let gameTurnLoadedSoundPlayed = false;
       let sawDoneEvent = false;
+      let passiveStreamRecovered = false;
+      let spatialTransitionCommitted = false;
+      let passiveStreamSettled = false;
       let typingActive = false;
       let typewriterDone: (() => void) | null = null;
       let rafId = 0;
@@ -1089,6 +1245,14 @@ export function useGenerate() {
       let gameStatePatchAnchor: { messageId: string; swipeIndex: number } | null = null;
       const normalizeLineBreakSpacing = (text: string) =>
         chatModeForGeneration === "roleplay" ? text.replace(/[ \t]+(\r?\n)/g, "$1") : text;
+      const rememberContinuedMessageContent = (message: Message) => {
+        if (!params.continueMessageId || message.id !== params.continueMessageId) return;
+        const swipeIndex =
+          typeof message.activeSwipeIndex === "number" && Number.isInteger(message.activeSwipeIndex)
+            ? message.activeSwipeIndex
+            : null;
+        rememberRecentMessageContentEdit(params.chatId, message.id, message.content, swipeIndex);
+      };
       const appendVisibleGeneratedChunk = (chunk: string) => {
         const normalizedChunk = normalizeLineBreakSpacing(chunk);
         if (/^\r?\n/.test(normalizedChunk)) {
@@ -1135,12 +1299,16 @@ export function useGenerate() {
         const normalized = Math.max(0, Math.min(1, (speed - 1) / 98));
         return 12 + Math.pow(normalized, 1.65) * 248;
       };
+      const getMaxCharsPerTypewriterFrame = (charsPerSecond: number) => {
+        if (charsPerSecond === Infinity) return Infinity;
+        return Math.max(1, Math.ceil(charsPerSecond / 60));
+      };
 
       const TYPEWRITER_MAX_FRAME_MS = 120;
       let lastTypewriterPaintAt = 0;
       let typewriterRemainder = 0;
       const canInspectPageFocus = typeof document !== "undefined";
-      const shouldFlushTypewriterForBackground = () => canInspectPageFocus && document.visibilityState !== "visible";
+      let pageWasHiddenDuringStream = canInspectPageFocus && document.visibilityState !== "visible";
 
       const flushTypewriterBuffer = () => {
         cancelAnimationFrame(rafId);
@@ -1148,6 +1316,7 @@ export function useGenerate() {
         pendingText = "";
         typingActive = false;
         typewriterRemainder = 0;
+        lastTypewriterPaintAt = 0;
         if (streamingEnabled && shouldDisplayRawStream && fullBuffer) setStreamBuffer(fullBuffer, params.chatId);
         if (typewriterDone) {
           const done = typewriterDone;
@@ -1161,6 +1330,7 @@ export function useGenerate() {
         cancelAnimationFrame(rafId);
         typingActive = false;
         typewriterRemainder = 0;
+        lastTypewriterPaintAt = 0;
 
         if (!streamingEnabled || !shouldDisplayRawStream) {
           fullBuffer = nextContent;
@@ -1168,18 +1338,9 @@ export function useGenerate() {
           return;
         }
 
-        if (options.retype) {
-          fullBuffer = "";
-          pendingText = nextContent;
-        } else if (nextContent.startsWith(fullBuffer)) {
-          pendingText = nextContent.slice(fullBuffer.length);
-        } else {
-          // Final cleanup can remove a speaker prefix, hidden command, or
-          // thinking block near the start. Re-animating from the common prefix
-          // makes the roleplay stream visibly jump backward and retype.
-          fullBuffer = nextContent;
-          pendingText = "";
-        }
+        const reconciled = reconcileTypewriterReplacement(fullBuffer, nextContent, options.retype === true);
+        fullBuffer = reconciled.visibleText;
+        pendingText = reconciled.pendingText;
 
         if (pendingText) {
           startTypewriter();
@@ -1194,19 +1355,12 @@ export function useGenerate() {
       };
 
       const startTypewriter = () => {
-        if (shouldFlushTypewriterForBackground()) {
-          flushTypewriterBuffer();
-          return;
-        }
         if (typingActive) return;
         typingActive = true;
         const tick = (now = performance.now()) => {
-          if (shouldFlushTypewriterForBackground()) {
-            flushTypewriterBuffer();
-            return;
-          }
           if (pendingText.length === 0) {
             typingActive = false;
+            lastTypewriterPaintAt = 0;
             if (typewriterDone) {
               typewriterDone();
               typewriterDone = null;
@@ -1227,7 +1381,8 @@ export function useGenerate() {
           }
 
           typewriterRemainder += (charsPerSecond * elapsedMs) / 1000;
-          const n = Math.min(Math.floor(typewriterRemainder), pendingText.length);
+          const maxCharsThisFrame = getMaxCharsPerTypewriterFrame(charsPerSecond);
+          const n = Math.min(Math.floor(typewriterRemainder), maxCharsThisFrame, pendingText.length);
           if (n < 1) {
             rafId = requestAnimationFrame(tick);
             return;
@@ -1241,17 +1396,27 @@ export function useGenerate() {
         };
         rafId = requestAnimationFrame(tick);
       };
-      const flushBackgroundedTypewriter = () => {
-        if (shouldFlushTypewriterForBackground() && (pendingText.length > 0 || typingActive)) {
-          flushTypewriterBuffer();
-        }
+      const markPageHidden = () => {
+        pageWasHiddenDuringStream = true;
+      };
+      const recordBackgroundedStream = () => {
+        if (document.visibilityState === "visible") return;
+        markPageHidden();
+        // Browsers pause requestAnimationFrame in background tabs. Finish the
+        // queued text immediately so post-processing cannot wait indefinitely.
+        if (pendingText.length > 0 || typingActive) flushTypewriterBuffer();
       };
       if (canInspectPageFocus) {
-        document.addEventListener("visibilitychange", flushBackgroundedTypewriter);
+        document.addEventListener("visibilitychange", recordBackgroundedStream);
+        window.addEventListener("pagehide", markPageHidden);
       }
 
       const waitForTypewriterDrain = async () => {
         if (!streamingEnabled || !shouldDisplayRawStream || (pendingText.length === 0 && !typingActive)) return;
+        if (canInspectPageFocus && document.visibilityState !== "visible") {
+          recordBackgroundedStream();
+          return;
+        }
         await new Promise<void>((resolve) => {
           if (pendingText.length === 0 && !typingActive) {
             resolve();
@@ -1260,6 +1425,16 @@ export function useGenerate() {
           typewriterDone = resolve;
           startTypewriter();
         });
+      };
+      const canRefreshCurrentMessagesNow = () => {
+        if (!streamingEnabled || !shouldDisplayRawStream) return true;
+        const streamState = useChatStore.getState();
+        return streamState.streamingChatId !== params.chatId || streamState.committedStreamChatIds.has(params.chatId);
+      };
+      const invalidateCurrentMessagesIfSafe = () => {
+        if (!canRefreshCurrentMessagesNow()) return false;
+        qc.invalidateQueries({ queryKey: chatKeys.messages(params.chatId) });
+        return true;
       };
 
       // Safety net: guarantees the Mari work-status pill clears for this
@@ -1306,6 +1481,21 @@ export function useGenerate() {
           abortController.signal,
         )) {
           switch (event.type) {
+            case "spatial_transition_committed": {
+              const transitionData = event.data as
+                | { chatId?: string; commandId?: string; currentLocationId?: string; definitionRevision?: number }
+                | undefined;
+              if (transitionData?.chatId === params.chatId && transitionData.commandId) {
+                spatialTransitionCommitted = true;
+                useChatStore
+                  .getState()
+                  .clearPendingSpatialTransition(params.chatId, transitionData.commandId);
+                void qc.invalidateQueries({ queryKey: spatialContextKeys.detail(params.chatId) });
+                void qc.invalidateQueries({ queryKey: chatKeys.detail(params.chatId) });
+              }
+              break;
+            }
+
             case "token": {
               const isFirstToken = !receivedContent;
               receivedContent = true;
@@ -1351,7 +1541,7 @@ export function useGenerate() {
             }
 
             case "agent_warning": {
-              showAgentWarning(event.data);
+              showAgentWarning(event.data, params.chatId);
               break;
             }
 
@@ -1413,14 +1603,7 @@ export function useGenerate() {
                 qc.invalidateQueries({ queryKey: agentKeys.customRuns(params.chatId) });
                 if (result.resultType === "sprite_change") {
                   spriteChangeReceived = true;
-                  const streamState = useChatStore.getState();
-                  const canRefreshMessagesNow =
-                    !streamingEnabled ||
-                    streamState.streamingChatId !== params.chatId ||
-                    streamState.committedStreamChatIds.has(params.chatId);
-                  if (canRefreshMessagesNow) {
-                    qc.invalidateQueries({ queryKey: chatKeys.messages(params.chatId) });
-                  }
+                  invalidateCurrentMessagesIfSafe();
                 }
                 if (result.resultType === "spotify_control") {
                   qc.invalidateQueries({ queryKey: ["spotify", "player"] });
@@ -1466,9 +1649,7 @@ export function useGenerate() {
                 if (result.agentType === "echo-chamber") {
                   const d = result.data as Record<string, unknown>;
                   const reactions = (d.reactions as Array<{ characterName: string; reaction: string }>) ?? [];
-                  for (const r of reactions) {
-                    addEchoMessage(r.characterName, r.reaction);
-                  }
+                  enqueueEchoMessages(reactions);
                 }
 
                 // Push CYOA choices to the dedicated store
@@ -1639,16 +1820,7 @@ export function useGenerate() {
               if (turn.index > 0) {
                 flushLeadingSpeakerPrefix();
                 // Drain typewriter for the previous character (only if streaming)
-                if (streamingEnabled && (pendingText.length > 0 || typingActive)) {
-                  await new Promise<void>((resolve) => {
-                    if (pendingText.length === 0 && !typingActive) {
-                      resolve();
-                      return;
-                    }
-                    typewriterDone = resolve;
-                    startTypewriter();
-                  });
-                }
+                await waitForTypewriterDrain();
                 const previousGroupMessage = latestAssistantMessage(persistedMessages.values());
 
                 // Pick up the just-saved message from the previous character
@@ -1689,6 +1861,11 @@ export function useGenerate() {
                 thinkingStreamFilter.reset();
                 setStreamBuffer("", params.chatId);
                 clearThinkingBuffer(params.chatId);
+                // Reveal the previous member's durable row only after its live
+                // presentation buffers are fully cleared.
+                setStreamedMessageId(params.chatId, null);
+              } else {
+                setStreamedMessageId(params.chatId, null);
               }
 
               if (streamingEnabled) setStreamCommitted(params.chatId, false);
@@ -1725,24 +1902,14 @@ export function useGenerate() {
             }
 
             case "turn_game_state_patch": {
-              // The payload carries a gameType discriminator — route it to the matching
-              // board store only; a view from one game rendered by another board crashes.
               const turnGameType = (event.data as { gameType?: string } | null)?.gameType;
-              if (!isActiveChat()) {
-                // A background chat's board can't be painted, but a silently
-                // dropped patch leaves a stale snapshot that blocks re-hydration
-                // on switch-back (the state query is disabled while a snapshot
-                // exists). Drop the snapshot and mark the query stale so
-                // returning to the chat refetches the board.
-                if (turnGameType === "chess") useChessGameStore.getState().clearChess(params.chatId);
-                else if (turnGameType === "uno") useUnoGameStore.getState().clearUno(params.chatId);
-                void qc.invalidateQueries({ queryKey: turnGameKeys.state(params.chatId) });
-                break;
-              }
-              if (turnGameType === "chess") {
-                useChessGameStore.getState().setChess(event.data as never, params.chatId);
-              } else if (turnGameType === "uno") {
-                useUnoGameStore.getState().setUno(event.data as never, params.chatId);
+              if (turnGameType) {
+                dispatchCapabilityClientEvent({
+                  packageId: turnGameType,
+                  type: event.type,
+                  chatId: params.chatId,
+                  data: event.data,
+                });
               }
               break;
             }
@@ -1760,7 +1927,7 @@ export function useGenerate() {
               // refresh the message list so their hidden state shows in the UI.
               const summaryData = event.data as { hiddenMessageIds?: unknown };
               if (Array.isArray(summaryData.hiddenMessageIds) && summaryData.hiddenMessageIds.length > 0) {
-                qc.invalidateQueries({ queryKey: chatKeys.messages(params.chatId) });
+                invalidateCurrentMessagesIfSafe();
               }
               break;
             }
@@ -1812,13 +1979,15 @@ export function useGenerate() {
                       setStreamBuffer(fullBuffer, params.chatId);
                     }
                   }
-                  const heldExtra = parseMessageExtraRecordForMerge(heldTextRewriteMessage.extra);
+                  const heldExtra = { ...parseMessageExtraRecord(heldTextRewriteMessage.extra) };
                   delete heldExtra.postProcessingPending;
                   if (builtInRewriteApplied) {
                     heldExtra.proseGuardianOriginalText = rw.originalText;
+                    heldExtra.proseGuardianRewrittenText = rewrittenText;
                     heldExtra.proseGuardianRewrittenAt = new Date().toISOString();
                   } else {
                     delete heldExtra.proseGuardianOriginalText;
+                    delete heldExtra.proseGuardianRewrittenText;
                     delete heldExtra.proseGuardianRewrittenAt;
                   }
                   const updatedMessage = {
@@ -1826,13 +1995,11 @@ export function useGenerate() {
                     content: rewrittenText,
                     extra: heldExtra as unknown as Message["extra"],
                   };
+                  rememberContinuedMessageContent(updatedMessage);
                   persistedMessages.set(updatedMessage.id, updatedMessage);
-                  upsertPersistedMessages(qc, params.chatId, [updatedMessage]);
-                  clearStreamBuffer(params.chatId);
-                  clearThinkingBuffer(params.chatId);
-                  setStreamCommitted(params.chatId, true);
-                  fullBuffer = "";
-                  pendingText = "";
+                  // Keep the final rewritten text as the live stream until the
+                  // full generation lifecycle finishes. The durable row is
+                  // primed during final cleanup so there is no full-text flash.
                   holdingTextRewrite = false;
                   heldTextRewriteMessage = null;
                   break;
@@ -1848,9 +2015,10 @@ export function useGenerate() {
                 if (useChatStore.getState().committedStreamChatIds.has(params.chatId)) {
                   const latestSavedMessage = latestAssistantMessage(persistedMessages.values());
                   if (latestSavedMessage) {
-                    const nextExtra = parseMessageExtraRecordForMerge(latestSavedMessage.extra);
+                    const nextExtra = { ...parseMessageExtraRecord(latestSavedMessage.extra) };
                     if (builtInRewriteApplied) {
                       nextExtra.proseGuardianOriginalText = rw.originalText;
+                      nextExtra.proseGuardianRewrittenText = rewrittenText;
                       nextExtra.proseGuardianRewrittenAt = new Date().toISOString();
                     }
                     const updatedMessage = {
@@ -1858,6 +2026,7 @@ export function useGenerate() {
                       content: fullBuffer,
                       extra: nextExtra as unknown as Message["extra"],
                     };
+                    rememberContinuedMessageContent(updatedMessage);
                     persistedMessages.set(updatedMessage.id, updatedMessage);
                     upsertPersistedMessages(qc, params.chatId, [updatedMessage]);
                   }
@@ -1883,6 +2052,9 @@ export function useGenerate() {
               }
               await qc.cancelQueries({ queryKey: chatKeys.messages(params.chatId), exact: true });
               persistedMessages.set(savedMessage.id, savedMessage);
+              if (savedMessage.role === "assistant" && keepStreamLiveThroughPostProcessing) {
+                setStreamedMessageId(params.chatId, savedMessage.id);
+              }
               gameStatePatchAnchor = {
                 messageId: savedMessage.id,
                 swipeIndex:
@@ -1890,7 +2062,7 @@ export function useGenerate() {
                     ? savedMessage.activeSwipeIndex
                     : 0,
               };
-              const savedExtra = parseMessageExtraRecordForMerge(savedMessage.extra);
+              const savedExtra = parseMessageExtraRecord(savedMessage.extra);
               const pendingPostProcessing = savedExtra.postProcessingPending;
               const pendingPostProcessingAgentType =
                 pendingPostProcessing &&
@@ -1927,22 +2099,13 @@ export function useGenerate() {
                 }
                 break;
               }
-              // Once an ordinary roleplay stream is saved, the durable message
-              // should own the transcript even if post-generation agents
-              // (Illustrator, Spotify, etc.) are still running.
-              if (params.regenerateMessageId || params.continueMessageId || !streamingEnabled) {
+              // The server saves fresh Roleplay output before post-processing
+              // agents start. Keep the live stream authoritative until `done`,
+              // otherwise the complete persisted row replaces the animated
+              // buffer as soon as agents begin their work.
+              if (!keepStreamLiveThroughPostProcessing) {
+                rememberContinuedMessageContent(savedMessage);
                 upsertPersistedMessages(qc, params.chatId, [savedMessage]);
-              } else if (shouldDisplayRawStream && !isGameGeneration) {
-                await waitForTypewriterDrain();
-                upsertPersistedMessages(qc, params.chatId, [savedMessage]);
-                clearStreamBuffer(params.chatId);
-                clearThinkingBuffer(params.chatId);
-                setStreamCommitted(params.chatId, true);
-                if (isActiveChat() && useChatStore.getState().streamingChatId === params.chatId) {
-                  setStreamingCharacterId(null);
-                  setTypingCharacterName(null);
-                  setDelayedCharacterInfo(null);
-                }
               }
               break;
             }
@@ -1989,6 +2152,63 @@ export function useGenerate() {
               const errData = event.data as { characterId: string; error: string };
               console.warn("[selfie] Generation failed:", errData.error);
               toast.error(`Selfie generation failed: ${errData.error}`);
+              break;
+            }
+
+            case "conversation_call_ringing": {
+              const data = event.data as {
+                session?: {
+                  id?: unknown;
+                  chatId?: unknown;
+                  initiatorCharacterId?: unknown;
+                  metadata?: Record<string, unknown>;
+                };
+                reason?: unknown;
+                characterId?: unknown;
+              };
+              const session = data.session;
+              const callId = typeof session?.id === "string" ? session.id : null;
+              const callChatId = typeof session?.chatId === "string" ? session.chatId : params.chatId;
+              const characterId =
+                typeof data.characterId === "string"
+                  ? data.characterId
+                  : typeof session?.initiatorCharacterId === "string"
+                    ? session.initiatorCharacterId
+                    : null;
+              const reason =
+                typeof data.reason === "string"
+                  ? data.reason
+                  : typeof session?.metadata?.reason === "string"
+                    ? session.metadata.reason
+                    : null;
+
+              dispatchCapabilityClientEvent({
+                packageId: "conversation-calls",
+                type: event.type,
+                chatId: callChatId,
+                data: event.data,
+              });
+              if (callChatId === params.chatId) {
+                invalidateCurrentMessagesIfSafe();
+              } else {
+                qc.invalidateQueries({ queryKey: chatKeys.messages(callChatId) });
+              }
+              qc.invalidateQueries({ queryKey: chatKeys.list() });
+
+              if (callId && !isChatSurfaceVisible(callChatId)) {
+                const identity = resolveCachedCharacterIdentity(qc, characterId);
+                useChatStore
+                  .getState()
+                  .addCallNotification(
+                    callChatId,
+                    callId,
+                    identity.name ?? "Character",
+                    identity.avatarUrl,
+                    identity.avatarCrop,
+                    reason,
+                    { showWhenActive: true },
+                  );
+              }
               break;
             }
 
@@ -2072,6 +2292,36 @@ export function useGenerate() {
               break;
             }
 
+            case "scene_requested": {
+              const sceneData = event.data as {
+                originChatId?: string;
+                prompt?: string;
+                background?: string | null;
+                plan?: string | null;
+                initiatorCharId?: string | null;
+                initiatorCharName?: string | null;
+              };
+              const sceneOriginChatId = sceneData.originChatId || params.chatId;
+              if (!isChatSurfaceVisible(sceneOriginChatId)) {
+                break;
+              }
+              void startSceneWithPromptPreferences({
+                chatId: sceneOriginChatId,
+                prompt: sceneData.prompt ?? "",
+                background: sceneData.background ?? null,
+                planHint: sceneData.plan ?? null,
+                initiatorCharId: sceneData.initiatorCharId ?? null,
+                initiatorCharName: sceneData.initiatorCharName ?? "Character",
+                connectionId: params.connectionId,
+                onCreated: () => {
+                  qc.invalidateQueries({ queryKey: chatKeys.all });
+                },
+              }).catch((error) => {
+                console.warn("[scene] Failed to handle requested scene:", error);
+              });
+              break;
+            }
+
             case "haptic_command": {
               break;
             }
@@ -2127,17 +2377,34 @@ export function useGenerate() {
                 toast(`Started ${actionData.mode} chat with ${actionData.characterName}`, { icon: "💬" });
                 qc.invalidateQueries({ queryKey: ["chats"] });
                 if (typeof actionData.chatId === "string") {
-                  qc.invalidateQueries({ queryKey: chatKeys.messages(actionData.chatId) });
+                  if (actionData.chatId === params.chatId) {
+                    invalidateCurrentMessagesIfSafe();
+                  } else {
+                    qc.invalidateQueries({ queryKey: chatKeys.messages(actionData.chatId) });
+                  }
                 }
               } else if (actionData.action === "dm_posted") {
                 if (typeof actionData.chatId === "string") {
                   qc.invalidateQueries({ queryKey: ["chats"] });
-                  qc.invalidateQueries({ queryKey: chatKeys.messages(actionData.chatId) });
+                  if (actionData.chatId === params.chatId) {
+                    invalidateCurrentMessagesIfSafe();
+                  } else {
+                    qc.invalidateQueries({ queryKey: chatKeys.messages(actionData.chatId) });
+                  }
                   qc.invalidateQueries({ queryKey: lorebookKeys.active(actionData.chatId) });
                 }
               } else if (actionData.action === "data_fetched") {
                 const fetchType = (actionData.fetchType as string) ?? "data";
                 toast(`Fetched ${fetchType}: ${actionData.name}`, { icon: "📋" });
+              } else if (actionData.action === "suggestions") {
+                const suggestions = Array.isArray(actionData.suggestions)
+                  ? (actionData.suggestions as MariSuggestionChip[])
+                  : [];
+                if (useUIStore.getState().professorMariSuggestionsEnabled) setMariChips(params.chatId, suggestions);
+              } else if (actionData.action === "plan") {
+                const plan = Array.isArray(actionData.plan) ? (actionData.plan as MariGuidedPlanStep[]) : [];
+                if (useUIStore.getState().professorMariSuggestionsEnabled && plan.length > 0)
+                  setMariPlan(params.chatId, plan);
               } else if (actionData.action === "navigate") {
                 const panel = actionData.panel as string;
                 const tab = actionData.tab as string | null;
@@ -2154,13 +2421,9 @@ export function useGenerate() {
               if (spriteChangeReceived) {
                 qc.invalidateQueries({ queryKey: chatKeys.messages(params.chatId) });
               }
-              setProcessing(false, params.chatId);
-              if (isActiveChat()) {
-                if (useChatStore.getState().streamingChatId === params.chatId) {
-                  setStreaming(false);
-                  clearStreamBuffer(params.chatId);
-                }
-              }
+              // Final UI handoff happens after the typewriter drains below.
+              // Clearing here makes the completed persisted message flash in
+              // while tokens or a held rewrite are still being animated.
               clearMariPhaseForThisChat();
               break;
             }
@@ -2180,7 +2443,7 @@ export function useGenerate() {
               const delayedNames = (event as any).characters as string[] | undefined;
               const delayedLabel =
                 delayedNames?.length === 1 ? delayedNames[0] : (delayedNames?.join(", ") ?? "Character");
-              const delayedStatus = (((event as any).status as DelayedCharacterInfo["status"] | undefined) ?? "idle");
+              const delayedStatus = ((event as any).status as DelayedCharacterInfo["status"] | undefined) ?? "idle";
               const delayedInfo: DelayedCharacterInfo = {
                 name: delayedLabel,
                 status: delayedStatus,
@@ -2213,7 +2476,11 @@ export function useGenerate() {
               // OOC messages were posted to the connected conversation — invalidate its messages
               const oocData = event.data as { chatId: string; count: number };
               if (oocData.chatId) {
-                qc.invalidateQueries({ queryKey: chatKeys.messages(oocData.chatId) });
+                if (oocData.chatId === params.chatId) {
+                  invalidateCurrentMessagesIfSafe();
+                } else {
+                  qc.invalidateQueries({ queryKey: chatKeys.messages(oocData.chatId) });
+                }
                 qc.invalidateQueries({ queryKey: lorebookKeys.active(oocData.chatId) });
               }
               break;
@@ -2253,14 +2520,7 @@ export function useGenerate() {
         flushThinkingStreamFilter();
         flushLeadingSpeakerPrefix();
         if (streamingEnabled && shouldDisplayRawStream && isActiveChat() && (pendingText.length > 0 || typingActive)) {
-          await new Promise<void>((resolve) => {
-            if (pendingText.length === 0 && !typingActive) {
-              resolve();
-              return;
-            }
-            typewriterDone = resolve;
-            startTypewriter();
-          });
+          await waitForTypewriterDrain();
         }
         // Final flush — ensure full content is set (only for the viewed chat)
         if (streamingEnabled && shouldDisplayRawStream) {
@@ -2271,18 +2531,72 @@ export function useGenerate() {
         flushLeadingSpeakerPrefix();
         flushTypewriterBuffer();
         // Abort is intentional — don't log or toast
-        if (error instanceof DOMException && error.name === "AbortError") return receivedContent;
+        if (isAbortError(error)) return receivedContent || spatialTransitionCommitted;
+        if (isPassiveStreamDisconnect(error, pageWasHiddenDuringStream, abortController.signal)) {
+          passiveStreamRecovered = true;
+          if (isActiveChat()) useChatStore.getState().setGenerationPhase("Finishing in background...");
+          const settled = await waitForServerGenerationToSettle(params.chatId, abortController.signal);
+          passiveStreamSettled = settled;
+          if (!abortController.signal.aborted) {
+            await refreshMessagesAuthoritatively(qc, params.chatId, persistedMessages.values());
+            if (!settled) {
+              toast.info(
+                "Generation is still finishing in the background. Refresh the chat in a moment if it has not appeared.",
+              );
+            }
+          }
+          return abortController.signal.aborted ? receivedContent || spatialTransitionCommitted : true;
+        }
+        if (params.pendingSpatialTransition) {
+          const payload = error instanceof ApiError && error.payload && typeof error.payload === "object"
+            ? (error.payload as Record<string, unknown>)
+            : null;
+          const spatialErrorCode = typeof payload?.code === "string" ? payload.code : null;
+          if (spatialErrorCode === "spatial_transition_already_applied") {
+            spatialTransitionCommitted = true;
+          } else if (!spatialErrorCode?.startsWith("spatial_")) {
+            try {
+              const current = await api.get<SpatialContextResponse>(`/chats/${params.chatId}/spatial-context`);
+              qc.setQueryData(spatialContextKeys.detail(params.chatId), current);
+              spatialTransitionCommitted =
+                current.currentLocationId === params.pendingSpatialTransition.destinationId;
+            } catch {
+              /* Preserve the pending command when current state cannot be confirmed. */
+            }
+          }
+          if (spatialTransitionCommitted) {
+            useChatStore
+              .getState()
+              .clearPendingSpatialTransition(params.chatId, params.pendingSpatialTransition.commandId);
+            void qc.invalidateQueries({ queryKey: chatKeys.detail(params.chatId) });
+            return true;
+          }
+          useChatStore.getState().setPendingSpatialTransitionStatus(params.chatId, "needs_review");
+        }
         const msg = error instanceof Error ? error.message : "Generation failed";
         showError(msg);
         window.dispatchEvent(new CustomEvent("marinara:generation-error", { detail: { chatId: params.chatId } }));
+        return false;
       } finally {
         // Stream has terminated (done, error, abort, or unexpected throw) —
         // guarantee the Mari indicator clears even if the end SSE never arrived.
         clearMariPhaseForThisChat();
+        // A provider can close the SSE immediately after its final agent event.
+        // If this generation still owns the visible Roleplay stream, drain the
+        // queued typewriter before cleanup exposes the already-saved full row.
+        // Error and abort paths flush/cancel explicitly and therefore skip this.
+        const ownsVisibleTypewriter =
+          !abortController.signal.aborted &&
+          isActiveChat() &&
+          useChatStore.getState().streamingChatId === params.chatId;
+        if (ownsVisibleTypewriter && (pendingText.length > 0 || typingActive)) {
+          await waitForTypewriterDrain();
+        }
         // Cancel any pending animation frame to prevent leaks
         cancelAnimationFrame(rafId);
         if (canInspectPageFocus) {
-          document.removeEventListener("visibilitychange", flushBackgroundedTypewriter);
+          document.removeEventListener("visibilitychange", recordBackgroundedStream);
+          window.removeEventListener("pagehide", markPageHidden);
         }
         const stillOwnerAtCleanupStart =
           useChatStore.getState().abortControllers.get(params.chatId) === abortController;
@@ -2326,7 +2640,11 @@ export function useGenerate() {
                 ? rawIds
                 : [];
           const notifiedMessage = latestAssistantMessage(persistedMessages.values());
-          const notifiedCharacterId = notifiedMessage?.characterId ?? parsedIds[0] ?? null;
+          const notifiedCharacterId = resolveNotifiedCharacterId(
+            notifiedMessage,
+            params.forCharacterId,
+            parsedIds[0] ?? null,
+          );
           if (notifiedCharacterId) {
             const identity = resolveCachedCharacterIdentity(qc, notifiedCharacterId);
             useChatStore
@@ -2350,33 +2668,56 @@ export function useGenerate() {
         // so the superseded one knows it no longer owns the state.
         const stillOwner = stillOwnerAtCleanupStart;
         const partialContent = normalizeLineBreakSpacing(fullBuffer + pendingText).trim();
-        const unpersistedPartialMessage: Message | null =
+        let unpersistedPartialMessage: Message | null = null;
+        if (
           receivedContent &&
           persistedMessages.size === 0 &&
           partialContent &&
           !params.regenerateMessageId &&
           !params.continueMessageId
-            ? {
-                id: `__partial_${params.chatId}_${Date.now()}`,
-                chatId: params.chatId,
-                role: params.impersonate ? "user" : "assistant",
-                characterId: params.impersonate
-                  ? null
-                  : (params.forCharacterId ?? useChatStore.getState().streamingCharacterId ?? null),
-                content: partialContent,
-                activeSwipeIndex: 0,
-                extra: {
-                  displayText: null,
-                  isGenerated: !params.impersonate,
-                  tokenCount: null,
-                  generationInfo: null,
-                },
-                createdAt: new Date().toISOString(),
-              }
-            : null;
+        ) {
+          const createdAt = new Date().toISOString();
+          const partialRole = params.impersonate ? "user" : "assistant";
+          const partialCharacterId = params.impersonate
+            ? null
+            : (params.forCharacterId ?? useChatStore.getState().streamingCharacterId ?? null);
+          try {
+            const created = await api.post<Message>(`/chats/${params.chatId}/messages`, {
+              role: partialRole,
+              characterId: partialCharacterId,
+              content: partialContent,
+              createdAt,
+              updatedAt: createdAt,
+            });
+            unpersistedPartialMessage = created;
+            persistedMessages.set(created.id, created);
+          } catch (error) {
+            console.warn(
+              "[use-generate] Failed to persist stopped partial message; keeping cache-only fallback",
+              error,
+            );
+            unpersistedPartialMessage = {
+              id: `__partial_${params.chatId}_${Date.now()}`,
+              chatId: params.chatId,
+              role: partialRole,
+              characterId: partialCharacterId,
+              content: partialContent,
+              activeSwipeIndex: 0,
+              extra: {
+                displayText: null,
+                isGenerated: !params.impersonate,
+                tokenCount: null,
+                generationInfo: null,
+              },
+              createdAt,
+            };
+          }
+        }
         const persistedForRefresh = [
           ...persistedMessages.values(),
-          ...(unpersistedPartialMessage ? [unpersistedPartialMessage] : []),
+          ...(unpersistedPartialMessage && !persistedMessages.has(unpersistedPartialMessage.id)
+            ? [unpersistedPartialMessage]
+            : []),
         ];
         const primeMessagesFromSaved = () => {
           if (persistedForRefresh.length > 0) {
@@ -2397,14 +2738,16 @@ export function useGenerate() {
               setStreaming(false);
               clearStreamBuffer(params.chatId);
             } else {
-              setStreaming(false);
-              clearStreamBuffer(params.chatId);
               if (receivedContent && persistedForRefresh.length === 0) {
                 await refreshMessagesAuthoritatively(qc, params.chatId, persistedForRefresh);
               } else {
                 primeMessagesFromSaved();
-                refreshMessagesInBackground();
               }
+              // Prime the durable message before releasing the live stream so
+              // React never renders an empty frame or the wrong full response.
+              setStreaming(false);
+              clearStreamBuffer(params.chatId);
+              if (persistedForRefresh.length > 0) refreshMessagesInBackground();
             }
           } else {
             if (isGameGeneration || (receivedContent && persistedForRefresh.length === 0)) {
@@ -2415,8 +2758,9 @@ export function useGenerate() {
             }
             clearStreamBuffer(params.chatId);
           }
+          setProcessing(false, params.chatId);
+          setStreamedMessageId(params.chatId, null);
           if (isActiveChat()) {
-            setProcessing(false, params.chatId);
             setRegenerateMessageId(null);
             setStreamingCharacterId(null);
             setTypingCharacterName(null);
@@ -2429,6 +2773,45 @@ export function useGenerate() {
           } else {
             primeMessagesFromSaved();
             refreshMessagesInBackground();
+          }
+        }
+
+        const completedReply =
+          !abortController.signal.aborted &&
+          !params.impersonate &&
+          !params.turnGameBots &&
+          ((sawDoneEvent && receivedContent) || passiveStreamSettled);
+        if (completedReply) {
+          const notifiedMessage =
+            latestAssistantMessage(persistedForRefresh) ??
+            latestChangedAssistantMessage(qc, params.chatId, assistantMessagesBeforeGeneration);
+          if (notifiedMessage) {
+            const chat = getCachedChatForGeneration(qc, params.chatId);
+            const fallbackCharacterId = parseChatCharacterIds(chat?.characterIds)[0] ?? null;
+            const notifiedCharacterId = resolveNotifiedCharacterId(
+              notifiedMessage,
+              params.forCharacterId,
+              fallbackCharacterId,
+            );
+            const characterName = notifiedCharacterId ? getCachedCharacterName(qc, notifiedCharacterId) : null;
+            const uiState = useUIStore.getState();
+            const notification = {
+              characterName,
+              title: replyNotificationTitle(chat?.mode ?? chatModeForGeneration, characterName),
+              tag: `marinara-chat-${params.chatId}`,
+            };
+            void showLocalMessageNotification({
+              ...notification,
+              enabled: params.autonomous
+                ? uiState.conversationBrowserNotifications
+                : uiState.generationBrowserNotifications,
+            });
+            showNativeMessageNotification({
+              ...notification,
+              enabled: params.autonomous
+                ? uiState.conversationMobileNotifications
+                : uiState.generationMobileNotifications,
+            });
           }
         }
 
@@ -2493,7 +2876,7 @@ export function useGenerate() {
           }
         }
       }
-      return receivedContent;
+      return receivedContent || passiveStreamRecovered || spatialTransitionCommitted;
     },
     [
       qc,
@@ -2501,6 +2884,7 @@ export function useGenerate() {
       setMariPhase,
       setStreamBuffer,
       setStreamCommitted,
+      setStreamedMessageId,
       clearStreamBuffer,
       appendThinkingBuffer,
       clearThinkingBuffer,
@@ -2516,9 +2900,13 @@ export function useGenerate() {
       addDebugEntry,
       addThoughtBubble,
       clearThoughtBubbles,
-      addEchoMessage,
+      enqueueEchoMessages,
       setCyoaChoices,
       clearCyoaChoices,
+      setMariChips,
+      clearMariChips,
+      setMariPlan,
+      clearMariPlan,
       setYoutubePlay,
       setYoutubeVolume,
       setLocalMusicPlay,
@@ -2540,13 +2928,14 @@ export function useGenerate() {
       }
       useChatStore.getState().setAbortController(chatId, abortController);
       const isTrackerRetry = agentTypes.some(
-        (agentType) => BUILT_IN_TRACKER_AGENT_TYPE_SET.has(agentType) || !BUILT_IN_AGENT_TYPE_SET.has(agentType),
+        (agentType) => isBuiltInTrackerAgentType(agentType) || !isBuiltInAgentType(agentType),
       );
       setProcessing(true, chatId);
       if (isTrackerRetry) useGameStateStore.getState().setRefreshingChat(chatId);
       clearFailedAgentTypes(chatId);
       if (isActiveChat()) clearThoughtBubbles();
       let hasError = false;
+      let imagePromptReviewRequested = false;
 
       try {
         const flushPatch = useGameStateStore.getState().flushPatch;
@@ -2571,6 +2960,11 @@ export function useGenerate() {
             agentTypes,
             streaming: useUIStore.getState().enableStreaming,
             debugMode: retryDebugMode,
+            queueImageGenerationRequests: useUIStore.getState().queueImageGenerationRequests,
+            reviewImagePromptsBeforeSend: useUIStore.getState().reviewImagePromptsBeforeSend,
+            ...(options?.illustratorPromptReviewOverride
+              ? { illustratorPromptReviewOverride: options.illustratorPromptReviewOverride }
+              : {}),
             musicPlayerEnabled: useUIStore.getState().musicPlayerEnabled,
             musicPlayerSource: useUIStore.getState().musicPlayerSource,
             lorebookKeeperBackfill: options?.lorebookKeeperBackfill === true,
@@ -2581,7 +2975,7 @@ export function useGenerate() {
         )) {
           switch (event.type) {
             case "agent_warning": {
-              showAgentWarning(event.data);
+              showAgentWarning(event.data, chatId);
               break;
             }
 
@@ -2666,7 +3060,7 @@ export function useGenerate() {
                 if (result.agentType === "echo-chamber") {
                   const d = result.data as Record<string, unknown>;
                   const reactions = (d.reactions as Array<{ characterName: string; reaction: string }>) ?? [];
-                  for (const r of reactions) addEchoMessage(r.characterName, r.reaction);
+                  if (isActiveChat()) enqueueEchoMessages(reactions);
                 }
                 // CYOA re-roll: push the freshly generated choices into the store
                 // so the buttons in CyoaChoices.tsx swap in immediately.
@@ -2781,24 +3175,9 @@ export function useGenerate() {
               break;
             }
             case "turn_game_state_patch": {
-              // The payload carries a gameType discriminator — route it to the matching
-              // board store only; a view from one game rendered by another board crashes.
               const turnGameType = (event.data as { gameType?: string } | null)?.gameType;
-              if (!isActiveChat()) {
-                // A background chat's board can't be painted, but a silently
-                // dropped patch leaves a stale snapshot that blocks re-hydration
-                // on switch-back (the state query is disabled while a snapshot
-                // exists). Drop the snapshot and mark the query stale so
-                // returning to the chat refetches the board.
-                if (turnGameType === "chess") useChessGameStore.getState().clearChess(chatId);
-                else if (turnGameType === "uno") useUnoGameStore.getState().clearUno(chatId);
-                void qc.invalidateQueries({ queryKey: turnGameKeys.state(chatId) });
-                break;
-              }
-              if (turnGameType === "chess") {
-                useChessGameStore.getState().setChess(event.data as never, chatId);
-              } else if (turnGameType === "uno") {
-                useUnoGameStore.getState().setUno(event.data as never, chatId);
+              if (turnGameType) {
+                dispatchCapabilityClientEvent({ packageId: turnGameType, type: event.type, chatId, data: event.data });
               }
               break;
             }
@@ -2825,6 +3204,15 @@ export function useGenerate() {
               }
               break;
             }
+            case "image_prompt_review": {
+              imagePromptReviewRequested = true;
+              window.dispatchEvent(
+                new CustomEvent("marinara:image-prompt-review", {
+                  detail: event.data,
+                }),
+              );
+              break;
+            }
             case "agent_error": {
               const errData = event.data as { agentType: string; agentName?: string | null; error: string };
               hasError = true;
@@ -2848,7 +3236,7 @@ export function useGenerate() {
             }
           }
         }
-        if (!hasError) {
+        if (!hasError && !imagePromptReviewRequested) {
           if (options?.lorebookKeeperBackfill) {
             toast.success("Lorebook Keeper backfill completed");
           } else if (agentResultCount === 0) {
@@ -2888,7 +3276,7 @@ export function useGenerate() {
       addResult,
       addDebugEntry,
       addThoughtBubble,
-      addEchoMessage,
+      enqueueEchoMessages,
       enqueuePendingCardUpdate,
       enqueuePendingAgentWriteApproval,
       clearFailedAgentTypes,
@@ -2911,22 +3299,11 @@ export function useGenerate() {
 
 /**
  * Format agent result data into a human-readable thought bubble string.
- * Returns null if the result shouldn't generate a bubble.
+ * Every branch returns a string describing the outcome (failure, no-op, or completion).
  */
-function formatRetryAgentActivityBubble(
-  result: {
-    success: boolean;
-    resultType: string;
-    error: string | null;
-    data?: unknown;
-  },
-  isTrackerRetry: boolean,
-): string | null {
+function formatRetryAgentActivityBubble(result: { data?: unknown }, isTrackerRetry: boolean): string | null {
   if (result.data && typeof result.data === "object" && (result.data as { parseError?: unknown }).parseError === true) {
     return "Failed: agent returned invalid JSON instead of the requested format.";
-  }
-  if (!result.success) {
-    return result.error ? `Failed: ${result.error}` : "Failed.";
   }
   if (isTrackerRetry) {
     return "Completed, but no tracker changes were returned.";
@@ -3108,6 +3485,24 @@ function formatAgentBubble(agentType: string, agentName: string, data: unknown):
       const updates = (d.updates as any[]) ?? [];
       if (!updates.length) return null;
       return updates.map((u: any) => `📖 ${u.action === "create" ? "New" : "Updated"}: ${u.entryName}`).join("\n");
+    }
+
+    case "knowledge-router": {
+      const selectedEntries = Array.isArray(d.selectedEntries)
+        ? (d.selectedEntries as Array<Record<string, unknown>>)
+        : [];
+      const candidateCount =
+        typeof d.candidateCount === "number" && Number.isFinite(d.candidateCount) ? d.candidateCount : null;
+      if (selectedEntries.length > 0) {
+        const names = selectedEntries
+          .map((entry) => (typeof entry.name === "string" ? entry.name.trim() : ""))
+          .filter(Boolean);
+        const list = names.slice(0, 5).join(", ");
+        const suffix = names.length > 5 ? ` +${names.length - 5} more` : "";
+        return `Selected ${selectedEntries.length}${candidateCount != null ? `/${candidateCount}` : ""} lorebook entries${list ? `: ${list}${suffix}` : ""}`;
+      }
+      if (candidateCount != null) return `Selected 0/${candidateCount} lorebook entries`;
+      return "Selected 0 lorebook entries";
     }
 
     case "html": {

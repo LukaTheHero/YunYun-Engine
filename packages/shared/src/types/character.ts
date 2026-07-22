@@ -48,7 +48,39 @@ export interface CharacterExtensions {
   rpgStats?: RPGStatsConfig;
   /** Marinara Engine: Conversation-mode availability status */
   conversationStatus?: import("./chat.js").ConversationPresenceStatus;
+  /** Marinara Engine: pronunciation override used when sending this character's name to TTS. */
+  phoneticName?: string;
+  /** Marinara Engine (Conversation mode ONLY): display name shown as the sender label
+   *  in Convo and used for attribution in the convo prompt. Never read in RP/VN/Game. */
+  convoDisplayName?: string;
+  /** Marinara Engine (Conversation mode ONLY): when true, prepend a line declaring the
+   *  convo display name to this character's card so the model can map the display name
+   *  to this specific card. No effect without a convoDisplayName. Never read in RP/VN/Game. */
+  convoDisplayNameInCard?: boolean;
+  /** Marinara Engine (Conversation mode ONLY): public "about me" profile. The
+   *  cross-chat default; a per-chat override can supersede it. Never read in RP/VN/Game. */
+  aboutMe?: string;
+  /** Marinara Engine (Conversation mode ONLY): behavior directive + insertion strategy.
+   *  Never read in RP/VN/Game. */
+  convoBehavior?: ConvoBehaviorConfig;
   [key: string]: unknown;
+}
+
+/** Where a Convo-mode behavior directive is inserted into the conversation prompt. */
+export type ConvoBehaviorInsertionStrategy =
+  | "constant_before"
+  | "constant_after"
+  | "post_history_replace"
+  | "post_history_before"
+  | "post_history_after"
+  | "macro";
+
+/** Conversation-mode-only behavior directive with a configurable insertion strategy. */
+export interface ConvoBehaviorConfig {
+  /** The directive text (macros allowed). */
+  instruction: string;
+  /** How/where the directive is placed in the convo prompt. */
+  insertionStrategy: ConvoBehaviorInsertionStrategy;
 }
 
 /** RPG stats configuration attached to a character card. */
@@ -157,6 +189,7 @@ export interface PersonaCardSnapshot {
   creator: string;
   personaVersion: string;
   creatorNotes: string;
+  phoneticName?: string;
   description: string;
   personality: string;
   scenario: string;
@@ -170,6 +203,10 @@ export interface PersonaCardSnapshot {
   personaStats: string;
   tags: string;
   savedStatusOptions: string;
+  /** Conversation mode ONLY fields (convoBehavior stored as a JSON string). */
+  convoDisplayName: string;
+  aboutMe: string;
+  convoBehavior: string;
 }
 
 /** Saved snapshot of a previous persona card state. */

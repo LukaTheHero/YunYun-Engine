@@ -2,7 +2,8 @@
 // Routes: Browser (proxy to character sources)
 // ──────────────────────────────────────────────
 import type { FastifyInstance } from "fastify";
-import { isAllowedImageBuffer, safeFetch } from "../utils/security.js";
+import { fetchBotBrowserJson } from "../services/bot-browser/fetch-json.js";
+import { resolveValidatedImage, safeFetch } from "../utils/security.js";
 
 const CHUB_API_BASE = "https://api.chub.ai";
 const CHUB_AVATARS = "https://avatars.charhub.io";
@@ -16,28 +17,9 @@ async function fetchAvatarImage(url: string, signal: AbortSignal) {
   });
   if (!res.ok) return null;
   const buf = Buffer.from(await res.arrayBuffer());
-  const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
-  const imageInfo = isAllowedImageBuffer(buf);
-  if (!contentType.startsWith("image/") || !imageInfo) {
-    throw new Error("Unsupported avatar image content");
-  }
-  return { buf, mimeType: imageInfo.mimeType };
-}
-
-/** Safely proxy-fetch an external URL, returning sanitised JSON. */
-async function proxyFetch(url: string, init?: RequestInit): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Upstream ${res.status}: ${text.slice(0, 300)}`);
-    }
-    return res.json();
-  } finally {
-    clearTimeout(timeout);
-  }
+  const image = resolveValidatedImage(buf);
+  if (!image) throw new Error("Unsupported avatar image content");
+  return { buf, mimeType: image.mimeType };
 }
 
 export async function botBrowserRoutes(app: FastifyInstance) {
@@ -131,7 +113,8 @@ export async function botBrowserRoutes(app: FastifyInstance) {
     if (require_expressions === "true") params.set("require_expressions", "true");
     if (require_alternate_greetings === "true") params.set("require_alternate_greetings", "true");
 
-    const data = await proxyFetch(`${CHUB_API_BASE}/search?${params}`, {
+    const data = await fetchBotBrowserJson(`${CHUB_API_BASE}/search?${params}`, {
+      allowedHosts: ["api.chub.ai"],
       method: "GET",
       headers: { Accept: "application/json" },
     });
@@ -143,9 +126,13 @@ export async function botBrowserRoutes(app: FastifyInstance) {
     const fullPath = (req.params as Record<string, string>)["*"];
     if (!fullPath) throw new Error("Missing character path");
     const nocache = Date.now();
-    const data = await proxyFetch(
+    const data = await fetchBotBrowserJson(
       `${CHUB_API_BASE}/api/characters/${encodeURI(fullPath)}?full=true&nocache=${nocache}`,
-      { headers: { Accept: "application/json", "Cache-Control": "no-cache" } },
+      {
+        allowedHosts: ["api.chub.ai"],
+        maxResponseBytes: 8 * 1024 * 1024,
+        headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+      },
     );
     return data;
   });

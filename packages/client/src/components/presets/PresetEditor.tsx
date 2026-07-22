@@ -67,27 +67,8 @@ import { useQuoteFormatter } from "../../hooks/use-quote-formatter";
 import { EditorTabRail } from "../ui/EditorTabRail";
 import { useTouchFolderDrag } from "../../hooks/use-touch-folder-drag";
 import { getTouchReorderDropIndex } from "../../lib/touch-reorder";
+import { handleTextareaTab } from "../../lib/textarea-editing";
 import { SettingsSwitch } from "../panels/settings/SettingControls";
-
-/** Intercept Tab in a textarea to insert 2 spaces instead of changing focus. */
-function handleTextareaTab(
-  e: React.KeyboardEvent<HTMLTextAreaElement>,
-  value: string,
-  setValue: (v: string) => void,
-  formatValue: (v: string) => string = (v) => v,
-) {
-  if (e.key !== "Tab") return;
-  e.preventDefault();
-  const ta = e.currentTarget;
-  const start = ta.selectionStart;
-  const end = ta.selectionEnd;
-  const newValue = formatValue(value.substring(0, start) + "  " + value.substring(end));
-  setValue(newValue);
-  // Restore cursor position after React re-renders
-  requestAnimationFrame(() => {
-    ta.selectionStart = ta.selectionEnd = start + 2;
-  });
-}
 
 // ── Input caret helpers ──
 type TextSelection = { start: number; end: number };
@@ -284,8 +265,6 @@ export function PresetEditor() {
   const [localDescription, setLocalDescription] = useState("");
   const [localWrapFormat, setLocalWrapFormat] = useState<WrapFormat>("xml");
   const [localAuthor, setLocalAuthor] = useState("");
-  const [localParams, setLocalParams] = useState<Record<string, unknown>>({});
-  const [localParamsParseFailed, setLocalParamsParseFailed] = useState(false);
   const [localConversationPrompt, setLocalConversationPrompt] = useState("");
   const [localGamePrompt, setLocalGamePrompt] = useState("");
   const hydratedPresetIdRef = useRef<string | null>(null);
@@ -308,13 +287,6 @@ export function PresetEditor() {
     setLocalAuthor(p.author ?? "");
     setLocalConversationPrompt(p.conversationPrompt ?? "");
     setLocalGamePrompt(p.gamePrompt ?? "");
-    try {
-      setLocalParams(typeof p.parameters === "string" ? JSON.parse(p.parameters) : (p.parameters ?? {}));
-      setLocalParamsParseFailed(false);
-    } catch {
-      setLocalParams({});
-      setLocalParamsParseFailed(true);
-    }
   }, [data, presetDetailId]);
 
   const handleClose = useCallback(() => {
@@ -336,7 +308,6 @@ export function PresetEditor() {
       conversationPrompt: localConversationPrompt,
       gamePrompt: localGamePrompt,
     };
-    if (!localParamsParseFailed) payload.parameters = localParams;
     await updatePreset.mutateAsync(payload);
     setDirty(false);
     setShowSaved(true);
@@ -347,8 +318,6 @@ export function PresetEditor() {
     localDescription,
     localWrapFormat,
     localAuthor,
-    localParamsParseFailed,
-    localParams,
     localConversationPrompt,
     localGamePrompt,
     updatePreset,
@@ -460,8 +429,8 @@ export function PresetEditor() {
 
   if (!data) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-[var(--muted-foreground)]">Preset not found</p>
+      <div className="mari-editor-shell flex flex-1 items-center justify-center">
+        <p className="mari-editor-empty px-4 py-3 text-sm">Preset not found</p>
       </div>
     );
   }
@@ -516,7 +485,7 @@ export function PresetEditor() {
               <rect x="3" y="15" width="14" height="2" rx="1" fill="currentColor" />
             </svg>
           </button>
-          <button onClick={handleDelete} className="mari-editor-action mari-editor-action--danger inline-flex">
+          <button onClick={handleDelete} className="mari-editor-action inline-flex">
             <Trash2 size="0.9375rem" />
           </button>
         </div>
@@ -1257,9 +1226,9 @@ function SectionsTab({
                         onDeleteGroup.mutate({ presetId, groupId: g.id });
                       }
                     }}
-                    className="rounded p-0.5 hover:bg-[var(--destructive)]/15"
+                    className="rounded p-0.5 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
                   >
-                    <Trash2 size="0.625rem" className="text-[var(--destructive)]" />
+                    <Trash2 size="0.625rem" />
                   </button>
                 </div>
               ))}
@@ -1428,10 +1397,10 @@ function SectionsTab({
                       </button>
                       <button
                         onClick={() => onDeleteSection.mutate({ presetId, sectionId: section.id })}
-                        className="rounded-lg p-1 hover:bg-[var(--destructive)]/15"
+                        className="rounded-lg p-1 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
                         title="Delete"
                       >
-                        <Trash2 size="0.75rem" className="text-[var(--destructive)]" />
+                        <Trash2 size="0.75rem" />
                       </button>
                     </div>
                   </div>
@@ -2073,10 +2042,10 @@ function VariableCard({
               onDeleteVariable.mutate({ presetId, variableId: variable.id });
             }
           }}
-          className="shrink-0 rounded-lg p-1 hover:bg-[var(--destructive)]/15"
+          className="shrink-0 rounded-lg p-1 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
           title="Delete variable"
         >
-          <Trash2 size="0.75rem" className="text-[var(--destructive)]" />
+          <Trash2 size="0.75rem" />
         </button>
       </div>
 
@@ -2704,21 +2673,7 @@ function ExpandedEditorModal({
               ref={textareaRef}
               value={local}
               onChange={handleChange}
-              onKeyDown={(e) =>
-                handleTextareaTab(
-                  e,
-                  local,
-                  (v) => {
-                    const nextValue = formatQuotes(v);
-                    setLocal(nextValue);
-                    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-                    timeoutRef.current = setTimeout(() => {
-                      onChange(nextValue);
-                    }, 600);
-                  },
-                  formatQuotes,
-                )
-              }
+              onKeyDown={handleTextareaTab}
               className="mari-editor-field h-full w-full resize-none p-4 font-mono text-sm"
               placeholder="Prompt content… (supports macros like {{user}}, {{char}}, etc.)"
             />

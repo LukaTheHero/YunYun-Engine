@@ -2,10 +2,14 @@
 // Routes: Synced App Settings (key/value)
 // ──────────────────────────────────────────────
 import type { FastifyInstance } from "fastify";
-import { appSettingsUpdateSchema } from "@marinara-engine/shared";
+import {
+  CHAT_SUMMARY_PROMPT_SETTINGS_KEY,
+  VIDEO_GENERATION_SETTINGS_KEY,
+  appSettingsUpdateSchema,
+} from "@marinara-engine/shared";
 import { createAppSettingsStorage } from "../services/storage/app-settings.storage.js";
 
-const ALLOWED_KEYS = new Set(["ui"]);
+const ALLOWED_KEYS = new Set(["ui", CHAT_SUMMARY_PROMPT_SETTINGS_KEY, VIDEO_GENERATION_SETTINGS_KEY]);
 
 export async function appSettingsRoutes(app: FastifyInstance) {
   const storage = createAppSettingsStorage(app.db);

@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { createPortal } from "react-dom";
 import { BookOpen, Maximize2, X } from "lucide-react";
 import { SUPPORTED_MACROS } from "@marinara-engine/shared";
 
 import { cn } from "../../lib/utils";
+import { handleTextareaTab } from "../../lib/textarea-editing";
 
 type MacroDefinition = (typeof SUPPORTED_MACROS)[number];
 
@@ -15,6 +25,24 @@ const MACRO_REFERENCE = Array.from(
     return groups;
   }, new Map()),
 );
+
+const EDITOR_MODAL_SURFACE_VARIABLES = [
+  "[--accent:var(--marinara-editor-control-bg-hover)]",
+  "[--accent-foreground:var(--marinara-editor-text)]",
+  "[--background:var(--marinara-editor-bg)]",
+  "[--border:var(--marinara-editor-border)]",
+  "[--card:var(--marinara-editor-surface-bg)]",
+  "[--foreground:var(--marinara-editor-text)]",
+  "[--input:var(--marinara-editor-border)]",
+  "[--muted:var(--marinara-editor-control-bg)]",
+  "[--muted-foreground:var(--marinara-editor-muted)]",
+  "[--popover:var(--marinara-editor-surface-bg)]",
+  "[--popover-foreground:var(--marinara-editor-text)]",
+  "[--primary:var(--marinara-editor-accent)]",
+  "[--primary-foreground:var(--marinara-editor-bg)]",
+  "[--ring:var(--marinara-editor-focus-ring)]",
+  "[--secondary:var(--marinara-editor-control-bg)]",
+].join(" ");
 
 interface MacroModalPortalProps {
   children: ReactNode;
@@ -36,14 +64,6 @@ interface ExpandedMacroEditorProps {
   onClose: () => void;
   placeholder?: string;
   formatOnChange?: (textarea: HTMLTextAreaElement) => string;
-}
-
-function insertTextAtSelection(target: HTMLTextAreaElement, insertText: string): { value: string; cursor: number } {
-  const { selectionStart, selectionEnd, value } = target;
-  return {
-    value: `${value.slice(0, selectionStart)}${insertText}${value.slice(selectionEnd)}`,
-    cursor: selectionStart + insertText.length,
-  };
 }
 
 function ExpandedMacroEditor({
@@ -92,32 +112,19 @@ function ExpandedMacroEditor({
     [formatOnChange, onChange],
   );
 
-  const handleKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key !== "Tab") {
-        return;
-      }
-
-      event.preventDefault();
-      const target = event.currentTarget;
-      const next = insertTextAtSelection(target, "  ");
-      setLocalValue(next.value);
-      onChange(next.value);
-      requestAnimationFrame(() => {
-        target.selectionStart = next.cursor;
-        target.selectionEnd = next.cursor;
-      });
-    },
-    [onChange],
-  );
-
   if (!open) {
     return null;
   }
 
   return (
     <MacroModalPortal>
-      <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-sm sm:p-4">
+      <div
+        data-component="ExpandedMacroEditor"
+        className={cn(
+          "fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-sm sm:p-4",
+          EDITOR_MODAL_SURFACE_VARIABLES,
+        )}
+      >
         <div className="flex h-[min(92vh,56rem)] max-h-[calc(100vh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)] shadow-2xl supports-[height:100dvh]:h-[min(92dvh,56rem)] supports-[height:100dvh]:max-h-[calc(100dvh-1.5rem)]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
             <div>
@@ -130,7 +137,7 @@ function ExpandedMacroEditor({
                 onChange(localValue);
                 onClose();
               }}
-              className="rounded-lg border border-[var(--border)] bg-[var(--secondary)] p-2 text-[var(--muted-foreground)] transition hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
+              className="rounded-lg border border-[var(--border)] bg-[var(--secondary)] p-2 text-[var(--muted-foreground)] transition hover:border-[var(--primary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               aria-label="Close expanded editor"
               title="Close"
             >
@@ -141,7 +148,7 @@ function ExpandedMacroEditor({
             ref={textareaRef}
             value={localValue}
             onChange={handleChange}
-            onKeyDown={handleKeyDown}
+            onKeyDown={handleTextareaTab}
             placeholder={placeholder}
             className="min-h-0 flex-1 resize-none bg-[var(--secondary)] p-4 font-mono text-sm leading-6 text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)]"
             spellCheck={false}
@@ -179,7 +186,12 @@ function MacrosReferenceModal({ open, onClose }: MacrosReferenceModalProps) {
 
   return (
     <MacroModalPortal>
-      <div className="fixed inset-0 z-[145] flex items-center justify-center bg-black/70 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-sm sm:p-4">
+      <div
+        className={cn(
+          "fixed inset-0 z-[145] flex items-center justify-center bg-black/70 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-sm sm:p-4",
+          EDITOR_MODAL_SURFACE_VARIABLES,
+        )}
+      >
         <div className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)] shadow-2xl supports-[height:100dvh]:max-h-[88dvh]">
           <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
             <div>
@@ -189,7 +201,7 @@ function MacrosReferenceModal({ open, onClose }: MacrosReferenceModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-[var(--border)] bg-[var(--secondary)] p-2 text-[var(--muted-foreground)] transition hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
+              className="rounded-lg border border-[var(--border)] bg-[var(--secondary)] p-2 text-[var(--muted-foreground)] transition hover:border-[var(--primary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
               aria-label="Close macro reference"
               title="Close"
             >
@@ -252,6 +264,8 @@ export interface MacroTextareaProps {
   showMacroReference?: boolean;
   showExpand?: boolean;
   spellCheck?: boolean;
+  /** Optional ref to the underlying textarea (e.g. to insert emoji at the caret). */
+  textareaRef?: Ref<HTMLTextAreaElement>;
 }
 
 export function MacroTextarea({
@@ -274,6 +288,7 @@ export function MacroTextarea({
   showMacroReference = true,
   showExpand = true,
   spellCheck = true,
+  textareaRef,
 }: MacroTextareaProps) {
   const [expanded, setExpanded] = useState(false);
   const [showMacroRef, setShowMacroRef] = useState(false);
@@ -297,16 +312,9 @@ export function MacroTextarea({
         return;
       }
 
-      event.preventDefault();
-      const target = event.currentTarget;
-      const next = insertTextAtSelection(target, "  ");
-      onChange(next.value);
-      requestAnimationFrame(() => {
-        target.selectionStart = next.cursor;
-        target.selectionEnd = next.cursor;
-      });
+      handleTextareaTab(event);
     },
-    [onChange, onKeyDown],
+    [onKeyDown],
   );
 
   const affordanceButtonClassName = cn(
@@ -318,6 +326,7 @@ export function MacroTextarea({
     <>
       <div className={cn("relative", wrapperClassName)}>
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={handleChange}
           onBlur={onBlur}

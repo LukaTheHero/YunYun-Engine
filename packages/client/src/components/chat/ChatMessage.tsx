@@ -11,6 +11,9 @@ import {
 } from "../../lib/utils";
 import { applyInlineMarkdown, renderMarkdownBlocks, applyInlineMarkdownHTML } from "../../lib/markdown";
 import { normalizeCardAssetImageSyntax, resolveCardAssetUrl } from "../../lib/card-asset-links";
+import { PendingTypingDots } from "./PendingTypingDots";
+import { isDiceRollResult } from "../dice/AnimatedDiceRoll";
+import { DiceMessageContent } from "./ConversationMessageShared";
 import {
   User,
   Bot,
@@ -29,6 +32,8 @@ import {
   Languages,
   Volume2,
   VolumeX,
+  Mic,
+  MicOff,
   Loader2,
   Pause,
   Play,
@@ -36,7 +41,7 @@ import {
   EyeOff,
   Shield,
 } from "lucide-react";
-import { formatTextQuotes, type Message, type QuoteFormat } from "@marinara-engine/shared";
+import { decodeEncodedSpeakerTags, formatTextQuotes, type Message, type QuoteFormat } from "@marinara-engine/shared";
 import { memo, useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -54,12 +59,14 @@ import { ttsService } from "../../lib/tts-service";
 import { useTTSConfig } from "../../hooks/use-tts";
 import { buildTTSVoiceRequests, normalizeTTSCharacterName, withTTSVoiceRequestCacheKeys } from "../../lib/tts-dialogue";
 import { DIALOGUE_QUOTE_PATTERN_SOURCE, HTML_SAFE_DIALOGUE_QUOTE_PATTERN_SOURCE } from "../../lib/dialogue-quotes";
+import { resolveMessageRewriteVersions } from "../../lib/message-rewrite-versions";
 import DOMPurify from "dompurify";
 import type { CharacterMap, ExpressionAvatarResolver, MessageSelectionToggle, PersonaInfo } from "./chat-area.types";
 import { GenerationReplayDetailsModal, hasGenerationReplayDetails } from "./GenerationReplayDetailsModal";
 import type { ChatImage } from "../../hooks/use-gallery";
 import { ChatImageLightbox } from "./ChatImageLightbox";
 import { SwipeJumpControl } from "./SwipeJumpControl";
+import { toast } from "sonner";
 import {
   NEUTRAL_PANEL_HEADER,
   NEUTRAL_PANEL_SCROLL_AREA,
@@ -523,9 +530,32 @@ function highlightDialogue(text: string, dialogueColor?: string, boldDialogue = 
   return result;
 }
 
+const HTML_TAG_NAME_SOURCE =
+  "div|span|style|table|p|br|img|a|ul|ol|li|h[1-6]|em|strong|b|i|pre|code|section|article|header|footer|nav|button|input|form|label|select|option|textarea|canvas|svg|video|audio|source|iframe|hr|blockquote|details|summary|figure|figcaption|main|aside|mark|small|sub|sup|del|ins|abbr|time|progress|meter|output|dialog|template|slot|ruby|rt|rp|bdi|bdo|wbr|area|map|track|embed|object|param|picture|portal|datalist|fieldset|legend|optgroup|caption|col|colgroup|thead|tbody|tfoot|th|td|dl|dt|dd|kbd|samp|var|cite|dfn|q|s|u|font|center";
+
 /** Check whether text contains meaningful HTML tags. */
-const HTML_TAG_RE =
-  /<(?:div|span|style|table|p|br|img|a|ul|ol|li|h[1-6]|em|strong|b|i|pre|code|section|article|header|footer|nav|button|input|form|label|select|option|textarea|canvas|svg|video|audio|source|iframe|hr|blockquote|details|summary|figure|figcaption|main|aside|mark|small|sub|sup|del|ins|abbr|time|progress|meter|output|dialog|template|slot|ruby|rt|rp|bdi|bdo|wbr|area|map|track|embed|object|param|picture|portal|datalist|fieldset|legend|optgroup|caption|col|colgroup|thead|tbody|tfoot|th|td|dl|dt|dd|kbd|samp|var|cite|dfn|q|s|u|font|center)\b[^>]*>/i;
+const HTML_TAG_RE = new RegExp(`<(?:${HTML_TAG_NAME_SOURCE})\\b[^>]*>`, "i");
+const ENCODED_HTML_TAG_RE = new RegExp(
+  `&(?:lt|#0*60|#x0*3c);(\\/?\\s*(?:${HTML_TAG_NAME_SOURCE})\\b[^<>]*?)&(?:gt|#0*62|#x0*3e);`,
+  "gi",
+);
+
+function decodeHtmlTagAttributeEntities(value: string): string {
+  return value
+    .replace(/&quot;|&#0*34;|&#x0*22;/gi, '"')
+    .replace(/&apos;|&#0*39;|&#x0*27;/gi, "'");
+}
+
+function decodeEncodedChatHtmlTags(value: string): string {
+  return value.replace(
+    ENCODED_HTML_TAG_RE,
+    (_match, tagBody: string) => `<${decodeHtmlTagAttributeEntities(tagBody)}>`,
+  );
+}
+
+function containsChatHtml(value: string): boolean {
+  return HTML_TAG_RE.test(decodeEncodedChatHtmlTags(value));
+}
 
 const CHAT_HTML_ALLOWED_TAGS = [
   "a",
@@ -728,7 +758,7 @@ function renderContent(
   htmlScopeClass = "mari-html-message-content",
   quoteFormat: QuoteFormat = "straight",
 ): ReactNode {
-  const normalized = formatTextQuotes(text, quoteFormat);
+  const normalized = decodeEncodedSpeakerTags(decodeEncodedChatHtmlTags(formatTextQuotes(text, quoteFormat)));
 
   // Strip speaker tags before HTML detection (they aren't real HTML)
   const withoutSpeakerTags = normalized.replace(/<\/?speaker(?:="[^"]*")?>/g, "");
@@ -769,7 +799,7 @@ function renderContent(
     .replace(new RegExp(ATTR_NL_PLACEHOLDER, "g"), "\n");
 
   // Convert markdown images to <img> before sanitization so DOMPurify validates them.
-  // Keep tags minimal (no class/loading) — styling is via .mari-message-content img in CSS
+  // Keep tags minimal (no class, only loading/decoding attrs) — styling is via .mari-message-content img in CSS
   // to avoid the dialogue-bolding regex mangling attribute quotes.
   const withImages = normalizeCardAssetImageSyntax(withBreaks).replace(MD_IMAGE_HTML_RE, (_m, alt: string, url: string) => {
     const src = escapeHtmlAttr(resolveCardAssetUrl(url));
@@ -910,6 +940,8 @@ export const ChatMessage = memo(function ChatMessage({
     boldDialogue,
     editMessageOnDoubleClick,
     quoteFormat,
+    ttsLineVolume,
+    setTTSLineVolume,
   } = useUIStore(
     useShallow((s) => ({
       chatFontSize: s.chatFontSize,
@@ -927,6 +959,8 @@ export const ChatMessage = memo(function ChatMessage({
       boldDialogue: s.boldDialogue ?? true,
       editMessageOnDoubleClick: s.editMessageOnDoubleClick,
       quoteFormat: s.quoteFormat,
+      ttsLineVolume: s.ttsLineVolume,
+      setTTSLineVolume: s.setTTSLineVolume,
     })),
   );
   const isGuided = guideGenerations && hasDraftInput;
@@ -973,7 +1007,7 @@ export const ChatMessage = memo(function ChatMessage({
   const [showGenerationReplay, setShowGenerationReplay] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [manuallyExpandedHidden, setManuallyExpandedHidden] = useState(false);
-  const [restoringProseGuardianOriginal, setRestoringProseGuardianOriginal] = useState(false);
+  const [switchingRewriteVersion, setSwitchingRewriteVersion] = useState(false);
   const collapseHiddenMessages = useUIStore((s) => s.summaryPopoverSettings.collapseHiddenMessages);
   const [imageLightbox, setImageLightbox] = useState<ChatMessageImageLightboxState | null>(null);
   const scrollRestoreRef = useRef<{ el: HTMLElement; top: number } | null>(null);
@@ -1073,6 +1107,20 @@ export const ChatMessage = memo(function ChatMessage({
   const isSpeakingThis = ttsActiveId === message.id;
   const isLoadingThis = isSpeakingThis && ttsState === "loading";
   const isPausedThis = isSpeakingThis && ttsState === "paused";
+  const ttsLinePlaybackVolume = ttsLineVolume / 100;
+
+  useEffect(() => {
+    if (ttsActiveId !== message.id) return;
+    ttsService.setCurrentPlaybackVolume(ttsLinePlaybackVolume);
+  }, [message.id, ttsActiveId, ttsLinePlaybackVolume, ttsState]);
+
+  const handleTTSLineVolumeChange = useCallback(
+    (volume: number) => {
+      setTTSLineVolume(volume);
+      ttsService.setCurrentPlaybackVolume(volume / 100);
+    },
+    [setTTSLineVolume],
+  );
 
   const handleSpeak = useCallback(() => {
     // Read directly from the singleton so we never act on stale React state
@@ -1085,9 +1133,12 @@ export const ChatMessage = memo(function ChatMessage({
       ttsService.stop();
     } else {
       if (!hasTTSContent) return;
-      void ttsService.speakSequence(ttsVoiceRequests, message.id, { progressive: ttsConfig?.progressivePlayback });
+      void ttsService.speakSequence(ttsVoiceRequests, message.id, {
+        progressive: ttsConfig?.progressivePlayback,
+        volume: ttsLinePlaybackVolume,
+      });
     }
-  }, [hasTTSContent, message.id, ttsConfig?.progressivePlayback, ttsVoiceRequests]);
+  }, [hasTTSContent, message.id, ttsConfig?.progressivePlayback, ttsLinePlaybackVolume, ttsVoiceRequests]);
 
   const handlePauseResumeTTS = useCallback(() => {
     if (ttsService.getActiveId() !== message.id) return;
@@ -1195,14 +1246,13 @@ export const ChatMessage = memo(function ChatMessage({
   const isHiddenFromAI = extra.hiddenFromAI === true;
   const thinking = extra.thinking as string | undefined;
   const generationReplay = hasGenerationReplayDetails(extra.generationReplay) ? extra.generationReplay : null;
+  const diceRollResult = isDiceRollResult(extra.diceRollResult) ? extra.diceRollResult : null;
   const canCreateNextSwipe = Boolean(onRegenerate && !isUser);
-  const proseGuardianOriginalText =
-    !isUser &&
-    typeof extra.proseGuardianOriginalText === "string" &&
-    extra.proseGuardianOriginalText.length > 0 &&
-    extra.proseGuardianOriginalText !== message.content
-      ? extra.proseGuardianOriginalText
-      : null;
+  const rewriteVersions = resolveMessageRewriteVersions(message.content, extra, isUser);
+  const proseGuardianOriginalText = rewriteVersions.originalText;
+  const proseGuardianRewrittenText = rewriteVersions.rewrittenText;
+  const hasRewriteVersions = rewriteVersions.hasVersions;
+  const showingProseGuardianOriginal = rewriteVersions.showingOriginal;
 
   useEffect(() => {
     setManuallyExpandedHidden(false);
@@ -1218,14 +1268,20 @@ export const ChatMessage = memo(function ChatMessage({
 
   // Remove an attachment from this message (keeps it in gallery)
   const qc = useQueryClient();
-  const handleRestoreProseGuardianOriginal = useCallback(async () => {
-    if (!proseGuardianOriginalText || restoringProseGuardianOriginal) return;
-    setRestoringProseGuardianOriginal(true);
+  const handleToggleProseGuardianVersion = useCallback(async () => {
+    if (!hasRewriteVersions || !proseGuardianOriginalText || !proseGuardianRewrittenText || switchingRewriteVersion)
+      return;
+    setSwitchingRewriteVersion(true);
 
     const msgKey = chatKeys.messages(message.chatId);
-    const clearedProseGuardianExtra = {
-      proseGuardianOriginalText: null,
-      proseGuardianRewrittenAt: null,
+    const targetContent = rewriteVersions.alternateText;
+    if (!targetContent) {
+      setSwitchingRewriteVersion(false);
+      return;
+    }
+    const rewriteVersionExtra = {
+      proseGuardianOriginalText,
+      proseGuardianRewrittenText,
     };
 
     qc.setQueryData<InfiniteData<Message[]>>(msgKey, (old) => {
@@ -1238,8 +1294,8 @@ export const ChatMessage = memo(function ChatMessage({
             const ex = typeof m.extra === "string" ? JSON.parse(m.extra) : (m.extra ?? {});
             return {
               ...m,
-              content: proseGuardianOriginalText,
-              extra: { ...ex, ...clearedProseGuardianExtra },
+              content: targetContent,
+              extra: { ...ex, ...rewriteVersionExtra },
             } as Message;
           }),
         ),
@@ -1247,27 +1303,34 @@ export const ChatMessage = memo(function ChatMessage({
     });
 
     try {
+      // Save the alternate version before changing content. This also upgrades
+      // older one-way restore metadata without risking loss of the rewrite.
+      await api.patch(`/chats/${message.chatId}/messages/${message.id}/extra`, rewriteVersionExtra);
       const updated = await api.patch<Message>(`/chats/${message.chatId}/messages/${message.id}`, {
-        content: proseGuardianOriginalText,
+        content: targetContent,
       });
       rememberRecentMessageContentEdit(
         message.chatId,
         message.id,
-        updated?.content ?? proseGuardianOriginalText,
+        updated?.content ?? targetContent,
         updated?.activeSwipeIndex ?? message.activeSwipeIndex ?? null,
       );
-      await api.patch(`/chats/${message.chatId}/messages/${message.id}/extra`, clearedProseGuardianExtra);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not switch message versions.");
     } finally {
-      setRestoringProseGuardianOriginal(false);
+      setSwitchingRewriteVersion(false);
       qc.invalidateQueries({ queryKey: msgKey });
     }
   }, [
+    hasRewriteVersions,
     message.activeSwipeIndex,
     message.chatId,
     message.id,
     proseGuardianOriginalText,
+    proseGuardianRewrittenText,
     qc,
-    restoringProseGuardianOriginal,
+    rewriteVersions.alternateText,
+    switchingRewriteVersion,
   ]);
 
   const handleRemoveAttachment = useCallback(
@@ -1296,7 +1359,6 @@ export const ChatMessage = memo(function ChatMessage({
   );
 
   // Model name display
-  const _modelName = !isUser && showModelName ? (extra.generationInfo?.model ?? null) : null;
   const genInfo = !isUser && (showModelName || showTokenUsage) ? extra.generationInfo : null;
   const genLabel = useMemo(() => {
     if (!genInfo) return null;
@@ -1450,7 +1512,10 @@ export const ChatMessage = memo(function ChatMessage({
       primaryCharacter: primaryCharInfo ?? { name: charName },
       characters: macroCharacters,
     };
-    const macroRandomSeed = `${message.id}:${message.content}`;
+    // #3164: seed display randomness by message identity, not content — a
+    // content-based seed re-rolls every {{random}}/{{roll}} on each streamed
+    // chunk (visible churn) and on every edit. Swipes keep distinct picks.
+    const macroRandomSeed = `${message.id}:${message.activeSwipeIndex ?? 0}`;
     const resolveDisplayMacros = createMessageMacroResolver(macroContext, { randomSeed: macroRandomSeed });
     const text =
       isUser || isSystem
@@ -1470,6 +1535,7 @@ export const ChatMessage = memo(function ChatMessage({
     isSystem,
     isUser,
     macroCharacters,
+    message.activeSwipeIndex,
     message.content,
     messageDepth,
     message.id,
@@ -1564,7 +1630,7 @@ export const ChatMessage = memo(function ChatMessage({
       return raw || fallbackPalette[i % fallbackPalette.length]!;
     });
   }, [isMergedGroup, characterMap, chatCharacterIds]);
-  // Cycle index for merged group avatars/names — driven by a ref + RAF to avoid re-renders
+  // Cycle index for merged group avatars/names — driven by a ref + 2s setInterval to avoid re-renders
   const cycleIndexRef = useRef(0);
   const cycleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mergedNameRef = useRef<HTMLSpanElement>(null);
@@ -1624,7 +1690,7 @@ export const ChatMessage = memo(function ChatMessage({
 
   // Render content with dialogue highlighting (or HTML rendering)
   const text = typeof displayContent === "string" ? displayContent : message.content;
-  const isHtmlContent = HTML_TAG_RE.test(text);
+  const isHtmlContent = containsChatHtml(text);
   const htmlScopeClass = useMemo(() => {
     const suffix = message.id.replace(/[^a-zA-Z0-9_-]/g, "");
     return `mari-html-message-${suffix || "content"}`;
@@ -1753,14 +1819,10 @@ export const ChatMessage = memo(function ChatMessage({
         style={messageTextStyle}
       >
         {isStreaming && !message.content ? (
-          <div className="mari-message-typing flex items-center gap-1 py-0.5">
-            <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400/60 [animation-delay:0ms]" />
-            <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400/60 [animation-delay:150ms]" />
-            <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400/60 [animation-delay:300ms]" />
-          </div>
+          <PendingTypingDots className="mari-message-typing py-0.5" dotClassName="bg-blue-400/60" />
         ) : (
           <>
-            {renderedContent}
+            {diceRollResult ? <DiceMessageContent diceRollResult={diceRollResult} createdAt={message.createdAt} /> : renderedContent}
             {isStreaming && (
               <span className="ml-0.5 inline-block h-4 w-[0.125rem] animate-pulse rounded-full bg-blue-400" />
             )}
@@ -1883,7 +1945,7 @@ export const ChatMessage = memo(function ChatMessage({
                   className={cn("mari-message-content break-words italic", !isHtmlContent && "whitespace-pre-wrap")}
                   style={messageTextStyle}
                 >
-                  {renderedContent}
+                  {diceRollResult ? <DiceMessageContent diceRollResult={diceRollResult} createdAt={message.createdAt} /> : renderedContent}
                 </div>
               )}
             </div>
@@ -2283,18 +2345,19 @@ export const ChatMessage = memo(function ChatMessage({
                 dark
               />
               <ActionBtn icon={<Pencil size={MESSAGE_ACTION_ICON_SIZE} />} onClick={startEditing} title="Edit" dark />
-              {proseGuardianOriginalText && (
+              {hasRewriteVersions && (
                 <ActionBtn
                   icon={
-                    restoringProseGuardianOriginal ? (
+                    switchingRewriteVersion ? (
                       <Loader2 size={MESSAGE_ACTION_ICON_SIZE} className="animate-spin" />
                     ) : (
                       <Shield size={MESSAGE_ACTION_ICON_SIZE} />
                     )
                   }
-                  onClick={handleRestoreProseGuardianOriginal}
-                  title="Restore original before rewrite"
-                  disabled={restoringProseGuardianOriginal}
+                  onClick={handleToggleProseGuardianVersion}
+                  title={showingProseGuardianOriginal ? "Show rewritten version" : "Show original before rewrite"}
+                  className={showingProseGuardianOriginal ? MESSAGE_CHROME_ACTIVE_ICON_CLASS : undefined}
+                  disabled={switchingRewriteVersion}
                   dark
                 />
               )}
@@ -2403,9 +2466,9 @@ export const ChatMessage = memo(function ChatMessage({
                       isLoadingThis ? (
                         <Loader2 size={MESSAGE_ACTION_ICON_SIZE} className="animate-spin" />
                       ) : isSpeakingThis ? (
-                        <VolumeX size={MESSAGE_ACTION_ICON_SIZE} />
+                        <MicOff size={MESSAGE_ACTION_ICON_SIZE} />
                       ) : (
-                        <Volume2 size={MESSAGE_ACTION_ICON_SIZE} />
+                        <Mic size={MESSAGE_ACTION_ICON_SIZE} />
                       )
                     }
                     onClick={handleSpeak}
@@ -2421,6 +2484,7 @@ export const ChatMessage = memo(function ChatMessage({
                     disabled={!hasTTSContent || (ttsBusy && !isSpeakingThis)}
                     dark
                   />
+                  <TTSLineVolumeControl volume={ttsLineVolume} onVolumeChange={handleTTSLineVolumeChange} dark />
                 </>
               )}
             </div>
@@ -2598,14 +2662,13 @@ export const ChatMessage = memo(function ChatMessage({
                   style={messageTextStyle}
                 >
                   {isStreaming && !message.content ? (
-                    <div className="mari-message-typing flex items-center gap-1 py-0.5">
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--muted-foreground)]/60 [animation-delay:0ms]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--muted-foreground)]/60 [animation-delay:150ms]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--muted-foreground)]/60 [animation-delay:300ms]" />
-                    </div>
+                    <PendingTypingDots
+                      className="mari-message-typing py-0.5"
+                      dotClassName="bg-[var(--muted-foreground)]/60"
+                    />
                   ) : (
                     <>
-                      {renderedContent}
+                      {diceRollResult ? <DiceMessageContent diceRollResult={diceRollResult} createdAt={message.createdAt} /> : renderedContent}
                       {isStreaming && (
                         <span className="ml-0.5 inline-block h-4 w-[0.125rem] animate-pulse rounded-full bg-white/70" />
                       )}
@@ -2731,18 +2794,19 @@ export const ChatMessage = memo(function ChatMessage({
               title={translatedText ? "Hide translation" : "Translate"}
             />
             <ActionBtn icon={<Pencil size={MESSAGE_ACTION_ICON_SIZE} />} onClick={startEditing} title="Edit" />
-            {proseGuardianOriginalText && (
+            {hasRewriteVersions && (
               <ActionBtn
                 icon={
-                  restoringProseGuardianOriginal ? (
+                  switchingRewriteVersion ? (
                     <Loader2 size={MESSAGE_ACTION_ICON_SIZE} className="animate-spin" />
                   ) : (
                     <Shield size={MESSAGE_ACTION_ICON_SIZE} />
                   )
                 }
-                onClick={handleRestoreProseGuardianOriginal}
-                title="Restore original before rewrite"
-                disabled={restoringProseGuardianOriginal}
+                onClick={handleToggleProseGuardianVersion}
+                title={showingProseGuardianOriginal ? "Show rewritten version" : "Show original before rewrite"}
+                className={showingProseGuardianOriginal ? MESSAGE_CHROME_ACTIVE_ICON_CLASS : undefined}
+                disabled={switchingRewriteVersion}
               />
             )}
             <ActionBtn
@@ -2853,6 +2917,7 @@ export const ChatMessage = memo(function ChatMessage({
                   }
                   disabled={!hasTTSContent || (ttsBusy && !isSpeakingThis)}
                 />
+                <TTSLineVolumeControl volume={ttsLineVolume} onVolumeChange={handleTTSLineVolumeChange} />
               </>
             )}
           </div>
@@ -2918,6 +2983,104 @@ function ThinkingModal({ thinking, onClose }: { thinking: string; onClose: () =>
   );
 }
 
+function TTSLineVolumeControl({
+  volume,
+  onVolumeChange,
+  dark,
+}: {
+  volume: number;
+  onVolumeChange: (volume: number) => void;
+  dark?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const muted = volume <= 0;
+  const label = `Line volume: ${volume}%`;
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (wrapperRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [open]);
+
+  return (
+    <div ref={wrapperRef} className="relative inline-flex">
+      <ActionBtn
+        icon={muted ? <VolumeX size={MESSAGE_ACTION_ICON_SIZE} /> : <Volume2 size={MESSAGE_ACTION_ICON_SIZE} />}
+        onClick={() => setOpen((value) => !value)}
+        title={label}
+        dark={dark}
+        ariaPressed={open}
+        className={
+          open
+            ? dark
+              ? MESSAGE_CHROME_ACTIVE_ICON_CLASS
+              : "bg-[var(--accent)] text-[var(--foreground)]"
+            : undefined
+        }
+      />
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Line volume"
+          className={cn(
+            "absolute bottom-full left-1/2 z-40 mb-2 flex w-44 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-col gap-2.5 rounded-lg border p-2.5 shadow-xl",
+            dark
+              ? "border-[var(--marinara-chat-chrome-panel-border)] bg-[var(--marinara-chat-chrome-panel-bg)] text-[var(--marinara-chat-chrome-panel-title)] shadow-black/30"
+              : "border-[var(--border)] bg-[var(--popover)] text-[var(--popover-foreground)] shadow-black/20",
+          )}
+        >
+          <div className="flex items-center justify-between gap-2 text-[0.6875rem]">
+            <span className={dark ? "text-[var(--marinara-chat-chrome-panel-title)]" : "text-[var(--foreground)]"}>
+              Line volume
+            </span>
+            <span
+              className={cn(
+                "tabular-nums",
+                dark ? "text-[var(--marinara-chat-chrome-panel-muted)]" : "text-[var(--muted-foreground)]",
+              )}
+            >
+              {volume}%
+            </span>
+          </div>
+          <input
+            ref={inputRef}
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={volume}
+            onChange={(event) => onVolumeChange(Number(event.currentTarget.value))}
+            className="mari-tts-line-volume-slider w-full"
+            aria-label="Line volume"
+            title="Line volume"
+            style={{ "--range-progress": `${volume}%` } as React.CSSProperties}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Action button ──
 function ActionBtn({
   icon,
@@ -2926,6 +3089,7 @@ function ActionBtn({
   className,
   dark,
   disabled,
+  ariaPressed,
 }: {
   icon: React.ReactNode;
   onClick: () => void;
@@ -2933,6 +3097,7 @@ function ActionBtn({
   className?: string;
   dark?: boolean;
   disabled?: boolean;
+  ariaPressed?: boolean;
 }) {
   return (
     <button
@@ -2940,6 +3105,7 @@ function ActionBtn({
       onClick={onClick}
       title={title}
       aria-label={title}
+      aria-pressed={ariaPressed}
       disabled={disabled}
       className={cn(
         "inline-flex h-[1.7em] w-[1.7em] shrink-0 items-center justify-center rounded-md p-0 text-[0.8125rem] leading-none transition-all active:scale-90 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-30",

@@ -27,6 +27,22 @@ const characterBookRoleSchema = z.union([
   z.literal(2),
 ]);
 
+/** Conversation-mode behavior directive insertion strategy. */
+export const convoBehaviorInsertionStrategySchema = z.enum([
+  "constant_before",
+  "constant_after",
+  "post_history_replace",
+  "post_history_before",
+  "post_history_after",
+  "macro",
+]);
+
+/** Conversation-mode-only behavior directive. */
+export const convoBehaviorConfigSchema = z.object({
+  instruction: z.string().default(""),
+  insertionStrategy: convoBehaviorInsertionStrategySchema.catch("constant_after").default("constant_after"),
+});
+
 export const characterExtensionsSchema = z
   .object({
     talkativeness: z.number().min(0).max(1).default(0.5),
@@ -35,6 +51,11 @@ export const characterExtensionsSchema = z
     depth_prompt: depthPromptSchema.default({}),
     backstory: z.string().default(""),
     appearance: z.string().default(""),
+    // Conversation-mode-only fields (optional — absent on non-convo cards).
+    convoDisplayName: z.string().optional(),
+    convoDisplayNameInCard: z.boolean().optional(),
+    aboutMe: z.string().optional(),
+    convoBehavior: convoBehaviorConfigSchema.optional(),
   })
   .passthrough();
 

@@ -13,6 +13,19 @@ echo ""
 # Navigate to script directory
 cd "$(dirname "$0")"
 
+# Load launcher settings before the update decision. Server settings are reused below.
+if [ -f .env ]; then
+  set -a
+  . ./.env
+  set +a
+fi
+
+AUTO_UPDATE_ENABLED_NORMALIZED=$(printf '%s' "${AUTO_UPDATE_ENABLED:-true}" | tr '[:upper:]' '[:lower:]' | tr -d '\r ')
+case "$AUTO_UPDATE_ENABLED_NORMALIZED" in
+  0|false|no|off) AUTO_UPDATE_DISABLED=1 ;;
+  *) AUTO_UPDATE_DISABLED=0 ;;
+esac
+
 SKIP_UPDATE=0
 for arg in "$@"; do
     case "$arg" in
@@ -113,12 +126,28 @@ PNPM_RUNNER="pnpm"
 
 run_pnpm() {
     if [ "$PNPM_RUNNER" = "corepack" ]; then
-        corepack "pnpm@${PNPM_VERSION}" "$@"
+        corepack "pnpm@${PNPM_VERSION}" --config.trustPolicy=off --config.confirmModulesPurge=false "$@"
     elif [ "$PNPM_RUNNER" = "npx" ]; then
-        npx --yes "pnpm@${PNPM_VERSION}" "$@"
+        npx --yes "pnpm@${PNPM_VERSION}" --config.trustPolicy=off --config.confirmModulesPurge=false "$@"
     else
-        pnpm "$@"
+        pnpm --config.trustPolicy=off --config.confirmModulesPurge=false "$@"
     fi
+}
+
+prune_pnpm_store() {
+    # The Android install deliberately keeps its pnpm store inside the checkout.
+    # Old releases otherwise accumulate there indefinitely and can consume several
+    # gigabytes even though the built application itself is comparatively small.
+    echo "  [..] Reclaiming dependency cache space from older releases..."
+    if ! run_pnpm store prune >/dev/null 2>&1; then
+        echo "  [WARN] Could not prune the pnpm store; continuing without removing cached packages."
+    fi
+}
+
+install_workspace_dependencies() {
+    # Avoid --force here. On constrained Android devices it recreates the entire
+    # virtual store and may download optional binaries for platforms we cannot run.
+    run_pnpm install --frozen-lockfile --prefer-offline
 }
 
 if command -v corepack &> /dev/null; then
@@ -177,6 +206,8 @@ has_git_worktree_changes() {
 # ── Auto-update from Git ──
 if [ "$SKIP_UPDATE" = "1" ]; then
     echo "  [OK] Skipping update check; starting the current local install."
+elif [ "$AUTO_UPDATE_DISABLED" = "1" ]; then
+    echo "  [OK] Automatic Engine updates disabled by AUTO_UPDATE_ENABLED=false."
 elif [ -d ".git" ]; then
     echo "  [..] Checking for updates..."
     OLD_HEAD=$(git rev-parse HEAD 2>/dev/null)
@@ -241,8 +272,9 @@ elif [ -d ".git" ]; then
                 echo "  [WARN] Update did not land on ${TARGET_REF}. Continuing with current version."
             else
                 echo "  [OK] Updated to $(git log -1 --format='%h %s' 2>/dev/null)"
-                echo "  [..] Reinstalling dependencies..."
-                run_pnpm install
+                prune_pnpm_store
+                echo "  [..] Refreshing dependencies..."
+                install_workspace_dependencies
                 rm -rf packages/shared/dist packages/server/dist packages/client/dist
                 rm -f packages/shared/tsconfig.tsbuildinfo packages/server/tsconfig.tsbuildinfo packages/client/tsconfig.tsbuildinfo
             fi
@@ -276,29 +308,30 @@ if [ -f "packages/shared/dist/constants/defaults.js" ]; then
     DIST_VER=$(node -e "try{const m=require('./packages/shared/dist/constants/defaults.js');console.log(m.APP_VERSION)}catch{}" 2>/dev/null || true)
     SOURCE_COMMIT=$(git rev-parse --short=12 HEAD 2>/dev/null || true)
     DIST_COMMIT=$(node -e "try{const m=require('./packages/server/dist/config/build-meta.json');console.log(m.commit || '')}catch{}" 2>/dev/null || true)
+    TERMUX_REBUILD_REQUIRED=0
     if [ -n "$SOURCE_VER" ] && [ -n "$DIST_VER" ] && [ "$SOURCE_VER" != "$DIST_VER" ]; then
         echo "  [WARN] Version mismatch: source v$SOURCE_VER but dist has v$DIST_VER"
-        echo "  [..] Forcing rebuild to apply update..."
-        run_pnpm install
-        rm -rf packages/shared/dist packages/server/dist packages/client/dist
-        rm -f packages/shared/tsconfig.tsbuildinfo packages/server/tsconfig.tsbuildinfo packages/client/tsconfig.tsbuildinfo
+        TERMUX_REBUILD_REQUIRED=1
     fi
     if [ -n "$SOURCE_COMMIT" ] && [ "$SOURCE_COMMIT" != "$DIST_COMMIT" ]; then
         echo "  [WARN] Build commit mismatch: source $SOURCE_COMMIT but dist has ${DIST_COMMIT:-<missing>}"
-        echo "  [..] Forcing rebuild to apply update..."
-        run_pnpm install
+        TERMUX_REBUILD_REQUIRED=1
+    fi
+    if [ "$TERMUX_REBUILD_REQUIRED" = "1" ]; then
+        echo "  [..] Rebuilding once to apply the update..."
         rm -rf packages/shared/dist packages/server/dist packages/client/dist
         rm -f packages/shared/tsconfig.tsbuildinfo packages/server/tsconfig.tsbuildinfo packages/client/tsconfig.tsbuildinfo
     fi
 fi
 
 # ── Install dependencies ──
-if [ ! -d "node_modules" ] || [ "$TERMUX_FORCE_INSTALL" = "1" ]; then
+if [ ! -d "node_modules" ] || [ "$TERMUX_FORCE_INSTALL" = "1" ] || ! node scripts/check-workspace-install.mjs >/dev/null 2>&1; then
     echo ""
     echo "  [..] Installing dependencies${TERMUX_FORCE_INSTALL:+ (refreshing for platform fix)}..."
     echo "       This may take several minutes on mobile."
     echo ""
-    run_pnpm install
+    prune_pnpm_store
+    install_workspace_dependencies
 fi
 
 # ── Build if needed ──
@@ -323,13 +356,6 @@ if [ ! -d "packages/client/dist" ]; then
     fi
 fi
 
-# Load .env if present (respects user overrides)
-if [ -f .env ]; then
-  set -a
-  . ./.env
-  set +a
-fi
-
 export NODE_ENV=production
 export PORT=${PORT:-7860}
 export HOST=${HOST:-0.0.0.0}
@@ -339,6 +365,11 @@ if [ -n "$SSL_CERT" ] && [ -n "$SSL_KEY" ]; then
 else
   PROTOCOL=http
 fi
+
+BROWSER_HOST="$HOST"
+case "$BROWSER_HOST" in
+  ""|"0.0.0.0"|"::") BROWSER_HOST="127.0.0.1" ;;
+esac
 
 AUTO_OPEN_BROWSER_VALUE="${AUTO_OPEN_BROWSER:-true}"
 case "${AUTO_OPEN_BROWSER_VALUE,,}" in
@@ -355,7 +386,10 @@ fi
 # ── Start ──
 echo ""
 echo "  ══════════════════════════════════════════"
-echo "    Starting Marinara Engine on ${PROTOCOL}://127.0.0.1:${PORT}"
+echo "    Starting Marinara Engine on ${PROTOCOL}://${HOST}:${PORT}"
+if [ "$BROWSER_HOST" != "$HOST" ]; then
+echo "    Local browser URL: ${PROTOCOL}://${BROWSER_HOST}:${PORT}"
+fi
 if [ -n "$LOCAL_IP" ]; then
 echo "    LAN access: ${PROTOCOL}://${LOCAL_IP}:${PORT}"
 fi
@@ -367,7 +401,7 @@ echo ""
 
 # Open in Termux browser if available (no-op if not)
 if [ "$AUTO_OPEN_BROWSER_ENABLED" = "1" ] && command -v termux-open-url &> /dev/null; then
-    (sleep 3 && termux-open-url "${PROTOCOL}://127.0.0.1:${PORT}") &
+    (sleep 3 && termux-open-url "${PROTOCOL}://${BROWSER_HOST}:${PORT}") &
 elif [ "$AUTO_OPEN_BROWSER_ENABLED" != "1" ]; then
     echo "  [OK] Auto-open disabled (AUTO_OPEN_BROWSER=${AUTO_OPEN_BROWSER_VALUE})"
 fi

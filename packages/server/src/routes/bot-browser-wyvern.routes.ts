@@ -2,25 +2,12 @@
 // Routes: Browser — Wyvern provider
 // ──────────────────────────────────────────────
 import type { FastifyInstance } from "fastify";
-import { safeFetch } from "../utils/security.js";
+import { logger } from "../lib/logger.js";
+import { fetchBotBrowserJson } from "../services/bot-browser/fetch-json.js";
+import { resolveValidatedImage, safeFetch } from "../utils/security.js";
 
 const WYVERN_API_BASE = "https://api.wyvern.chat";
 const WYVERN_IMAGE_BASE = "https://imagedelivery.net";
-
-async function proxyFetch(url: string, init?: RequestInit): Promise<unknown> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Upstream ${res.status}: ${text.slice(0, 300)}`);
-    }
-    return res.json();
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 export async function botBrowserWyvernRoutes(app: FastifyInstance) {
   // ── Search characters on Wyvern ──
@@ -55,7 +42,8 @@ export async function botBrowserWyvernRoutes(app: FastifyInstance) {
     // Rating filter (SFW = "none", omit for all content)
     if (rating) params.set("rating", rating);
 
-    const data = await proxyFetch(`${WYVERN_API_BASE}/exploreSearch/characters?${params}`, {
+    const data = await fetchBotBrowserJson(`${WYVERN_API_BASE}/exploreSearch/characters?${params}`, {
+      allowedHosts: ["api.wyvern.chat"],
       headers: { Accept: "application/json" },
     });
     return data;
@@ -65,7 +53,9 @@ export async function botBrowserWyvernRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>("/wyvern/character/:id", async (req) => {
     const { id } = req.params;
     if (!id) throw new Error("Missing character id");
-    const data = await proxyFetch(`${WYVERN_API_BASE}/characters/${id}`, {
+    const data = await fetchBotBrowserJson(`${WYVERN_API_BASE}/characters/${id}`, {
+      allowedHosts: ["api.wyvern.chat"],
+      maxResponseBytes: 8 * 1024 * 1024,
       headers: { Accept: "application/json" },
     });
     return data;
@@ -78,7 +68,8 @@ export async function botBrowserWyvernRoutes(app: FastifyInstance) {
     const { q, page = "1", limit = "10" } = req.query;
     if (!q) throw new Error("Missing query");
     const params = new URLSearchParams({ q, page, limit });
-    const data = await proxyFetch(`${WYVERN_API_BASE}/exploreSearch/users?${params}`, {
+    const data = await fetchBotBrowserJson(`${WYVERN_API_BASE}/exploreSearch/users?${params}`, {
+      allowedHosts: ["api.wyvern.chat"],
       headers: { Accept: "application/json" },
     });
     return data;
@@ -88,7 +79,8 @@ export async function botBrowserWyvernRoutes(app: FastifyInstance) {
   app.get<{ Params: { uid: string } }>("/wyvern/characters/user/:uid", async (req) => {
     const { uid } = req.params;
     if (!uid) throw new Error("Missing user id");
-    const data = await proxyFetch(`${WYVERN_API_BASE}/characters/user/${uid}`, {
+    const data = await fetchBotBrowserJson(`${WYVERN_API_BASE}/characters/user/${uid}`, {
+      allowedHosts: ["api.wyvern.chat"],
       headers: { Accept: "application/json" },
     });
     return data;
@@ -121,13 +113,19 @@ export async function botBrowserWyvernRoutes(app: FastifyInstance) {
       const res = await safeFetch(parsedUrl, {
         signal: controller.signal,
         policy: { allowedProtocols: ["https:"] },
-        allowedContentTypes: ["image/"],
         maxResponseBytes: 10 * 1024 * 1024,
       });
       if (!res.ok) return reply.status(404).send({ error: "Avatar not found" });
       const buf = Buffer.from(await res.arrayBuffer());
-      const ct = res.headers.get("content-type") || "image/webp";
-      return reply.header("Content-Type", ct).header("Cache-Control", "public, max-age=86400").send(buf);
+      const image = resolveValidatedImage(buf);
+      if (!image) {
+        logger.warn(
+          "[bot-browser] Wyvern avatar returned unsupported content type: %s",
+          res.headers.get("content-type") || "(missing)",
+        );
+        return reply.status(415).send({ error: "Unsupported avatar content type" });
+      }
+      return reply.header("Content-Type", image.mimeType).header("Cache-Control", "public, max-age=86400").send(buf);
     } finally {
       clearTimeout(timeout);
     }

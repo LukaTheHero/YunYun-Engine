@@ -3,14 +3,16 @@
 // ──────────────────────────────────────────────
 import { User } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { PendingTypingDots } from "./PendingTypingDots";
 import {
   HiddenFromAIConversationSummary,
+  DiceMessageContent,
   MessageContent,
   ConversationMessageEditForm,
   ConversationMessageAttachments,
   ConversationMessageTranslation,
   ConversationMessageSwipes,
-  nameColorStyle,
+  ConversationMessageName,
   formatTimestamp,
   type MessageRenderContext,
 } from "./ConversationMessageShared";
@@ -90,15 +92,36 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
       <div className={cn("mari-message-avatar w-10 flex-shrink-0", shouldHideUserAvatar && "hidden")}>
         {!isGrouped && (
           <>
-            <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[var(--accent)]">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={displayName} loading="lazy" className="h-full w-full object-cover" style={avatarCropStyle} />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-bold text-[var(--muted-foreground)]">
-                  {isUser ? <User size="1.125rem" /> : displayName[0]?.toUpperCase()}
-                </div>
-              )}
-            </div>
+            {ctx.onOpenAboutMe ? (
+              // Clickable avatar → about-me viewer (Convo only). A plain <div> is
+              // used when there's no target so mobile taps still fall through to
+              // the message action-reveal gesture.
+              <button
+                type="button"
+                onClick={(e) => ctx.onOpenAboutMe?.(e.currentTarget.getBoundingClientRect())}
+                aria-label={`View ${displayName}'s about me`}
+                title={`View ${displayName}'s about me`}
+                className="relative block h-10 w-10 overflow-hidden rounded-full bg-[var(--accent)] cursor-pointer transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50"
+              >
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} loading="lazy" className="h-full w-full object-cover" style={avatarCropStyle} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm font-bold text-[var(--muted-foreground)]">
+                    {isUser ? <User size="1.125rem" /> : displayName[0]?.toUpperCase()}
+                  </div>
+                )}
+              </button>
+            ) : (
+              <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[var(--accent)]">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={displayName} loading="lazy" className="h-full w-full object-cover" style={avatarCropStyle} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm font-bold text-[var(--muted-foreground)]">
+                    {isUser ? <User size="1.125rem" /> : displayName[0]?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+            )}
             {(showActions || forceShowActions || showMessageNumbers) && messageIndex != null && (
               <span className="mt-0.5 block text-center text-[0.5rem] font-medium text-[var(--muted-foreground)] select-none">
                 #{messageIndex}
@@ -114,9 +137,7 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
         {!isGrouped && (
           <div className="mari-message-meta mb-0.5 flex items-baseline gap-2">
             {hiddenFromAIHeader}
-            <span className="mari-message-name text-[0.9375rem] font-semibold leading-tight hover:underline cursor-default" style={nameColorStyle(nameColor)}>
-              {displayName}
-            </span>
+            <ConversationMessageName displayName={displayName} nameColor={nameColor} onOpenAboutMe={ctx.onOpenAboutMe} />
             {!hideTimestamp && (
               <span className="mari-message-timestamp text-[0.6875rem] text-[var(--muted-foreground)]/60">
                 {formatTimestamp(message.createdAt)}
@@ -147,11 +168,7 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
             style={messageTextStyle}
           >
             {isStreaming && !renderedContent ? (
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--muted-foreground)]/60 [animation-delay:0ms]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--muted-foreground)]/60 [animation-delay:150ms]" />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-[var(--muted-foreground)]/60 [animation-delay:300ms]" />
-              </div>
+              <PendingTypingDots dotClassName="bg-[var(--muted-foreground)]/60" />
             ) : (
               <>
                 {renderedContentParts ? (
@@ -162,6 +179,8 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
                       </div>
                     ))}
                   </div>
+                ) : extra.diceRollResult ? (
+                  <DiceMessageContent diceRollResult={extra.diceRollResult} createdAt={message.createdAt} />
                 ) : (
                   <MessageContent content={renderedContent} mentionNames={mentionNames} emojiMap={emojiMap} stickerMap={stickerMap} onImageOpen={(url) => onImageOpen(url)} />
                 )}

@@ -1,12 +1,20 @@
 // ──────────────────────────────────────────────
 // Storage: API Connections
 // ──────────────────────────────────────────────
-import { eq, desc, and, ne } from "drizzle-orm";
+import { eq, desc, and, ne } from "../../db/file-query.js";
 import type { DB } from "../../db/connection.js";
 import { apiConnections } from "../../db/schema/index.js";
 import { newId, now } from "../../utils/id-generator.js";
 import { encryptApiKey, decryptApiKey } from "../../utils/crypto.js";
 import type { CreateConnectionInput } from "@marinara-engine/shared";
+
+type ConnectionDefaultCategory = "image_generation" | "video_generation" | "language";
+
+function defaultCategoryForProvider(provider: string): ConnectionDefaultCategory {
+  if (provider === "image_generation") return "image_generation";
+  if (provider === "video_generation") return "video_generation";
+  return "language";
+}
 
 export function createConnectionsStorage(db: DB) {
   return {
@@ -33,15 +41,31 @@ export function createConnectionsStorage(db: DB) {
       return rows[0] ?? null;
     },
 
-    /** Get the connection marked as default for agents (with decrypted key). */
-    async getDefaultForAgents() {
-      const rows = await db.select().from(apiConnections).where(eq(apiConnections.defaultForAgents, "true"));
-      const row = rows.find((candidate) => candidate.provider !== "image_generation");
+    /** Get the language connection used after a main generation failure. */
+    async getFallbackForMain() {
+      const rows = await db.select().from(apiConnections).where(eq(apiConnections.fallbackForMain, "true"));
+      const row = rows.find((candidate) => defaultCategoryForProvider(candidate.provider) === "language");
       if (!row) return null;
       return { ...row, apiKey: decryptApiKey(row.apiKeyEncrypted) };
     },
 
-    /** Get the image-generation connection marked as default for Illustrator (with decrypted key). */
+    /** Get the connection marked as default for agents (with decrypted key). */
+    async getDefaultForAgents() {
+      const rows = await db.select().from(apiConnections).where(eq(apiConnections.defaultForAgents, "true"));
+      const row = rows.find((candidate) => defaultCategoryForProvider(candidate.provider) === "language");
+      if (!row) return null;
+      return { ...row, apiKey: decryptApiKey(row.apiKeyEncrypted) };
+    },
+
+    /** Get the language connection used after an agent generation failure. */
+    async getFallbackForAgents() {
+      const rows = await db.select().from(apiConnections).where(eq(apiConnections.fallbackForAgents, "true"));
+      const row = rows.find((candidate) => defaultCategoryForProvider(candidate.provider) === "language");
+      if (!row) return null;
+      return { ...row, apiKey: decryptApiKey(row.apiKeyEncrypted) };
+    },
+
+    /** Get the image-generation connection selected under Defaults → Images (with decrypted key). */
     async getDefaultForImageGeneration() {
       const rows = await db
         .select()
@@ -52,33 +76,44 @@ export function createConnectionsStorage(db: DB) {
       return { ...row, apiKey: decryptApiKey(row.apiKeyEncrypted) };
     },
 
+    /** Get the image-generation connection used after an image generation failure. */
+    async getFallbackForImageGeneration() {
+      const rows = await db
+        .select()
+        .from(apiConnections)
+        .where(and(eq(apiConnections.fallbackForAgents, "true"), eq(apiConnections.provider, "image_generation")));
+      const row = rows[0] ?? null;
+      if (!row) return null;
+      return { ...row, apiKey: decryptApiKey(row.apiKeyEncrypted) };
+    },
+
+    /** Get the video-generation connection marked as default for scene videos (with decrypted key). */
+    async getDefaultForVideoGeneration() {
+      const rows = await db
+        .select()
+        .from(apiConnections)
+        .where(and(eq(apiConnections.defaultForAgents, "true"), eq(apiConnections.provider, "video_generation")));
+      const row = rows[0] ?? null;
+      if (!row) return null;
+      return { ...row, apiKey: decryptApiKey(row.apiKeyEncrypted) };
+    },
+
+    /** Get the video-generation connection used after a video generation failure. */
+    async getFallbackForVideoGeneration() {
+      const rows = await db
+        .select()
+        .from(apiConnections)
+        .where(and(eq(apiConnections.fallbackForAgents, "true"), eq(apiConnections.provider, "video_generation")));
+      const row = rows[0] ?? null;
+      if (!row) return null;
+      return { ...row, apiKey: decryptApiKey(row.apiKeyEncrypted) };
+    },
+
     async create(input: CreateConnectionInput) {
       const id = newId();
       const timestamp = now();
-      // If this is set as default, unset others
-      if (input.isDefault) {
-        await db.update(apiConnections).set({ isDefault: "false" });
-      }
-      // If this is set as default for agents, unset others in the same provider category
-      if (input.defaultForAgents) {
-        if (input.provider === "image_generation") {
-          await db
-            .update(apiConnections)
-            .set({ defaultForAgents: "false" })
-            .where(and(eq(apiConnections.defaultForAgents, "true"), eq(apiConnections.provider, "image_generation")));
-        } else {
-          const existingDefaults = await db
-            .select()
-            .from(apiConnections)
-            .where(eq(apiConnections.defaultForAgents, "true"));
-          for (const row of existingDefaults) {
-            if (row.provider !== "image_generation") {
-              await db.update(apiConnections).set({ defaultForAgents: "false" }).where(eq(apiConnections.id, row.id));
-            }
-          }
-        }
-      }
-      await db.insert(apiConnections).values({
+      const providerCategory = defaultCategoryForProvider(input.provider);
+      const values = {
         id,
         name: input.name,
         provider: input.provider,
@@ -88,8 +123,10 @@ export function createConnectionsStorage(db: DB) {
         imagePath: input.imagePath ?? null,
         maxContext: input.maxContext ?? 128000,
         isDefault: String(input.isDefault ?? false),
+        fallbackForMain: String(providerCategory === "language" && (input.fallbackForMain ?? false)),
         useForRandom: String(input.useForRandom ?? false),
         defaultForAgents: String(input.defaultForAgents ?? false),
+        fallbackForAgents: String(input.fallbackForAgents ?? false),
         enableCaching: String(input.enableCaching ?? false),
         anthropicExtendedCacheTtl: String(input.anthropicExtendedCacheTtl ?? false),
         cachingAtDepth: input.cachingAtDepth ?? 5,
@@ -102,12 +139,70 @@ export function createConnectionsStorage(db: DB) {
         comfyuiWorkflow: input.comfyuiWorkflow ?? null,
         imageService: input.imageService ?? null,
         imageEndpointId: input.imageEndpointId ?? null,
+        videoGenerationSource: input.videoGenerationSource ?? null,
+        videoService: input.videoService ?? null,
         promptPresetId: input.promptPresetId ?? null,
         maxTokensOverride: input.maxTokensOverride ?? null,
         claudeFastMode: String(input.claudeFastMode ?? false),
         treatAsLocalEndpoint: String(input.treatAsLocalEndpoint ?? false),
         createdAt: timestamp,
         updatedAt: timestamp,
+      };
+      await db.transaction(async (tx) => {
+        // If this is set as default, unset others.
+        if (input.isDefault) {
+          await tx.update(apiConnections).set({ isDefault: "false" });
+          values.fallbackForMain = "false";
+        }
+        if (providerCategory === "language" && input.fallbackForMain) {
+          await tx.update(apiConnections).set({ fallbackForMain: "false" });
+          values.isDefault = "false";
+        }
+        // If this is set as default for agents, unset others in the same provider category.
+        if (input.defaultForAgents) {
+          values.fallbackForAgents = "false";
+          const category = defaultCategoryForProvider(input.provider);
+          if (category === "image_generation" || category === "video_generation") {
+            await tx
+              .update(apiConnections)
+              .set({ defaultForAgents: "false" })
+              .where(and(eq(apiConnections.defaultForAgents, "true"), eq(apiConnections.provider, category)));
+          } else {
+            const existingDefaults = await tx
+              .select()
+              .from(apiConnections)
+              .where(eq(apiConnections.defaultForAgents, "true"));
+            for (const row of existingDefaults) {
+              if (defaultCategoryForProvider(row.provider) === "language") {
+                await tx.update(apiConnections).set({ defaultForAgents: "false" }).where(eq(apiConnections.id, row.id));
+              }
+            }
+          }
+        }
+        if (input.fallbackForAgents) {
+          values.defaultForAgents = "false";
+          const category = defaultCategoryForProvider(input.provider);
+          if (category === "image_generation" || category === "video_generation") {
+            await tx
+              .update(apiConnections)
+              .set({ fallbackForAgents: "false" })
+              .where(and(eq(apiConnections.fallbackForAgents, "true"), eq(apiConnections.provider, category)));
+          } else {
+            const existingFallbacks = await tx
+              .select()
+              .from(apiConnections)
+              .where(eq(apiConnections.fallbackForAgents, "true"));
+            for (const row of existingFallbacks) {
+              if (defaultCategoryForProvider(row.provider) === "language") {
+                await tx
+                  .update(apiConnections)
+                  .set({ fallbackForAgents: "false" })
+                  .where(eq(apiConnections.id, row.id));
+              }
+            }
+          }
+        }
+        await tx.insert(apiConnections).values(values);
       });
       return this.getById(id);
     },
@@ -117,11 +212,16 @@ export function createConnectionsStorage(db: DB) {
       if (!existing) return null;
 
       const effectiveProvider = data.provider ?? existing.provider;
+      const effectiveProviderCategory = defaultCategoryForProvider(effectiveProvider);
       const updateFields: Record<string, unknown> = { updatedAt: now() };
       const shouldClearDefault = data.isDefault === true;
+      const shouldClearMainFallback = effectiveProviderCategory === "language" && data.fallbackForMain === true;
       const shouldClearAgentDefaults =
         data.defaultForAgents === true ||
         (data.defaultForAgents === undefined && data.provider !== undefined && existing.defaultForAgents === "true");
+      const shouldClearAgentFallbacks =
+        data.fallbackForAgents === true ||
+        (data.fallbackForAgents === undefined && data.provider !== undefined && existing.fallbackForAgents === "true");
       if (data.name !== undefined) updateFields.name = data.name;
       if (data.provider !== undefined) updateFields.provider = data.provider;
       if (data.baseUrl !== undefined) updateFields.baseUrl = data.baseUrl;
@@ -132,11 +232,20 @@ export function createConnectionsStorage(db: DB) {
       if (data.isDefault !== undefined) {
         updateFields.isDefault = String(data.isDefault);
       }
+      if (data.fallbackForMain !== undefined) {
+        updateFields.fallbackForMain = String(effectiveProviderCategory === "language" && data.fallbackForMain);
+      }
+      if (data.provider !== undefined && effectiveProviderCategory !== "language") {
+        updateFields.fallbackForMain = "false";
+      }
       if (data.useForRandom !== undefined) {
         updateFields.useForRandom = String(data.useForRandom);
       }
       if (data.defaultForAgents !== undefined) {
         updateFields.defaultForAgents = String(data.defaultForAgents);
+      }
+      if (data.fallbackForAgents !== undefined) {
+        updateFields.fallbackForAgents = String(data.fallbackForAgents);
       }
       if (data.enableCaching !== undefined) {
         updateFields.enableCaching = String(data.enableCaching);
@@ -171,6 +280,12 @@ export function createConnectionsStorage(db: DB) {
       if (data.imageEndpointId !== undefined) {
         updateFields.imageEndpointId = data.imageEndpointId;
       }
+      if (data.videoGenerationSource !== undefined) {
+        updateFields.videoGenerationSource = data.videoGenerationSource;
+      }
+      if (data.videoService !== undefined) {
+        updateFields.videoService = data.videoService;
+      }
       if (data.promptPresetId !== undefined) {
         updateFields.promptPresetId = data.promptPresetId;
       }
@@ -189,18 +304,25 @@ export function createConnectionsStorage(db: DB) {
       await db.transaction(async (tx) => {
         if (shouldClearDefault) {
           await tx.update(apiConnections).set({ isDefault: "false" });
+          updateFields.fallbackForMain = "false";
+        }
+        if (shouldClearMainFallback) {
+          await tx.update(apiConnections).set({ fallbackForMain: "false" });
+          updateFields.isDefault = "false";
         }
         if (shouldClearAgentDefaults) {
-          if (effectiveProvider === "image_generation") {
+          updateFields.fallbackForAgents = "false";
+          const category = defaultCategoryForProvider(effectiveProvider);
+          if (category === "image_generation" || category === "video_generation") {
             await tx
               .update(apiConnections)
               .set({ defaultForAgents: "false" })
               .where(
                 data.defaultForAgents === true
-                  ? and(eq(apiConnections.defaultForAgents, "true"), eq(apiConnections.provider, "image_generation"))
+                  ? and(eq(apiConnections.defaultForAgents, "true"), eq(apiConnections.provider, category))
                   : and(
                       eq(apiConnections.defaultForAgents, "true"),
-                      eq(apiConnections.provider, "image_generation"),
+                      eq(apiConnections.provider, category),
                       ne(apiConnections.id, id),
                     ),
               );
@@ -210,8 +332,45 @@ export function createConnectionsStorage(db: DB) {
               .from(apiConnections)
               .where(eq(apiConnections.defaultForAgents, "true"));
             for (const row of existingDefaults) {
-              if (row.provider !== "image_generation" && (data.defaultForAgents === true || row.id !== id)) {
+              if (
+                defaultCategoryForProvider(row.provider) === "language" &&
+                (data.defaultForAgents === true || row.id !== id)
+              ) {
                 await tx.update(apiConnections).set({ defaultForAgents: "false" }).where(eq(apiConnections.id, row.id));
+              }
+            }
+          }
+        }
+        if (shouldClearAgentFallbacks) {
+          updateFields.defaultForAgents = "false";
+          const category = defaultCategoryForProvider(effectiveProvider);
+          if (category === "image_generation" || category === "video_generation") {
+            await tx
+              .update(apiConnections)
+              .set({ fallbackForAgents: "false" })
+              .where(
+                data.fallbackForAgents === true
+                  ? and(eq(apiConnections.fallbackForAgents, "true"), eq(apiConnections.provider, category))
+                  : and(
+                      eq(apiConnections.fallbackForAgents, "true"),
+                      eq(apiConnections.provider, category),
+                      ne(apiConnections.id, id),
+                    ),
+              );
+          } else {
+            const existingFallbacks = await tx
+              .select()
+              .from(apiConnections)
+              .where(eq(apiConnections.fallbackForAgents, "true"));
+            for (const row of existingFallbacks) {
+              if (
+                defaultCategoryForProvider(row.provider) === "language" &&
+                (data.fallbackForAgents === true || row.id !== id)
+              ) {
+                await tx
+                  .update(apiConnections)
+                  .set({ fallbackForAgents: "false" })
+                  .where(eq(apiConnections.id, row.id));
               }
             }
           }
@@ -237,8 +396,10 @@ export function createConnectionsStorage(db: DB) {
         imagePath: source.imagePath,
         maxContext: source.maxContext,
         isDefault: "false",
+        fallbackForMain: "false",
         useForRandom: "false",
         defaultForAgents: "false",
+        fallbackForAgents: "false",
         enableCaching: source.enableCaching,
         anthropicExtendedCacheTtl: source.anthropicExtendedCacheTtl,
         cachingAtDepth: source.cachingAtDepth,
@@ -251,6 +412,8 @@ export function createConnectionsStorage(db: DB) {
         comfyuiWorkflow: source.comfyuiWorkflow,
         imageService: source.imageService,
         imageEndpointId: source.imageEndpointId,
+        videoGenerationSource: source.videoGenerationSource,
+        videoService: source.videoService,
         promptPresetId: source.promptPresetId,
         maxTokensOverride: source.maxTokensOverride,
         maxParallelJobs: source.maxParallelJobs,

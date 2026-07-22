@@ -2,12 +2,14 @@ import {
   BUILT_IN_AGENTS,
   DEFAULT_AGENT_TOOLS,
   getDefaultAgentPrompt,
+  getBuiltInAgentDefaultPrompt,
   getDefaultBuiltInAgentSettings,
   isBuiltInAgentRuntimeDisabled,
   isAgentConfigDeleted,
   isRetiredBuiltInAgentId,
   LOCAL_SIDECAR_CONNECTION_ID,
   mergeBuiltInAgentSettings,
+  normalizeAgentPhaseValue,
   resolveAgentPromptTemplate,
   findKnownModel,
   type APIProvider,
@@ -26,15 +28,15 @@ import {
   type AgentConnectionWarning,
 } from "../../routes/generate/agent-connection-guards.js";
 import { parseStoredGenerationParameters } from "../../routes/generate/generate-route-utils.js";
-import {
-  applyTextRewriteAgentChatSettings,
-  normalizeProseGuardianPromptTemplate,
-} from "./prose-guardian-settings.js";
+import { applyTextRewriteAgentChatSettings, normalizeProseGuardianPromptTemplate } from "./prose-guardian-settings.js";
 import { applyKnowledgeAgentChatSettings } from "./knowledge-agent-settings.js";
+import { withConnectionFallbackProvider, type FallbackConnection } from "../llm/connection-fallback-provider.js";
+import type { GenerationFallbackNotifier } from "./fallback-notification.js";
 
 type ConnectionsStore = {
   getWithKey(id: string): Promise<any | null>;
   getDefaultForAgents(): Promise<any | null>;
+  getFallbackForAgents(): Promise<any | null>;
 };
 
 type ResolveAgentPipelineAgentsArgs = {
@@ -46,6 +48,7 @@ type ResolveAgentPipelineAgentsArgs = {
   perChatAgentSet: Set<string>;
   agentPromptTemplateSelections: Record<string, string>;
   chatProvider: BaseLLMProvider;
+  chatConnectionId: string;
   chatModel: string;
   chatCustomParameters: Record<string, unknown>;
   chatMaxOutputTokens: number | null;
@@ -55,6 +58,7 @@ type ResolveAgentPipelineAgentsArgs = {
   chatCachingAtDepth: number;
   activeMusicPlayerSource?: "spotify" | "youtube" | "custom" | null;
   chatMetadata?: Record<string, unknown>;
+  onFallback?: GenerationFallbackNotifier;
   resolveBaseUrl(connection: { baseUrl: string | null; provider: string }): string;
 };
 
@@ -111,10 +115,8 @@ export type ResolvedAgentPipelineAgents = {
   agentConnectionWarnings: AgentConnectionWarning[];
 };
 
-function resolveAgentRuntimePhase(agentType: string, configuredPhase: string): string {
-  if (agentType === "prose-guardian" || agentType === "continuity" || agentType === "html") return "post_processing";
-  if (agentType === "echo-chamber") return "parallel";
-  return configuredPhase;
+function resolveAgentRuntimePhase(_agentType: string, configuredPhase: string): string {
+  return normalizeAgentPhaseValue(configuredPhase);
 }
 
 function parseAgentSettings(settings: unknown): Record<string, unknown> {
@@ -157,7 +159,7 @@ function getAgentFallbackPrompt(agentType: string, settings: Record<string, unkn
   if (agentType === "spotify" && (settings.musicProvider === "custom" || settings.musicPlayerSource === "custom")) {
     return getDefaultAgentPrompt("local-music");
   }
-  return getDefaultAgentPrompt(agentType);
+  return getBuiltInAgentDefaultPrompt(agentType) || getDefaultAgentPrompt(agentType);
 }
 
 function resolveConnectionCustomParameters(connection: { defaultParameters?: unknown }): Record<string, unknown> {
@@ -181,12 +183,23 @@ async function resolveAgentConnectionProvider(args: {
   fallbackEnableCaching: boolean;
   fallbackAnthropicExtendedCacheTtl: boolean;
   fallbackCachingAtDepth: number;
+  fallbackConnection: FallbackConnection | null;
+  primaryConnectionId: string;
+  onFallback?: GenerationFallbackNotifier;
   resolveBaseUrl(connection: { baseUrl: string | null; provider: string }): string;
 }): Promise<AgentConnectionResolution> {
   if (!args.connectionId) {
+    const provider = withConnectionFallbackProvider({
+      primary: args.fallbackProvider,
+      primaryConnectionId: args.primaryConnectionId,
+      fallbackConnection: args.fallbackConnection,
+      fallbackBaseUrl: args.fallbackConnection ? args.resolveBaseUrl(args.fallbackConnection) : "",
+      category: "agents",
+      onFallback: args.onFallback,
+    });
     return {
       entry: {
-        provider: args.fallbackProvider,
+        provider,
         model: args.fallbackModel,
         customParameters: args.fallbackCustomParameters,
         maxOutputTokens: args.fallbackMaxOutputTokens,
@@ -224,15 +237,26 @@ async function resolveAgentConnectionProvider(args: {
     };
   }
 
+  const primaryProvider = createLLMProvider(
+    agentConn.provider,
+    agentBaseUrl,
+    agentConn.apiKey,
+    agentConn.maxContext,
+    agentConn.openrouterProvider,
+    agentConn.maxTokensOverride,
+    agentConn.claudeFastMode === "true",
+    agentConn.treatAsLocalEndpoint === "true",
+    agentConn.defaultParameters,
+  );
   const resolved = {
-    provider: createLLMProvider(
-      agentConn.provider,
-      agentBaseUrl,
-      agentConn.apiKey,
-      agentConn.maxContext,
-      agentConn.openrouterProvider,
-      agentConn.maxTokensOverride,
-    ),
+    provider: withConnectionFallbackProvider({
+      primary: primaryProvider,
+      primaryConnectionId: agentConn.id,
+      fallbackConnection: args.fallbackConnection,
+      fallbackBaseUrl: args.fallbackConnection ? args.resolveBaseUrl(args.fallbackConnection) : "",
+      category: "agents",
+      onFallback: args.onFallback,
+    }),
     model,
     customParameters: resolveConnectionCustomParameters(agentConn),
     maxOutputTokens: resolveConnectionMaxOutputTokens({ provider: agentConn.provider, model }),
@@ -254,6 +278,7 @@ export async function resolveAgentPipelineAgents({
   perChatAgentSet,
   agentPromptTemplateSelections,
   chatProvider,
+  chatConnectionId,
   chatModel,
   chatCustomParameters,
   chatMaxOutputTokens,
@@ -263,6 +288,7 @@ export async function resolveAgentPipelineAgents({
   chatCachingAtDepth,
   activeMusicPlayerSource,
   chatMetadata,
+  onFallback,
   resolveBaseUrl,
 }: ResolveAgentPipelineAgentsArgs): Promise<ResolvedAgentPipelineAgents> {
   const deletedBuiltInTypes = new Set(
@@ -320,6 +346,7 @@ export async function resolveAgentPipelineAgents({
     }
   };
   const defaultAgentConn = await connections.getDefaultForAgents();
+  const fallbackAgentConn = await connections.getFallbackForAgents();
   for (const cfg of enabledConfigs) {
     if (hasPerChatAgentList && !perChatAgentSet.has(cfg.type)) continue;
 
@@ -384,6 +411,9 @@ export async function resolveAgentPipelineAgents({
       fallbackEnableCaching: chatEnableCaching,
       fallbackAnthropicExtendedCacheTtl: chatAnthropicExtendedCacheTtl,
       fallbackCachingAtDepth: chatCachingAtDepth,
+      fallbackConnection: fallbackAgentConn,
+      primaryConnectionId: effectiveConnectionId ?? chatConnectionId,
+      onFallback,
       resolveBaseUrl,
     });
     if (!resolvedProvider.entry) {
@@ -462,6 +492,9 @@ export async function resolveAgentPipelineAgents({
       fallbackEnableCaching: chatEnableCaching,
       fallbackAnthropicExtendedCacheTtl: chatAnthropicExtendedCacheTtl,
       fallbackCachingAtDepth: chatCachingAtDepth,
+      fallbackConnection: fallbackAgentConn,
+      primaryConnectionId: builtInConnectionId ?? chatConnectionId,
+      onFallback,
       resolveBaseUrl,
     });
     if (!builtInConnection.entry) {
@@ -474,7 +507,8 @@ export async function resolveAgentPipelineAgents({
       );
       continue;
     }
-    if (defaultAgentConn && builtInConnectionId === defaultAgentConn.id) defaultAgentConnectionAgents.push(builtIn.name);
+    if (defaultAgentConn && builtInConnectionId === defaultAgentConn.id)
+      defaultAgentConnectionAgents.push(builtIn.name);
     let builtInSettings = getDefaultBuiltInAgentSettings(builtIn.id);
     if (builtIn.id === "spotify") {
       builtInSettings = applyMusicPlayerSourceToMusicDjSettings(builtInSettings, activeMusicPlayerSource);
@@ -539,6 +573,7 @@ export async function resolveAgentPipelineAgents({
     agentConnectionWarnings.push(
       buildDefaultAgentConnectionWarning({
         agentNames: defaultAgentConnectionAgents,
+        connectionId: defaultAgentConn.id,
         connectionName: defaultAgentConn.name,
         model: String(defaultAgentConn.model ?? "").trim(),
       }),

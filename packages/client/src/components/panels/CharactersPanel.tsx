@@ -182,7 +182,8 @@ export function CharactersPanel() {
   const setFavFilter = useUIStore((s) => s.setCharacterPanelFavoriteFilter);
   const setCharacterPanelScrollTop = useUIStore((s) => s.setCharacterPanelScrollTop);
   const serverSearch = useMemo(() => parseCharacterSearchQuery(search).text, [search]);
-  const characterPages = useCharacterPages({ search: serverSearch, sort });
+  const serverFavoriteFilter = favFilter === "favorites" || favFilter === "non-favorites" ? favFilter : "";
+  const characterPages = useCharacterPages({ search: serverSearch, sort, favoriteFilter: serverFavoriteFilter });
   const characters = useMemo(() => flattenCharacterPages(characterPages.data), [characterPages.data]);
   const isLoading = characterPages.isLoading;
 
@@ -341,14 +342,7 @@ export function CharactersPanel() {
         toast.error("Failed to remove tag from some characters");
       }
     },
-    [
-      sort,
-      updateCharacter,
-      includedTags,
-      excludedTags,
-      setCharacterPanelIncludedTags,
-      setCharacterPanelExcludedTags,
-    ],
+    [sort, updateCharacter, includedTags, excludedTags, setCharacterPanelIncludedTags, setCharacterPanelExcludedTags],
   );
 
   const toggleIncludedTag = useCallback(
@@ -798,7 +792,11 @@ export function CharactersPanel() {
             New Folder
           </button>
         </div>
-        {parsedGroups.length > 0 && <p className="mari-folder-helper">Drag and drop characters to folders, double-click or double-tap to rename</p>}
+        {parsedGroups.length > 0 && (
+          <p className="mari-folder-helper">
+            Drag and drop characters to folders, double-click or double-tap to rename
+          </p>
+        )}
       </div>
 
       {/* Filters */}
@@ -974,10 +972,10 @@ export function CharactersPanel() {
                       e.stopPropagation();
                       void handleDeleteGroup(group);
                     }}
-                    className="mari-chrome-control mari-chrome-control--small mari-chrome-control--danger p-1"
+                    className="mari-chrome-control mari-chrome-control--small p-1"
                     title="Delete folder"
                   >
-                    <Trash2 size="0.6875rem" className="text-[var(--destructive)]" />
+                    <Trash2 size="0.6875rem" />
                   </button>
                 </div>
               </div>
@@ -1214,7 +1212,7 @@ export function CharactersPanel() {
           <div className="mari-chrome-accent-soft-tile mari-accent-animated animate-float flex h-12 w-12 items-center justify-center rounded-2xl">
             <User size="1.25rem" />
           </div>
-          <p className="text-xs text-[var(--muted-foreground)]">{search ? "No matches found" : "No characters yet"}</p>
+          <p className="mari-chrome-text-muted text-xs">{search ? "No matches found" : "No characters yet"}</p>
         </div>
       )}
 
@@ -1423,10 +1421,10 @@ export function CharactersPanel() {
                       }
                       deleteCharacter.mutate(char.id);
                     }}
-                    className="mari-chrome-control mari-chrome-control--small mari-chrome-control--danger p-1.5"
+                    className="mari-chrome-control mari-chrome-control--small p-1.5"
                     title="Delete"
                   >
-                    <Trash2 size="0.75rem" className="text-[var(--destructive)]" />
+                    <Trash2 size="0.75rem" />
                   </button>
                 </div>
               )}
@@ -1436,14 +1434,16 @@ export function CharactersPanel() {
       </div>
 
       {characterPages.hasNextPage && (
-        <button
-          type="button"
-          onClick={() => void characterPages.fetchNextPage()}
-          disabled={characterPages.isFetchingNextPage}
-          className="mari-chrome-control mari-chrome-control--primary justify-center text-xs"
-        >
-          {characterPages.isFetchingNextPage ? "Loading..." : `Load more (${parsedCharacters.length} loaded)`}
-        </button>
+        <div className="relative -mx-3 mt-2 border-t border-[var(--marinara-chat-chrome-panel-divider)] bg-[var(--sidebar)]/95 px-3 pt-2 pb-3 backdrop-blur-md md:sticky md:bottom-0 md:z-20">
+          <button
+            type="button"
+            onClick={() => void characterPages.fetchNextPage()}
+            disabled={characterPages.isFetchingNextPage}
+            className="mari-chrome-control mari-chrome-control--primary w-full justify-center text-xs"
+          >
+            {characterPages.isFetchingNextPage ? "Loading..." : `Load more (${parsedCharacters.length} loaded)`}
+          </button>
+        </div>
       )}
 
       {selectionMode && (

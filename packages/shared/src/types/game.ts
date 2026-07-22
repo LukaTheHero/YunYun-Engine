@@ -10,6 +10,13 @@ export type GameActiveState = "exploration" | "dialogue" | "combat" | "travel_re
 /** How the Game Master is controlled. */
 export type GameGmMode = "standalone" | "character";
 
+/**
+ * Combat presentation preference for Game Mode.
+ * - `classic`: existing cinematic JRPG menu combat (GameCombatUI + combat.service).
+ * - `tactical`: Fire Emblem / FFT style grid battle (tactical-combat feature engine).
+ */
+export type GameCombatStyle = "classic" | "tactical";
+
 /** Status of a game session. */
 export type GameSessionStatus = "setup" | "active" | "concluded";
 
@@ -28,6 +35,8 @@ export interface GridCell {
   terrain: string;
   /** Optional longer description shown on hover/click */
   description?: string;
+  /** Explicit hierarchical-location binding. Unbound cells remain tactical positions. */
+  spatialLocationId?: string;
 }
 
 /** A node in a dungeon/interior node-graph map. */
@@ -41,6 +50,8 @@ export interface MapNode {
   y: number;
   discovered: boolean;
   description?: string;
+  /** Explicit hierarchical-location binding. Unbound nodes remain tactical positions. */
+  spatialLocationId?: string;
 }
 
 /** An edge connecting two nodes in a node-graph map. */
@@ -57,6 +68,8 @@ export interface GameMap {
   type: "grid" | "node";
   name: string;
   description: string;
+  /** Hierarchical location represented by this local or tactical map. */
+  spatialLocationId?: string;
   /** Grid dimensions (only for type: "grid") */
   width?: number;
   height?: number;
@@ -111,7 +124,7 @@ export interface GameNpc {
   name: string;
   emoji: string;
   description: string;
-  /** Origin of the description. Only "model" descriptions should be treated as canonical profile text. */
+  /** Origin of the description. "model", "library", and "user" descriptions are canonical profile text. */
   descriptionSource?: "model" | "library" | "narration" | "user";
   /** Optional presentation hint used for systems like NPC voice matching. */
   gender?: string | null;
@@ -166,6 +179,8 @@ export interface GameSetupConfig {
   gmMode: GameGmMode;
   /** Content rating: sfw or nsfw */
   rating: "sfw" | "nsfw";
+  /** Combat presentation preference (classic menu battles vs tactical grid battles). Defaults to "classic". */
+  combatStyle?: GameCombatStyle;
   /** Character ID to use as GM (only when gmMode is "character") */
   gmCharacterId?: string | null;
   /** Party member IDs; library character IDs or `npc:<slug>` tracked-NPC IDs. */
@@ -179,8 +194,28 @@ export interface GameSetupConfig {
   enableSpriteGeneration?: boolean;
   /** Connection ID for image generation (NPC portraits + location backgrounds) */
   imageConnectionId?: string;
-  /** Unified art style prompt applied to all generated images (auto-generated at setup) */
+  /** Connection ID for video generation (animated scene clips from generated illustrations). */
+  videoConnectionId?: string;
+  /** Automatically create storyboard keyframe illustrations after completed GM turns. */
+  gameStoryboardAutoIllustrationsEnabled?: boolean;
+  /** Automatically create storyboard keyframe videos after completed GM turns. */
+  gameStoryboardAutoGenerationEnabled?: boolean;
+  /** Target number of storyboard keyframes to create per completed GM turn. */
+  gameStoryboardKeyframeCount?: number;
+  /** Selected built-in or chat-local GM prompt template. */
+  gameGmPromptTemplateId?: string | null;
+  /** Selected animation-ready storyboard director template. */
+  gameStoryboardAnimationPromptTemplateId?: string | null;
+  /** Selected provider-facing image prompt template for storyboard keyframes. */
+  gameStoryboardImagePromptTemplateId?: string | null;
+  /** Selected prompt template used only for storyboard keyframe videos. */
+  gameStoryboardVideoPromptTemplateId?: string | null;
+  /** Unified art style prompt applied to all generated images (auto-generated at setup, user-editable). */
   artStylePrompt?: string;
+  /** Original setup-generated art style, retained so user edits can be restored. */
+  generatedArtStylePrompt?: string;
+  /** Whether the campaign art style is included in generated image prompts. Defaults to true. */
+  useCampaignArtStyle?: boolean;
   /** Optional image style profile applied to generated images in this game. */
   imageStyleProfileId?: string | null;
   /** Lorebook IDs to activate for this game */
@@ -211,6 +246,40 @@ export interface GameSetupConfig {
   gameSystemPrompt?: string | null;
   /** Additional game-mode generation instructions appended to the GM format reminder. */
   gameSpecialInstructions?: string | null;
+}
+
+/** Safe, immutable connection details retained for sharing a game's original setup. */
+export interface GameInitialSetupConnectionSnapshot {
+  name: string;
+  provider?: string | null;
+  model?: string | null;
+  service?: string | null;
+}
+
+/** Creation-time display names for local resources referenced by the setup. */
+export interface GameInitialSetupLabels {
+  characterNames?: Record<string, string>;
+  lorebookNames?: Record<string, string>;
+  promptPresetNames?: Record<string, string>;
+  personaName?: string | null;
+}
+
+/** Immutable copy of the choices and effective parameters used when a game was first created. */
+export interface GameInitialSetupSnapshot {
+  config: GameSetupConfig;
+  /** Effective values after connection defaults and setup overrides were merged. */
+  effectiveGenerationParameters?: Partial<GenerationParameters> | null;
+  /** Free-text preferences are sent separately during setup, so retain them beside the config. */
+  preferences?: string | null;
+  /** Safe display details only. API keys, URLs, and local connection IDs are never retained here. */
+  connections?: {
+    gm?: GameInitialSetupConnectionSnapshot | null;
+    scene?: GameInitialSetupConnectionSnapshot | null;
+    image?: GameInitialSetupConnectionSnapshot | null;
+    video?: GameInitialSetupConnectionSnapshot | null;
+  };
+  labels?: GameInitialSetupLabels;
+  createdAt: string;
 }
 
 // ── Dice ──
@@ -266,6 +335,8 @@ export interface Combatant {
   element?: string;
   /** Current elemental aura applied to this combatant */
   elementAura?: { element: string; gauge: number; sourceId: string } | null;
+  /** Tactical-combat class hint (fighter/knight/rogue/archer/mage/healer). Classic combat ignores this. */
+  combatClass?: string;
 }
 
 export interface CombatStatusEffect {
@@ -288,9 +359,6 @@ export interface CombatSkill {
   element?: string;
   statusEffect?: string;
 }
-
-/** Element presets for the elemental reaction system */
-export type ElementPresetName = "default" | "genshin" | "hsr";
 
 /** Lightweight element info for the client */
 export interface ElementInfo {
@@ -583,4 +651,96 @@ export interface GameCheckpoint {
   timeOfDay: string | null;
   turnNumber: number | null;
   createdAt: string;
+}
+
+export type GameSceneVideoAspectRatio = "16:9" | "9:16";
+
+export interface GeneratedSceneVideo {
+  id: string;
+  chatId: string;
+  filePath: string;
+  url: string;
+  sourceIllustrationTag: string | null;
+  sourceIllustrationPath: string | null;
+  prompt: string;
+  provider: string;
+  model: string;
+  durationSeconds: number;
+  aspectRatio: GameSceneVideoAspectRatio;
+  createdAt: string;
+}
+
+export type GameStoryboardStatus =
+  | "planning"
+  | "rendering_images"
+  | "rendering_videos"
+  | "complete"
+  | "partial"
+  | "failed";
+
+export type GameStoryboardKeyframeStatus =
+  | "planned"
+  | "rendering_image"
+  | "image_complete"
+  | "rendering_video"
+  | "complete"
+  | "failed";
+
+export interface GameStoryboardMediaRef {
+  id: string;
+  url: string;
+  prompt: string;
+  provider: string;
+  model: string;
+  createdAt: string;
+}
+
+export interface GameTurnStoryboardKeyframe {
+  id: string;
+  storyboardId: string;
+  index: number;
+  title: string;
+  sectionStartIndex: number | null;
+  sectionEndIndex: number | null;
+  anchorQuote: string;
+  anchorKind: "narration" | "dialogue" | "readable" | "system" | "";
+  narrationBeat: string;
+  mangaPanelPrompt: string;
+  imagePrompt: string;
+  videoPrompt: string;
+  characters: string[];
+  continuityNotes: string;
+  cameraMotion: string;
+  transitionHint: string;
+  durationSeconds: number;
+  aspectRatio: GameSceneVideoAspectRatio;
+  chatImageId: string | null;
+  sceneVideoId: string | null;
+  image: GameStoryboardMediaRef | null;
+  video: GeneratedSceneVideo | null;
+  status: GameStoryboardKeyframeStatus;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GameTurnStoryboard {
+  id: string;
+  chatId: string;
+  messageId: string;
+  swipeIndex: number;
+  snapshotId: string | null;
+  sessionNumber: number | null;
+  turnNumber: number | null;
+  title: string;
+  sourceNarration: string;
+  sourceNarrationHash: string;
+  status: GameStoryboardStatus;
+  provider: string;
+  model: string;
+  directorPrompt: string;
+  error: string | null;
+  keyframes: GameTurnStoryboardKeyframe[];
+  createdAt: string;
+  updatedAt: string;
 }

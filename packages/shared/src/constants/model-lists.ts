@@ -27,6 +27,7 @@ export function isClaudeAdaptiveOnlyNoSamplingModel(model: string): boolean {
 export function supportsXhighReasoningEffort(model: string): boolean {
   const normalized = model.toLowerCase();
   return (
+    normalized.startsWith("gpt-5.6") ||
     normalized.startsWith("gpt-5.5") ||
     normalized.startsWith("gpt-5.4") ||
     normalized === "grok-4.20-multi-agent" ||
@@ -34,9 +35,72 @@ export function supportsXhighReasoningEffort(model: string): boolean {
   );
 }
 
+export function isOpenAIGpt56Model(model: string): boolean {
+  return model.toLowerCase().startsWith("gpt-5.6");
+}
+
+export function isOpenAIGpt56SolProAlias(model: string): boolean {
+  return model.toLowerCase() === "gpt-5.6-sol-pro";
+}
+
+export function resolveOpenAIGpt56ModelForRequest(model: string): string {
+  return isOpenAIGpt56SolProAlias(model) ? "gpt-5.6-sol" : model;
+}
+
+export type StoredReasoningEffort = "low" | "medium" | "high" | "xhigh" | "maximum" | "max" | null;
+export type ProviderReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max" | null;
+
+export function resolveProviderReasoningEffort(args: {
+  provider: string;
+  model: string;
+  reasoningEffort: StoredReasoningEffort | undefined;
+}): ProviderReasoningEffort {
+  if (!args.reasoningEffort) return null;
+  const modelLower = args.model.toLowerCase();
+  const providerLower = args.provider.toLowerCase();
+
+  const xaiUsesAutoReasoning =
+    (providerLower === "xai" && isXaiAutoReasoningModel(modelLower)) ||
+    (providerLower === "openrouter" && modelLower.startsWith("x-ai/grok-"));
+  if (xaiUsesAutoReasoning) return null;
+
+  const isNativeAnthropicAdaptiveOnly =
+    (providerLower === "anthropic" || providerLower === "claude_subscription") &&
+    isClaudeAdaptiveOnlyNoSamplingModel(modelLower);
+  const supportsXhigh = supportsXhighReasoningEffort(modelLower);
+  const supportsMax = isOpenAIGpt56Model(modelLower) || isNativeAnthropicAdaptiveOnly;
+
+  if (args.reasoningEffort === "maximum") {
+    return supportsMax ? "max" : supportsXhigh ? "xhigh" : "high";
+  }
+  if (args.reasoningEffort === "max") {
+    return supportsMax ? "max" : supportsXhigh ? "xhigh" : "high";
+  }
+  if (args.reasoningEffort === "xhigh") {
+    return supportsXhigh ? "xhigh" : "high";
+  }
+  return args.reasoningEffort;
+}
+
+export function isXaiConfigurableReasoningModel(model: string): boolean {
+  const normalized = model.toLowerCase().replace(/^x-ai\//, "");
+  return normalized.startsWith("grok-4.5") || normalized.startsWith("grok-4.3");
+}
+
+export function isXaiAutoReasoningModel(model: string): boolean {
+  const normalized = model.toLowerCase().replace(/^x-ai\//, "");
+  return normalized.startsWith("grok-4-1-fast");
+}
+
 // ── OpenAI (from #model_openai_select) ──
 
 export const OPENAI_MODELS: KnownModel[] = [
+  // GPT-5.6
+  { id: "gpt-5.6", name: "gpt-5.6 (alias for gpt-5.6-sol)", context: 1050000, maxOutput: 128000 },
+  { id: "gpt-5.6-sol", name: "gpt-5.6-sol", context: 1050000, maxOutput: 128000 },
+  { id: "gpt-5.6-sol-pro", name: "gpt-5.6-sol-pro (Sol with pro mode)", context: 1050000, maxOutput: 128000 },
+  { id: "gpt-5.6-terra", name: "gpt-5.6-terra", context: 1050000, maxOutput: 128000 },
+  { id: "gpt-5.6-luna", name: "gpt-5.6-luna", context: 1050000, maxOutput: 128000 },
   // GPT-5.5
   { id: "gpt-5.5", name: "gpt-5.5", context: 1050000, maxOutput: 128000 },
   { id: "gpt-5.5-2026-04-23", name: "gpt-5.5-2026-04-23", context: 1050000, maxOutput: 128000 },
@@ -369,7 +433,10 @@ export const OPENROUTER_MODELS: KnownModel[] = [];
 // ── xAI / Grok (OpenAI-compatible API) ──
 
 export const XAI_MODELS: KnownModel[] = [
-  // Official xAI docs recommend Grok 4.3 for standard chat API usage.
+  // Grok 4.5 launched July 8, 2026. The launch post gives the API ID; xAI's
+  // current Grok text family uses a 1M context window in the model docs.
+  { id: "grok-4.5", name: "Grok 4.5", context: 1000000, maxOutput: 0 },
+  { id: "grok-4.5-latest", name: "Grok 4.5 Latest", context: 1000000, maxOutput: 0 },
   { id: "grok-4.3", name: "Grok 4.3", context: 1000000, maxOutput: 0 },
   { id: "grok-4.3-latest", name: "Grok 4.3 Latest", context: 1000000, maxOutput: 0 },
   { id: "grok-latest", name: "Grok Latest", context: 1000000, maxOutput: 0 },
@@ -390,6 +457,12 @@ export const XAI_MODELS: KnownModel[] = [
   { id: "grok-code-fast-1-0825", name: "Grok Code Fast 1 0825", context: 256000, maxOutput: 0 },
   { id: "grok-code-fast-1-0831", name: "Grok Code Fast 1 0831", context: 256000, maxOutput: 0 },
 ];
+
+// ── Grok CLI (Subscription via local Grok Build auth) ──
+// Account-tier availability is discovered from the installed CLI with
+// `grok models`. Keep this empty so Marinara does not hand the CLI stale API
+// aliases such as `grok-build-latest` that some Grok CLI installs reject.
+export const GROK_SUBSCRIPTION_MODELS: KnownModel[] = [];
 
 // ── Additional providers with static lists in SillyTavern ──
 
@@ -453,6 +526,7 @@ export const MOONSHOT_MODELS: KnownModel[] = [
 
 // Z.AI / GLM (from #model_zai_select)
 export const ZAI_MODELS: KnownModel[] = [
+  { id: "glm-5.2", name: "glm-5.2", context: 1000000, maxOutput: 128000 },
   { id: "glm-5", name: "glm-5", context: 200000, maxOutput: 8192 },
   { id: "glm-4.7", name: "glm-4.7", context: 200000, maxOutput: 8192 },
   { id: "glm-4.7-flash", name: "glm-4.7-flash", context: 200000, maxOutput: 8192 },
@@ -499,6 +573,45 @@ export interface ImageGenSource {
   requiresApiKey: boolean;
 }
 
+export interface VideoGenSource {
+  id: string;
+  name: string;
+  description: string;
+  defaultBaseUrl: string;
+  requiresApiKey: boolean;
+}
+
+export const VIDEO_GENERATION_SOURCES: VideoGenSource[] = [
+  {
+    id: "google_ai_studio",
+    name: "Google AI Studio",
+    description: "Gemini Omni and Veo video models via the Gemini API.",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    requiresApiKey: true,
+  },
+  {
+    id: "xai",
+    name: "xAI Imagine",
+    description: "Grok Imagine video and image-to-video via the xAI Videos API.",
+    defaultBaseUrl: "https://api.x.ai/v1",
+    requiresApiKey: true,
+  },
+  {
+    id: "openrouter",
+    name: "OpenRouter Video",
+    description: "Video generation models exposed through OpenRouter's asynchronous Videos API.",
+    defaultBaseUrl: "https://openrouter.ai/api/v1",
+    requiresApiKey: true,
+  },
+  {
+    id: "seedance",
+    name: "Seedance 2.0",
+    description: "Seedance 2.0 video generation with text, first-frame, and first/last-frame modes.",
+    defaultBaseUrl: "https://api.seedance2.ai",
+    requiresApiKey: true,
+  },
+];
+
 export const IMAGE_GENERATION_SOURCES: ImageGenSource[] = [
   {
     id: "openai",
@@ -540,6 +653,13 @@ export const IMAGE_GENERATION_SOURCES: ImageGenSource[] = [
     name: "xAI / Grok Imagine",
     description: "Grok Imagine image generation via xAI's Images API.",
     defaultBaseUrl: "https://api.x.ai/v1",
+    requiresApiKey: true,
+  },
+  {
+    id: "venice",
+    name: "Venice.ai",
+    description: "Private image generation through Venice's native image API.",
+    defaultBaseUrl: "https://api.venice.ai/api/v1",
     requiresApiKey: true,
   },
   {
@@ -645,6 +765,10 @@ const IMAGE_GEN_MODELS: KnownModel[] = [
   { id: "grok-4.1-fast-image", name: "Grok 4.1 Fast Image", context: 0, maxOutput: 0 },
   { id: "grok-imagine-image", name: "Grok Imagine Image", context: 0, maxOutput: 0 },
   { id: "grok-2-image", name: "Grok 2 Image", context: 0, maxOutput: 0 },
+  // Venice.ai
+  { id: "chroma", name: "Chroma (Venice)", context: 0, maxOutput: 0 },
+  { id: "flux-2-pro", name: "FLUX 2 Pro (Venice)", context: 0, maxOutput: 0 },
+  { id: "venice-sd35", name: "Venice SD3.5", context: 0, maxOutput: 0 },
   // NovelAI
   { id: "nai-diffusion-4-curated-preview", name: "NAI Diffusion 4 Curated", context: 0, maxOutput: 0 },
   { id: "nai-diffusion-4-5-full", name: "NAI Diffusion 4.5 Full", context: 0, maxOutput: 0 },
@@ -652,6 +776,33 @@ const IMAGE_GEN_MODELS: KnownModel[] = [
   // Pollinations (model-free, but include as placeholder)
   { id: "pollinations", name: "Pollinations (Auto)", context: 0, maxOutput: 0 },
 ];
+
+const VIDEO_GEN_MODELS: KnownModel[] = [
+  { id: "gemini-omni-flash-preview", name: "Gemini Omni Flash Preview", context: 0, maxOutput: 0 },
+  { id: "veo-3.1-generate-preview", name: "Veo 3.1 Generate Preview", context: 0, maxOutput: 0 },
+  { id: "veo-3.1-fast-generate-preview", name: "Veo 3.1 Fast Generate Preview", context: 0, maxOutput: 0 },
+  { id: "veo-3.1-lite-generate-preview", name: "Veo 3.1 Lite Generate Preview", context: 0, maxOutput: 0 },
+  { id: "veo-3.0-generate-preview", name: "Veo 3 Generate Preview", context: 0, maxOutput: 0 },
+  { id: "veo-3.0-fast-generate-preview", name: "Veo 3 Fast Generate Preview", context: 0, maxOutput: 0 },
+  { id: "grok-imagine-video-1.5", name: "Grok Imagine Video 1.5", context: 0, maxOutput: 0 },
+  { id: "grok-imagine-video", name: "Grok Imagine Video", context: 0, maxOutput: 0 },
+  { id: "google/veo-3.1", name: "Google Veo 3.1 (OpenRouter)", context: 0, maxOutput: 0 },
+  { id: "alibaba/wan-2.7", name: "Alibaba WAN 2.7 (OpenRouter)", context: 0, maxOutput: 0 },
+  { id: "seedance-2-0", name: "Seedance 2.0", context: 0, maxOutput: 0 },
+  { id: "seedance-2-0-fast", name: "Seedance 2.0 Fast", context: 0, maxOutput: 0 },
+];
+
+export function inferVideoSource(model: string, baseUrl: string): string {
+  const m = model.toLowerCase();
+  const u = baseUrl.toLowerCase();
+  if (m === "seedance" || m.startsWith("seedance-") || u.includes("seedance2.ai")) return "seedance";
+  if (m === "openrouter" || u.includes("openrouter.ai")) return "openrouter";
+  if (m.includes("/") && (m.includes("veo") || m.includes("wan"))) return "openrouter";
+  if (m === "google_veo" || m === "veo" || /^veo-[\d.]+/.test(m)) return "google_veo";
+  if (m === "xai" || u.includes("api.x.ai") || u.includes("x.ai")) return "xai";
+  if (m.includes("grok") && m.includes("imagine") && m.includes("video")) return "xai";
+  return "gemini_omni";
+}
 
 /**
  * Infer which image generation API source to use from the model name and base URL.
@@ -670,6 +821,7 @@ export function inferImageSource(model: string, baseUrl: string): string {
     m === "blockentropy" ||
     m === "openrouter" ||
     m === "xai" ||
+    m === "venice" ||
     m === "comfyui" ||
     m === "automatic1111" ||
     m === "runpod_comfyui" ||
@@ -681,6 +833,7 @@ export function inferImageSource(model: string, baseUrl: string): string {
   if (u.includes("nano-gpt.com")) return "nanogpt";
   if (u.includes("openrouter.ai")) return "openrouter";
   if (u.includes("api.x.ai") || u.includes("x.ai")) return "xai";
+  if (u.includes("venice.ai")) return "venice";
   if (m.startsWith("grok-") && m.includes("image")) return "xai";
   if (m.includes("grok") && m.includes("imagine")) return "xai";
   if (m.startsWith("dall-e") || m.startsWith("gpt-image") || u.includes("openai.com")) return "openai";
@@ -707,6 +860,7 @@ export const MODEL_LISTS: Record<APIProvider, KnownModel[]> = {
   openai_chatgpt: OPENAI_CHATGPT_MODELS,
   anthropic: ANTHROPIC_MODELS,
   claude_subscription: CLAUDE_SUBSCRIPTION_MODELS,
+  grok_subscription: GROK_SUBSCRIPTION_MODELS,
   google: GOOGLE_MODELS,
   google_vertex: GOOGLE_MODELS,
   mistral: MISTRAL_MODELS,
@@ -715,8 +869,9 @@ export const MODEL_LISTS: Record<APIProvider, KnownModel[]> = {
   nanogpt: [], // NanoGPT aggregator — models fetched dynamically via API
   xai: XAI_MODELS,
   // Seed OAI-compatible endpoints with the OpenAI catalog; remote /models still merge on top.
-  custom: OPENAI_MODELS,
+  custom: [...OPENAI_MODELS, ...ZAI_MODELS],
   image_generation: IMAGE_GEN_MODELS,
+  video_generation: VIDEO_GEN_MODELS,
 };
 
 /**

@@ -66,7 +66,6 @@ export type MetadataUpdater = (current: MetadataPatch) => MetadataPatch | Promis
 export type MetadataPatchInput = MetadataPatch | MetadataUpdater;
 
 const MAX_APPEND_BYTES = 16 * 1024;
-const MAX_LOREBOOK_ENTRY_CONTENT_BYTES = 64 * 1024;
 const MAX_LOREBOOK_ENTRY_DESCRIPTION_BYTES = 4 * 1024;
 const MAX_LOREBOOK_ENTRY_NAME_LENGTH = 160;
 const MAX_LOREBOOK_ENTRY_KEYS = 24;
@@ -168,6 +167,8 @@ export interface ToolExecutionContext {
   gameState?: Record<string, unknown>;
   chatMeta?: Record<string, unknown>;
   hiddenContext?: CustomToolHiddenContext;
+  /** The character whose turn invoked the tool (Conversation mode; used by update_about_me). */
+  callingCharacterId?: string | null;
   onUpdateMetadata?: (patch: MetadataPatchInput) => Promise<MetadataPatch>;
   customTools?: CustomToolDef[];
   searchLorebook?: LorebookSearchFn;
@@ -258,6 +259,8 @@ async function executeSingleTool(
       return spotifyPlay(args, context?.spotify, context);
     case "spotify_set_volume":
       return spotifySetVolume(args, context?.spotify);
+    case "update_about_me":
+      return updateAboutMe(args, context);
     default: {
       // Try custom tools
       const custom = context?.customTools?.find((t) => t.name === name);
@@ -277,6 +280,7 @@ async function executeSingleTool(
           "append_chat_summary",
           "read_chat_variable",
           "write_chat_variable",
+          "update_about_me",
           "spotify_get_current_playback",
           "spotify_get_playlists",
           "spotify_get_playlist_tracks",
@@ -598,6 +602,37 @@ async function writeChatVariable(
   };
 }
 
+async function updateAboutMe(
+  args: Record<string, unknown>,
+  context?: ToolExecutionContext,
+): Promise<Record<string, unknown>> {
+  const scope = args.scope === "public" ? "public" : args.scope === "chat" ? "chat" : null;
+  if (!scope) return { error: "update_about_me requires scope \"public\" or \"chat\"" };
+  if (typeof args.content !== "string") return { error: "update_about_me requires a string content" };
+  const characterId = context?.callingCharacterId;
+  if (!characterId) return { error: "update_about_me could not resolve the calling character" };
+  const content = args.content;
+
+  if (scope === "chat") {
+    if (!context?.onUpdateMetadata) {
+      return { error: "Chat metadata updates are not available in this context" };
+    }
+    await context.onUpdateMetadata((currentMeta) => {
+      const overrides = {
+        ...((currentMeta.conversationAboutMeOverrides as Record<string, string> | undefined) ?? {}),
+      };
+      if (content.trim()) overrides[characterId] = content;
+      else delete overrides[characterId];
+      return { conversationAboutMeOverrides: overrides };
+    });
+    return { scope: "chat", applied: true, characterId };
+  }
+
+  // Public edits are proposed for user approval — the route detects this result
+  // and emits a character_card_update event (it can compute the exact oldText).
+  return { scope: "public", proposedCardUpdate: { characterId, newText: content }, applied: false };
+}
+
 function triggerEvent(args: Record<string, unknown>): Record<string, unknown> {
   return {
     applied: true,
@@ -774,7 +809,7 @@ async function saveLorebookEntry(
   }
 
   const name = args.name.trim().slice(0, MAX_LOREBOOK_ENTRY_NAME_LENGTH);
-  const content = trimToUtf8Bytes(args.content.trim(), MAX_LOREBOOK_ENTRY_CONTENT_BYTES);
+  const content = args.content.trim();
   const description =
     typeof args.description === "string" && args.description.trim()
       ? trimToUtf8Bytes(args.description.trim(), MAX_LOREBOOK_ENTRY_DESCRIPTION_BYTES)

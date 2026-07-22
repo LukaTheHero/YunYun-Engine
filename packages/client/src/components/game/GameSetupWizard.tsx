@@ -1,9 +1,10 @@
 // ──────────────────────────────────────────────
 // Game: Setup Wizard (initial game setup modal)
 // ──────────────────────────────────────────────
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type ChangeEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
 import {
   Wand2,
   ArrowRight,
@@ -16,20 +17,45 @@ import {
   User,
   Plug,
   Image,
+  Film,
+  PanelsTopLeft,
   BookOpen,
   Music2,
   Volume2,
   VolumeX,
   Feather,
+  Map as MapIcon,
   RotateCcw,
+  FolderOpen,
+  FileUp,
+  CheckCircle2,
 } from "lucide-react";
-import { DEFAULT_GAME_SYSTEM_PROMPT, type GameSetupConfig, type GameGmMode } from "@marinara-engine/shared";
+import {
+  ANIME_GAME_PROMPT_TEMPLATE_ID,
+  ANIME_GAME_SYSTEM_PROMPT,
+  COMIC_PAGE_GAME_VIDEO_PROMPT_TEMPLATE_ID,
+  DEFAULT_GAME_SYSTEM_PROMPT,
+  STORYBOARD_OPTIMIZED_IMAGE_PROMPT_TEMPLATE_ID,
+  GAME_STORYBOARD_COMIC_ANIMATION_PROMPT_TEMPLATE_ID,
+  GAME_STORYBOARD_KEYFRAME_COUNT_DEFAULT,
+  GAME_STORYBOARD_KEYFRAME_COUNT_MAX,
+  GAME_STORYBOARD_KEYFRAME_COUNT_MIN,
+  type CharacterGroup,
+  type GameInitialSetupLabels,
+  type GameSetupConfig,
+  type GameGmMode,
+  type GenerationParameters,
+  type SpatialMapGroundingMode,
+  type SpatialMapDraftSize,
+  type GameCombatStyle,
+} from "@marinara-engine/shared";
 import { getCharacterTitle } from "../../lib/character-display";
 import { api } from "../../lib/api-client";
 import { cn, getAvatarCropStyle, parseAvatarCropJson, type AvatarCropValue } from "../../lib/utils";
 import {
   GenerationParametersFields,
   getEditableGenerationParameters,
+  parseEditableGenerationParameters,
   ROLEPLAY_PARAMETER_DEFAULTS,
   type EditableGenerationParameters,
 } from "../ui/GenerationParametersEditor";
@@ -48,21 +74,30 @@ import {
 } from "./GameWidgetSetupEditor";
 import { useConnections } from "../../hooks/use-connections";
 import { useDefaultPreset, usePresets } from "../../hooks/use-presets";
-import { usePersonas } from "../../hooks/use-characters";
+import { useCharacterGroups, usePersonas } from "../../hooks/use-characters";
 import { useSidecarStore } from "../../stores/sidecar.store";
 import { useLorebooks } from "../../hooks/use-lorebooks";
+import { useCapabilityAgentRegistry } from "../../hooks/use-capability-packages";
 import { useGameAssetStore } from "../../stores/game-asset.store";
 import { useUIStore } from "../../stores/ui.store";
+import { parseGameSetupShareFileJson, resolveGameSetupImport } from "../../lib/game-setup-share";
 
 interface GameSetupWizardProps {
   onComplete: (
     config: GameSetupConfig,
     preferences: string,
-    connections: { gmConnectionId?: string },
+    connections: { gmConnectionId?: string; shareLabels?: GameInitialSetupLabels },
     gameName?: string,
+    mapDraft?: {
+      size: SpatialMapDraftSize;
+      groundingMode: SpatialMapGroundingMode;
+      sourceLorebookIds: string[];
+      instructions?: string;
+    },
   ) => void;
   onCancel: () => void;
   isLoading: boolean;
+  isDraftingMap: boolean;
   characters: Array<{
     id: string;
     name: string;
@@ -75,6 +110,15 @@ interface GameSetupWizardProps {
 interface PersonaDisplayInfo {
   name: string;
   comment?: string | null;
+}
+
+interface WizardConnection {
+  id: string;
+  name: string;
+  model?: string;
+  provider?: string;
+  defaultParameters?: string | null;
+  isDefault?: boolean | string;
 }
 
 function CharacterAvatar({
@@ -117,6 +161,7 @@ const GENRES = ["Fantasy", "Sci-Fi", "Horror", "Modern", "Post-Apocalyptic", "Cy
 const TONES = ["Heroic", "Dark", "Comedic", "Gritty", "Whimsical", "Serious", "Campy"];
 const DIFFICULTIES = ["Casual", "Normal", "Hard", "Brutal"];
 const LEARNED_OPTION_PREVIEW_LIMIT = 8;
+const GAME_SETUP_IMPORT_MAX_BYTES = 1_000_000;
 
 const SETTING_SUGGESTIONS = [
   "Surprise me!",
@@ -137,6 +182,16 @@ const PREFERENCE_SUGGESTIONS = [
   "Focus on exploration",
   "Make NPCs memorable",
   "Keep it short",
+];
+
+const SPATIAL_MAP_DRAFT_SIZE_OPTIONS: Array<{
+  value: SpatialMapDraftSize;
+  label: string;
+  detail: string;
+}> = [
+  { value: "small", label: "Small", detail: "About 8 places" },
+  { value: "medium", label: "Medium", detail: "About 16 places" },
+  { value: "large", label: "Large", detail: "About 28 places" },
 ];
 
 const GAME_SETUP_FIELD_LABEL = "mb-1.5 block text-xs font-medium text-[var(--foreground)]";
@@ -180,7 +235,7 @@ const GAME_SETUP_STEPS = [
   {
     key: "features",
     title: "Features",
-    body: "Choose optional visual, music, lore, and HUD features for the session.",
+    body: "Choose installed agent features, audio behavior, and HUD options for the session.",
   },
   {
     key: "gm",
@@ -190,6 +245,21 @@ const GAME_SETUP_STEPS = [
 ] as const;
 
 type GameSpotifySourceType = "liked" | "playlist" | "artist" | "any";
+
+function parseCharacterFolderIds(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+  }
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 const GAME_SPOTIFY_SOURCE_OPTIONS: Array<{ id: GameSpotifySourceType; label: string; description: string }> = [
   { id: "liked", label: "Liked Songs", description: "Pick from saved tracks first." },
@@ -203,6 +273,14 @@ function normalizeGameSpotifySourceType(value: unknown): GameSpotifySourceType {
 }
 
 type LearnedOptionGroup = "genres" | "tones" | "settings" | "goals" | "preferences";
+
+function getPreferredConnectionId(connections: WizardConnection[]): string | null {
+  return (
+    connections.find((connection) => connection.isDefault === true || connection.isDefault === "true")?.id ??
+    connections[0]?.id ??
+    null
+  );
+}
 
 function optionKey(value: string) {
   return value.trim().toLowerCase();
@@ -330,8 +408,16 @@ function normalizeGameLanguage(language: string): string {
   return GAME_LANGUAGE_LOOKUP.get(trimmed.toLowerCase()) ?? trimmed;
 }
 
-export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }: GameSetupWizardProps) {
+export function GameSetupWizard({
+  onComplete,
+  onCancel,
+  isLoading,
+  isDraftingMap,
+  characters,
+}: GameSetupWizardProps) {
+  const prefersReducedMotion = useReducedMotion();
   const [step, setStep] = useState(0);
+  const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [gameName, setGameName] = useState("");
   const [genres, setGenres] = useState<string[]>(["Fantasy"]);
   const [customGenre, setCustomGenre] = useState("");
@@ -339,6 +425,7 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
   const [tones, setTones] = useState<string[]>(["Heroic"]);
   const [customTone, setCustomTone] = useState("");
   const [difficulty, setDifficulty] = useState("Normal");
+  const [combatStyle, setCombatStyle] = useState<GameCombatStyle>("classic");
   const [gmMode, setGmMode] = useState<GameGmMode>("standalone");
   const [gmCharacterId, setGmCharacterId] = useState<string | null>(null);
   const [partyCharacterIds, setPartyCharacterIds] = useState<string[]>([]);
@@ -350,6 +437,7 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
   );
   const [gmSearch, setGmSearch] = useState("");
   const [partySearch, setPartySearch] = useState("");
+  const [partyFolderId, setPartyFolderId] = useState("");
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [gmConnectionId, setGmConnectionId] = useState<string | null>(null);
   const [customizeParameters, setCustomizeParameters] = useState(false);
@@ -366,6 +454,12 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
   const [gameSpotifyArtist, setGameSpotifyArtist] = useState("");
   const [enableLorebookKeeper, setEnableLorebookKeeper] = useState(false);
   const [imageConnectionId, setImageConnectionId] = useState<string | null>(null);
+  const [videoConnectionId, setVideoConnectionId] = useState<string | null>(null);
+  const [enableStoryboardIllustrations, setEnableStoryboardIllustrations] = useState(true);
+  const [enableStoryboardAnimations, setEnableStoryboardAnimations] = useState(false);
+  const [storyboardKeyframeCount, setStoryboardKeyframeCount] = useState(
+    GAME_STORYBOARD_KEYFRAME_COUNT_DEFAULT,
+  );
   const [sceneConnectionId, setSceneConnectionId] = useState<string | null>(null);
   const [activeLorebookIds, setActiveLorebookIds] = useState<string[]>([]);
   const [lbSearch, setLbSearch] = useState("");
@@ -379,8 +473,14 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
   const [promptPresetTouched, setPromptPresetTouched] = useState(false);
   const [customGamePromptEnabled, setCustomGamePromptEnabled] = useState(false);
   const [gameSystemPromptDraft, setGameSystemPromptDraft] = useState(DEFAULT_GAME_SYSTEM_PROMPT);
+  const [gameSystemPromptEdited, setGameSystemPromptEdited] = useState(false);
+  const [gamePresentation, setGamePresentation] = useState<"standard" | "anime">("standard");
   const [language, setLanguage] = useState("English");
   const [startMuted, setStartMuted] = useState(false);
+  const [draftSpatialMap, setDraftSpatialMap] = useState(false);
+  const [spatialMapDraftSize, setSpatialMapDraftSize] = useState<SpatialMapDraftSize>("medium");
+  const [spatialMapGroundingMode, setSpatialMapGroundingMode] = useState<SpatialMapGroundingMode>("setup");
+  const [spatialMapInstructions, setSpatialMapInstructions] = useState("");
   const [expandedLearnedOptions, setExpandedLearnedOptions] = useState<Record<LearnedOptionGroup, boolean>>({
     genres: false,
     tones: false,
@@ -388,18 +488,42 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
     goals: false,
     preferences: false,
   });
+  const [importedSetupNotice, setImportedSetupNotice] = useState<string | null>(null);
+  const setupImportInputRef = useRef<HTMLInputElement>(null);
+  const pendingImportedGenerationParametersRef = useRef<Partial<EditableGenerationParameters> | null>(null);
+  const importedGenerationParametersRef = useRef<Partial<GenerationParameters> | null>(null);
+  const importedArtStyleSettingsRef = useRef<
+    Pick<
+      GameSetupConfig,
+      "artStylePrompt" | "generatedArtStylePrompt" | "useCampaignArtStyle" | "imageStyleProfileId"
+    > | null
+  >(null);
 
   const sidecarStatus = useSidecarStore((s) => s.status);
   const sidecarConfig = useSidecarStore((s) => s.config);
   const learnedGameSetupOptions = useUIStore((s) => s.learnedGameSetupOptions);
   const rememberGameSetupOptions = useUIStore((s) => s.rememberGameSetupOptions);
   const forgetGameSetupOption = useUIStore((s) => s.forgetGameSetupOption);
+  const openRightPanel = useUIStore((s) => s.openRightPanel);
+  const openAgentCatalog = useUIStore((s) => s.openAgentCatalog);
   const sidecarAvailable = !!sidecarConfig.modelPath && sidecarStatus !== "not_downloaded";
 
   // Fetch sidecar status on mount so the dropdown is populated without visiting Connections first
   useEffect(() => {
     useSidecarStore.getState().fetchStatus();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setGenerationElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const updateElapsed = () => setGenerationElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 1_000);
+    return () => window.clearInterval(interval);
+  }, [isLoading]);
 
   // Once status loads, sync the local toggle with the persisted config
   useEffect(() => {
@@ -411,11 +535,22 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
   // "local" = sidecar, a connection id = API connection, null = skip
   const sceneModelValue = useLocalScene && sidecarAvailable ? "local" : sceneConnectionId;
 
-  const { data: connectionsList } = useConnections();
-  const { data: promptPresetsList } = usePresets();
+  const { data: connectionsList, isLoading: connectionsLoading } = useConnections();
+  const { data: promptPresetsList, isLoading: promptPresetsLoading } = usePresets();
   const { data: defaultPreset } = useDefaultPreset();
-  const { data: personasList } = usePersonas();
-  const { data: lorebooksList } = useLorebooks();
+  const { data: personasList, isLoading: personasLoading } = usePersonas();
+  const { data: characterGroupsList } = useCharacterGroups();
+  const { data: lorebooksList, isLoading: lorebooksLoading } = useLorebooks();
+  const { data: installedAgentManifests = [], isLoading: installedAgentsLoading } = useCapabilityAgentRegistry();
+  const installedAgentIds = useMemo(
+    () => new Set(installedAgentManifests.map((agent) => agent.id)),
+    [installedAgentManifests],
+  );
+  const hasInstalledAgents = installedAgentIds.size > 0;
+  const hierarchicalMapsInstalled = installedAgentIds.has("hierarchical-maps");
+  const musicDjInstalled = installedAgentIds.has("spotify");
+  const lorebookKeeperInstalled = installedAgentIds.has("lorebook-keeper");
+  const illustratorInstalled = installedAgentIds.has("illustrator");
   const spotifyPlaylistsQuery = useQuery({
     queryKey: ["spotify", "playlists", 50],
     queryFn: () =>
@@ -428,20 +563,14 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
           owned: boolean | null;
         }>;
       }>("/spotify/playlists?limit=50"),
-    enabled: enableSpotifyDj && gameSpotifySourceType === "playlist",
+    enabled: musicDjInstalled && enableSpotifyDj && gameSpotifySourceType === "playlist",
     staleTime: 60_000,
     retry: false,
   });
 
   const connections = useMemo(
     () =>
-      (connectionsList as Array<{
-        id: string;
-        name: string;
-        model?: string;
-        provider?: string;
-        defaultParameters?: string | null;
-      }>) ?? [],
+      (connectionsList as WizardConnection[]) ?? [],
     [connectionsList],
   );
   const selectedGmConnection = useMemo(
@@ -453,13 +582,33 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
     [selectedGmConnection?.defaultParameters],
   );
   const imageConnections = useMemo(() => connections.filter((c) => c.provider === "image_generation"), [connections]);
+  const videoConnections = useMemo(() => connections.filter((c) => c.provider === "video_generation"), [connections]);
+  const preferredImageConnectionId = useMemo(() => getPreferredConnectionId(imageConnections), [imageConnections]);
+  const preferredVideoConnectionId = useMemo(() => getPreferredConnectionId(videoConnections), [videoConnections]);
   const promptPresets = useMemo(
-    () => (promptPresetsList as Array<{ id: string; name: string; isDefault?: boolean | string }>) ?? [],
+    () =>
+      (promptPresetsList as Array<{
+        id: string;
+        name: string;
+        gamePrompt?: string;
+        isDefault?: boolean | string;
+      }>) ?? [],
     [promptPresetsList],
   );
-  const selectedPromptPresetName = useMemo(
-    () => promptPresets.find((preset) => preset.id === promptPresetId)?.name ?? null,
+  const selectedPromptPreset = useMemo(
+    () => promptPresets.find((preset) => preset.id === promptPresetId) ?? null,
     [promptPresetId, promptPresets],
+  );
+  const selectedPromptPresetName = useMemo(
+    () => selectedPromptPreset?.name ?? null,
+    [selectedPromptPreset],
+  );
+  const effectiveGameSystemPrompt = useMemo(
+    () =>
+      gamePresentation === "anime"
+        ? ANIME_GAME_SYSTEM_PROMPT
+        : selectedPromptPreset?.gamePrompt?.trim() || DEFAULT_GAME_SYSTEM_PROMPT,
+    [gamePresentation, selectedPromptPreset?.gamePrompt],
   );
   const personas = useMemo(
     () =>
@@ -472,11 +621,22 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
       }>) ?? [],
     [personasList],
   );
+  const characterFolders = useMemo(
+    () =>
+      ((characterGroupsList ?? []) as CharacterGroup[]).map((group) => ({
+        ...group,
+        characterIds: parseCharacterFolderIds(group.characterIds),
+      })),
+    [characterGroupsList],
+  );
+  const validCharacterIds = useMemo(() => new Set(characters.map((character) => character.id)), [characters]);
 
   const lorebooks = useMemo(
     () => (lorebooksList as Array<{ id: string; name: string; enabled?: boolean }>) ?? [],
     [lorebooksList],
   );
+  const setupImportResourcesReady =
+    !connectionsLoading && !promptPresetsLoading && !personasLoading && !lorebooksLoading;
 
   const availableLorebooks = useMemo(
     () =>
@@ -489,6 +649,11 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
   const toggleLorebook = useCallback((lbId: string) => {
     setActiveLorebookIds((prev) => (prev.includes(lbId) ? prev.filter((id) => id !== lbId) : [...prev, lbId]));
   }, []);
+
+  useEffect(() => {
+    if (activeLorebookIds.length > 0 || spatialMapGroundingMode === "setup") return;
+    setSpatialMapGroundingMode("setup");
+  }, [activeLorebookIds.length, spatialMapGroundingMode]);
 
   const filteredPersonas = useMemo(
     () =>
@@ -555,6 +720,23 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
     setPartyCharacterIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   };
 
+  const addPartyMembersFromFolder = useCallback(
+    (folderId: string) => {
+      const folder = characterFolders.find((entry) => entry.id === folderId);
+      if (!folder) return;
+      const folderCharacterIds = folder.characterIds.filter((id) => validCharacterIds.has(id) && id !== gmCharacterId);
+      setPartyCharacterIds((prev) => {
+        const next = [...prev];
+        for (const id of folderCharacterIds) {
+          if (!next.includes(id)) next.push(id);
+        }
+        return next;
+      });
+      setPartyFolderId("");
+    },
+    [characterFolders, gmCharacterId, validCharacterIds],
+  );
+
   const filteredGmCharacters = useMemo(
     () =>
       characters.filter((c) => {
@@ -585,14 +767,57 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
   }, []);
 
   useEffect(() => {
+    const importedParameters = pendingImportedGenerationParametersRef.current;
+    if (importedParameters) {
+      if (!gmConnectionId) return;
+      pendingImportedGenerationParametersRef.current = null;
+      setGenerationParameters(getEditableGenerationParameters(gmParameterDefaults, importedParameters));
+      return;
+    }
     setGenerationParameters(gmParameterDefaults);
-  }, [gmParameterDefaults]);
+  }, [gmConnectionId, gmParameterDefaults]);
+
+  useEffect(() => {
+    if (enableSpriteGeneration && !imageConnectionId && preferredImageConnectionId) {
+      setImageConnectionId(preferredImageConnectionId);
+    }
+  }, [enableSpriteGeneration, imageConnectionId, preferredImageConnectionId]);
+
+  useEffect(() => {
+    if (enableStoryboardAnimations && !videoConnectionId && preferredVideoConnectionId) {
+      setVideoConnectionId(preferredVideoConnectionId);
+    }
+  }, [enableStoryboardAnimations, preferredVideoConnectionId, videoConnectionId]);
 
   useEffect(() => {
     if (!promptPresetTouched && !promptPresetId && defaultPreset?.id) {
       setPromptPresetId(defaultPreset.id);
     }
   }, [defaultPreset?.id, promptPresetId, promptPresetTouched]);
+
+  useEffect(() => {
+    if (!gameSystemPromptEdited) {
+      setGameSystemPromptDraft(effectiveGameSystemPrompt);
+    }
+  }, [effectiveGameSystemPrompt, gameSystemPromptEdited]);
+
+  useEffect(() => {
+    if (installedAgentsLoading) return;
+    if (!hierarchicalMapsInstalled) setDraftSpatialMap(false);
+    if (!musicDjInstalled) setEnableSpotifyDj(false);
+    if (!lorebookKeeperInstalled) setEnableLorebookKeeper(false);
+    if (!illustratorInstalled) {
+      setEnableSpriteGeneration(false);
+      setEnableStoryboardIllustrations(false);
+      setEnableStoryboardAnimations(false);
+    }
+  }, [
+    hierarchicalMapsInstalled,
+    illustratorInstalled,
+    installedAgentsLoading,
+    lorebookKeeperInstalled,
+    musicDjInstalled,
+  ]);
 
   const handlePromptPresetChange = useCallback((presetId: string | null) => {
     setPromptPresetTouched(true);
@@ -601,6 +826,219 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
 
   const canStart = !!gmConnectionId;
   const normalizedLanguage = normalizeGameLanguage(language);
+  const illustratorEnabled = illustratorInstalled && enableSpriteGeneration;
+  const musicDjEnabled = musicDjInstalled && enableSpotifyDj;
+  const lorebookKeeperEnabled = lorebookKeeperInstalled && enableLorebookKeeper;
+  const storyboardIllustrationsEnabled = illustratorEnabled && enableStoryboardIllustrations;
+  const storyboardAnimationsEnabled = storyboardIllustrationsEnabled && enableStoryboardAnimations && !!videoConnectionId;
+
+  const openDownloadAgents = useCallback(() => {
+    onCancel();
+    openRightPanel("agents");
+    openAgentCatalog();
+  }, [onCancel, openAgentCatalog, openRightPanel]);
+
+  const toggleVisualGeneration = () => {
+    const nextEnabled = !enableSpriteGeneration;
+    setEnableSpriteGeneration(nextEnabled);
+    if (nextEnabled && !imageConnectionId && preferredImageConnectionId) {
+      setImageConnectionId(preferredImageConnectionId);
+    }
+    if (nextEnabled) {
+      setEnableStoryboardIllustrations(true);
+    }
+    if (!nextEnabled) {
+      setEnableStoryboardIllustrations(false);
+      setEnableStoryboardAnimations(false);
+    }
+  };
+
+  const toggleStoryboardIllustrations = () => {
+    const nextEnabled = !enableStoryboardIllustrations;
+    setEnableSpriteGeneration(true);
+    setEnableStoryboardIllustrations(nextEnabled);
+    if (nextEnabled && !imageConnectionId && preferredImageConnectionId) {
+      setImageConnectionId(preferredImageConnectionId);
+    }
+    if (!nextEnabled) {
+      setEnableStoryboardAnimations(false);
+    }
+  };
+
+  const toggleStoryboardAnimations = () => {
+    const nextEnabled = !enableStoryboardAnimations;
+    setEnableSpriteGeneration(true);
+    setEnableStoryboardIllustrations(true);
+    setEnableStoryboardAnimations(nextEnabled);
+    if (nextEnabled) {
+      if (!imageConnectionId && preferredImageConnectionId) {
+        setImageConnectionId(preferredImageConnectionId);
+      }
+      if (!videoConnectionId && preferredVideoConnectionId) {
+        setVideoConnectionId(preferredVideoConnectionId);
+      }
+    }
+  };
+
+  const handleImportSetupFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || isLoading) return;
+
+    try {
+      if (!setupImportResourcesReady) {
+        throw new Error("Setup resources are still loading. Try the import again in a moment.");
+      }
+      if (file.size > GAME_SETUP_IMPORT_MAX_BYTES) {
+        throw new Error("This setup file is too large. Choose a Game Mode setup file smaller than 1 MB.");
+      }
+
+      const shareFile = parseGameSetupShareFileJson(await file.text());
+      const imported = resolveGameSetupImport(shareFile, {
+        characters,
+        connections,
+        lorebooks,
+        personas,
+        promptPresets,
+      });
+      const config = imported.config;
+      const importedGenres = config.genre
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const importedTones = config.tone
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const importedPresentation =
+        config.gameGmPromptTemplateId === ANIME_GAME_PROMPT_TEMPLATE_ID ? "anime" : "standard";
+      const importedPromptPreset = promptPresets.find((preset) => preset.id === config.promptPresetId) ?? null;
+      const importedCustomPrompt = config.gameSystemPrompt?.trim() ?? "";
+      const importedBasePrompt =
+        importedPresentation === "anime"
+          ? ANIME_GAME_SYSTEM_PROMPT
+          : importedPromptPreset?.gamePrompt?.trim() || DEFAULT_GAME_SYSTEM_PROMPT;
+      const importedWidgets = normalizeGameHudWidgets(config.customHudWidgets ?? []);
+      const importedGenerationParameters = imported.effectiveGenerationParameters ?? config.generationParameters ?? null;
+      const importedParameterOverrides = parseEditableGenerationParameters(importedGenerationParameters);
+      const hasImportedGenerationParameters =
+        importedGenerationParameters !== null && Object.keys(importedGenerationParameters).length > 0;
+      const importedGmConnection = connections.find((connection) => connection.id === imported.gmConnectionId) ?? null;
+      const importedGmDefaults = getEditableGenerationParameters(
+        ROLEPLAY_PARAMETER_DEFAULTS,
+        importedGmConnection?.defaultParameters,
+      );
+
+      setStep(0);
+      setGameName(imported.gameName);
+      setGenres(importedGenres.length > 0 ? importedGenres : ["Fantasy"]);
+      setCustomGenre("");
+      setSetting(config.setting);
+      setTones(importedTones.length > 0 ? importedTones : ["Heroic"]);
+      setCustomTone("");
+      setDifficulty(config.difficulty);
+      setCombatStyle(config.combatStyle === "tactical" ? "tactical" : "classic");
+      setRating(config.rating);
+      setLanguage(config.language?.trim() || "English");
+      setGmMode(config.gmMode);
+      setGmCharacterId(config.gmCharacterId ?? null);
+      setPartyCharacterIds(config.partyCharacterIds);
+      setPersonaId(config.personaId ?? null);
+      setPlayerGoals(config.playerGoals);
+      setPreferences(imported.preferences);
+      setGmSearch("");
+      setPartySearch("");
+      setPartyFolderId("");
+      setPersonaSearch("");
+      setGmConnectionId(imported.gmConnectionId);
+      setCustomizeParameters(hasImportedGenerationParameters);
+      setGenerationParameters(getEditableGenerationParameters(importedGmDefaults, importedParameterOverrides));
+      importedGenerationParametersRef.current = importedGenerationParameters;
+      pendingImportedGenerationParametersRef.current =
+        importedParameterOverrides &&
+        (imported.gmConnectionId === null || imported.gmConnectionId !== gmConnectionId)
+          ? importedParameterOverrides
+          : null;
+      importedArtStyleSettingsRef.current = {
+        artStylePrompt: config.artStylePrompt,
+        generatedArtStylePrompt: config.generatedArtStylePrompt,
+        useCampaignArtStyle: config.useCampaignArtStyle,
+        imageStyleProfileId: config.imageStyleProfileId,
+      };
+      setUseLocalScene(
+        sidecarAvailable &&
+          !config.sceneConnectionId &&
+          shareFile.setup.connections?.scene?.provider === "local",
+      );
+      setSceneConnectionId(config.sceneConnectionId ?? null);
+
+      const visualGenerationEnabled =
+        config.enableSpriteGeneration === true ||
+        config.gameStoryboardAutoIllustrationsEnabled === true ||
+        config.gameStoryboardAutoGenerationEnabled === true;
+      setEnableSpriteGeneration(visualGenerationEnabled);
+      setImageConnectionId(config.imageConnectionId ?? null);
+      setVideoConnectionId(config.videoConnectionId ?? null);
+      setEnableStoryboardIllustrations(
+        config.gameStoryboardAutoIllustrationsEnabled === true ||
+          config.gameStoryboardAutoGenerationEnabled === true,
+      );
+      setEnableStoryboardAnimations(config.gameStoryboardAutoGenerationEnabled === true);
+      setStoryboardKeyframeCount(
+        Math.min(
+          GAME_STORYBOARD_KEYFRAME_COUNT_MAX,
+          Math.max(
+            GAME_STORYBOARD_KEYFRAME_COUNT_MIN,
+            Number.isFinite(config.gameStoryboardKeyframeCount)
+              ? Math.round(config.gameStoryboardKeyframeCount!)
+              : GAME_STORYBOARD_KEYFRAME_COUNT_DEFAULT,
+          ),
+        ),
+      );
+      setGamePresentation(importedPresentation);
+      setActiveLorebookIds(config.activeLorebookIds ?? []);
+      setLbSearch("");
+      setEnableCustomWidgets(config.enableCustomWidgets !== false);
+      setManualWidgetSetupEnabled(importedWidgets.length > 0);
+      setCustomHudWidgets(
+        importedWidgets.length > 0
+          ? importedWidgets
+          : normalizeGameHudWidgets([createDefaultGameHudWidget("progress_bar", [])]),
+      );
+      setEnableSpotifyDj(config.enableSpotifyDj === true);
+      setGameSpotifySourceType(normalizeGameSpotifySourceType(config.spotifySourceType));
+      setGameSpotifyPlaylistId(config.spotifyPlaylistId?.trim() || "");
+      setGameSpotifyPlaylistName(config.spotifyPlaylistName?.trim() || "");
+      setGameSpotifyArtist(config.spotifyArtist?.trim() || "");
+      setEnableLorebookKeeper(config.enableLorebookKeeper === true);
+      setPromptPresetTouched(true);
+      setPromptPresetId(config.promptPresetId ?? null);
+      setCustomGamePromptEnabled(Boolean(importedCustomPrompt));
+      setGameSystemPromptDraft(importedCustomPrompt || importedBasePrompt);
+      setGameSystemPromptEdited(Boolean(importedCustomPrompt));
+      setGameSpecialInstructions(config.gameSpecialInstructions?.trim() || "");
+      setDraftSpatialMap(false);
+      setSpatialMapDraftSize("medium");
+      setSpatialMapGroundingMode("setup");
+
+      const warningCount = imported.warnings.length;
+      setImportedSetupNotice(
+        warningCount > 0
+          ? `${file.name} loaded. ${warningCount} local ${warningCount === 1 ? "selection needs" : "selections need"} review.`
+          : `${file.name} loaded. Review the steps, then start the new game.`,
+      );
+      toast.success("Game Mode setup imported.");
+      if (warningCount > 0) {
+        toast.warning("Some local selections could not be restored.", {
+          description: imported.warnings.join(" "),
+        });
+      }
+    } catch (error) {
+      setImportedSetupNotice(null);
+      toast.error(error instanceof Error ? error.message : "Could not import this Game Mode setup file.");
+    }
+  };
 
   const handleComplete = () => {
     if (isLoading || !canStart) return;
@@ -608,7 +1046,7 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
     const customGameSystemPrompt =
       customGamePromptEnabled &&
       trimmedGameSystemPrompt &&
-      trimmedGameSystemPrompt !== DEFAULT_GAME_SYSTEM_PROMPT.trim()
+      trimmedGameSystemPrompt !== effectiveGameSystemPrompt.trim()
         ? trimmedGameSystemPrompt
         : null;
     const trimmedGameSpecialInstructions = gameSpecialInstructions.trim();
@@ -638,6 +1076,7 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
         setting: setting || `A ${(genres[0] ?? "fantasy").toLowerCase()} world`,
         tone: tones.join(", ") || "Heroic",
         difficulty,
+        combatStyle,
         rating,
         gmMode,
         gmCharacterId: gmMode === "character" && gmCharacterId ? gmCharacterId : undefined,
@@ -645,27 +1084,43 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
         playerGoals: playerGoals || "Have an adventure",
         personaId: personaId ?? undefined,
         sceneConnectionId: sceneModelValue && sceneModelValue !== "local" ? sceneModelValue : undefined,
-        enableSpriteGeneration: enableSpriteGeneration || undefined,
-        imageConnectionId: enableSpriteGeneration && imageConnectionId ? imageConnectionId : undefined,
+        enableSpriteGeneration: illustratorEnabled || undefined,
+        imageConnectionId: illustratorEnabled && imageConnectionId ? imageConnectionId : undefined,
+        videoConnectionId: illustratorEnabled && videoConnectionId ? videoConnectionId : undefined,
+        ...(importedArtStyleSettingsRef.current ?? {}),
+        gameStoryboardAutoIllustrationsEnabled: illustratorEnabled
+          ? enableStoryboardIllustrations
+          : undefined,
+        gameStoryboardAutoGenerationEnabled: storyboardAnimationsEnabled || undefined,
+        gameStoryboardKeyframeCount: illustratorEnabled ? storyboardKeyframeCount : undefined,
+        gameGmPromptTemplateId: gamePresentation === "anime" ? ANIME_GAME_PROMPT_TEMPLATE_ID : null,
+        gameStoryboardAnimationPromptTemplateId:
+          gamePresentation === "anime" ? GAME_STORYBOARD_COMIC_ANIMATION_PROMPT_TEMPLATE_ID : null,
+        gameStoryboardImagePromptTemplateId:
+          gamePresentation === "anime" ? STORYBOARD_OPTIMIZED_IMAGE_PROMPT_TEMPLATE_ID : null,
+        gameStoryboardVideoPromptTemplateId:
+          gamePresentation === "anime" ? COMIC_PAGE_GAME_VIDEO_PROMPT_TEMPLATE_ID : null,
         activeLorebookIds: activeLorebookIds.length > 0 ? activeLorebookIds : undefined,
         enableCustomWidgets,
         customHudWidgets:
           enableCustomWidgets && manualWidgetSetupEnabled ? normalizeGameHudWidgets(customHudWidgets) : undefined,
-        enableSpotifyDj: enableSpotifyDj || undefined,
-        spotifySourceType: enableSpotifyDj ? gameSpotifySourceType : undefined,
+        enableSpotifyDj: musicDjEnabled || undefined,
+        spotifySourceType: musicDjEnabled ? gameSpotifySourceType : undefined,
         spotifyPlaylistId:
-          enableSpotifyDj && gameSpotifySourceType === "playlist"
+          musicDjEnabled && gameSpotifySourceType === "playlist"
             ? gameSpotifyPlaylistId.trim() || undefined
             : undefined,
         spotifyPlaylistName:
-          enableSpotifyDj && gameSpotifySourceType === "playlist"
+          musicDjEnabled && gameSpotifySourceType === "playlist"
             ? gameSpotifyPlaylistName.trim() || undefined
             : undefined,
         spotifyArtist:
-          enableSpotifyDj && gameSpotifySourceType === "artist" ? gameSpotifyArtist.trim() || undefined : undefined,
-        enableLorebookKeeper: enableLorebookKeeper || undefined,
+          musicDjEnabled && gameSpotifySourceType === "artist" ? gameSpotifyArtist.trim() || undefined : undefined,
+        enableLorebookKeeper: lorebookKeeperEnabled || undefined,
         language: normalizedLanguage || undefined,
-        generationParameters: customizeParameters ? generationParameters : undefined,
+        generationParameters: customizeParameters
+          ? { ...(importedGenerationParametersRef.current ?? {}), ...generationParameters }
+          : undefined,
         promptPresetId,
         gameSystemPrompt: customGameSystemPrompt,
         gameSpecialInstructions: trimmedGameSpecialInstructions || null,
@@ -673,14 +1128,43 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
       preferences,
       {
         gmConnectionId: gmConnectionId ?? undefined,
+        shareLabels: {
+          characterNames: Object.fromEntries(
+            characters
+              .filter((character) =>
+                [...partyCharacterIds, ...(gmCharacterId ? [gmCharacterId] : [])].includes(character.id),
+              )
+              .map((character) => [character.id, character.name]),
+          ),
+          lorebookNames: Object.fromEntries(
+            lorebooks
+              .filter((lorebook) => activeLorebookIds.includes(lorebook.id))
+              .map((lorebook) => [lorebook.id, lorebook.name]),
+          ),
+          promptPresetNames: selectedPromptPreset
+            ? { [selectedPromptPreset.id]: selectedPromptPreset.name }
+            : undefined,
+          personaName: personas.find((persona) => persona.id === personaId)?.name ?? null,
+        },
       },
       gameName.trim() || undefined,
+      hierarchicalMapsInstalled && draftSpatialMap
+        ? {
+            size: spatialMapDraftSize,
+            groundingMode: spatialMapGroundingMode,
+            sourceLorebookIds: spatialMapGroundingMode === "setup" ? [] : activeLorebookIds,
+            instructions: spatialMapInstructions.trim() || undefined,
+          }
+        : undefined,
     );
   };
 
   return (
     <>
-      <div className="fixed inset-0 z-[10000] bg-black/45 backdrop-blur-[2px]" onClick={onCancel} />
+      <div
+        className="fixed inset-0 z-[10000] bg-black/45 backdrop-blur-[2px]"
+        onClick={isLoading ? undefined : onCancel}
+      />
       <div className="fixed inset-0 z-[10001] flex items-center justify-center p-3 pointer-events-none max-md:pt-[max(0.75rem,env(safe-area-inset-top))] max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
         <AnimatePresence mode="wait">
           <motion.div
@@ -701,7 +1185,8 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
               <button
                 type="button"
                 onClick={onCancel}
-                className="rounded-lg p-1.5 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
+                disabled={isLoading}
+                className="rounded-lg p-1.5 text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)] disabled:cursor-wait disabled:opacity-40"
                 aria-label="Close setup"
               >
                 <X size="0.875rem" />
@@ -714,6 +1199,47 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
               <div className="space-y-4">
         {step === 0 && (
           <>
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-3">
+              <input
+                ref={setupImportInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={(event) => void handleImportSetupFile(event)}
+                className="sr-only"
+                aria-label="Import Game Mode setup file"
+              />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                  <FileUp size={16} className="mt-0.5 shrink-0 text-[var(--primary)]" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[var(--foreground)]">Reuse a game setup</p>
+                    <p className="mt-0.5 text-[0.625rem] leading-relaxed text-[var(--muted-foreground)]">
+                      Import a setup downloaded from another campaign. You can review every step before starting.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setupImportInputRef.current?.click()}
+                  disabled={isLoading || !setupImportResourcesReady}
+                  className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--secondary)] px-3 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 disabled:cursor-wait disabled:opacity-50"
+                >
+                  <FileUp size={13} />
+                  {setupImportResourcesReady ? "Import setup" : "Loading…"}
+                </button>
+              </div>
+              {importedSetupNotice && (
+                <p
+                  className="mt-3 flex items-start gap-2 border-t border-[var(--border)] pt-3 text-[0.6875rem] leading-relaxed text-[var(--foreground)]"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-[var(--primary)]" />
+                  <span>{importedSetupNotice}</span>
+                </p>
+              )}
+            </div>
+
             <div>
               <label className={GAME_SETUP_FIELD_LABEL}>Game Name</label>
               <input
@@ -743,7 +1269,7 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                   </option>
                 ))}
               </select>
-              <p className="mt-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[0.6875rem] leading-relaxed text-amber-800 dark:text-amber-100">
+              <p className="mt-2 rounded-lg border border-[var(--primary)]/35 bg-[var(--primary)]/10 px-3 py-2 text-[0.6875rem] leading-relaxed text-[var(--primary)]">
                 Use a strong model for the initial world generation. You can change it later in Chat Settings.
               </p>
               <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
@@ -999,27 +1525,64 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
               </div>
             </div>
 
+            {/* Combat Preference — single-select */}
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">Combat Preference</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCombatStyle("classic")}
+                  className={cn(
+                    "flex-1 rounded-lg p-3 text-left text-xs transition-colors ring-1",
+                    combatStyle === "classic"
+                      ? "bg-[var(--primary)]/10 ring-[var(--primary)]/40"
+                      : "bg-[var(--secondary)] ring-[var(--border)] hover:ring-[var(--primary)]/20",
+                  )}
+                >
+                  <div className="font-medium text-[var(--foreground)]">Classic</div>
+                  <div className="mt-1 text-[var(--muted-foreground)]">Cinematic menu battles (current style)</div>
+                </button>
+                <button
+                  onClick={() => setCombatStyle("tactical")}
+                  className={cn(
+                    "flex-1 rounded-lg p-3 text-left text-xs transition-colors ring-1",
+                    combatStyle === "tactical"
+                      ? "bg-[var(--primary)]/10 ring-[var(--primary)]/40"
+                      : "bg-[var(--secondary)] ring-[var(--border)] hover:ring-[var(--primary)]/20",
+                  )}
+                >
+                  <div className="font-medium text-[var(--foreground)]">Tactical</div>
+                  <div className="mt-1 text-[var(--muted-foreground)]">
+                    Fire Emblem-style grid battles: movement, terrain, forecasts
+                  </div>
+                </button>
+              </div>
+            </div>
+
             {/* Content Rating */}
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">Content Rating</label>
               <div className="flex gap-1.5">
                 <button
+                  type="button"
                   onClick={() => setRating("sfw")}
+                  aria-pressed={rating === "sfw"}
                   className={cn(
                     "rounded-full px-3 py-1 text-xs transition-colors",
                     rating === "sfw"
-                      ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/40"
+                      ? "bg-[var(--primary)]/20 text-[var(--primary)] ring-1 ring-[var(--primary)]/40"
                       : "bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
                   )}
                 >
                   SFW
                 </button>
                 <button
+                  type="button"
                   onClick={() => setRating("nsfw")}
+                  aria-pressed={rating === "nsfw"}
                   className={cn(
                     "rounded-full px-3 py-1 text-xs transition-colors",
                     rating === "nsfw"
-                      ? "bg-[var(--destructive)]/20 text-[var(--destructive)] ring-1 ring-[var(--destructive)]/40"
+                      ? "bg-[var(--primary)]/20 text-[var(--primary)] ring-1 ring-[var(--primary)]/40"
                       : "bg-[var(--secondary)] text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
                   )}
                 >
@@ -1215,6 +1778,37 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                     className="flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--muted-foreground)]"
                   />
                 </div>
+                {characterFolders.length > 0 && (
+                  <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
+                    <FolderOpen size="0.75rem" className="shrink-0 text-[var(--muted-foreground)]" />
+                    <select
+                      value={partyFolderId}
+                      onChange={(event) => setPartyFolderId(event.target.value)}
+                      className="min-w-0 flex-1 bg-transparent text-xs text-[var(--foreground)] outline-none"
+                      aria-label="Add party members from folder"
+                    >
+                      <option value="">Add from Folder</option>
+                      {characterFolders.map((folder) => {
+                        const newCount = folder.characterIds.filter(
+                          (id) => validCharacterIds.has(id) && id !== gmCharacterId && !partyCharacterIds.includes(id),
+                        ).length;
+                        return (
+                          <option key={folder.id} value={folder.id}>
+                            {folder.name} ({newCount > 0 ? `${newCount} new` : "all added"})
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => addPartyMembersFromFolder(partyFolderId)}
+                      disabled={!partyFolderId}
+                      className="rounded-lg bg-[var(--primary)]/15 px-2.5 py-1 text-[0.625rem] font-medium text-[var(--primary)] transition-colors hover:bg-[var(--primary)]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
                 <div className="max-h-36 overflow-y-auto">
                   {filteredPartyCharacters.map((c) => {
                     const isSelected = partyCharacterIds.includes(c.id);
@@ -1347,7 +1941,33 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">Game Features</label>
               <div className="space-y-2">
-                <div>
+                {installedAgentsLoading ? (
+                  <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border)] px-4 py-4 text-xs text-[var(--muted-foreground)]">
+                    <Loader2 size={13} className="animate-spin" />
+                    Loading installed agents…
+                  </div>
+                ) : (
+                  !hasInstalledAgents && (
+                    <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--secondary)]/35 px-4 py-4 text-center">
+                      <p className="text-xs font-medium text-[var(--foreground)]">No agents downloaded yet.</p>
+                      <p className="mx-auto mt-1 max-w-sm text-[0.625rem] leading-relaxed text-[var(--muted-foreground)]">
+                        Download agents to add maps, Illustrator, Music DJ, Lorebook Keeper, and other optional game
+                        features.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openDownloadAgents}
+                        className={cn(GAME_SETUP_PRIMARY_BUTTON_CLASS, "mx-auto mt-3 gap-2")}
+                      >
+                        <Sparkles size={13} />
+                        Download Agents
+                      </button>
+                    </div>
+                  )
+                )}
+
+                {musicDjInstalled && (
+                  <div>
                   <button
                     type="button"
                     onClick={() => setEnableSpotifyDj((prev) => !prev)}
@@ -1481,18 +2101,20 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                       )}
                     </div>
                   )}
-                </div>
+                  </div>
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => setEnableLorebookKeeper((prev) => !prev)}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
-                    enableLorebookKeeper
-                      ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
-                      : "bg-[var(--secondary)] ring-1 ring-transparent hover:ring-[var(--border)]",
-                  )}
-                >
+                {lorebookKeeperInstalled && (
+                  <button
+                    type="button"
+                    onClick={() => setEnableLorebookKeeper((prev) => !prev)}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
+                      enableLorebookKeeper
+                        ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
+                        : "bg-[var(--secondary)] ring-1 ring-transparent hover:ring-[var(--border)]",
+                    )}
+                  >
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
                     <BookOpen
                       size={14}
@@ -1518,11 +2140,14 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                       )}
                     />
                   </div>
-                </button>
+                  </button>
+                )}
 
-                <div>
+                {illustratorInstalled && (
+                  <div>
                   <button
-                    onClick={() => setEnableSpriteGeneration(!enableSpriteGeneration)}
+                    type="button"
+                    onClick={toggleVisualGeneration}
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all",
                       enableSpriteGeneration
@@ -1535,9 +2160,9 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                       className={enableSpriteGeneration ? "text-[var(--primary)]" : "text-[var(--muted-foreground)]"}
                     />
                     <div className="flex-1">
-                      <span className="block text-xs font-medium text-[var(--foreground)]">Image Generation</span>
+                      <span className="block text-xs font-medium text-[var(--foreground)]">Illustrator</span>
                       <span className="block text-[0.575rem] text-[var(--muted-foreground)]">
-                        Auto-generate NPC portraits and location backgrounds during gameplay
+                        Generate NPC portraits, location backgrounds, scene images, and optional storyboards
                       </span>
                     </div>
                     <div
@@ -1580,12 +2205,157 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                         </p>
                       )}
                       <p className="mt-1 text-[0.55rem] text-[var(--muted-foreground)]">
-                        Generates portraits for new NPCs and backgrounds for new locations using the scene analysis
-                        pipeline.
+                        Powers automatic portraits, backgrounds, scene illustrations, and storyboard keyframes.
                       </p>
+                      <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
+                        <div className="flex items-start gap-2">
+                          <PanelsTopLeft size={12} className="mt-0.5 shrink-0 text-[var(--muted-foreground)]" />
+                          <div className="min-w-0">
+                            <p className="text-[0.625rem] font-medium text-[var(--foreground)]">Storyboards</p>
+                            <p className="text-[0.55rem] leading-relaxed text-[var(--muted-foreground)]">
+                              Attach keyframes to GM narration so the floating viewer changes with the current story
+                              section.
+                            </p>
+                            <p className="mt-1 text-[0.55rem] leading-relaxed text-[var(--muted-foreground)]">
+                              Recommended: use a strong state-of-the-art image model for storyboard images, or
+                              something equivalent to Google Nano Banana 2 Lite.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={toggleStoryboardIllustrations}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-all",
+                            enableStoryboardIllustrations
+                              ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
+                              : "bg-[var(--background)]/70 ring-1 ring-[var(--border)] hover:bg-[var(--accent)]",
+                          )}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[0.6875rem] font-medium text-[var(--foreground)]">
+                              Automatic Storyboard Illustrations
+                            </span>
+                            <span className="block text-[0.575rem] text-[var(--muted-foreground)]">
+                              Low-cost manga keyframe images after completed GM turns
+                            </span>
+                          </span>
+                          <span
+                            className={cn(
+                              "h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors",
+                              enableStoryboardIllustrations
+                                ? "bg-[var(--primary)]"
+                                : "bg-[var(--muted-foreground)]/50",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "block h-4 w-4 rounded-full bg-white transition-transform",
+                                enableStoryboardIllustrations && "translate-x-3.5",
+                              )}
+                            />
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={toggleStoryboardAnimations}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-all",
+                            enableStoryboardAnimations
+                              ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
+                              : "bg-[var(--background)]/70 ring-1 ring-[var(--border)] hover:bg-[var(--accent)]",
+                          )}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[0.6875rem] font-medium text-[var(--foreground)]">
+                              Automatic Storyboard Animations
+                            </span>
+                            <span className="block text-[0.575rem] text-[var(--muted-foreground)]">
+                              Adds video clips to every storyboard keyframe
+                            </span>
+                          </span>
+                          <span
+                            className={cn(
+                              "h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors",
+                              enableStoryboardAnimations ? "bg-[var(--primary)]" : "bg-[var(--muted-foreground)]/50",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "block h-4 w-4 rounded-full bg-white transition-transform",
+                                enableStoryboardAnimations && "translate-x-3.5",
+                              )}
+                            />
+                          </span>
+                        </button>
+                        {enableStoryboardIllustrations && (
+                          <label className="block rounded-lg bg-[var(--background)]/70 px-3 py-2 ring-1 ring-[var(--border)]">
+                            <span className="flex items-center justify-between gap-3">
+                              <span>
+                                <span className="block text-[0.6875rem] font-medium text-[var(--foreground)]">
+                                  Keyframes per Turn
+                                </span>
+                                <span className="block text-[0.575rem] text-[var(--muted-foreground)]">
+                                  Target storyboard shots. Short turns may produce fewer.
+                                </span>
+                              </span>
+                              <span className="min-w-7 rounded-md bg-[var(--secondary)] px-2 py-1 text-center text-xs font-semibold text-[var(--foreground)] ring-1 ring-[var(--border)]">
+                                {storyboardKeyframeCount}
+                              </span>
+                            </span>
+                            <input
+                              type="range"
+                              min={GAME_STORYBOARD_KEYFRAME_COUNT_MIN}
+                              max={GAME_STORYBOARD_KEYFRAME_COUNT_MAX}
+                              step={1}
+                              value={storyboardKeyframeCount}
+                              onChange={(event) => setStoryboardKeyframeCount(Number(event.target.value))}
+                              className="mt-2 w-full accent-[var(--primary)]"
+                              aria-label="Keyframes per Turn"
+                            />
+                          </label>
+                        )}
+                        <p className="text-[0.55rem] leading-relaxed text-[var(--muted-foreground)]">
+                          Illustrations use the image connection. Animations also need the video connection below and
+                          cost much more per turn.
+                        </p>
+                        {enableStoryboardAnimations && !videoConnectionId && (
+                          <p className="text-[0.55rem] leading-relaxed text-amber-700 dark:text-amber-400/80">
+                            Choose a Video Generation connection below to save automatic storyboard animations.
+                          </p>
+                        )}
+                      </div>
+                      <div className="mt-3 border-t border-[var(--border)] pt-3">
+                        <label className="mb-1 flex items-center gap-1 text-[0.625rem] font-medium text-[var(--muted-foreground)]">
+                          <Film size={11} />
+                          Video Generation Connection
+                        </label>
+                        <select
+                          value={videoConnectionId ?? ""}
+                          onChange={(e) => setVideoConnectionId(e.target.value || null)}
+                          className="w-full rounded-lg border border-[var(--border)] bg-[var(--secondary)] px-2.5 py-1.5 text-xs text-[var(--foreground)]"
+                        >
+                          <option value="">No scene video connection</option>
+                          {videoConnections.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                              {c.model ? ` - ${c.model}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {videoConnections.length === 0 && (
+                          <p className="mt-1 text-[0.55rem] text-amber-700 dark:text-amber-400/80">
+                            No video generation connections found. Add one in Settings -&gt; Connections.
+                          </p>
+                        )}
+                        <p className="mt-1 text-[0.55rem] text-[var(--muted-foreground)]">
+                          Used for manual scene videos and storyboard animations.
+                        </p>
+                      </div>
                     </div>
                   )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1816,6 +2586,139 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                 </div>
               </div>
             </div>
+
+            {hierarchicalMapsInstalled && (
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-[var(--foreground)]">
+                  <MapIcon size={12} className="mr-1 inline" />
+                  Hierarchical world map
+                </label>
+                <button
+                type="button"
+                aria-pressed={draftSpatialMap}
+                onClick={() => setDraftSpatialMap((enabled) => !enabled)}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
+                  draftSpatialMap
+                    ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
+                    : "bg-[var(--secondary)] ring-1 ring-transparent hover:ring-[var(--border)]",
+                )}
+              >
+                <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <MapIcon
+                    size={14}
+                    className={draftSpatialMap ? "text-[var(--primary)]" : "text-[var(--muted-foreground)]"}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-xs font-medium text-[var(--foreground)]">Draft with AI</span>
+                    <span className="block text-[0.575rem] leading-relaxed text-[var(--muted-foreground)]">
+                      After setup, AI builds nested regions and places for you to review.
+                    </span>
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors",
+                    draftSpatialMap ? "bg-[var(--primary)]" : "bg-[var(--muted-foreground)]/50",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "block h-4 w-4 rounded-full bg-white transition-transform",
+                      draftSpatialMap && "translate-x-3.5",
+                    )}
+                  />
+                </span>
+                </button>
+
+                {draftSpatialMap && (
+                  <div className="mt-2 space-y-3 rounded-lg bg-[var(--background)]/55 p-3 ring-1 ring-[var(--border)]">
+                    <div>
+                      <label
+                        htmlFor="game-setup-spatial-map-instructions"
+                        className="text-[0.625rem] font-medium text-[var(--foreground)]"
+                      >
+                        What should this world include?
+                      </label>
+                      <textarea
+                        id="game-setup-spatial-map-instructions"
+                        value={spatialMapInstructions}
+                        onChange={(event) => setSpatialMapInstructions(event.target.value)}
+                        maxLength={4_000}
+                        rows={3}
+                        placeholder="A misty coastal city with a harbor, market, haunted inn, lighthouse, and sewers beneath the old district."
+                        className="mt-2 w-full resize-y rounded-lg bg-[var(--secondary)] px-3 py-2 text-xs leading-relaxed text-[var(--foreground)] outline-none ring-1 ring-[var(--border)] transition-all placeholder:text-[var(--muted-foreground)] focus:ring-[var(--primary)]/40"
+                      />
+                      <p className="mt-1 text-[0.5625rem] leading-relaxed text-[var(--muted-foreground)]">
+                        Optional. If left blank, Marinara builds from the existing game setup.
+                      </p>
+                    </div>
+
+                  <fieldset>
+                    <legend className="text-[0.625rem] font-medium text-[var(--foreground)]">Map size</legend>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {SPATIAL_MAP_DRAFT_SIZE_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={spatialMapDraftSize === option.value}
+                          onClick={() => setSpatialMapDraftSize(option.value)}
+                          className={cn(
+                            "min-h-12 rounded-lg px-2 py-2 text-left transition-colors",
+                            spatialMapDraftSize === option.value
+                              ? "bg-[var(--primary)]/12 text-[var(--foreground)] ring-1 ring-[var(--primary)]/35"
+                              : "bg-[var(--secondary)] text-[var(--muted-foreground)] ring-1 ring-[var(--border)] hover:text-[var(--foreground)]",
+                          )}
+                        >
+                          <span className="block text-[0.6875rem] font-semibold">{option.label}</span>
+                          <span className="mt-0.5 block text-[0.55rem] leading-tight">{option.detail}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <fieldset>
+                    <legend className="text-[0.625rem] font-medium text-[var(--foreground)]">Build from</legend>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {([
+                        { value: "setup", label: "Game setup" },
+                        { value: "lore_strict", label: "Strict lore" },
+                        { value: "lore_expand", label: "Lore + AI" },
+                      ] as const).map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={spatialMapGroundingMode === option.value}
+                          disabled={option.value !== "setup" && activeLorebookIds.length === 0}
+                          onClick={() => setSpatialMapGroundingMode(option.value)}
+                          className={cn(
+                            "min-h-11 rounded-lg px-2 py-2 text-left text-[0.625rem] font-semibold ring-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                            spatialMapGroundingMode === option.value
+                              ? "bg-[var(--primary)]/12 text-[var(--foreground)] ring-[var(--primary)]/35"
+                              : "bg-[var(--secondary)] text-[var(--muted-foreground)] ring-[var(--border)]",
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[0.5625rem] leading-relaxed text-[var(--muted-foreground)]">
+                      {spatialMapGroundingMode === "setup"
+                        ? "Uses the generated game world and party."
+                        : spatialMapGroundingMode === "lore_strict"
+                          ? `Only creates places supported by the ${activeLorebookIds.length} selected lorebook${activeLorebookIds.length === 1 ? "" : "s"}.`
+                          : `Uses the ${activeLorebookIds.length} selected lorebook${activeLorebookIds.length === 1 ? "" : "s"} as canon and may add fitting places.`}
+                    </p>
+                  </fieldset>
+
+                  <p className="text-[0.5625rem] leading-relaxed text-[var(--muted-foreground)]">
+                    The draft stays disabled until you review, apply, enable, and save it in the map editor.
+                  </p>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -1860,8 +2763,44 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
           <>
             <div>
               <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--foreground)]">
+                <Sparkles size={12} />
+                Game Presentation
+              </label>
+              <select
+                value={gamePresentation}
+                onChange={(event) => setGamePresentation(event.target.value === "anime" ? "anime" : "standard")}
+                className={GAME_SETUP_INPUT_CLASS}
+              >
+                <option value="standard">Standard</option>
+                <option value="anime">Storyboard Optimized</option>
+              </select>
+              <p className="mt-1 text-[0.575rem] leading-relaxed text-[var(--muted-foreground)]">
+                {gamePresentation === "anime"
+                  ? "Coordinates the game narration, storyboard planning, image formatting, and video formatting without enabling media generation or changing your connections."
+                  : "Uses the standard flexible Game Mode narration and media prompts."}
+              </p>
+              {gamePresentation === "anime" && (
+                <dl className="mt-2 grid gap-1.5 rounded-lg bg-[var(--secondary)]/55 p-2 ring-1 ring-[var(--border)] sm:grid-cols-2">
+                  {[
+                    ["Game Prompt", "Storyboard Game Prompt"],
+                    ["Animation Planner", "Comic Page Animation"],
+                    ["Storyboard Illustration Prompt", "Storyboard Illustration"],
+                    ["Storyboard Video Prompt", "Comic Page Video"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-0 rounded-md bg-[var(--background)]/65 px-2 py-1.5">
+                      <dt className="text-[0.525rem] font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+                        {label}
+                      </dt>
+                      <dd className="truncate text-[0.625rem] font-semibold text-[var(--foreground)]">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </div>
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-[var(--foreground)]">
                 <Feather size={12} />
-                Game Prompt Preset
+                Base Prompt Preset
               </label>
               <select
                 value={promptPresetId ?? ""}
@@ -1876,7 +2815,9 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                 ))}
               </select>
               <p className="mt-1 text-[0.575rem] leading-relaxed text-[var(--muted-foreground)]">
-                Uses the Game mode prompt from the selected preset unless the custom GM prompt below is enabled.
+                {gamePresentation === "anime"
+                  ? "The Storyboard Game Prompt replaces the selected preset's Game prompt. Other preset settings remain available."
+                  : "Uses the Game mode prompt from the selected preset unless the custom GM prompt below is enabled."}
               </p>
             </div>
 
@@ -1913,8 +2854,12 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                     <p className="text-xs font-medium text-[var(--foreground)]">GM Prompt</p>
                     <p className="text-[0.55rem] text-[var(--muted-foreground)]">
                       {customGamePromptEnabled
-                        ? "Custom prompt will override the selected preset"
-                        : selectedPromptPresetName
+                        ? gameSystemPromptEdited
+                          ? "Custom prompt will override the selected prompt"
+                          : "Previewing the selected prompt; edit it to override"
+                        : gamePresentation === "anime"
+                          ? "Using Storyboard Game Prompt"
+                          : selectedPromptPresetName
                           ? `Using ${selectedPromptPresetName}`
                           : "Using default game prompt"}
                     </p>
@@ -1922,7 +2867,15 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className="rounded-full bg-[var(--background)] px-2 py-0.5 text-[0.5625rem] font-medium text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
-                    {customGamePromptEnabled ? "Custom" : selectedPromptPresetName ? "Preset" : "Default"}
+                    {customGamePromptEnabled
+                      ? gameSystemPromptEdited
+                        ? "Custom"
+                        : "Preview"
+                      : gamePresentation === "anime"
+                        ? "Storyboard"
+                        : selectedPromptPresetName
+                          ? "Preset"
+                          : "Default"}
                   </span>
                   <div
                     className={cn(
@@ -1944,22 +2897,28 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                 <div className="mt-3 space-y-2 border-t border-[var(--border)] pt-3">
                   <textarea
                     value={gameSystemPromptDraft}
-                    onChange={(event) => setGameSystemPromptDraft(event.target.value)}
+                    onChange={(event) => {
+                      setGameSystemPromptDraft(event.target.value);
+                      setGameSystemPromptEdited(true);
+                    }}
                     rows={10}
                     maxLength={16000}
                     className="max-h-72 min-h-48 w-full resize-y rounded-lg bg-[var(--secondary)] px-3 py-2 text-xs leading-relaxed text-[var(--foreground)] outline-none ring-1 ring-[var(--border)] transition-all placeholder:text-[var(--muted-foreground)]/50 focus:ring-[var(--primary)]/40"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[0.5625rem] text-[var(--muted-foreground)]">
-                      Resetting or leaving this unchanged keeps the built-in default.
+                      Leaving this unchanged keeps the selected presentation or preset.
                     </p>
                     <button
                       type="button"
-                      onClick={() => setGameSystemPromptDraft(DEFAULT_GAME_SYSTEM_PROMPT)}
+                      onClick={() => {
+                        setGameSystemPromptDraft(effectiveGameSystemPrompt);
+                        setGameSystemPromptEdited(false);
+                      }}
                       className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-2.5 py-1 text-[0.625rem] font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
                     >
                       <RotateCcw size={11} />
-                      Reset
+                      Reset to selected
                     </button>
                   </div>
                 </div>
@@ -1971,6 +2930,35 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
             </div>
 
             <div className="shrink-0 border-t border-[var(--border)]/70 px-5 py-3">
+              {isLoading && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between gap-3 text-[0.6875rem]">
+                    <span className="font-medium text-[var(--foreground)]" role="status" aria-live="polite">
+                      {isDraftingMap
+                        ? "The world is ready. Now drafting its map for your review."
+                        : "Hold on tight, the game is being generated right now!"}
+                    </span>
+                    <span aria-hidden="true" className="shrink-0 tabular-nums text-[var(--muted-foreground)]">
+                      {generationElapsedSeconds}s
+                    </span>
+                  </div>
+                  <div
+                    className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--muted)]/60"
+                    role="progressbar"
+                    aria-label={isDraftingMap ? "Drafting hierarchical world map" : "Generating game world"}
+                  >
+                    <motion.div
+                      className="h-full w-2/5 rounded-full bg-[var(--primary)]"
+                      animate={prefersReducedMotion ? { x: 0 } : { x: ["-110%", "260%"] }}
+                      transition={
+                        prefersReducedMotion
+                          ? undefined
+                          : { duration: 1.35, ease: [0.16, 1, 0.3, 1], repeat: Infinity }
+                      }
+                    />
+                  </div>
+                </div>
+              )}
               <div className="mb-3 flex items-center justify-center gap-1.5">
                 {steps.map((item, i) => (
                   <button
@@ -1978,7 +2966,7 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                     type="button"
                     aria-label={`Go to ${item.title}`}
                     aria-current={i === step ? "step" : undefined}
-                    disabled={i >= step}
+                    disabled={isLoading || i >= step}
                     onClick={() => {
                       if (i < step) setStep(i);
                     }}
@@ -2004,14 +2992,20 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                 <button
                   type="button"
                   onClick={step === 0 ? onCancel : () => setStep(step - 1)}
-                  className={GAME_SETUP_GHOST_BUTTON_CLASS}
+                  disabled={isLoading}
+                  className={cn(GAME_SETUP_GHOST_BUTTON_CLASS, "disabled:cursor-wait disabled:opacity-40")}
                 >
                   <ArrowLeft size={14} />
                   {step === 0 ? "Cancel" : "Back"}
                 </button>
 
                 {step < steps.length - 1 ? (
-                  <button type="button" onClick={() => setStep(step + 1)} className={GAME_SETUP_PRIMARY_BUTTON_CLASS}>
+                  <button
+                    type="button"
+                    onClick={() => setStep(step + 1)}
+                    disabled={isLoading}
+                    className={GAME_SETUP_PRIMARY_BUTTON_CLASS}
+                  >
                     Next
                     <ArrowRight size={14} />
                   </button>
@@ -2026,7 +3020,7 @@ export function GameSetupWizard({ onComplete, onCancel, isLoading, characters }:
                     {isLoading ? (
                       <>
                         <Loader2 size={14} className="animate-spin" />
-                        Generating World…
+                        {isDraftingMap ? "Drafting Map…" : "Generating World…"}
                       </>
                     ) : (
                       <>

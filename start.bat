@@ -9,6 +9,23 @@ echo  ^|       Marinara Engine  -  Launcher        ^|
 echo  +==========================================+
 echo.
 
+set "SKIP_UPDATE="
+if /I "%~1"=="--skip-update" set "SKIP_UPDATE=1"
+if /I "%~1"=="--no-update" set "SKIP_UPDATE=1"
+
+:: Load launcher settings before the update decision. Server settings are reused below.
+if not exist .env goto :early_env_done
+for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+    if not "%%A"=="" if not "%%B"=="" set "%%A=%%~B"
+)
+:early_env_done
+
+set "AUTO_UPDATE_DISABLED="
+if /I "%AUTO_UPDATE_ENABLED%"=="0" set "AUTO_UPDATE_DISABLED=1"
+if /I "%AUTO_UPDATE_ENABLED%"=="false" set "AUTO_UPDATE_DISABLED=1"
+if /I "%AUTO_UPDATE_ENABLED%"=="no" set "AUTO_UPDATE_DISABLED=1"
+if /I "%AUTO_UPDATE_ENABLED%"=="off" set "AUTO_UPDATE_DISABLED=1"
+
 :: Check for Node.js
 where node >nul 2>&1
 if errorlevel 1 (
@@ -56,8 +73,11 @@ if not defined CURRENT_PNPM_VERSION (
     where pnpm >nul 2>&1
     if not errorlevel 1 (
         for /f "usebackq delims=" %%i in (`pnpm --version 2^>nul`) do set "CURRENT_PNPM_VERSION=%%i"
-        if defined CURRENT_PNPM_VERSION (
+        if /I "!CURRENT_PNPM_VERSION!"=="%PNPM_VERSION%" (
             echo  [..] Using installed pnpm !CURRENT_PNPM_VERSION!
+        ) else (
+            if defined CURRENT_PNPM_VERSION echo  [..] Installed pnpm !CURRENT_PNPM_VERSION! does not match required %PNPM_VERSION%; trying a pinned temporary runner...
+            set "CURRENT_PNPM_VERSION="
         )
     )
 )
@@ -74,6 +94,8 @@ if not defined CURRENT_PNPM_VERSION (
 
 if not defined CURRENT_PNPM_VERSION (
     echo  [ERROR] Failed to make pnpm %PNPM_VERSION% available.
+    echo          Marinara can run without a global pnpm install, but Node.js must provide Corepack or npx/npm.
+    echo          Reinstall Node.js 24 LTS with npm enabled, or run: npm install -g pnpm
     pause
     exit /b 1
 )
@@ -96,8 +118,18 @@ git stash drop -q "!STASH_REF!" >nul 2>&1
 goto :eof
 
 :after_restore_helper
+set "INSTALL_REQUIRED=0"
+set "BUILD_REQUIRED=0"
 
 :: Auto-update from Git
+if defined SKIP_UPDATE (
+    echo  [OK] Skipping update check; starting the current local install.
+    goto :skip_update
+)
+if defined AUTO_UPDATE_DISABLED (
+    echo  [OK] Automatic Engine updates disabled by AUTO_UPDATE_ENABLED=false.
+    goto :skip_update
+)
 if not exist ".git" goto :skip_update
 echo  [..] Checking for updates...
 for /f "tokens=*" %%i in ('git rev-parse HEAD 2^>nul') do set "OLD_HEAD=%%i"
@@ -198,14 +230,9 @@ if /I not "!NEW_HEAD!"=="!TARGET_HEAD!" (
 if "!STASHED!"=="1" call :restore_stashed_changes
 if exist "!UPDATE_LOG!" del /q "!UPDATE_LOG!" >nul 2>&1
 echo  [OK] Updated to latest version
-echo  [..] Reinstalling dependencies...
-call :run_pnpm install
-if exist "packages\shared\dist" rmdir /s /q "packages\shared\dist"
-if exist "packages\server\dist" rmdir /s /q "packages\server\dist"
-if exist "packages\client\dist" rmdir /s /q "packages\client\dist"
-del /q "packages\shared\tsconfig.tsbuildinfo" 2>nul
-del /q "packages\server\tsconfig.tsbuildinfo" 2>nul
-del /q "packages\client\tsconfig.tsbuildinfo" 2>nul
+echo  [..] Dependencies and build will be refreshed before startup.
+set "INSTALL_REQUIRED=1"
+set "BUILD_REQUIRED=1"
 
 :skip_update
 echo  [OK] Node.js found:
@@ -220,39 +247,33 @@ for /f "usebackq delims=" %%i in (`git rev-parse --short=12 HEAD 2^>nul`) do set
 for /f "usebackq delims=" %%i in (`node -e "try{const m=require('./packages/server/dist/config/build-meta.json');console.log(m.commit || '')}catch{}" 2^>nul`) do set "DIST_COMMIT=%%i"
 if not "!SOURCE_VER!"=="" if not "!DIST_VER!"=="" if not "!SOURCE_VER!"=="!DIST_VER!" (
     echo  [WARN] Version mismatch: source v!SOURCE_VER! but dist has v!DIST_VER!
-    echo  [..] Forcing rebuild to apply update...
-    call :run_pnpm install
-    if exist "packages\shared\dist" rmdir /s /q "packages\shared\dist"
-    if exist "packages\server\dist" rmdir /s /q "packages\server\dist"
-    if exist "packages\client\dist" rmdir /s /q "packages\client\dist"
-    del /q "packages\shared\tsconfig.tsbuildinfo" 2>nul
-    del /q "packages\server\tsconfig.tsbuildinfo" 2>nul
-    del /q "packages\client\tsconfig.tsbuildinfo" 2>nul
+    echo  [..] Dependencies and build will be refreshed before startup.
+    set "INSTALL_REQUIRED=1"
+    set "BUILD_REQUIRED=1"
 )
 if not "!SOURCE_COMMIT!"=="" if /I not "!SOURCE_COMMIT!"=="!DIST_COMMIT!" (
     echo  [WARN] Build commit mismatch: source !SOURCE_COMMIT! but dist has !DIST_COMMIT!
-    echo  [..] Forcing rebuild to apply update...
-    call :run_pnpm install
-    if exist "packages\shared\dist" rmdir /s /q "packages\shared\dist"
-    if exist "packages\server\dist" rmdir /s /q "packages\server\dist"
-    if exist "packages\client\dist" rmdir /s /q "packages\client\dist"
-    del /q "packages\shared\tsconfig.tsbuildinfo" 2>nul
-    del /q "packages\server\tsconfig.tsbuildinfo" 2>nul
-    del /q "packages\client\tsconfig.tsbuildinfo" 2>nul
+    echo  [..] Dependencies and build will be refreshed before startup.
+    set "INSTALL_REQUIRED=1"
+    set "BUILD_REQUIRED=1"
 )
 :skip_version_check
 
 :: Install dependencies if needed
-if exist "node_modules" goto :skip_install
+if not exist "node_modules" set "INSTALL_REQUIRED=1"
+node scripts\check-workspace-install.mjs >nul 2>&1
+if errorlevel 1 set "INSTALL_REQUIRED=1"
+if not "!INSTALL_REQUIRED!"=="1" goto :skip_install
 echo.
-echo  [..] Installing dependencies (first run)...
+echo  [..] Installing dependencies...
 echo      This may take a few minutes.
 echo.
-call :run_pnpm install
+call :run_pnpm install --force
 if errorlevel 1 echo  [ERROR] Failed to install dependencies. & pause & exit /b 1
 
 :skip_install
 
+:skip_env
 :: Optional AI sprite background remover
 if defined BACKGROUNDREMOVER_AUTO_INSTALL (
     if /I "%BACKGROUNDREMOVER_AUTO_INSTALL%"=="1" goto install_bgremover
@@ -268,31 +289,28 @@ if errorlevel 1 echo  [WARN] Optional background remover install failed; built-i
 :skip_bgremover
 
 :: Build if needed
-if not exist "packages\shared\dist" (
-    echo  [..] Building shared types...
+if not exist "packages\shared\dist\constants\defaults.js" set "BUILD_REQUIRED=1"
+if not exist "packages\server\dist\index.js" set "BUILD_REQUIRED=1"
+if not exist "packages\client\dist\index.html" set "BUILD_REQUIRED=1"
+if "!BUILD_REQUIRED!"=="1" (
+    echo  [..] Cleaning stale build artifacts...
+    call :run_pnpm clean:stale-client
+    if errorlevel 1 echo  [ERROR] Failed to clean stale client artifacts. & pause & exit /b 1
+    call :run_pnpm --filter @marinara-engine/shared clean
+    if errorlevel 1 echo  [ERROR] Failed to clean shared build artifacts. & pause & exit /b 1
+    call :run_pnpm --filter @marinara-engine/server clean
+    if errorlevel 1 echo  [ERROR] Failed to clean server build artifacts. & pause & exit /b 1
+    call :run_pnpm --filter @marinara-engine/client clean
+    if errorlevel 1 echo  [ERROR] Failed to clean client build artifacts. & pause & exit /b 1
+    echo  [..] Building Marinara Engine...
     call :run_pnpm --filter @marinara-engine/shared build
-    if errorlevel 1 echo  [ERROR] Failed to build shared types. & pause & exit /b 1
-)
-if not exist "packages\server\dist" (
-    echo  [..] Building server...
-    call :run_pnpm --filter @marinara-engine/server build
-    if errorlevel 1 echo  [ERROR] Failed to build the server. & pause & exit /b 1
-)
-if not exist "packages\client\dist" (
-    echo  [..] Building client...
-    call :run_pnpm --filter @marinara-engine/client build
-    if errorlevel 1 echo  [ERROR] Failed to build the client. & pause & exit /b 1
+    if errorlevel 1 echo  [ERROR] Failed to build shared package. & pause & exit /b 1
+    call :run_pnpm --filter @marinara-engine/server --filter @marinara-engine/client --parallel run build
+    if errorlevel 1 echo  [ERROR] Failed to build server or client package. & pause & exit /b 1
 )
 
 :: Database migrations are handled automatically at server startup by runMigrations()
 
-:: Load .env if present (respects user overrides)
-if not exist .env goto :skip_env
-for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
-    if not "%%A"=="" if not "%%B"=="" set "%%A=%%B"
-)
-
-:skip_env
 :: Set defaults only if not already set
 set NODE_ENV=production
 if not defined PORT set PORT=7860
@@ -301,6 +319,10 @@ if not defined SIDECAR_RUNTIME_INSTALL_ENABLED set SIDECAR_RUNTIME_INSTALL_ENABL
 
 set PROTOCOL=http
 if defined SSL_CERT if defined SSL_KEY set PROTOCOL=https
+set "BROWSER_HOST=%HOST%"
+if "%BROWSER_HOST%"=="" set "BROWSER_HOST=127.0.0.1"
+if "%BROWSER_HOST%"=="0.0.0.0" set "BROWSER_HOST=127.0.0.1"
+if "%BROWSER_HOST%"=="::" set "BROWSER_HOST=127.0.0.1"
 
 set "AUTO_OPEN_BROWSER_ENABLED=1"
 if defined AUTO_OPEN_BROWSER (
@@ -318,14 +340,15 @@ if errorlevel 1 (
 
 echo.
 echo  ==========================================
-echo    Starting Marinara Engine on %PROTOCOL%://127.0.0.1:%PORT%
+echo    Starting Marinara Engine on %PROTOCOL%://%HOST%:%PORT%
+if not "%BROWSER_HOST%"=="%HOST%" echo    Local browser URL: %PROTOCOL%://%BROWSER_HOST%:%PORT%
 echo    Press Ctrl+C to stop
 echo  ==========================================
 echo.
 
 :: Open browser after a short delay (use explorer.exe as fallback)
 if defined AUTO_OPEN_BROWSER_ENABLED (
-    start "" cmd /c "timeout /t 4 /nobreak >nul && start %PROTOCOL%://127.0.0.1:%PORT% || explorer %PROTOCOL%://127.0.0.1:%PORT%"
+    start "" cmd /c "timeout /t 4 /nobreak >nul && start %PROTOCOL%://%BROWSER_HOST%:%PORT% || explorer %PROTOCOL%://%BROWSER_HOST%:%PORT%"
 ) else (
     echo  [OK] Auto-open disabled ^(AUTO_OPEN_BROWSER=%AUTO_OPEN_BROWSER%^)
 )
@@ -343,12 +366,12 @@ goto :eof
 
 :run_pnpm
 if /I "%PNPM_RUNNER%"=="corepack" (
-    call corepack pnpm@%PNPM_VERSION% %*
+    call corepack pnpm@%PNPM_VERSION% --config.trustPolicy=off --config.confirmModulesPurge=false %*
 ) else (
     if /I "%PNPM_RUNNER%"=="npx" (
-        call npx --yes pnpm@%PNPM_VERSION% %*
+        call npx --yes pnpm@%PNPM_VERSION% --config.trustPolicy=off --config.confirmModulesPurge=false %*
     ) else (
-        call pnpm %*
+        call pnpm --config.trustPolicy=off --config.confirmModulesPurge=false %*
     )
 )
 exit /b %errorlevel%

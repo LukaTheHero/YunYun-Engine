@@ -2,7 +2,11 @@
 // Agent System Types
 // ──────────────────────────────────────────────
 
-import { BUILT_IN_AGENT_MANIFESTS } from "../features/agents/agent-registry.js";
+import {
+  BUILT_IN_AGENT_MANIFESTS,
+  replaceBuiltInAgentManifestRegistry,
+} from "../features/agents/agent-registry.js";
+import type { BuiltInAgentManifest } from "../features/agents/agent-manifest.types.js";
 import type { AgentToolConfig, ToolDefinition } from "../features/function-calls/tool-definitions.js";
 import type { ChatMode } from "./chat.js";
 import type { WrapFormat } from "./prompt.js";
@@ -23,19 +27,13 @@ export function normalizeAgentPhaseValue(value: unknown, fallback: AgentPhase = 
 }
 
 export function normalizeAgentPhaseForType(
-  agentType: string,
+  _agentType: string,
   configuredPhase: unknown,
   fallback: AgentPhase = "post_processing",
 ): AgentPhase {
-  if (
-    agentType === "prose-guardian" ||
-    agentType === "continuity" ||
-    agentType === "html" ||
-    agentType === "expression" ||
-    agentType === "spotify"
-  ) {
-    return "post_processing";
-  }
+  // Keep the historical helper name for call-site compatibility, but do not
+  // coerce built-ins by type. If the agent editor lets a user choose a phase,
+  // that valid phase must survive storage, UI hydration, and runtime resolution.
   return normalizeAgentPhaseValue(configuredPhase, fallback);
 }
 
@@ -67,7 +65,8 @@ export type AgentResultType =
   | "game_map_update"
   | "game_state_transition"
   | "prompt_patch"
-  | "frontend_theme_update";
+  | "frontend_theme_update"
+  | "about_me_update";
 
 /** Configuration for a single agent. */
 export interface AgentConfig {
@@ -216,6 +215,18 @@ export function getAgentPromptTemplateOptions(input: {
   ];
 }
 
+export function resolveDefaultAgentPromptTemplateId(settingsValue: unknown): string {
+  const settings = parseAgentSettingsRecord(settingsValue);
+  const configuredId = normalizePromptTemplateId(
+    settings.defaultPromptTemplateId,
+    DEFAULT_AGENT_PROMPT_TEMPLATE_ID,
+  );
+  if (configuredId === DEFAULT_AGENT_PROMPT_TEMPLATE_ID) return configuredId;
+  return normalizeAgentPromptTemplateOptions(settings.promptTemplates).some((option) => option.id === configuredId)
+    ? configuredId
+    : DEFAULT_AGENT_PROMPT_TEMPLATE_ID;
+}
+
 export function normalizeAgentPromptTemplateSelectionMap(value: unknown): Record<string, string> {
   if (!isRecord(value)) return {};
   const selections: Record<string, string> = {};
@@ -236,8 +247,9 @@ export function resolveAgentPromptTemplate(input: {
   settings?: unknown;
   selectedPromptTemplateId?: string | null;
 }): string {
-  const selectedId = normalizePromptTemplateId(input.selectedPromptTemplateId, "");
-  if (!selectedId || selectedId === DEFAULT_AGENT_PROMPT_TEMPLATE_ID) {
+  const explicitSelectedId = normalizePromptTemplateId(input.selectedPromptTemplateId, "");
+  const selectedId = explicitSelectedId || resolveDefaultAgentPromptTemplateId(input.settings);
+  if (selectedId === DEFAULT_AGENT_PROMPT_TEMPLATE_ID) {
     return input.promptTemplate?.trim() ? input.promptTemplate : (input.fallbackPromptTemplate ?? "");
   }
   const option = getAgentPromptTemplateOptions(input).find((entry) => entry.id === selectedId);
@@ -351,7 +363,12 @@ export interface AgentContext {
     mesExample?: string;
     firstMes?: string;
     postHistoryInstructions?: string;
+    avatarPath?: string | null;
+    avatarCrop?: unknown;
+    rpgStats?: import("./character.js").RPGStatsConfig;
   }>;
+  /** Latest known tracker entries, including recurring characters that are currently absent. */
+  characterTrackerHistory?: import("./game-state.js").PresentCharacter[];
   /** User persona info */
   persona: {
     name: string;
@@ -415,6 +432,7 @@ export const BUILT_IN_AGENT_IDS = {
 } as const;
 
 export const RETIRED_BUILT_IN_AGENT_IDS = [
+  "about-me-keeper",
   "prompt-reviewer",
   "response-orchestrator",
   "schedule-planner",
@@ -448,9 +466,11 @@ export interface BuiltInAgentMeta {
   runtimeDisabled?: boolean;
   modeAllowlist?: readonly ChatMode[];
   promptTemplates?: AgentPromptTemplateOption[];
+  execution?: "pipeline" | "feature";
 }
 
-export const BUILT_IN_AGENTS: BuiltInAgentMeta[] = BUILT_IN_AGENT_MANIFESTS.map((agent) => ({
+function toBuiltInAgentMeta(agent: BuiltInAgentManifest): BuiltInAgentMeta {
+  return {
   id: agent.id,
   name: agent.name,
   description: agent.description,
@@ -463,11 +483,13 @@ export const BUILT_IN_AGENTS: BuiltInAgentMeta[] = BUILT_IN_AGENT_MANIFESTS.map(
   ...(agent.runtimeDisabled !== undefined ? { runtimeDisabled: agent.runtimeDisabled } : {}),
   ...(agent.modeAllowlist !== undefined ? { modeAllowlist: [...agent.modeAllowlist] } : {}),
   ...(agent.promptTemplates !== undefined ? { promptTemplates: [...agent.promptTemplates] } : {}),
-}));
+  ...(agent.execution !== undefined ? { execution: agent.execution } : {}),
+  };
+}
 
-export const BUILT_IN_AGENT_RUN_INTERVAL_DEFAULTS: Readonly<Record<string, number>> = Object.fromEntries(
-  BUILT_IN_AGENT_MANIFESTS.flatMap((agent) => (agent.runInterval === undefined ? [] : [[agent.id, agent.runInterval]])),
-);
+export const BUILT_IN_AGENTS: BuiltInAgentMeta[] = [];
+
+export const BUILT_IN_AGENT_RUN_INTERVAL_DEFAULTS: Record<string, number> = {};
 
 export const DEFAULT_AGENT_CONTEXT_SIZE = 5;
 export const DEFAULT_AGENT_MAX_TOKENS = 4096;
@@ -614,9 +636,18 @@ export function mergeBuiltInAgentSettings(agentType: string, settings: unknown):
 }
 
 /** Recommended default tools for each built-in agent type. */
-export const DEFAULT_AGENT_TOOLS: Record<string, string[]> = Object.fromEntries(
-  BUILT_IN_AGENT_MANIFESTS.map((agent) => [agent.id, [...(agent.defaultTools ?? [])]]),
-);
+export const DEFAULT_AGENT_TOOLS: Record<string, string[]> = {};
+
+export function replaceBuiltInAgentDefinitions(manifests: readonly BuiltInAgentManifest[]): void {
+  replaceBuiltInAgentManifestRegistry(manifests);
+  BUILT_IN_AGENTS.splice(0, BUILT_IN_AGENTS.length, ...manifests.map(toBuiltInAgentMeta));
+  for (const key of Object.keys(BUILT_IN_AGENT_RUN_INTERVAL_DEFAULTS)) delete BUILT_IN_AGENT_RUN_INTERVAL_DEFAULTS[key];
+  for (const key of Object.keys(DEFAULT_AGENT_TOOLS)) delete DEFAULT_AGENT_TOOLS[key];
+  for (const agent of manifests) {
+    if (agent.runInterval !== undefined) BUILT_IN_AGENT_RUN_INTERVAL_DEFAULTS[agent.id] = agent.runInterval;
+    DEFAULT_AGENT_TOOLS[agent.id] = [...(agent.defaultTools ?? [])];
+  }
+}
 
 /** Data shape for a lorebook_update agent result. */
 export interface LorebookUpdateResult {
@@ -654,6 +685,7 @@ export const EDITABLE_CHARACTER_CARD_FIELDS = [
   "post_history_instructions",
   "backstory",
   "appearance",
+  "aboutMe",
 ] as const;
 
 export type EditableCharacterCardField = (typeof EDITABLE_CHARACTER_CARD_FIELDS)[number];

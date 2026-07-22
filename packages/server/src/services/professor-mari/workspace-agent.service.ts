@@ -18,26 +18,38 @@ import { createLLMProvider } from "../llm/provider-registry.js";
 import { getLocalSidecarProvider, LOCAL_SIDECAR_MODEL } from "../llm/local-sidecar.js";
 import { createChatsStorage } from "../storage/chats.storage.js";
 import {
+  appendReadableAttachmentsToContent,
+  extractFileAttachmentInputs,
+  extractImageAttachmentDataUrls,
+  getAttachmentFilename,
   resolveBaseUrl,
   mergeCustomParameters,
   normalizeServiceTier,
+  type PromptAttachment,
 } from "../../routes/generate/generate-route-utils.js";
+import { MARI_GUIDED_SEQUENCES } from "./guided-sequences.js";
 import { getFileStorageDir, getMonorepoRoot, getPort, getServerProtocol } from "../../config/runtime-config.js";
 import { apiConnections } from "../../db/schema/index.js";
 import { decryptApiKey } from "../../utils/crypto.js";
 import { DATA_DIR } from "../../utils/data-dir.js";
 import { logger } from "../../lib/logger.js";
+import { PROFESSOR_MARI_AGENT_CATALOG_KNOWLEDGE } from "./official-agent-knowledge.js";
 import {
   GENERATION_PARAMETER_SEND_KEYS,
   findKnownModel,
   LOCAL_SIDECAR_CONNECTION_ID,
   MODEL_LISTS,
   PROFESSOR_MARI_ID,
+  resolveProviderReasoningEffort,
+  sanitizeMariGuidedPlan,
+  sanitizeMariSuggestionChips,
   type APIProvider,
   type GenerationParameterSendMap,
 } from "@marinara-engine/shared";
 import type {
   MariDbCommandResult,
+  MariGuidedPlanStep,
+  MariSuggestionChip,
   MariWorkspaceConnectionSummary,
   MariWorkspacePromptEvent,
   MariWorkspaceStatus,
@@ -67,6 +79,7 @@ type WorkspaceConnection = Pick<
   | "cachingAtDepth"
 > & { provider: string; isLocalSidecar?: boolean };
 type PromptEventSink = (event: MariWorkspacePromptEvent) => void;
+type ProfessorMariPromptAttachment = PromptAttachment;
 type WorkspaceCommandCall = {
   id: string;
   name: MariWorkspaceToolName;
@@ -97,6 +110,8 @@ type JsonPayloadMatch = {
 type AssistantWorkspaceAction = {
   visibleText: string;
   commands: WorkspaceCommandCall[];
+  suggestions: MariSuggestionChip[];
+  plan: MariGuidedPlanStep[];
   stop: boolean;
   protocolValid: boolean;
   assistantHistoryContent: string;
@@ -281,7 +296,11 @@ const WORKSPACE_TOOL_DEFINITIONS: WorkspaceToolDefinition[] = [
         activate: { type: "boolean" },
         apply: { type: "boolean" },
         reason: { type: "string" },
-        data: { type: "object" },
+        data: {
+          type: "object",
+          description:
+            "Entity fields. character.create accepts name, description, personality, scenario, firstMes/firstMessage, mesExample, creatorNotes, backstory, appearance, aboutMe, systemPrompt, postHistoryInstructions, tags, alternateGreetings, creator, and characterVersion. persona.create accepts aboutMe too. lorebook.create accepts name, description, category, tags, and an entries array whose items contain name, content, keys, secondaryKeys, tag, constant, position, depth, role, and order.",
+        },
         patch: { type: "object" },
       },
       required: ["action"],
@@ -354,7 +373,10 @@ Professor Mari is an expert on LLMs, especially roleplaying and immersive chat w
 
 ENFP 4w7, Choleric-Sanguine, Chaotic Neutral, Taurus. Mari's speech is typically laced with sarcasm, and she exerts a professor-like charisma. Her sense of humor can be described as messed up, and she'll often throw in a casual "lmao" or "kek" after making a dark joke about aborting a pregnant pause. Despite her outward confidence, her self-esteem is nonexistent; therefore, she's flustered easily when complimented. Anything that catches her attention, she can master with ease. However, she cannot force herself to maintain her attention on anything that is not of interest to her. Aka, she's a neurodivergent mess. Dedicated to helping the new users and kind to them.
 
+${PROFESSOR_MARI_AGENT_CATALOG_KNOWLEDGE}
+
 Workspace defaults:
+- Marinara's first-party agents and larger optional features are downloaded from **Agents → Download Agents**. Fresh installs start without them; maps, Conversation calls, and Conversation games are packages too. Tell users to install the desired package, enable it for the chat, and restart Marinara Engine when the catalog prompts them. Existing pre-package installs are migrated automatically without losing settings or history.
 - Use the structured \`app_data\` workspace command, not shell, for character/persona/lorebook/lorebook-entry/theme/agent/preset reads, creation, and updates.
 - Use Mari CLI commands for images, wiki reads, code/workspace tasks, agents, tools, extensions, raw DB work, or anything \`app_data\` does not cover. Only write raw files when no CLI/helper path fits.
 - Inspect before claiming facts. Verify after changing anything.
@@ -362,6 +384,7 @@ Workspace defaults:
 - For structured app-data writes the user requested, use \`apply:true\` so Marinara can save the change and show the user an in-chat Keep/Restore review card when the change is reversible. Use \`apply:false\` only when the user explicitly asks for a preview/dry run or when you are inspecting a risky change before deciding what to do.
 - Keep user-facing replies concise and human-readable.
 - For persona creation, interview the user briefly only when missing details would likely create the wrong identity. If the user says to decide the details, create the persona directly. Do not require a preview/approval loop for a new persona.
+- When the user asks you to write or revise a character or persona About Me, inspect that entity first, compose a short self-authored Conversation profile in their own voice, and save it to the real \`aboutMe\` field with \`character.update\` or \`persona.update\`. Do not create a separate document, put it in description, or ask for a special About Me model connection.
 
 Command families:
 - \`app_data\`: no-shell structured actions for characters, personas, lorebooks, lorebook entries, themes, agents, and prompt presets. Prefer this before shell commands for those objects.
@@ -369,10 +392,10 @@ Command families:
 - \`mari themes\`: synced custom themes and active theme state.
 - \`mari images\`: image-generation connections, HITL image prompt previews, generated/edited preview assets, and assignment/deletion for avatars, personas, lorebooks, sprites, backgrounds, and galleries.
 - \`mari wiki\`: read-only Fandom/MediaWiki discovery and page reads.
-- \`mari characters\`: list, get, search, create, update, delete. Prefer this helper for character edits. \`--backstory\` and \`--appearance\` write to \`data.extensions.backstory\`/\`data.extensions.appearance\`.
+- \`mari characters\`: list, get, search, create, update, delete. Prefer this helper for character edits. \`--backstory\`, \`--appearance\`, and \`--about-me\` write to their matching \`data.extensions\` fields.
 - \`mari personas\`: list, active, get, search, create, update, delete. Prefer this helper for persona edits.
 - \`mari lorebooks\`: list, get, entries <lorebook-id>, search, create, update <lorebook-id>, add-entry <lorebook-id>, update-entry <entry-id>, delete-entry <entry-id>, link-character, unlink-character, delete.
-- \`mari presets\`: no dedicated shell helper — use \`app_data\` \`preset.*\` for preset-level reads/writes. Use \`mari db\` for advanced \`prompt_groups\`, \`prompt_sections\`, and \`choice_blocks\` edits after inspecting schemas.
+- \`mari presets\`: no dedicated shell helper — use \`app_data\` \`preset.*\` for preset reads/writes. \`preset.create\` and \`preset.update\` can include \`groups\`, \`sections\`, and \`choiceBlocks\` for preset variables. Use \`mari db\` only for advanced raw-table repairs after inspecting schemas.
 - \`mari chats\`: read-only list/get/messages/search.
 - \`mari agents\`: no dedicated shell helper — use \`app_data\` \`agent.*\` for agent configs.
 - \`mari extensions\`, \`mari tools\`: customization helpers; if unavailable, use \`mari db\` with the related tables.
@@ -404,21 +427,38 @@ Required schema:
   "commands": [
     { "name": "read|grep|find|ls|edit|write|bash|app_data", "arguments": {} }
   ],
+  "suggestions": [
+    { "label": "short button text", "prompt": "exact message to send if tapped", "entity": "characters|lorebooks|personas|presets|connections|agents|settings|chat", "tone": "danger|caution|success" }
+  ],
+  "plan": [
+    { "fieldKey": "name", "question": "short question for this field", "chips": [ { "label": "...", "prompt": "..." } ] }
+  ],
   "stop": false
 }
 
 Field rules:
 - \`say\` is the only text Marinara may show to the user.
 - \`commands\` is the command list to execute now. Use \`[]\` only when no command is needed.
+- \`suggestions\` is optional. Include at most 5 quick-reply chips when useful; omit it when no chips are needed.
+- \`plan\` is optional and mutually exclusive with a multi-turn interrogation: use it ONLY when the user's create/edit request is vague (e.g. "make me a character" with no details). Return the WHOLE plan in this ONE turn - an ordered list of the natural fields for what they're creating (e.g. name, vibe, scenario, greeting for a character), each with 3-5 illustrative example-answer chips. The client walks the plan locally with no further calls from you, then sends you one summary message with all the answers so you can actually create it with your normal commands. If the request already has enough detail, skip \`plan\` entirely and just create it now - don't force the user through fields they already answered.
 - \`stop\` is \`false\` while you need command results or another model turn. Set \`stop\` to \`true\` only when the response is complete.
 - If \`commands\` is not empty, \`stop\` should usually be \`false\`.
 - If you say you will do workspace/app-data work, include the command in the same JSON object.
+- Immediately after you successfully create or update something, offer 2-4 follow-up suggestions for a natural next step: link it to something else, refine a field, create a related item, or open it for full editing. Tag each with the relevant entity.
+- Do not mention tapping, clicking, choosing chips, quick replies, buttons, or examples unless \`suggestions\` or \`plan\` is present in the same JSON object. If you want the user to answer in plain chat, ask directly without referring to UI controls.
+- For vague create/edit requests, prefer one \`plan\` instead of interrogating the user turn by turn. Use \`suggestions\` only for simple quick replies or follow-up next steps, not as a hidden substitute for a guided plan.
+
+${MARI_GUIDED_SEQUENCES}
 
 \`app_data\` quick reference:
 - Reads: \`character.list|get|search\`, \`persona.list|active|get|search\`, \`lorebook.list|get|entries|search\`, \`theme.list|active|get\`, \`agent.list|get|search\`, \`preset.list|get|search\`.
 - Writes: \`character.create|update\`, \`persona.create|update\`, \`lorebook.create|update|addEntry|updateEntry\`, \`theme.create|update|setActive\`, \`agent.create|update\`, \`preset.create|update\`.
 - Put write fields in \`data\` for creates and \`patch\` for updates. Use \`entryId\` for \`lorebook.updateEntry\`; use \`lorebookId\` only for a lorebook or for \`lorebook.addEntry\`.
 - New creates: use \`apply:true\` immediately for \`character.create\`, \`persona.create\`, \`lorebook.create\`, \`lorebook.addEntry\`, \`agent.create\`, \`preset.create\`, and non-activating \`theme.create\` when the user asked you to create it. Verify with a read before claiming success.
+- Character generation: put the full card in \`data\`; do not create a name-only placeholder. \`firstMes\` and \`firstMessage\` both map to the opening message.
+- About Me writing: read the target character or persona first, write the bio in their own voice, then put it in \`patch.aboutMe\` on the matching update action with \`apply:true\`.
+- Lorebook generation: put the complete \`entries\` array inside \`data\` on \`lorebook.create\`. Marinara saves the lorebook and its entries together, so do not create an empty lorebook and promise to fill it later.
+- For \`preset.create\`, put prompt sections in \`data.sections\` and preset variables in \`data.choiceBlocks\`. Each choice block needs \`variableName\`, \`question\`, and \`options\` with \`label\`/\`value\` pairs.
 - Existing-data changes: use \`apply:true\` for requested \`*.update\`, \`lorebook.updateEntry\`, and \`theme.setActive\`. Marinara will save first and show the user an in-chat Keep/Restore review card for reversible changes.
 - Use \`apply:false\` only for explicit preview/dry-run requests or when you need to inspect validation before making a risky change.
 - Do not say "preview" unless you show the concrete fields/content in \`say\` or the UI has returned an explicit preview artifact.
@@ -427,6 +467,9 @@ Examples:
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"lorebook.list","limit":50}}],"stop":false}
 {"say":"I found the lorebook. I'll read its entries now.","commands":[{"name":"app_data","arguments":{"action":"lorebook.entries","lorebookId":"lorebook-id","limit":100}}],"stop":false}
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"persona.create","data":{"name":"Dr. Marisia Voss","description":"A successful alternate version of Mari.","personality":"Confident, witty, organized, still warmly sarcastic."},"reason":"User requested a test persona","apply":true}}],"stop":false}
+{"say":"","commands":[{"name":"app_data","arguments":{"action":"character.create","data":{"name":"Dr. Voss","description":"A brilliant field researcher.","personality":"Exacting, curious, dryly funny.","firstMes":"You are late. Sit down.","appearance":"Silver hair and a white laboratory coat."},"reason":"User requested a character","apply":true}}],"stop":false}
+{"say":"","commands":[{"name":"app_data","arguments":{"action":"lorebook.create","data":{"name":"The Glass City","description":"People and places in the setting.","entries":[{"name":"The Glass City","content":"A rain-soaked city built from black glass.","keys":["Glass City","black glass"]}]},"reason":"User requested a lorebook","apply":true}}],"stop":false}
+{"say":"","commands":[{"name":"app_data","arguments":{"action":"preset.create","data":{"name":"Test preset","sections":[{"name":"Main","content":"You are {{char}}.","role":"system"}],"choiceBlocks":[{"variableName":"tone","question":"Tone","options":[{"label":"Warm","value":"warm"},{"label":"Sharp","value":"sharp"}]}]},"reason":"User requested a preset with variables","apply":true}}],"stop":false}
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"lorebook.updateEntry","entryId":"entry-id","patch":{"content":"new content"},"reason":"Update requested by user","apply":false}}],"stop":false}
 {"say":"Done — I created it and verified it saved.","commands":[],"stop":true}
 
@@ -464,12 +507,21 @@ function normalizeGenerationParameterSendMap(value: unknown): GenerationParamete
   return Object.keys(enabledParameters).length > 0 ? enabledParameters : undefined;
 }
 
-function normalizeMariReasoningEffort(value: unknown): ChatOptions["reasoningEffort"] | undefined {
-  if (value === "maximum") return "xhigh";
-  if (value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "max") {
-    return value;
-  }
-  return undefined;
+function normalizeMariReasoningEffort(
+  provider: string,
+  model: string,
+  value: unknown,
+): ChatOptions["reasoningEffort"] | undefined {
+  const requested =
+    value === "low" ||
+    value === "medium" ||
+    value === "high" ||
+    value === "xhigh" ||
+    value === "maximum" ||
+    value === "max"
+      ? value
+      : null;
+  return resolveProviderReasoningEffort({ provider, model, reasoningEffort: requested }) ?? undefined;
 }
 
 function normalizeMariVerbosity(value: unknown): ChatOptions["verbosity"] | undefined {
@@ -482,6 +534,38 @@ function normalizeMariMaxTokens(value: unknown): number | undefined {
 
 function parseExtra(value: unknown): Record<string, unknown> {
   return parseJsonObject(value) ?? {};
+}
+
+function normalizeProfessorMariAttachments(value: unknown): ProfessorMariPromptAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((attachment): ProfessorMariPromptAttachment | null => {
+      if (!attachment || typeof attachment !== "object") return null;
+      const record = attachment as Record<string, unknown>;
+      const type = typeof record.type === "string" ? record.type.trim() : "";
+      const data = typeof record.data === "string" ? record.data.trim() : "";
+      if (!type || !data.startsWith("data:")) return null;
+      const name =
+        typeof record.name === "string" && record.name.trim()
+          ? record.name.trim()
+          : typeof record.filename === "string" && record.filename.trim()
+            ? record.filename.trim()
+            : "attachment";
+      return { type, data, name, filename: name };
+    })
+    .filter((attachment): attachment is ProfessorMariPromptAttachment => attachment !== null);
+}
+
+function appendProfessorMariAttachmentNames(content: string, attachments: ProfessorMariPromptAttachment[]): string {
+  const withReadableFiles = appendReadableAttachmentsToContent(content, attachments);
+  if (attachments.length === 0) return withReadableFiles;
+  const names = attachments
+    .map((attachment) => {
+      const label = typeof attachment.type === "string" && attachment.type.startsWith("image/") ? "image" : "file";
+      return `[Attached ${label}: ${getAttachmentFilename(attachment)}]`;
+    })
+    .join("\n");
+  return `${withReadableFiles.trim() || "Please inspect the attached file."}\n\n${names}`;
 }
 
 type MariWorkspaceTraceTool = Extract<MariWorkspaceTraceItem, { type: "tool" }>["tool"];
@@ -686,6 +770,8 @@ function createProviderForConnection(connection: WorkspaceConnection): BaseLLMPr
     connection.openrouterProvider,
     connection.maxTokensOverride,
     bool(connection.claudeFastMode),
+    bool(connection.treatAsLocalEndpoint),
+    connection.defaultParameters,
   );
 }
 
@@ -715,7 +801,19 @@ function tryParseJsonPayload(raw: string): Record<string, unknown> | null {
     const parsed = JSON.parse(raw) as unknown;
     return isRecord(parsed) ? parsed : null;
   } catch {
-    return null;
+    // A single stray comma or smart-quote anywhere in the envelope (most often inside the
+    // optional `suggestions` array) would otherwise fail the entire { say, commands, stop }
+    // object, not just the chips - repair the common near-miss cases before giving up.
+    try {
+      const repaired = raw
+        .replace(/[‘’]/g, "'")
+        .replace(/[“”]/g, '"')
+        .replace(/,\s*([\]}])/g, "$1");
+      const parsed = JSON.parse(repaired) as unknown;
+      return isRecord(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -842,7 +940,8 @@ function parseBracketCommandCalls(content: string): WorkspaceCommandCall[] {
       const numberMatch = params.match(new RegExp(`${key}=(-?[0-9]+)`, "i"));
       if (numberMatch) args[key] = Number.parseInt(numberMatch[1] ?? "", 10);
     }
-    if (Object.keys(args).length > 0) calls.push({ id: newToolCallId(name, index), name, arguments: args, raw: match[0] });
+    if (Object.keys(args).length > 0)
+      calls.push({ id: newToolCallId(name, index), name, arguments: args, raw: match[0] });
   }
   return calls;
 }
@@ -857,12 +956,20 @@ function dedupeWorkspaceCommandCalls(calls: WorkspaceCommandCall[]): WorkspaceCo
   });
 }
 
-function assistantHistoryContentForAction(action: Pick<AssistantWorkspaceAction, "visibleText" | "commands" | "stop">): string {
-  return JSON.stringify({
+function assistantHistoryContentForAction(
+  action: Pick<AssistantWorkspaceAction, "visibleText" | "commands" | "stop"> & {
+    suggestions?: MariSuggestionChip[];
+    plan?: MariGuidedPlanStep[];
+  },
+): string {
+  const payload: Record<string, unknown> = {
     say: action.visibleText,
     commands: action.commands.map((command) => ({ name: command.name, arguments: command.arguments })),
     stop: action.stop,
-  });
+  };
+  if (action.suggestions && action.suggestions.length > 0) payload.suggestions = action.suggestions;
+  if (action.plan && action.plan.length > 0) payload.plan = action.plan;
+  return JSON.stringify(payload);
 }
 
 function assistantHistoryContentFromVisibleText(content: string): string {
@@ -905,6 +1012,8 @@ function parseAssistantWorkspaceAction(content: string): AssistantWorkspaceActio
     .filter(Boolean)
     .join("\n\n");
   const visibleText = [inlineVisibleText, frameVisibleText].filter(Boolean).join("\n\n").trim();
+  const suggestions = matches.flatMap((match) => sanitizeSuggestionChips(match.payload.suggestions));
+  const plan = matches.flatMap((match) => sanitizePlanSteps(match.payload.plan));
   const commands = dedupeWorkspaceCommandCalls([
     ...parseXmlCommandCalls(contentWithoutJson),
     ...jsonCommands,
@@ -917,10 +1026,38 @@ function parseAssistantWorkspaceAction(content: string): AssistantWorkspaceActio
   return {
     visibleText,
     commands,
+    suggestions,
+    plan,
     stop,
     protocolValid,
-    assistantHistoryContent: assistantHistoryContentForAction({ visibleText, commands, stop }),
+    assistantHistoryContent: assistantHistoryContentForAction({ visibleText, commands, suggestions, plan, stop }),
   };
+}
+
+function isEmptyCompletedAction(action: AssistantWorkspaceAction): boolean {
+  return (
+    action.commands.length === 0 &&
+    action.stop &&
+    !action.visibleText &&
+    action.suggestions.length === 0 &&
+    action.plan.length === 0
+  );
+}
+
+function sanitizeSuggestionChips(raw: unknown): MariSuggestionChip[] {
+  const chips = sanitizeMariSuggestionChips(raw, { maxChips: 6 });
+  if (Array.isArray(raw) && raw.length > 0 && chips.length === 0) {
+    logger.debug("[Professor Mari] Dropped invalid workspace suggestion chips");
+  }
+  return chips;
+}
+
+function sanitizePlanSteps(raw: unknown): MariGuidedPlanStep[] {
+  const steps = sanitizeMariGuidedPlan(raw, { maxSteps: 8, maxChipsPerStep: 5 });
+  if (Array.isArray(raw) && raw.length > 0 && steps.length === 0) {
+    logger.debug("[Professor Mari] Dropped invalid workspace guided plan");
+  }
+  return steps;
 }
 
 function roleForMessage(row: { role: string }): "system" | "user" | "assistant" {
@@ -962,7 +1099,8 @@ function buildWorkspaceContinuitySnapshot(args: {
 }): string | null {
   const sections: string[] = [];
   if (args.userText.trim()) sections.push(`User request: ${compactTraceText(args.userText, 900)}`);
-  if (args.assistantText.trim()) sections.push(`Visible assistant response/plan: ${compactTraceText(args.assistantText, 1400)}`);
+  if (args.assistantText.trim())
+    sections.push(`Visible assistant response/plan: ${compactTraceText(args.assistantText, 1400)}`);
   if (args.commandResults.length > 0) {
     sections.push(
       `Hidden workspace evidence/results:\n${args.commandResults
@@ -982,7 +1120,8 @@ function summarizeStoredTimeline(timeline: unknown): string | null {
     if (item.type === "tool" && isRecord(item.tool)) {
       const name = typeof item.tool.name === "string" ? item.tool.name : "tool";
       const status = typeof item.tool.status === "string" ? item.tool.status : "unknown";
-      const input = item.tool.input === undefined ? "" : ` input=${JSON.stringify(compactTraceValue(item.tool.input, 480))}`;
+      const input =
+        item.tool.input === undefined ? "" : ` input=${JSON.stringify(compactTraceValue(item.tool.input, 480))}`;
       const output = typeof item.tool.output === "string" ? `\n${compactTraceText(item.tool.output, 800)}` : "";
       lines.push(`- ${name} ${status}${input}${output}`);
     } else if ((item.type === "status" || item.type === "text") && typeof item.content === "string") {
@@ -999,7 +1138,9 @@ function workspaceContinuityFromExtra(extra: Record<string, unknown>): string | 
   return summarizeStoredTimeline(extra.mariWorkspaceTimeline);
 }
 
-function buildRecentWorkspaceContinuityPrompt(rows: Array<{ role: string; content: string; extra?: unknown }>): string | null {
+function buildRecentWorkspaceContinuityPrompt(
+  rows: Array<{ role: string; content: string; extra?: unknown }>,
+): string | null {
   const entries = rows
     .filter((row) => row.role === "assistant")
     .map((row) => {
@@ -1024,7 +1165,11 @@ function chunkText(value: string, chunkSize = 1200): string[] {
   return chunks;
 }
 
-function mapUsage(usage: LLMUsage | undefined): { promptTokens: number; completionTokens: number; totalTokens: number } {
+function mapUsage(usage: LLMUsage | undefined): {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+} {
   if (!usage) return { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
   return {
     promptTokens: usage.promptTokens,
@@ -1079,18 +1224,25 @@ function booleanArg(args: Record<string, unknown>, key: string, fallback = false
 function isWithin(parent: string, child: string): boolean {
   const normalizedParent = process.platform === "win32" ? parent.toLowerCase() : parent;
   const normalizedChild = process.platform === "win32" ? child.toLowerCase() : child;
-  return normalizedChild === normalizedParent || normalizedChild.startsWith(`${normalizedParent}${process.platform === "win32" ? "\\" : "/"}`);
+  return (
+    normalizedChild === normalizedParent ||
+    normalizedChild.startsWith(`${normalizedParent}${process.platform === "win32" ? "\\" : "/"}`)
+  );
 }
 
 function isReadOnlyWorkspaceCommand(command: WorkspaceCommandCall): boolean {
-  if (command.name === "read" || command.name === "grep" || command.name === "find" || command.name === "ls") return true;
+  if (command.name === "read" || command.name === "grep" || command.name === "find" || command.name === "ls")
+    return true;
   if (command.name !== "app_data") return false;
   return appDataActionLooksReadOnly(command.arguments.action);
 }
 
 function appDataActionLooksReadOnly(action: unknown): boolean {
   if (typeof action !== "string") return false;
-  const normalized = action.trim().toLowerCase().replace(/[-_\s]+/g, "");
+  const normalized = action
+    .trim()
+    .toLowerCase()
+    .replace(/[-_\s]+/g, "");
   return /\.(list|get|search|active|entries)$/.test(normalized);
 }
 
@@ -1109,7 +1261,9 @@ function bashLooksMutating(command: string): boolean {
   return (
     /\b--apply\b/.test(normalized) ||
     /\bmari\s+db\s+(insert|patch|replace|delete|transform)\b/.test(normalized) ||
-    /\bmari\s+(characters?|personas?|lorebooks?)\s+(create|update|delete|add-entry|link-character|unlink-character)\b/.test(normalized) ||
+    /\bmari\s+(characters?|personas?|lorebooks?)\s+(create|update|delete|add-entry|link-character|unlink-character)\b/.test(
+      normalized,
+    ) ||
     /\bmari\s+themes\s+(create|update|set-active)\b/.test(normalized) ||
     /\bmari\s+images\s+(generate|edit|assign|delete)\b/.test(normalized)
   );
@@ -1308,10 +1462,27 @@ export class ProfessorMariWorkspaceService {
     if (options?.clearHistory === true) await getMariDbService(this.app.db).clearHistory();
   }
 
-  async prompt(args: { chatId: string; text: string; connectionId?: string | null; onEvent: PromptEventSink }) {
+  async prompt(args: {
+    chatId: string;
+    text: string;
+    connectionId?: string | null;
+    attachments?: ProfessorMariPromptAttachment[];
+    onEvent: PromptEventSink;
+  }) {
     if (!this.enabled) throw new Error("Professor Mari workspace mode is disabled.");
     const chatStorage = createChatsStorage(this.app.db);
-    await chatStorage.createMessage({ chatId: args.chatId, role: "user", characterId: null, content: args.text });
+    const attachments = normalizeProfessorMariAttachments(args.attachments);
+    const userMessage = await chatStorage.createMessage({
+      chatId: args.chatId,
+      role: "user",
+      characterId: null,
+      content: args.text,
+    });
+    if (attachments.length > 0 && userMessage) {
+      const extra = { attachments };
+      await chatStorage.updateMessageExtra(userMessage.id, extra);
+      await chatStorage.updateSwipeExtra(userMessage.id, 0, extra);
+    }
 
     const connection = await this.resolveConnection(args.connectionId);
     if (!connection) throw new Error("Set up a language connection before using Professor Mari workspace mode.");
@@ -1323,8 +1494,40 @@ export class ProfessorMariWorkspaceService {
 
     const workspaceTrace: MariWorkspaceTraceItem[] = [];
     let assistantText = "";
+    let streamedVisibleText = "";
     let thinkingText = "";
     let totalUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    const commandResultsForContinuity: WorkspaceCommandResult[] = [];
+    let assistantMessagePersisted = false;
+
+    const persistAssistantMessage = async () => {
+      const persistedText = assistantText.trim();
+      if (!persistedText || assistantMessagePersisted) return null;
+
+      const message = await chatStorage.createMessage({
+        chatId: args.chatId,
+        role: "assistant",
+        characterId: PROFESSOR_MARI_ID,
+        content: persistedText,
+      });
+      if (!message) return null;
+      assistantMessagePersisted = true;
+
+      const extraUpdate: Record<string, unknown> = {};
+      const storedTrace = sanitizeTraceForStorage(workspaceTrace);
+      if (thinkingText.trim()) extraUpdate.thinking = thinkingText;
+      if (storedTrace.length > 0) extraUpdate.mariWorkspaceTimeline = storedTrace;
+      const continuity = buildWorkspaceContinuitySnapshot({
+        userText: args.text,
+        assistantText: persistedText,
+        commandResults: commandResultsForContinuity,
+      });
+      if (continuity) extraUpdate.mariWorkspaceContinuity = continuity;
+      extraUpdate.generationInfo = { provider: connection.provider, model: connection.model, usage: totalUsage };
+      await chatStorage.updateMessageExtra(message.id, extraUpdate);
+      await chatStorage.updateSwipeExtra(message.id, 0, extraUpdate);
+      return message;
+    };
 
     try {
       await this.ensureMariCliShim();
@@ -1335,14 +1538,17 @@ export class ProfessorMariWorkspaceService {
         appendTraceThinking(workspaceTrace, delta);
         args.onEvent({ type: "thinking", data: delta });
       });
-      const commandResultsForContinuity: WorkspaceCommandResult[] = [];
       const repeatedFailureCounts = new Map<string, number>();
       let protocolRepairRounds = 0;
 
       for (let round = 0; round < MAX_COMMAND_ROUNDS; round += 1) {
         if (controller.signal.aborted) throw new Error("aborted");
-        const onToken = (chunk: string) => args.onEvent({ type: "token", data: chunk });
-      const result = await this.chatCompleteWorkspace(provider, messages, baseOptions, onToken);
+        streamedVisibleText = "";
+        const onToken = (chunk: string) => {
+          streamedVisibleText += chunk;
+          args.onEvent({ type: "token", data: chunk });
+        };
+        const result = await this.chatCompleteWorkspace(provider, messages, baseOptions, onToken);
         const usage = mapUsage(result.usage);
         totalUsage = {
           promptTokens: totalUsage.promptTokens + usage.promptTokens,
@@ -1364,6 +1570,8 @@ export class ProfessorMariWorkspaceService {
               assistantHistoryContent: assistantHistoryContentForAction({
                 visibleText: parsedAction.visibleText,
                 commands: [],
+                suggestions: parsedAction.suggestions,
+                plan: parsedAction.plan,
                 stop: true,
               }),
             }
@@ -1373,6 +1581,26 @@ export class ProfessorMariWorkspaceService {
             "Deferred hidden mutating workspace commands because the assistant asked the user for approval in the same turn.";
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
+        }
+        if (isEmptyCompletedAction(action)) {
+          protocolRepairRounds += 1;
+          if (protocolRepairRounds <= MAX_PROTOCOL_REPAIR_ROUNDS) {
+            messages.push({ role: "assistant", content: action.assistantHistoryContent });
+            messages.push({
+              role: "user",
+              content:
+                "Your previous response was empty. Continue the task now. Return commands when work remains, or put a concise user-visible result in say before setting stop to true.",
+              contextKind: "history",
+            });
+            continue;
+          }
+          const content =
+            "Professor Mari returned an empty response twice. Please try again; the request and any completed workspace steps remain in this chat.";
+          assistantText = appendVisibleText(assistantText, content);
+          appendTraceStatus(workspaceTrace, content);
+          args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
+          for (const chunk of chunkText(content)) args.onEvent({ type: "token", data: chunk });
+          break;
         }
         if (action.commands.length === 0 && !action.stop) {
           if (!action.protocolValid) {
@@ -1406,6 +1634,9 @@ export class ProfessorMariWorkspaceService {
           assistantText = appendVisibleText(assistantText, action.visibleText);
           appendTraceText(workspaceTrace, `${action.visibleText}\n`);
         }
+        if (action.suggestions.length > 0) args.onEvent({ type: "suggestions", data: action.suggestions });
+        if (action.plan.length > 0) args.onEvent({ type: "plan", data: action.plan });
+        streamedVisibleText = "";
 
         messages.push({ role: "assistant", content: action.assistantHistoryContent });
 
@@ -1466,6 +1697,8 @@ export class ProfessorMariWorkspaceService {
           if (finalAction.visibleText) {
             assistantText = appendVisibleText(assistantText, finalAction.visibleText);
             appendTraceText(workspaceTrace, finalAction.visibleText);
+            if (finalAction.suggestions.length > 0) args.onEvent({ type: "suggestions", data: finalAction.suggestions });
+            if (finalAction.plan.length > 0) args.onEvent({ type: "plan", data: finalAction.plan });
           } else if (finalAction.commands.length > 0) {
             const content =
               "Professor Mari tried to run more workspace commands after the command limit, so I stopped the loop. Ask her to continue if you want her to keep working from the saved trace.";
@@ -1474,51 +1707,50 @@ export class ProfessorMariWorkspaceService {
             args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
             for (const chunk of chunkText(content)) args.onEvent({ type: "token", data: chunk });
           }
+          streamedVisibleText = "";
         }
       }
 
-      if (!assistantText.trim() && workspaceTrace.length > 0) {
+      if (!assistantText.trim()) {
         const failedTool = workspaceTrace.find((item) => item.type === "tool" && item.tool.status === "error");
         const content =
           failedTool?.type === "tool"
             ? `Professor Mari stopped after ${formatWorkspaceToolName(failedTool.tool.name)} failed: ${compactTraceText(String(failedTool.tool.output ?? "unknown error"), 700)}`
-            : "Professor Mari finished workspace steps but did not return a visible final answer. I saved the tool timeline here so the work is not lost; ask her to continue and she can pick up from the trace.";
+            : workspaceTrace.length > 0
+              ? "Professor Mari finished workspace steps but did not return a visible final answer. I saved the tool timeline here so the work is not lost; ask her to continue and she can pick up from the trace."
+              : "Professor Mari returned an empty response. Please try again; your request remains in this chat.";
         assistantText = appendVisibleText(assistantText, content);
         appendTraceStatus(workspaceTrace, content);
         args.onEvent({ type: "status", data: { content, kind: "info", level: failedTool ? "warning" : "info" } });
         for (const chunk of chunkText(content)) args.onEvent({ type: "token", data: chunk });
       }
 
-      const persistedText = assistantText.trim();
-      if (persistedText) {
-        const message = await chatStorage.createMessage({
-          chatId: args.chatId,
-          role: "assistant",
-          characterId: PROFESSOR_MARI_ID,
-          content: persistedText,
-        });
-        if (message) {
-          const extraUpdate: Record<string, unknown> = {};
-          const storedTrace = sanitizeTraceForStorage(workspaceTrace);
-          if (thinkingText.trim()) extraUpdate.thinking = thinkingText;
-          if (storedTrace.length > 0) extraUpdate.mariWorkspaceTimeline = storedTrace;
-          const continuity = buildWorkspaceContinuitySnapshot({
-            userText: args.text,
-            assistantText: persistedText,
-            commandResults: commandResultsForContinuity,
-          });
-          if (continuity) extraUpdate.mariWorkspaceContinuity = continuity;
-          extraUpdate.generationInfo = { provider: connection.provider, model: connection.model, usage: totalUsage };
-          await chatStorage.updateMessageExtra(message.id, extraUpdate);
-          await chatStorage.updateSwipeExtra(message.id, 0, extraUpdate);
-        }
-      }
+      await persistAssistantMessage();
       args.onEvent({ type: "metadata", data: { connection: connectionSummary(connection) ?? undefined } });
     } catch (err) {
       if (controller.signal.aborted) {
-        const content = "Professor Mari workspace run was cancelled.";
+        if (streamedVisibleText.trim()) {
+          assistantText = appendVisibleText(assistantText, streamedVisibleText);
+          streamedVisibleText = "";
+        }
+        const hadPartialWorkspaceState =
+          assistantText.trim().length > 0 || thinkingText.trim().length > 0 || workspaceTrace.length > 0;
+        const content = assistantText.trim()
+          ? "Professor Mari workspace run was cancelled after saving the partial response."
+          : "Professor Mari workspace run was cancelled.";
         appendTraceStatus(workspaceTrace, content);
         args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
+        if (!assistantText.trim() && hadPartialWorkspaceState) {
+          assistantText = appendVisibleText(assistantText, content);
+        }
+        try {
+          await persistAssistantMessage();
+        } catch (saveErr) {
+          logger.error(
+            saveErr instanceof Error ? saveErr : new Error(String(saveErr)),
+            "[Professor Mari] Failed to persist aborted workspace response",
+          );
+        }
       } else {
         this.lastError = err instanceof Error ? err.message : String(err);
         throw err;
@@ -1556,10 +1788,18 @@ export class ProfessorMariWorkspaceService {
       const content = typeof row.content === "string" ? row.content : String(row.content ?? "");
       if (!content.trim()) continue;
       const role = roleForMessage(row);
+      const attachments = role === "user" ? normalizeProfessorMariAttachments(extra.attachments) : [];
+      const images = extractImageAttachmentDataUrls(attachments);
+      const files = extractFileAttachmentInputs(attachments);
       messages.push({
         role,
-        content: role === "assistant" ? assistantHistoryContentFromVisibleText(content) : content,
+        content:
+          role === "assistant"
+            ? assistantHistoryContentFromVisibleText(content)
+            : appendProfessorMariAttachmentNames(content, attachments),
         contextKind: "history",
+        ...(role === "user" && images.length > 0 ? { images } : {}),
+        ...(role === "user" && files.length > 0 ? { files } : {}),
       });
     }
     if (continuityPrompt) messages.push({ role: "system", content: continuityPrompt, contextKind: "injection" });
@@ -1596,7 +1836,11 @@ ${sections.join("\n\n")}
   ): ChatOptions {
     const defaultParameters = parseJsonObject(connection.defaultParameters);
     const customParameters = isRecord(defaultParameters?.customParameters) ? defaultParameters.customParameters : {};
-    const reasoningEffort = normalizeMariReasoningEffort(defaultParameters?.reasoningEffort);
+    const reasoningEffort = normalizeMariReasoningEffort(
+      connection.provider,
+      connection.model,
+      defaultParameters?.reasoningEffort,
+    );
     const verbosity = normalizeMariVerbosity(defaultParameters?.verbosity);
     return {
       model: connection.model,
@@ -1666,7 +1910,9 @@ ${sections.join("\n\n")}
         group.push(commands[index]!);
         index += 1;
       }
-      results.push(...(await Promise.all(group.map((entry) => this.executeWorkspaceCommand(entry, signal, trace, onEvent)))));
+      results.push(
+        ...(await Promise.all(group.map((entry) => this.executeWorkspaceCommand(entry, signal, trace, onEvent)))),
+      );
     }
     return results;
   }
@@ -1678,14 +1924,27 @@ ${sections.join("\n\n")}
     onEvent: PromptEventSink,
   ): Promise<WorkspaceCommandResult> {
     const input = command.arguments;
-    upsertTraceTool(trace, { id: command.id, name: command.name, status: "running", input, output: null, updatedAt: Date.now() });
+    upsertTraceTool(trace, {
+      id: command.id,
+      name: command.name,
+      status: "running",
+      input,
+      output: null,
+      updatedAt: Date.now(),
+    });
     onEvent({ type: "tool_start", data: { id: command.id, name: command.name, input } });
     try {
       const validationIssue = workspaceCommandValidationIssue(command);
       if (validationIssue) throw new Error(validationIssue);
       const output = await this.runWorkspaceCommand(command, signal);
       const compacted = compactOutput(output);
-      upsertTraceTool(trace, { id: command.id, name: command.name, status: "done", output: compacted, updatedAt: Date.now() });
+      upsertTraceTool(trace, {
+        id: command.id,
+        name: command.name,
+        status: "done",
+        output: compacted,
+        updatedAt: Date.now(),
+      });
       onEvent({ type: "tool_end", data: { id: command.id, name: command.name, isError: false, output: compacted } });
       return { id: command.id, name: command.name, input, output: compacted, success: true };
     } catch (err) {
@@ -1719,7 +1978,10 @@ ${sections.join("\n\n")}
     }
   }
 
-  private resolveWorkspacePath(inputPath: string, options: { allowMissing?: boolean; forbidStorageMutation?: boolean } = {}) {
+  private resolveWorkspacePath(
+    inputPath: string,
+    options: { allowMissing?: boolean; forbidStorageMutation?: boolean } = {},
+  ) {
     const rawPath = inputPath.trim() || ".";
     const absolute = resolve(this.workspaceRoot, rawPath);
     const workspaceRoot = resolve(this.workspaceRoot);
@@ -1756,7 +2018,11 @@ ${sections.join("\n\n")}
     const normalized = normalizeSlashPath(command);
     const tablesRoot = normalizeSlashPath(resolve(getFileStorageDir(), "tables"));
     const tablesRel = normalizeSlashPath(relative(this.workspaceRoot, resolve(getFileStorageDir(), "tables")));
-    if (!normalized.includes("data/storage/tables/") && !normalized.includes(tablesRoot) && !normalized.includes(tablesRel)) {
+    if (
+      !normalized.includes("data/storage/tables/") &&
+      !normalized.includes(tablesRoot) &&
+      !normalized.includes(tablesRel)
+    ) {
       return null;
     }
     return "Do not pass DATA_DIR/storage/tables/*.json to mari --json-file/--file. Those are full raw table exports; create a temp file containing one row/card payload instead.";
@@ -1798,7 +2064,11 @@ ${sections.join("\n\n")}
       .sort((a, b) => a.localeCompare(b))
       .slice(0, limit);
     const truncated = entries.length > names.length;
-    return [`Directory: ${this.displayPath(dirPath)}`, ...names, truncated ? `… ${entries.length - names.length} more` : ""]
+    return [
+      `Directory: ${this.displayPath(dirPath)}`,
+      ...names,
+      truncated ? `… ${entries.length - names.length} more` : "",
+    ]
       .filter(Boolean)
       .join("\n");
   }
@@ -1886,7 +2156,10 @@ ${sections.join("\n\n")}
   }
 
   private async commandWrite(args: Record<string, unknown>): Promise<string> {
-    const filePath = this.resolveWorkspacePath(stringArg(args, "path"), { allowMissing: true, forbidStorageMutation: true });
+    const filePath = this.resolveWorkspacePath(stringArg(args, "path"), {
+      allowMissing: true,
+      forbidStorageMutation: true,
+    });
     const content = stringArg(args, "content");
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, content, "utf8");
@@ -1951,13 +2224,7 @@ ${sections.join("\n\n")}
     if (storageIssue) throw new Error(storageIssue);
     const storageTableJsonIssue = this.storageTableJsonFileIssue(command);
     if (storageTableJsonIssue) throw new Error(storageTableJsonIssue);
-    const timeoutSeconds = numberArg(
-      args,
-      "timeout",
-      DEFAULT_BASH_TIMEOUT_SECONDS,
-      1,
-      MAX_BASH_TIMEOUT_SECONDS,
-    );
+    const timeoutSeconds = numberArg(args, "timeout", DEFAULT_BASH_TIMEOUT_SECONDS, 1, MAX_BASH_TIMEOUT_SECONDS);
     const mariCliBinDir = await this.ensureMariCliShim();
     const env = this.withMariRuntimeEnv({ ...process.env }, mariCliBinDir);
     const directMariArgv = parseDirectMariArgv(command, this.workspaceRoot);
@@ -2003,12 +2270,14 @@ ${sections.join("\n\n")}
       child.on("error", (err) => finish(() => rejectRun(err)));
       child.on("close", (exitCode) =>
         finish(() => {
-          const output = compactOutput([
-            `Command: ${command}`,
-            `Exit code: ${exitCode}${timedOut ? ` (timeout after ${timeoutSeconds}s)` : ""}`,
-            stdout ? `\nstdout:\n${stdout.trimEnd()}` : "",
-            stderr ? `\nstderr:\n${stderr.trimEnd()}` : "",
-          ].join("\n"));
+          const output = compactOutput(
+            [
+              `Command: ${command}`,
+              `Exit code: ${exitCode}${timedOut ? ` (timeout after ${timeoutSeconds}s)` : ""}`,
+              stdout ? `\nstdout:\n${stdout.trimEnd()}` : "",
+              stderr ? `\nstderr:\n${stderr.trimEnd()}` : "",
+            ].join("\n"),
+          );
           if (timedOut || exitCode !== 0) rejectRun(new Error(output));
           else resolveRun(output);
         }),
@@ -2023,9 +2292,8 @@ ${sections.join("\n\n")}
       cwd: this.workspaceRoot,
       sessionId: SESSION_ID,
     });
-    const printable = isRecord(result) && "output" in result && !("summary" in result)
-      ? result.output
-      : compactMutationResult(result);
+    const printable =
+      isRecord(result) && "output" in result && !("summary" in result) ? result.output : compactMutationResult(result);
     const output = compactOutput(
       [
         `Command: ${command}`,
@@ -2045,9 +2313,8 @@ ${sections.join("\n\n")}
       cwd: this.workspaceRoot,
       sessionId: SESSION_ID,
     });
-    const printable = isRecord(result) && "output" in result && !("summary" in result)
-      ? result.output
-      : compactMutationResult(result);
+    const printable =
+      isRecord(result) && "output" in result && !("summary" in result) ? result.output : compactMutationResult(result);
     const action = typeof args.action === "string" ? args.action : "unknown";
     const output = compactOutput(
       [
@@ -2091,7 +2358,9 @@ ${sections.join("\n\n")}
     }
 
     const rows = (await this.app.db.select().from(apiConnections)) as Array<typeof apiConnections.$inferSelect>;
-    const languageRows = rows.filter((row) => row.provider !== "image_generation");
+    const languageRows = rows.filter(
+      (row) => row.provider !== "image_generation" && row.provider !== "video_generation",
+    );
     const selected = connectionId ? languageRows.find((row) => row.id === connectionId) : null;
     const fallback =
       selected ??
@@ -2176,10 +2445,7 @@ function formatWorkspaceToolName(name: string): string {
 
 // Extracts and streams a single named string field from a JSON object as tokens arrive,
 // forwarding each character to the provided sink as it is encountered.
-function createJsonFieldStreamExtractor(
-  fieldName: string,
-  onChunk: (chunk: string) => void,
-): (chunk: string) => void {
+function createJsonFieldStreamExtractor(fieldName: string, onChunk: (chunk: string) => void): (chunk: string) => void {
   const pattern = new RegExp(`"${fieldName}"\\s*:\\s*"`);
   let buffer = "";
   let state: "seeking" | "in_value" | "done" = "seeking";

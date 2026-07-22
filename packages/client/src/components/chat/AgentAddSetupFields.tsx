@@ -5,6 +5,7 @@ import {
   DEFAULT_AGENT_PROMPT_TEMPLATE_ID,
   getDefaultBuiltInAgentSettings,
   normalizeAgentPromptTemplateSelectionMap,
+  resolveDefaultAgentPromptTemplateId,
   type AgentPromptTemplateOption,
   type HapticFeedbackSensitivity,
   type KnowledgeAgentSourceSettings,
@@ -205,9 +206,13 @@ function normalizeKnowledgeAgentSourceSettings(
   };
 }
 
-function readPromptTemplateId(metadata: Record<string, unknown>, agentId: string): string {
+function readPromptTemplateId(
+  metadata: Record<string, unknown>,
+  agentId: string,
+  settings: Record<string, unknown>,
+): string {
   const selections = normalizeAgentPromptTemplateSelectionMap(metadata.agentPromptTemplateIds);
-  return selections[agentId] ?? DEFAULT_AGENT_PROMPT_TEMPLATE_ID;
+  return selections[agentId] ?? resolveDefaultAgentPromptTemplateId(settings);
 }
 
 export function buildInitialAgentAddSetupState({
@@ -272,7 +277,7 @@ export function buildInitialAgentAddSetupState({
         metadata.knowledgeAgentSources,
       ),
     },
-    promptTemplateId: readPromptTemplateId(metadata, agentId),
+    promptTemplateId: readPromptTemplateId(metadata, agentId, settings),
     includeCharacterAppearance:
       typeof metadata.illustratorIncludeCharacterAppearance === "boolean"
         ? metadata.illustratorIncludeCharacterAppearance
@@ -281,7 +286,7 @@ export function buildInitialAgentAddSetupState({
       typeof metadata.illustratorUseAvatarReferences === "boolean"
         ? metadata.illustratorUseAvatarReferences
         : settings.useAvatarReferences === true,
-    spriteCharacterIds: normalizeStringArray(metadata.spriteCharacterIds).slice(0, 3),
+    spriteCharacterIds: normalizeStringArray(metadata.spriteCharacterIds),
     spriteDisplayModes: normalizeSpriteDisplayModes(metadata.spriteDisplayModes),
     expressionAvatarsEnabled: metadata.expressionAvatarsEnabled === true,
     spritePosition: metadata.spritePosition === "right" ? "right" : "left",
@@ -372,13 +377,15 @@ export function buildAgentAddMetadataPatch(
   agentId: string,
   setup: AgentAddSetupState,
   metadata: Record<string, unknown>,
-  options?: { allowSecretPlot?: boolean },
+  options?: { allowSecretPlot?: boolean; defaultPromptTemplateId?: string },
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
 
   const existingPromptSelections = normalizeAgentPromptTemplateSelectionMap(metadata.agentPromptTemplateIds);
   const nextPromptSelections = { ...existingPromptSelections };
-  if (setup.promptTemplateId && setup.promptTemplateId !== DEFAULT_AGENT_PROMPT_TEMPLATE_ID) {
+  const defaultPromptTemplateId =
+    options?.defaultPromptTemplateId ?? resolveDefaultAgentPromptTemplateId(getDefaultBuiltInAgentSettings(agentId));
+  if (setup.promptTemplateId && setup.promptTemplateId !== defaultPromptTemplateId) {
     nextPromptSelections[agentId] = setup.promptTemplateId;
   } else {
     delete nextPromptSelections[agentId];
@@ -916,7 +923,6 @@ function ExpressionSetupFields({
       onChange({ spriteCharacterIds: selectedSpriteIds.filter((current) => current !== id) });
       return;
     }
-    if (selectedSpriteIds.length >= 3) return;
     onChange({ spriteCharacterIds: [...selectedSpriteIds, id] });
   };
 
@@ -943,12 +949,11 @@ function ExpressionSetupFields({
           <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--background)]/75 p-2">
             {subjectsWithSprites.map((subject) => {
               const active = selectedSpriteIds.includes(subject.id);
-              const maxed = !active && selectedSpriteIds.length >= 3;
               return (
                 <button
                   key={subject.id}
                   type="button"
-                  disabled={disabled || maxed}
+                  disabled={disabled}
                   onClick={() => toggleSprite(subject.id)}
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs transition-all disabled:cursor-not-allowed disabled:opacity-50",

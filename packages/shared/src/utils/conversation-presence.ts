@@ -23,6 +23,16 @@ export interface ScheduleBlock {
 /** One day of a character's schedule */
 export type DaySchedule = ScheduleBlock[];
 
+export type ConversationMessageIntent =
+  | "check_in"
+  | "long_absence_check_in"
+  | "came_back_online"
+  | "after_busy"
+  | "good_morning"
+  | "good_night"
+  | "meal_break"
+  | "transition_ping";
+
 /** Full weekly schedule for a character */
 export interface WeekSchedule {
   /** ISO date string of the Monday this schedule starts */
@@ -35,6 +45,14 @@ export interface WeekSchedule {
   idleResponseDelayMinutes?: number;
   /** Optional exact response delay in minutes while busy / DND */
   dndResponseDelayMinutes?: number;
+  /** Optional per-character daily autonomous check-in cap. Chat caps can still lower this ceiling. */
+  autonomousDailyCapOverride?: number | null;
+  /** Optional generated profile text that summarizes this character's weekly routine. */
+  routineSummary?: string | null;
+  /** ISO timestamp for the generated routine summary. */
+  routineSummaryGeneratedAt?: string | null;
+  /** Optional special autonomous message reasons this routine should not use. */
+  disabledAutonomousIntents?: ConversationMessageIntent[];
   /** How chatty the character is — affects autonomous messaging frequency (0-100) */
   talkativeness: number;
 }
@@ -62,6 +80,40 @@ export const CONVERSATION_SCHEDULE_DAYS = [
   "Saturday",
   "Sunday",
 ];
+
+/**
+ * Re-express an instant as a local wall-clock Date in an IANA timezone.
+ * This lets schedule code keep using Date's weekday/hour accessors without
+ * tying evaluation to the browser or server host timezone.
+ */
+export function toConversationScheduleWallClockDate(date: Date, timeZone?: string): Date {
+  if (!timeZone) return date;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).formatToParts(date);
+    const readPart = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)?.value ?? 0);
+    const hour = readPart("hour");
+    return new Date(
+      readPart("year"),
+      readPart("month") - 1,
+      readPart("day"),
+      hour === 24 ? 0 : hour,
+      readPart("minute"),
+      readPart("second"),
+    );
+  } catch {
+    return date;
+  }
+}
 
 // ── Status Derivation ──
 
@@ -123,8 +175,11 @@ export function getEffectiveCurrentStatus(
   override: ConversationStatusOverride | null | undefined,
   now: Date = new Date(),
   fallbackActivity = "free time",
+  scheduleNow: Date = now,
 ): CurrentConversationStatus {
-  const scheduled = schedule ? getCurrentStatus(schedule, now) : { status: "online" as const, activity: fallbackActivity };
+  const scheduled = schedule
+    ? getCurrentStatus(schedule, scheduleNow)
+    : { status: "online" as const, activity: fallbackActivity };
   const activeOverride = getActiveStatusOverride(override, now);
   if (!activeOverride) return scheduled;
   const activity = typeof activeOverride.activity === "string" ? activeOverride.activity.trim() : scheduled.activity;

@@ -24,10 +24,13 @@ const ROUTE_RULES: Array<{ pattern: RegExp; rule: RateLimitRule }> = [
   { pattern: /^\/api\/backup(?:\/|$)/, rule: { key: "backup", limit: 30, windowMs: 60_000 } },
   { pattern: /^\/api\/updates\/apply(?:\?|$)/, rule: { key: "updates-apply", limit: 5, windowMs: 60_000 } },
   {
-    pattern: /^\/api\/sidecar\/(?:runtime\/install|reinstall|download|model)(?:\/|\?|$)/,
+    pattern: /^\/api\/sidecar\/(?:runtime\/install|reinstall|download|model|speech\/download|speech\/model)(?:\/|\?|$)/,
     rule: { key: "sidecar-privileged", limit: 20, windowMs: 60_000 },
   },
   { pattern: /^\/api\/haptic\/command(?:\?|$)/, rule: { key: "haptic-command", limit: 30, windowMs: 60_000 } },
+  // One-shot LLM call per user click; keep it out of the 600/min default
+  // class so a runaway loop can't burn API credits.
+  { pattern: /^\/api\/agents\/suite\/rewrite(?:\?|$)/, rule: { key: "agent-suite-rewrite", limit: 20, windowMs: 60_000 } },
   // Cap on extension routes so an XSS-driven mass install / spam can't
   // exploit the persistent storage path. 60/min covers React Query
   // refetches + legacy migrations of small extension lists comfortably.
@@ -36,6 +39,7 @@ const ROUTE_RULES: Array<{ pattern: RegExp; rule: RateLimitRule }> = [
 
 const buckets = new Map<string, Bucket>();
 let lastSweepAt = 0;
+const isE2ERateLimitDisabled = process.env.MARINARA_E2E_DISABLE_RATE_LIMIT === "true";
 
 function selectRule(url: string): RateLimitRule {
   const path = url.split("?")[0] ?? url;
@@ -52,6 +56,7 @@ function sweepExpired(now: number) {
 
 export function rateLimitHook(request: FastifyRequest, reply: FastifyReply, done: () => void) {
   if (!request.url.startsWith("/api/")) return done();
+  if (isE2ERateLimitDisabled) return done();
 
   const now = Date.now();
   sweepExpired(now);

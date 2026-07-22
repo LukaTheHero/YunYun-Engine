@@ -6,6 +6,7 @@ import { FileText, X } from "lucide-react";
 import type { TreeNode } from "../../hooks/use-game-assets";
 import { useGameAssetFileContent, useSaveGameAssetFile } from "../../hooks/use-game-assets";
 import { cn } from "../../lib/utils";
+import { handleTextareaTab } from "../../lib/textarea-editing";
 import { toast } from "sonner";
 import { renderMarkdownBlocks, applyInlineMarkdown } from "../../lib/markdown";
 
@@ -81,18 +82,7 @@ export function FileEditorModal({ node, onClose, initialMode = "edit" }: FileEdi
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Tab") {
-        e.preventDefault();
-        const ta = e.currentTarget;
-        const start = ta.selectionStart;
-        const end = ta.selectionEnd;
-        const newValue = content.substring(0, start) + "  " + content.substring(end);
-        setContent(newValue);
-        requestAnimationFrame(() => {
-          ta.selectionStart = ta.selectionEnd = start + 2;
-        });
-        return;
-      }
+      if (handleTextareaTab(e)) return;
 
       if (e.key === "s" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -108,7 +98,7 @@ export function FileEditorModal({ node, onClose, initialMode = "edit" }: FileEdi
         return;
       }
     },
-    [content, isDirty, handleSave, handleRequestClose],
+    [isDirty, handleSave, handleRequestClose],
   );
 
   const isMd = node.ext === ".md";
@@ -170,12 +160,12 @@ export function FileEditorModal({ node, onClose, initialMode = "edit" }: FileEdi
         {/* Body */}
         <div className="flex-1 overflow-hidden">
           {isLoading ? (
-            <div className="flex h-full items-center justify-center text-sm text-[var(--muted-foreground)]">
+            <div className="mari-chrome-text-muted flex h-full items-center justify-center text-sm">
               Loading...
             </div>
           ) : mode === "preview" && isMd ? (
             <div className="h-full overflow-y-auto p-6">
-              <div className="prose prose-sm max-w-none text-[var(--foreground)]">
+              <div className="mari-message-content whitespace-pre-wrap break-words text-sm text-[var(--foreground)]">
                 {renderMarkdownBlocks(content, applyInlineMarkdown, "editor-preview")}
               </div>
             </div>

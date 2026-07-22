@@ -11,7 +11,7 @@ import { mapSheetAttributesToRPG } from "../services/game/skill-check.service.js
 import { createLLMProvider } from "../services/llm/provider-registry.js";
 import type { ChatMessage } from "../services/llm/base-provider.js";
 import { logger, logDebugOverride } from "../lib/logger.js";
-import { normalizeRpgStatPools, stripMacroComments } from "@marinara-engine/shared";
+import { localAuthProviderBaseUrl, normalizeRpgStatPools, stripMacroComments } from "@marinara-engine/shared";
 import type {
   EncounterInitRequest,
   EncounterActionRequest,
@@ -24,6 +24,7 @@ import type {
   EncounterLogEntry,
   RPGStatsConfig,
 } from "@marinara-engine/shared";
+import { resolveActivePersonaCandidate } from "./generate/generate-route-utils.js";
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -66,10 +67,8 @@ async function resolveConnection(
     const providerDef = PROVIDERS[conn.provider as keyof typeof PROVIDERS];
     baseUrl = providerDef?.defaultBaseUrl ?? "";
   }
-  // Claude (Subscription) uses the local Claude Agent SDK and has no HTTP
-  // endpoint — return a sentinel so the gate passes. The provider ignores it.
-  if (!baseUrl && conn.provider === "claude_subscription") baseUrl = "claude-agent-sdk://local";
-  if (!baseUrl && conn.provider === "openai_chatgpt") baseUrl = "openai-chatgpt://codex-auth";
+  const localAuthBaseUrl = localAuthProviderBaseUrl(conn.provider);
+  if (!baseUrl && localAuthBaseUrl) baseUrl = localAuthBaseUrl;
   if (!baseUrl) throw new Error("No base URL configured for this connection");
 
   return { conn, baseUrl };
@@ -155,17 +154,22 @@ async function buildCharacterContext(chars: ReturnType<typeof createCharactersSt
 
 /**
  * Build persona context. Prefers the chat-scoped persona (`chat.personaId`)
- * before falling back to the globally active persona — mirrors the same
- * resolution order used elsewhere (see `chats.routes.ts`). Without this, a
+ * before Conversation-only fallback to the globally active Persona — mirrors
+ * the resolution order used elsewhere (see `chats.routes.ts`). Without this, a
  * user who picks a per-chat persona but doesn't have a matching global active
  * persona ends up named "User" in combat because the encounter prompt's
  * `${personaName}` placeholder defaulted to that string.
+ *
+ * Roleplay and Game skip active-Persona fallback, so both can intentionally
+ * remain Persona-less in combat prompts.
  */
-async function buildPersonaContext(chars: ReturnType<typeof createCharactersStorage>, chatPersonaId: string | null) {
+async function buildPersonaContext(
+  chars: ReturnType<typeof createCharactersStorage>,
+  chatPersonaId: string | null,
+  chatMode?: string | null,
+) {
   const allPersonas = await chars.listPersonas();
-  const persona =
-    (chatPersonaId ? allPersonas.find((p) => p.id === chatPersonaId) : null) ??
-    allPersonas.find((p) => p.isActive === "true");
+  const persona = resolveActivePersonaCandidate(allPersonas, chatPersonaId, chatMode);
   if (!persona) return { personaName: "User", personaCtx: "No persona information available." };
   let ctx = `Name: ${persona.name}\n`;
   const description = cardPromptText(persona.description);
@@ -306,6 +310,7 @@ function buildInitPrompt(
   chatHistory: ChatMessage[],
   gameStateCtx: string,
   spellbookCtx: string,
+  tactical: boolean,
 ): ChatMessage[] {
   const msgs: ChatMessage[] = [];
 
@@ -350,6 +355,9 @@ function buildInitPrompt(
   inst += `      "attacks": [{"name": "Attack", "type": "single-target|AoE|both", "description": "what it does", "power": 1.2, "cooldown": 0, "element": "optional", "statusEffect": "optional"}],\n`;
   inst += `      "items": ["Item Name x3"],\n`;
   inst += `      "statuses": [],\n`;
+  if (tactical) {
+    inst += `      "class": "fighter|knight|rogue|archer|mage|healer",\n`;
+  }
   inst += `      "isPlayer": true\n`;
   inst += `    }\n`;
   inst += `  ],\n`;
@@ -361,6 +369,9 @@ function buildInitPrompt(
   inst += `      "attacks": [{"name": "Attack1", "type": "single-target|AoE|both", "description": "what it does", "power": 1.3, "cooldown": 2, "element": "optional", "statusEffect": "optional"}],\n`;
   inst += `      "statuses": [],\n`;
   inst += `      "description": "Brief enemy description",\n`;
+  if (tactical) {
+    inst += `      "class": "fighter|knight|rogue|archer|mage|healer",\n`;
+  }
   inst += `      "sprite": "emoji or brief visual description"\n`;
   inst += `    }\n`;
   inst += `  ],\n`;
@@ -371,6 +382,11 @@ function buildInitPrompt(
   inst += `    "timeOfDay": "dawn|day|dusk|night|twilight",\n`;
   inst += `    "weather": "clear|rainy|snowy|windy|stormy|overcast"\n`;
   inst += `  },\n`;
+  if (tactical) {
+    inst += `  "battlefield": {\n`;
+    inst += `    "formation": "line|ambush|surrounded|skirmish|defense"\n`;
+    inst += `  },\n`;
+  }
   inst += `  "itemEffects": [\n`;
   inst += `    {"name":"Inventory item name","target":"self|ally|enemy|any","type":"heal|damage|buff|debuff|status|utility","description":"what this item does in this fight","power":0.3,"element":"optional","status":{"name":"Wet","emoji":"💧","duration":2,"modifier":-2,"stat":"defense"},"consumes":true}\n`;
   inst += `  ],\n`;
@@ -390,6 +406,10 @@ function buildInitPrompt(
   inst += `- mechanics: use sparingly. Boss charge attacks should include interval, counterplay, effectType, and a matching dialogueCue with trigger "charge".\n`;
   inst += `- dialogueCues: optional, short, and only for named allies, named enemies, bosses, or important NPCs. Generic unnamed enemies should not get voiced lines.\n`;
   inst += `- visuals: set isBossFight true only for bosses/story-significant enemies. backgroundPrompt/illustrationPrompt are optional and only for important fights.\n`;
+  if (tactical) {
+    inst += `- battlefield.formation: pick the arrangement matching how the scene led into combat — ambushed → ambush, encircled → surrounded, holding/defending a position → defense, sudden chance encounter → skirmish, otherwise line.\n`;
+    inst += `- class: pick each combatant's tactical role from how they fight — ranged bow/gun users → archer, spellcasters → mage, dedicated healers → healer, fast skirmishers/assassins → rogue, armored defenders → knight, otherwise fighter.\n`;
+  }
   inst += `- statuses: format {"name":"Status","emoji":"💀","duration":X,"modifier":-2,"stat":"attack|defense|speed|hp"}\n`;
   inst += `- HP values: if the persona section above lists a configured Max HP (from stat bars named HP/Health/etc, or from "Max HP" under Persona RPG Stats), use that EXACT number for the player's maxHp, and set hp = maxHp so combat starts at full health. If a character ally has a "Max HP: N" line in its block, do the same for that ally. Do NOT invent or "rebalance" a defined Max HP, and do NOT start any combatant below full HP at combat init. Only invent HP for combatants (enemies, unstatted allies) that have no defined HP in the context.\n`;
   inst += `- RPG attribute scaling: when the context lists Attributes for the player or an ally (STR/DEX/CON/INT/WIS/CHA, on a roughly 8-20 D&D-style scale), let those values shape the generated stats: high STR → stronger physical attack power; high DEX → higher speed and accuracy; high CON → larger HP pool when HP is not already defined; high INT/WIS/CHA → stronger magical/support attack power for casters. Treat 10 as average and scale proportionally. Do NOT override an explicitly configured Max HP using these attributes.\n`;
@@ -566,11 +586,14 @@ export async function encounterRoutes(app: FastifyInstance) {
         conn.maxContext,
         conn.openrouterProvider,
         conn.maxTokensOverride,
+        conn.claudeFastMode === "true",
+        conn.treatAsLocalEndpoint === "true",
+        conn.defaultParameters,
       );
 
       const characterIds: string[] = JSON.parse(chat.characterIds as string);
       const characterCtx = await buildCharacterContext(chars, characterIds);
-      const { personaName, personaCtx } = await buildPersonaContext(chars, chat.personaId ?? null);
+      const { personaName, personaCtx } = await buildPersonaContext(chars, chat.personaId ?? null, chat.mode);
       let chatMeta: Record<string, unknown> | null = null;
       if (typeof chat.metadata === "string") {
         try {
@@ -581,6 +604,10 @@ export async function encounterRoutes(app: FastifyInstance) {
       } else {
         chatMeta = (chat.metadata as Record<string, unknown> | null) ?? null;
       }
+      const combatStyle =
+        (chatMeta?.gameCombatStyle as string | undefined) ??
+        ((chatMeta?.gameSetupConfig as Record<string, unknown> | undefined)?.combatStyle as string | undefined) ??
+        "classic";
       const gameStateCtx = await buildGameStateContext(gsStorage, chatId, personaName, chatMeta);
       const spellbookCtx = await loadSpellbookContext(spellbookId);
 
@@ -592,7 +619,15 @@ export async function encounterRoutes(app: FastifyInstance) {
         content: m.content as string,
       }));
 
-      const prompt = buildInitPrompt(personaName, personaCtx, characterCtx, recentMsgs, gameStateCtx, spellbookCtx);
+      const prompt = buildInitPrompt(
+        personaName,
+        personaCtx,
+        characterCtx,
+        recentMsgs,
+        gameStateCtx,
+        spellbookCtx,
+        combatStyle === "tactical",
+      );
       debugLog(
         "[debug/game/combat:init] request chatId=%s model=%s historyMessages=%d settings=%s",
         chatId,
@@ -661,11 +696,14 @@ export async function encounterRoutes(app: FastifyInstance) {
         conn.maxContext,
         conn.openrouterProvider,
         conn.maxTokensOverride,
+        conn.claudeFastMode === "true",
+        conn.treatAsLocalEndpoint === "true",
+        conn.defaultParameters,
       );
 
       const characterIds: string[] = JSON.parse(chat.characterIds as string);
       const characterCtx = await buildCharacterContext(chars, characterIds);
-      const { personaName, personaCtx } = await buildPersonaContext(chars, chat.personaId ?? null);
+      const { personaName, personaCtx } = await buildPersonaContext(chars, chat.personaId ?? null, chat.mode);
       const spellbookCtx = await loadSpellbookContext(spellbookId);
 
       const chatMessages = await chats.listMessages(chatId);
@@ -759,11 +797,14 @@ export async function encounterRoutes(app: FastifyInstance) {
         conn.maxContext,
         conn.openrouterProvider,
         conn.maxTokensOverride,
+        conn.claudeFastMode === "true",
+        conn.treatAsLocalEndpoint === "true",
+        conn.defaultParameters,
       );
 
       const characterIds: string[] = JSON.parse(chat.characterIds as string);
       const characterCtx = await buildCharacterContext(chars, characterIds);
-      const { personaName, personaCtx } = await buildPersonaContext(chars, chat.personaId ?? null);
+      const { personaName, personaCtx } = await buildPersonaContext(chars, chat.personaId ?? null, chat.mode);
 
       const prompt = buildSummaryPrompt(
         personaName,

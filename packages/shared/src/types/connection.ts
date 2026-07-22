@@ -8,6 +8,7 @@ export type APIProvider =
   | "openai_chatgpt"
   | "anthropic"
   | "claude_subscription"
+  | "grok_subscription"
   | "google"
   | "google_vertex"
   | "mistral"
@@ -16,7 +17,8 @@ export type APIProvider =
   | "nanogpt"
   | "xai"
   | "custom"
-  | "image_generation";
+  | "image_generation"
+  | "video_generation";
 
 /** An API connection configuration. */
 export interface APIConnection {
@@ -33,10 +35,14 @@ export interface APIConnection {
   maxContext: number;
   /** Whether this connection is the default */
   isDefault: boolean;
+  /** Whether this language connection is the fallback for main generations */
+  fallbackForMain: boolean;
   /** Whether this connection is in the random-selection pool */
   useForRandom: boolean;
   /** Whether this connection is the default for all agents */
   defaultForAgents: boolean;
+  /** Whether this connection is the category fallback for agents, images, or videos */
+  fallbackForAgents: boolean;
   /** Whether provider-native prompt caching is enabled */
   enableCaching: boolean;
   /** Anthropic only: use the 1-hour prompt-cache TTL instead of the default 5-minute TTL */
@@ -59,6 +65,10 @@ export interface APIConnection {
   imageService: string | null;
   /** For endpoint-based image services (e.g. RunPod Serverless): the endpoint ID sent alongside the base URL. */
   imageEndpointId: string | null;
+  /** Explicit video backend selection for video-generation connections (e.g. Gemini Omni). */
+  videoGenerationSource: string | null;
+  /** Explicitly selected video generation service ID. Overrides URL/model inference when set. */
+  videoService: string | null;
   /** Default generation parameters for new chats using this connection (JSON) */
   defaultParameters: string | null;
   /** Prompt preset to use instead of a chat's selected preset when this connection is active */

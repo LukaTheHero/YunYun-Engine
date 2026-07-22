@@ -2,6 +2,7 @@
 // LLM Provider — Abstract Base
 // ──────────────────────────────────────────────
 import { logger } from "../../lib/logger.js";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { getEmbeddingRequestTimeoutMs, isProviderLocalUrlsEnabled } from "../../config/runtime-config.js";
 import { requestHeadersWithIdentityEncoding, safeFetch, type SafeFetchOptions } from "../../utils/security.js";
 import type { GenerationParameterSendKey, GenerationParameterSendMap } from "@marinara-engine/shared";
@@ -14,6 +15,12 @@ import type { GenerationParameterSendKey, GenerationParameterSendMap } from "@ma
 const LLM_HEADERS_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 const LLM_BODY_TIMEOUT = 120 * 1000; // 2 minutes between body chunks
 const llmAgentOptions = { bodyTimeout: LLM_BODY_TIMEOUT, headersTimeout: LLM_HEADERS_TIMEOUT };
+const llmRequestTimeout = new AsyncLocalStorage<number>();
+
+/** Scope a provider request timeout without changing background/agent generation behavior. */
+export function withLlmRequestTimeout<T>(timeoutMs: number, operation: () => Promise<T>): Promise<T> {
+  return llmRequestTimeout.run(timeoutMs, operation);
+}
 
 /**
  * Drop-in replacement for `fetch()` that uses a custom undici dispatcher
@@ -24,6 +31,7 @@ export function llmFetch(
   init?: RequestInit & Pick<SafeFetchOptions, "agentOptions" | "bufferResponse" | "decodeCompressedResponse">,
 ): Promise<Response> {
   const bufferResponse = init?.bufferResponse ?? false;
+  const requestTimeoutMs = llmRequestTimeout.getStore();
   return safeFetch(url, {
     ...(init ?? {}),
     headers: requestHeadersWithIdentityEncoding(init?.headers),
@@ -35,7 +43,11 @@ export function llmFetch(
       flagName: "PROVIDER_LOCAL_URLS_ENABLED",
     },
     maxResponseBytes: 50 * 1024 * 1024,
-    agentOptions: init?.agentOptions ?? llmAgentOptions,
+    agentOptions:
+      init?.agentOptions ??
+      (requestTimeoutMs
+        ? { bodyTimeout: requestTimeoutMs, headersTimeout: requestTimeoutMs }
+        : llmAgentOptions),
     bufferResponse,
     decodeCompressedResponse: init?.decodeCompressedResponse ?? bufferResponse,
   });
@@ -62,8 +74,17 @@ export interface ChatMessage {
     data: string;
     filename?: string;
   }>;
+  /** Base64 data URLs for provider-native audio/video inputs */
+  media?: ChatMediaAttachment[];
   /** Provider-specific metadata (e.g. Gemini parts with thought signatures) */
   providerMetadata?: Record<string, unknown>;
+}
+
+export interface ChatMediaAttachment {
+  kind: "audio" | "video";
+  data: string;
+  mimeType: string;
+  filename?: string;
 }
 
 export interface LLMToolCall {
@@ -115,8 +136,12 @@ export interface ChatOptions {
   enableThinking?: boolean;
   /** Reasoning effort level for models that support it */
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
+  /** When true, previous provider-native reasoning state is not reused. */
+  excludePastReasoning?: boolean;
   /** Output verbosity for GPT-5+ models */
   verbosity?: "low" | "medium" | "high";
+  /** Emit provider prompt debug logs even when normal debug logging is disabled. */
+  debugMode?: boolean;
   /** OpenRouter-only service tier. */
   serviceTier?: "flex" | "priority" | null;
   /** Abort signal — when triggered, the in-flight LLM request should be cancelled. */
@@ -258,6 +283,9 @@ function estimateMessageTokens(message: ChatMessage): number {
   if (message.files?.length) {
     total += message.files.reduce((sum, file) => sum + estimateFileTokens(file), 0);
   }
+  if (message.media?.length) {
+    total += message.media.reduce((sum, media) => sum + estimateFileTokens({ data: media.data }), 0);
+  }
   if (message.providerMetadata) {
     total += Math.min(estimateStructuredTokens(message.providerMetadata), 512);
   }
@@ -273,6 +301,7 @@ function cloneMessages(messages: ChatMessage[]): ChatMessage[] {
     ...message,
     ...(message.images ? { images: [...message.images] } : {}),
     ...(message.files ? { files: message.files.map((file) => ({ ...file })) } : {}),
+    ...(message.media ? { media: message.media.map((media) => ({ ...media })) } : {}),
     ...(message.tool_calls
       ? { tool_calls: message.tool_calls.map((call) => ({ ...call, function: { ...call.function } })) }
       : {}),
@@ -684,10 +713,6 @@ export abstract class BaseLLMProvider {
       "Content-Type": "application/json",
       Authorization: `Bearer ${this.apiKey}`,
     };
-    if (this.baseUrl.includes("openrouter.ai")) {
-      headers["HTTP-Referer"] = "https://github.com/Pasta-Devs/Marinara-Engine";
-      headers["X-Title"] = "Marinara Engine";
-    }
     const res = await llmFetch(`${this.baseUrl}/embeddings`, {
       method: "POST",
       headers,

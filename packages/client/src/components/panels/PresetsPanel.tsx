@@ -911,11 +911,11 @@ export function PresetsPanel() {
                     deletePreset.mutate(preset.id);
                   }
                 }}
-                className="mari-chrome-control mari-chrome-control--small mari-chrome-control--danger p-1.5"
+                className="mari-chrome-control mari-chrome-control--small p-1.5"
                 title="Delete"
                 aria-label="Delete preset"
               >
-                <Trash2 size="0.75rem" className="text-[var(--destructive)]" />
+                <Trash2 size="0.75rem" />
               </button>
             </div>
           )}
@@ -1137,11 +1137,11 @@ export function PresetsPanel() {
                           if (expandedFolderId === folder.id) setExpandedFolderId(null);
                         });
                       }}
-                      className="mari-chrome-control mari-chrome-control--small mari-chrome-control--danger p-1"
+                      className="mari-chrome-control mari-chrome-control--small p-1"
                       title="Delete folder"
                       aria-label="Delete folder"
                     >
-                      <Trash2 size="0.6875rem" className="text-[var(--destructive)]" />
+                      <Trash2 size="0.6875rem" />
                     </button>
                   </div>
                 </div>
@@ -1151,7 +1151,7 @@ export function PresetsPanel() {
                   innerClassName="flex flex-col gap-0.5"
                 >
                   {folderItems.length === 0 ? (
-                    <p className="py-2 text-[0.625rem] italic text-[var(--muted-foreground)]">Drop presets here.</p>
+                    <p className="mari-chrome-text-muted py-2 text-[0.625rem] italic">Drop presets here.</p>
                   ) : (
                     folderItems.map((preset) => renderPresetRow(preset))
                   )}
@@ -1176,7 +1176,7 @@ export function PresetsPanel() {
             <div className="mari-panel-gradient-surface mari-panel-gradient--presets animate-float flex h-12 w-12 items-center justify-center rounded-2xl">
               <FileText size="1.25rem" />
             </div>
-            <p className="text-xs text-[var(--muted-foreground)]">
+            <p className="mari-chrome-text-muted text-xs">
               {search ? "No matching presets" : "No presets yet"}
             </p>
           </div>
@@ -1375,10 +1375,14 @@ function RegexSection({
       <div className="mb-1.5 px-1 text-[0.625rem] text-[var(--muted-foreground)]">
         Find/replace patterns applied to AI output or user input
       </div>
-      {regexImportError && <div className="mb-1 px-1 text-xs text-red-500">{regexImportError}</div>}
+      {regexImportError && (
+        <div className="mb-1 rounded-md border border-[var(--marinara-chat-chrome-panel-border)] bg-[var(--marinara-chat-chrome-highlight-bg)] px-2 py-1.5 text-xs text-[var(--marinara-chat-chrome-panel-text)]">
+          {regexImportError}
+        </div>
+      )}
       {regexImportSuccess && <div className="mb-1 px-1 text-xs text-green-500">{regexImportSuccess}</div>}
       {sortedRegexScripts.length === 0 ? (
-        <p className="px-1 py-2 text-[0.625rem] text-[var(--muted-foreground)]">No regexes yet</p>
+        <p className="mari-chrome-text-muted px-1 py-2 text-[0.625rem]">No regexes yet</p>
       ) : (
         <div data-preset-regex-root className="flex flex-col gap-0.5">
           {sortedRegexScripts.map((script, index) => {
@@ -1452,18 +1456,21 @@ function RegexSection({
                   onClick={() => openRegexDetail(script.id)}
                 >
                   <div className="text-xs font-medium">{script.name}</div>
-                  <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1">
+                    <span
+                      className="min-w-0 flex-1 truncate font-mono text-[0.5625rem] text-[var(--muted-foreground)]"
+                      title={`/${script.findRegex}/${script.flags}`}
+                    >
+                      /{script.findRegex}/{script.flags}
+                    </span>
                     {placements.map((placement) => (
                       <span
                         key={placement}
-                        className="rounded bg-[var(--secondary)] px-1 py-0.5 text-[0.5rem] text-[var(--muted-foreground)]"
+                        className="shrink-0 rounded bg-[var(--secondary)] px-1 py-0.5 text-[0.5rem] text-[var(--muted-foreground)]"
                       >
                         {placement === "ai_output" ? "AI" : "User"}
                       </span>
                     ))}
-                    <span className="min-w-0 max-w-full truncate font-mono text-[0.5625rem] text-[var(--muted-foreground)]">
-                      /{script.findRegex}/{script.flags}
-                    </span>
                   </div>
                 </button>
                 <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -1492,7 +1499,7 @@ function RegexSection({
                   </button>
                   <button
                     type="button"
-                    className="mari-chrome-control mari-chrome-control--small mari-chrome-control--danger shrink-0 p-1"
+                    className="mari-chrome-control mari-chrome-control--small shrink-0 p-1"
                     title="Delete regex"
                     aria-label="Delete regex"
                     onClick={async () => {
@@ -1508,7 +1515,7 @@ function RegexSection({
                       }
                     }}
                   >
-                    <Trash2 size="0.8125rem" className="text-[var(--destructive)]" />
+                    <Trash2 size="0.8125rem" />
                   </button>
                 </div>
               </div>
@@ -1623,10 +1630,14 @@ function FunctionsSection({
       <div className="mb-1.5 px-1 text-[0.625rem] text-[var(--muted-foreground)]">
         Custom function calls available from Chat Settings
       </div>
-      {functionImportError && <div className="mb-1 px-1 text-xs text-red-500">{functionImportError}</div>}
+      {functionImportError && (
+        <div className="mb-1 rounded-md border border-[var(--marinara-chat-chrome-panel-border)] bg-[var(--marinara-chat-chrome-highlight-bg)] px-2 py-1.5 text-xs text-[var(--marinara-chat-chrome-panel-text)]">
+          {functionImportError}
+        </div>
+      )}
       {functionImportSuccess && <div className="mb-1 px-1 text-xs text-green-500">{functionImportSuccess}</div>}
       {customToolRows.length === 0 ? (
-        <p className="px-1 py-2 text-[0.625rem] text-[var(--muted-foreground)]">No functions yet</p>
+        <p className="mari-chrome-text-muted px-1 py-2 text-[0.625rem]">No functions yet</p>
       ) : (
         <div data-preset-functions-root className="flex flex-col gap-0.5">
           {customToolRows.map((tool, index) => {
@@ -1696,16 +1707,18 @@ function FunctionsSection({
                   className="min-w-0 flex-1 basis-[min(100%,10rem)] text-left"
                   onClick={() => openToolDetail(tool.id)}
                 >
-                  <div className="truncate font-mono text-xs font-medium">{tool.name}</div>
-                  <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1">
-                    <span className="rounded bg-[var(--secondary)] px-1 py-0.5 text-[0.5rem] text-[var(--muted-foreground)]">
+                  <div className="flex min-w-0 items-center gap-1">
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium" title={tool.name}>
+                      {tool.name}
+                    </span>
+                    <span className="shrink-0 rounded bg-[var(--secondary)] px-1 py-0.5 text-[0.5rem] text-[var(--muted-foreground)]">
                       {formatFunctionExecutionType(tool.executionType)}
                     </span>
-                    <span className="rounded bg-[var(--secondary)] px-1 py-0.5 text-[0.5rem] text-[var(--muted-foreground)]">
+                    <span className="shrink-0 rounded bg-[var(--secondary)] px-1 py-0.5 text-[0.5rem] text-[var(--muted-foreground)]">
                       {parameterCount} param{parameterCount === 1 ? "" : "s"}
                     </span>
                     {scriptUnavailable && (
-                      <span className="rounded bg-amber-500/10 px-1 py-0.5 text-[0.5rem] text-amber-400">
+                      <span className="shrink-0 rounded bg-amber-500/10 px-1 py-0.5 text-[0.5rem] text-amber-400">
                         Script disabled
                       </span>
                     )}
@@ -1740,7 +1753,7 @@ function FunctionsSection({
                   </button>
                   <button
                     type="button"
-                    className="mari-chrome-control mari-chrome-control--small mari-chrome-control--danger shrink-0 p-1"
+                    className="mari-chrome-control mari-chrome-control--small shrink-0 p-1"
                     title="Delete function"
                     aria-label="Delete function"
                     onClick={async () => {
@@ -1756,7 +1769,7 @@ function FunctionsSection({
                       }
                     }}
                   >
-                    <Trash2 size="0.8125rem" className="text-[var(--destructive)]" />
+                    <Trash2 size="0.8125rem" />
                   </button>
                 </div>
               </div>

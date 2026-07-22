@@ -27,8 +27,7 @@ import { injectAtDepth } from "../lorebook/prompt-injector.js";
 import type { LorebookScanResult } from "../lorebook/index.js";
 import {
   buildPromptMacroContext,
-  collectCharacterDepthPromptEntries,
-  collectCharacterPostHistoryEntries,
+  collectCharacterAdvancedPromptEntries,
   resolveMacrosWithVariableSnapshot,
 } from "./macro-context.js";
 
@@ -136,8 +135,10 @@ export interface AssemblerInput {
   characterIds: string[];
   personaId?: string | null;
   personaName: string;
+  personaPhoneticName?: string;
   personaDescription: string;
   personaFields?: {
+    phoneticName?: string;
     personality?: string;
     scenario?: string;
     backstory?: string;
@@ -157,6 +158,8 @@ export interface AssemblerInput {
   activeAgentIds?: string[];
   /** Per-chat list of manually activated lorebook IDs from chat settings */
   activeLorebookIds?: string[];
+  /** Entries attached to the exact current hierarchical location. */
+  forcedLorebookEntryIds?: string[];
   /** Lorebook IDs that should be excluded even if otherwise scoped to the chat. */
   excludedLorebookIds?: string[];
   /** Source agent IDs whose generated lorebooks should be excluded from scanning. */
@@ -167,6 +170,8 @@ export interface AssemblerInput {
   chatEmbedding?: number[] | null;
   /** Per-lorebook pre-computed embeddings for semantic lorebook matching. */
   semanticEmbeddingsByLorebookId?: ReadonlyMap<string, number[] | null>;
+  /** Unrelated-text cosine floor used to calibrate clustered embedding models. */
+  semanticSimilarityBaseline?: number;
   /** Per-chat ephemeral state overrides for lorebook entries (from chat metadata). */
   entryStateOverrides?: Record<string, { ephemeral?: number | null; enabled?: boolean }>;
   /** Per-chat sticky/cooldown/delay timing state for lorebook entries. */
@@ -191,6 +196,8 @@ export interface AssemblerInput {
   timeZone?: string;
   /** Skip regular preset instructions that would conflict with user impersonation. */
   impersonate?: boolean;
+  /** Preserve normal preset sections for a dedicated impersonation preset. */
+  preserveImpersonatePresetSections?: boolean;
   /** Preserve character-scoped macros for a later known-speaker finalization pass. */
   deferCharacterMacros?: boolean;
 }
@@ -300,6 +307,7 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
     db: input.db,
     characterIds: input.characterIds,
     personaName: input.personaName,
+    personaPhoneticName: input.personaPhoneticName,
     personaDescription: input.personaDescription,
     personaFields: input.personaFields,
     variables: variableValues,
@@ -333,11 +341,13 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
     enableAgents: input.enableAgents ?? true,
     activeAgentIds: input.activeAgentIds ?? [],
     activeLorebookIds: input.activeLorebookIds ?? [],
+    forcedLorebookEntryIds: input.forcedLorebookEntryIds ?? [],
     excludedLorebookIds: input.excludedLorebookIds ?? [],
     excludedLorebookSourceAgentIds: input.excludedLorebookSourceAgentIds ?? [],
     disableLorebooks: input.disableLorebooks === true,
     chatEmbedding: input.chatEmbedding ?? null,
     semanticEmbeddingsByLorebookId: input.semanticEmbeddingsByLorebookId,
+    semanticSimilarityBaseline: input.semanticSimilarityBaseline,
     entryStateOverrides: input.entryStateOverrides,
     entryTimingStates: input.entryTimingStates,
     lorebookTokenBudget: input.lorebookTokenBudget,
@@ -361,7 +371,9 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
     const section = sectionMap.get(sectionId);
     if (!section) continue;
     if (section.enabled !== "true") continue;
-    if (input.impersonate === true && section.isMarker !== "true") continue;
+    if (input.impersonate === true && input.preserveImpersonatePresetSections !== true && section.isMarker !== "true") {
+      continue;
+    }
 
     // Check if group is enabled
     if (section.groupId) {
@@ -478,19 +490,14 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
     allDepthEntries.push(markerCtx.lorebookDepthEntries);
   }
 
-  const characterDepthEntries = await collectCharacterDepthPromptEntries(input.db, input.characterIds, macroCtx);
-  if (characterDepthEntries.length > 0) {
-    allDepthEntries.push(characterDepthEntries);
-  }
-
-  const characterPostHistoryEntries = await collectCharacterPostHistoryEntries(
+  const characterAdvancedPromptEntries = await collectCharacterAdvancedPromptEntries(
     input.db,
     input.characterIds,
     macroCtx,
     wrapFormat,
   );
-  if (characterPostHistoryEntries.length > 0) {
-    allDepthEntries.push(characterPostHistoryEntries);
+  if (characterAdvancedPromptEntries.length > 0) {
+    allDepthEntries.push(characterAdvancedPromptEntries);
   }
 
   const combinedDepthEntries = allDepthEntries.flat();

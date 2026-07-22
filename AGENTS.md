@@ -22,6 +22,8 @@ This file is a thin maintainer note for contributors using Codex. Canonical work
 - Keep edits non-destructive. Do not revert unrelated work in the tree.
 - Make Marinara Engine changes against `staging` first; do not target `main` directly unless the user or maintainer explicitly asks for a mainline change. See `CONTRIBUTING.md § Branches`.
 - Prefer focused patches that keep code, docs, and release metadata aligned in the same change.
+- Route changes to downloadable agents such as Illustrator, Music DJ, and Lorebook Keeper to [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents). Agent definitions, default prompts, package-owned runtime code, metadata, artwork/assets, manifests, artifacts, and catalog entries must be fixed and submitted there against its `staging` branch, not in Marinara Engine.
+- Keep host integration changes in Marinara Engine. Package loading, capability APIs and shared contracts, Engine UI/settings, storage, provider/model routing, orchestration, and compatibility handling remain Engine-owned even when the affected feature is an agent. Determine which side of this boundary owns a fix before opening an issue, branch, or PR; split cross-repository changes when both sides are affected.
 - Agent-specific coordination rule: before starting issue work, check for an existing issue-linked branch, open PR, draft PR, or project board item so multiple agents do not duplicate effort. See `CONTRIBUTING.md` for the general contributor workflow.
 - Agent-specific coordination rule: when implementation effort starts for an issue, open a draft PR immediately so the project Kanban board shows the work in progress.
 - Agent-specific coordination rule: when starting work on an issue, tag or identify the GitHub user or agent owning that issue/PR on the single issue so ownership is visible before implementation proceeds.
@@ -56,6 +58,7 @@ Android-specific rule:
 ## Safe Multi-File Updates
 
 - When changing version numbers, bump root `package.json` first, then run `pnpm version:sync -- --android-version-code <next-code>`.
+- When changing version numbers or preparing a release, run `pnpm credits:check`; if it fails, run `pnpm credits:sync` and include the Credits modal update.
 - Run `pnpm version:check` before tagging or publishing.
 - Keep `CONTRIBUTING.md` authoritative. Add Codex-specific notes here only when they are operationally useful and not already covered there.
 

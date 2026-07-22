@@ -2,13 +2,12 @@ import type { FastifyInstance } from "fastify";
 import {
   LOCAL_SIDECAR_CONNECTION_ID,
   isClaudeAdaptiveOnlyNoSamplingModel,
-  supportsXhighReasoningEffort,
+  resolveProviderReasoningEffort,
   resolveMacros,
   stripMacroComments,
   DEFAULT_CONVERSATION_PROMPT,
   DEFAULT_GAME_SYSTEM_PROMPT,
-  wrapConversationInstructions,
-  unwrapConversationInstructions,
+  normalizeGameStoryboardKeyframeCount,
   type GenerationParameterSendMap,
   type LorebookEntryTimingState,
 } from "@marinara-engine/shared";
@@ -19,6 +18,11 @@ import { createPromptsStorage } from "../../services/storage/prompts.storage.js"
 import { createCharactersStorage } from "../../services/storage/characters.storage.js";
 import { createLorebooksStorage } from "../../services/storage/lorebooks.storage.js";
 import { createRegexScriptsStorage } from "../../services/storage/regex-scripts.storage.js";
+import {
+  injectOwnerSpatialPrompt,
+  projectGameSnapshotLocation,
+  resolveOwnerSpatialProjection,
+} from "../../services/spatial-context/projection.js";
 import { buildImpersonateInstruction } from "../../services/conversation/impersonate-prompt.js";
 import { processLorebooks } from "../../services/lorebook/index.js";
 import { resolveLorebookScopeExclusions } from "../../services/lorebook/game-lorebook-scope.js";
@@ -28,7 +32,8 @@ import { getLocalSidecarProvider } from "../../services/llm/local-sidecar.js";
 import {
   assemblePrompt,
   buildPromptMacroContext,
-  collectCharacterDepthPromptEntries,
+  collectCharacterAdvancedPromptEntries,
+  resolveCharacterAdvancedPromptIds,
   resolveCharacterMacroData,
   resolveMacrosWithVariableSnapshot,
   resolvePromptIdleDuration,
@@ -58,12 +63,15 @@ import {
   extractFileAttachmentInputs,
   extractImageAttachmentDataUrls,
   findTrackerContextInsertIndex,
+  formatConversationInstructionsForWrap,
   isMessageHiddenFromAI,
   mergeCustomParameters,
+  normalizePromptWrapFormat,
   parseExtra,
   parseStoredGenerationParameters,
   prefixGroupIndividualHistorySpeakers,
   resolveActiveCharacterIds,
+  resolveActivePersonaCandidate,
   resolvePromptCharacterIdsForTarget,
   resolveCharacterNameMap,
   resolveRegenerationGameStateAnchor,
@@ -79,6 +87,7 @@ import { buildGenerationPromptPresetCandidates, type PromptPresetCandidateSource
 import { createGameStateStorage, type GameStateVisibleAnchor } from "../../services/storage/game-state.storage.js";
 import { buildCommittedTrackerContextBlock } from "../../services/generation/committed-tracker-context.js";
 import { logger } from "../../lib/logger.js";
+import { resolveGameGmPromptTemplate } from "../../services/generation/game-gm-prompt-runtime.js";
 
 type WrapFormat = "xml" | "markdown" | "none";
 type DryRunPromptMessage = {
@@ -578,7 +587,6 @@ export async function registerDryRunRoute(app: FastifyInstance) {
     const dryRunActiveAgentIds = Array.isArray(chatMeta.activeAgentIds) ? (chatMeta.activeAgentIds as string[]) : [];
     const dryRunChatEnableAgents = shouldEnableAgentsForGeneration({
       chatEnableAgents: chatMeta.enableAgents === true,
-      chatMode,
       impersonate,
       impersonateBlockAgents: false,
     });
@@ -599,6 +607,17 @@ export async function registerDryRunRoute(app: FastifyInstance) {
       typeof body.regenerateMessageId === "string" && body.regenerateMessageId.trim()
         ? body.regenerateMessageId.trim()
         : null;
+    const ownerSpatialProjection = await resolveOwnerSpatialProjection(
+      chatId,
+      regenerateMessageId ? { beforeMessageId: regenerateMessageId } : {},
+      chatMeta,
+    );
+    const promptSpatialProjection =
+      (ownerSpatialProjection?.ownerMode === "game" && chatMode === "game") ||
+      (ownerSpatialProjection?.ownerMode === "roleplay" && (chatMode === "roleplay" || chatMode === "visual_novel"))
+        ? ownerSpatialProjection
+        : null;
+    const ownerSpatialLorebookEntryIds = promptSpatialProjection?.lorebookEntryIds ?? [];
     const visibleGameStateAnchor = regenerateMessageId
       ? resolveRegenerationGameStateAnchor(scopedMessages, regenerateMessageId)
       : resolveVisibleGameStateAnchor(allChatMessages);
@@ -711,9 +730,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
     let persona: any = null;
     try {
       const allPersonas = await chars.listPersonas();
-      persona =
-        ((chat as any).personaId ? allPersonas.find((p: any) => p.id === (chat as any).personaId) : null) ??
-        allPersonas.find((p: any) => p.isActive === "true");
+      persona = resolveActivePersonaCandidate(allPersonas, (chat as any).personaId, chatMode);
       if (persona) {
         personaId = persona.id as string;
         personaName = persona.name;
@@ -787,7 +804,9 @@ export async function registerDryRunRoute(app: FastifyInstance) {
       personaName,
       personaDescription,
       personaFields,
-      variables: {},
+      variables: {
+        gameStoryboardKeyframeCount: String(normalizeGameStoryboardKeyframeCount(chatMeta.gameStoryboardKeyframeCount)),
+      },
       groupScenarioOverrideText:
         typeof chatMeta.groupScenarioText === "string" && (chatMeta.groupScenarioText as string).trim()
           ? (chatMeta.groupScenarioText as string).trim()
@@ -833,6 +852,9 @@ export async function registerDryRunRoute(app: FastifyInstance) {
     promptMacroContext.lastInput = [...mappedMessages].reverse().find((message) => message.role === "user")?.content;
 
     const usePromptParts = !!promptParts;
+    if (!usePromptParts && chatMode === "conversation" && effectivePreset) {
+      wrapFormat = normalizePromptWrapFormat(effectivePreset.wrapFormat);
+    }
     if (usePromptParts) {
       // Pick wrap format (default xml). If not specified, fall back to the selected preset's wrapFormat (if any).
       if (
@@ -840,9 +862,9 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         promptParts.wrapFormat === "none" ||
         promptParts.wrapFormat === "xml"
       ) {
-        wrapFormat = promptParts.wrapFormat;
+        wrapFormat = normalizePromptWrapFormat(promptParts.wrapFormat);
       } else if (effectivePreset) {
-        wrapFormat = (effectivePreset.wrapFormat as "xml" | "markdown" | "none") || "xml";
+        wrapFormat = normalizePromptWrapFormat(effectivePreset.wrapFormat);
       }
 
       type PromptPartKey =
@@ -994,7 +1016,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         if (!includeChatSummary) return "";
         const summary = activeChatSummary ?? "";
         if (!summary) return "";
-        return wrapFormat === "xml" ? `<chat_summary>\n${summary}\n</chat_summary>` : `Chat summary:\n${summary}`;
+        return wrapContent(summary, "Chat Summary", wrapFormat);
       })();
 
       const lorebookPayload = includeLorebook
@@ -1011,6 +1033,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
               characterIds: promptCharacterIds,
               personaId,
               activeLorebookIds,
+              forcedEntryIds: ownerSpatialLorebookEntryIds,
               excludedLorebookIds: lorebookScopeExclusions.excludedLorebookIds,
               excludedSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
               tokenBudget: lorebookTokenBudget,
@@ -1038,7 +1061,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
             const loreContent = [lorebookResult.worldInfoBefore, lorebookResult.worldInfoAfter]
               .filter((content): content is string => typeof content === "string" && content.length > 0)
               .join("\n");
-            const loreBlock = loreContent ? `<lore>\n${loreContent}\n</lore>` : "";
+            const loreBlock = wrapContent(loreContent, "Lore", wrapFormat);
             return { loreBlock, depthEntries: lorebookResult.depthEntries };
           })()
         : { loreBlock: "", depthEntries: [] as any[] };
@@ -1152,7 +1175,6 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         }
         if (key === "lorebook") {
           if (!lorebookPayload.loreBlock) continue;
-          // Lorebook already comes as `<lore> ... </lore>`.
           const insertChunks: Array<{ role: "system"; content: string }> = [
             { role: "system", content: lorebookPayload.loreBlock },
           ];
@@ -1179,7 +1201,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
       }
     } else if (effectivePresetId && effectivePreset && chatMode !== "conversation" && chatMode !== "game") {
       const preset = effectivePreset;
-      wrapFormat = (preset.wrapFormat as "xml" | "markdown" | "none") || "xml";
+      wrapFormat = normalizePromptWrapFormat(preset.wrapFormat);
       const [sections, groups, choiceBlocks] = await Promise.all([
         presets.listSections(effectivePresetId),
         presets.listGroups(effectivePresetId),
@@ -1217,6 +1239,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
             ? (chatMeta.activeLorebookIds as string[])
             : []
           : [],
+        forcedLorebookEntryIds: ownerSpatialLorebookEntryIds,
         excludedLorebookIds: lorebookScopeExclusions.excludedLorebookIds,
         excludedLorebookSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
         chatEmbedding: null,
@@ -1246,6 +1269,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         lastGenerationType: promptLastGenerationType,
         idleDuration: promptIdleDuration,
         impersonate,
+        preserveImpersonatePresetSections: impersonate && effectivePresetSource === "impersonate",
       };
 
       const assembled = await assemblePrompt(assemblerInput);
@@ -1309,20 +1333,21 @@ export async function registerDryRunRoute(app: FastifyInstance) {
           .join(", ") || "Character";
       const conversationPromptTemplate = customPrompt ?? (selectedConversationPrompt || DEFAULT_CONVERSATION_PROMPT);
       const renderedConversationPrompt = resolvePromptMacros(
-        conversationPromptTemplate
-          .replace(/\{\{charName\}\}/g, charNameList)
-          .replace(/\{\{userName\}\}/g, personaName),
+        conversationPromptTemplate.replace(/\{\{charName\}\}/g, charNameList).replace(/\{\{userName\}\}/g, personaName),
       );
       finalMessages = [
-        { role: "system", content: wrapConversationInstructions(unwrapConversationInstructions(renderedConversationPrompt)) },
+        { role: "system", content: formatConversationInstructionsForWrap(renderedConversationPrompt, wrapFormat) },
         ...finalMessages,
       ];
     }
     if (chatMode === "game") {
-      const customPrompt =
-        typeof chatMeta.gameSystemPrompt === "string" && chatMeta.gameSystemPrompt.trim()
-          ? (chatMeta.gameSystemPrompt as string)
+      const setupConfig =
+        chatMeta.gameSetupConfig &&
+        typeof chatMeta.gameSetupConfig === "object" &&
+        !Array.isArray(chatMeta.gameSetupConfig)
+          ? (chatMeta.gameSetupConfig as Record<string, unknown>)
           : null;
+      const customPrompt = resolveGameGmPromptTemplate(chatMeta, setupConfig);
       const selectedGamePrompt = presetStringField(effectivePreset as Record<string, unknown> | null, "gamePrompt");
       const gamePromptTemplate = customPrompt ?? (selectedGamePrompt || DEFAULT_GAME_SYSTEM_PROMPT);
       const renderedGamePrompt = resolvePromptMacros(gamePromptTemplate);
@@ -1344,8 +1369,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
     if (!usePromptParts && !effectivePresetId && resolvedInjectChatSummary) {
       const summary = activeChatSummary ?? "";
       if (summary) {
-        const block =
-          wrapFormat === "xml" ? `<chat_summary>\n${summary}\n</chat_summary>` : `Chat summary:\n${summary}`;
+        const block = wrapContent(summary, "Chat Summary", wrapFormat);
         const firstUserIdx = finalMessages.findIndex((m) => m.role === "user" || m.role === "assistant");
         const insertAt = firstUserIdx >= 0 ? firstUserIdx : finalMessages.length;
         finalMessages.splice(insertAt, 0, { role: "system", content: block });
@@ -1365,6 +1389,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         chatId,
         characterIds: promptCharacterIds,
         personaId,
+        forcedEntryIds: ownerSpatialLorebookEntryIds,
         activeLorebookIds,
         excludedLorebookIds: lorebookScopeExclusions.excludedLorebookIds,
         excludedSourceAgentIds: lorebookScopeExclusions.excludedSourceAgentIds,
@@ -1394,7 +1419,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         .filter((content): content is string => typeof content === "string" && content.length > 0)
         .join("\n");
       if (loreContent) {
-        const loreBlock = `<lore>\n${loreContent}\n</lore>`;
+        const loreBlock = wrapContent(loreContent, "Lore", wrapFormat);
         const firstUserIdx = finalMessages.findIndex((m) => m.role === "user" || m.role === "assistant");
         const insertAt = firstUserIdx >= 0 ? firstUserIdx : finalMessages.length;
         finalMessages.splice(insertAt, 0, { role: "system", content: loreBlock });
@@ -1405,20 +1430,25 @@ export async function registerDryRunRoute(app: FastifyInstance) {
     }
 
     if (usePromptParts || !effectivePresetId) {
-      const characterDepthEntries = await collectCharacterDepthPromptEntries(
+      const characterAdvancedPromptIds = resolveCharacterAdvancedPromptIds(promptCharacterIds, chatMode, chatMeta);
+      const characterAdvancedPromptEntries = await collectCharacterAdvancedPromptEntries(
         app.db,
-        promptCharacterIds,
+        characterAdvancedPromptIds,
         promptMacroContext,
+        wrapFormat,
       );
-      if (characterDepthEntries.length > 0) {
-        finalMessages = injectAtDepth(finalMessages as any, characterDepthEntries) as any;
+      if (characterAdvancedPromptEntries.length > 0) {
+        finalMessages = injectAtDepth(finalMessages as any, characterAdvancedPromptEntries) as any;
       }
     }
 
     // Optional injection: tracker context (read-only snapshot)
     const resolvedInjectTrackersForRun = usePromptParts ? false : resolvedInjectTrackers;
     if (resolvedInjectTrackersForRun) {
-      const snap = await loadLatestGameSnapshot(app, chatId, visibleGameStateAnchor, regenerateMessageId);
+      const snap = projectGameSnapshotLocation(
+        await loadLatestGameSnapshot(app, chatId, visibleGameStateAnchor, regenerateMessageId),
+        ownerSpatialProjection,
+      );
       const contextBlock = snap
         ? formatTrackersContextBlock({
             wrapFormat,
@@ -1466,34 +1496,21 @@ export async function registerDryRunRoute(app: FastifyInstance) {
       // rejects a final assistant message ending in whitespace.
       finalMessages.push({ role: "assistant", content: assistantPrefill.trimEnd() });
     }
+    finalMessages = injectOwnerSpatialPrompt(finalMessages, promptSpatialProjection);
     dedupeLastMessageWrappers(finalMessages);
+    // Mirror the live route's provider-boundary macro guard so Peek Prompt is
+    // both accurate and incapable of exposing late raw identity macros (#3704).
+    finalMessages = resolveHistoryMessageMacros(finalMessages);
 
     // ── Parameter normalization (mirror /api/generate) ──
     const modelLower = (conn.model ?? "").toLowerCase();
     const providerLower = (conn.provider ?? "").toLowerCase();
 
-    // Resolve "xhigh" and "maximum" reasoning effort to provider-facing levels.
-    // Native Anthropic/Claude subscription adaptive-only models use "max";
-    // OpenAI-compatible Claude routes keep "xhigh". All other models get "high".
-    let resolvedEffort: "low" | "medium" | "high" | "xhigh" | "max" | null =
-      reasoningEffort !== "maximum" ? reasoningEffort : null;
-    const supportsXhigh = supportsXhighReasoningEffort(modelLower);
-    if (reasoningEffort === "xhigh" && !supportsXhigh) {
-      resolvedEffort = "high";
-    }
-    if (reasoningEffort === "maximum") {
-      const isNativeAnthropicAdaptiveOnly =
-        (providerLower === "anthropic" || providerLower === "claude_subscription") &&
-        isClaudeAdaptiveOnlyNoSamplingModel(modelLower);
-      resolvedEffort = isNativeAnthropicAdaptiveOnly ? "max" : supportsXhigh ? "xhigh" : "high";
-    }
-
-    const isXaiAutoReasoningModel =
-      (providerLower === "xai" && (modelLower.startsWith("grok-4.3") || modelLower.startsWith("grok-4-1-fast"))) ||
-      (providerLower === "openrouter" && modelLower.startsWith("x-ai/grok-"));
-    if (isXaiAutoReasoningModel) {
-      resolvedEffort = null;
-    }
+    const resolvedEffort = resolveProviderReasoningEffort({
+      provider: providerLower,
+      model: modelLower,
+      reasoningEffort,
+    });
 
     // When reasoning effort is set, force showThoughts on (matches /generate's display behavior).
     if (resolvedEffort && !showThoughts) {
@@ -1526,7 +1543,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
       frequencyPenalty = 0;
       presencePenalty = 0;
     }
-    const providerTopK = resolveProviderTopK(conn.provider, topK);
+    const providerTopK = resolveProviderTopK(topK);
 
     const provider: BaseLLMProvider =
       connId === LOCAL_SIDECAR_CONNECTION_ID
@@ -1538,6 +1555,9 @@ export async function registerDryRunRoute(app: FastifyInstance) {
             conn.maxContext,
             conn.openrouterProvider,
             conn.maxTokensOverride,
+            conn.claudeFastMode === "true",
+            conn.treatAsLocalEndpoint === "true",
+            conn.defaultParameters,
           );
 
     // ── Mirror /api/generate: normalize + fit prompt to context ──
@@ -1671,6 +1691,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
           minP: minP || undefined,
           enableThinking,
           reasoningEffort: resolvedEffort ?? undefined,
+          excludePastReasoning,
           verbosity: verbosity ?? undefined,
           serviceTier,
           customParameters,
@@ -1735,6 +1756,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         minP: minP || undefined,
         enableThinking,
         reasoningEffort: resolvedEffort ?? undefined,
+        excludePastReasoning,
         verbosity: verbosity ?? undefined,
         serviceTier,
         customParameters,

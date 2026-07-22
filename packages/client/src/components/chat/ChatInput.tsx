@@ -13,6 +13,7 @@ import {
   Languages,
   Loader2,
   FileText,
+  Sparkles,
   WandSparkles,
   Swords,
 } from "lucide-react";
@@ -20,14 +21,25 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useChatStore } from "../../stores/chat.store";
+import { useAgentStore } from "../../stores/agent.store";
 import { useUIStore } from "../../stores/ui.store";
 import { useGenerate } from "../../hooks/use-generate";
+import { useCommitSpatialOwnerTurn } from "../../hooks/use-spatial-context";
 import { useApplyRegex } from "../../hooks/use-apply-regex";
+import { useInstalledCapabilityPackages } from "../../hooks/use-capability-packages";
 import { useCreateMessage, useDeleteMessage, useUpdateMessageExtra, chatKeys } from "../../hooks/use-chats";
 import { characterKeys } from "../../hooks/use-characters";
-import { buildGuidedGenerationInstructionMessage, formatTextQuotes, type Message } from "@marinara-engine/shared";
+import {
+  buildGuidedGenerationInstructionMessage,
+  formatTextQuotes,
+  MARI_STARTER_CHIPS,
+  PROFESSOR_MARI_ID,
+  type MariSuggestionChip,
+  type Message,
+} from "@marinara-engine/shared";
 import {
   matchSlashCommand,
+  shouldExecuteQuickPostAsCommand,
   getSlashCompletions,
   type SlashCommand,
   type SlashCommandContext,
@@ -48,6 +60,9 @@ import { QuickSwitcherMobile } from "./QuickSwitcherMobile";
 import { SlashCommandFeedback } from "./SlashCommandFeedback";
 import { QuickReplyMenu, type QuickReplyAction } from "./QuickReplyMenu";
 import { getChatInputShellClass } from "./chat-input-styles";
+import { MariSuggestionChips } from "./MariSuggestionChips";
+import { CapabilityElement } from "../capabilities/CapabilityElement";
+import type { PendingSpatialTransitionDraft } from "../../stores/chat.store";
 
 interface Attachment {
   type: string; // MIME type
@@ -167,6 +182,7 @@ interface ChatInputProps {
     options?: { immediate?: boolean },
   ) => void | Promise<void>;
   onPeekPrompt?: () => void;
+  onIllustrate?: () => void | Promise<void>;
   combatAgentEnabled?: boolean;
   onStartEncounter?: () => void;
   interactionsLocked?: boolean;
@@ -181,6 +197,7 @@ export const ChatInput = memo(function ChatInput({
   chatCharacters,
   onExpressionChange,
   onPeekPrompt,
+  onIllustrate,
   combatAgentEnabled,
   onStartEncounter,
   interactionsLocked = false,
@@ -203,10 +220,21 @@ export const ChatInput = memo(function ChatInput({
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const inputBarRef = useRef<HTMLDivElement>(null);
   const focusAfterMobileRestoreRef = useRef(false);
+  const textareaFocusedRef = useRef(false);
+  const restoreFocusAfterBusyRef = useRef(false);
+  const wasInputBusyRef = useRef(false);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attachmentsRef = useRef<Attachment[]>([]);
   const pendingAttachmentDraftsRef = useRef<Map<string, Attachment[]>>(new Map());
   const activeChatId = useChatStore((s) => s.activeChatId);
+  const pendingSpatialTransition = useChatStore((s) =>
+    activeChatId ? (s.pendingSpatialTransitions.get(activeChatId) ?? null) : null,
+  );
+  const canSubmitSpatialMove = mode === "roleplay" && pendingSpatialTransition?.status === "ready";
+  const mariChips = useAgentStore((s) => s.mariChips);
+  const mariChipsChatId = useAgentStore((s) => s.mariChipsChatId);
+  const clearMariChips = useAgentStore((s) => s.clearMariChips);
+  const professorMariSuggestionsEnabled = useUIStore((s) => s.professorMariSuggestionsEnabled);
   const streamingChatId = useChatStore((s) => s.streamingChatId);
   const isStreamingGlobal = useChatStore((s) => s.isStreaming);
   const isStreaming = isStreamingGlobal && streamingChatId === activeChatId;
@@ -221,6 +249,11 @@ export const ChatInput = memo(function ChatInput({
   const clearResponseQueue = useChatStore((s) => s.clearResponseQueue);
   const activeChat = useChatStore((s) => s.activeChat);
   const chatMetadata = useMemo(() => parseChatMetadata(activeChat?.metadata), [activeChat?.metadata]);
+  const { data: installedCapabilities = [] } = useInstalledCapabilityPackages();
+  const availableCapabilityIds = useMemo(
+    () => new Set(installedCapabilities.filter((item) => item.status === "active").map((item) => item.id)),
+    [installedCapabilities],
+  );
   const inactiveCharacterIds = useMemo(
     () =>
       new Set(
@@ -261,6 +294,7 @@ export const ChatInput = memo(function ChatInput({
   const speechToTextEnabled = useUIStore((s) => s.speechToTextEnabled);
   const quoteFormat = useUIStore((s) => s.quoteFormat);
   const createMessage = useCreateMessage(activeChatId);
+  const commitSpatialOwnerTurn = useCommitSpatialOwnerTurn();
   const deleteMessage = useDeleteMessage(activeChatId);
   const updateMessageExtra = useUpdateMessageExtra(activeChatId);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -271,6 +305,7 @@ export const ChatInput = memo(function ChatInput({
     mobileHistoryCollapsed &&
     !hasInput &&
     attachments.length === 0 &&
+    !pendingSpatialTransition &&
     !isInputBusy &&
     !emojiOpen &&
     !charPickerOpen;
@@ -283,6 +318,8 @@ export const ChatInput = memo(function ChatInput({
   );
   const narrativeDirectorActive =
     mode === "roleplay" && chatMetadata.enableAgents === true && activeAgentIds.includes("director");
+  const hierarchicalMapsActive =
+    mode === "roleplay" && chatMetadata.enableAgents === true && activeAgentIds.includes("hierarchical-maps");
   const combatActionActive =
     mode === "roleplay" && combatAgentEnabled === true && typeof onStartEncounter === "function";
   const showRoleplayAgentActions = narrativeDirectorActive || combatActionActive;
@@ -473,6 +510,70 @@ export const ChatInput = memo(function ChatInput({
     });
   }, [activeChatId, qc]);
   const messagesData = qc.getQueryData<InfiniteData<Message[]>>(chatKeys.messages(activeChatId ?? ""));
+  const isProfessorMariChat = activeChatCharacters?.some((character) => character.id === PROFESSOR_MARI_ID) ?? false;
+  const hasMessages = (messagesData?.pages ?? []).some((page) => page.length > 0);
+  const visibleMariChips =
+    isProfessorMariChat && professorMariSuggestionsEnabled
+      ? mariChipsChatId === activeChatId && mariChips.length > 0
+        ? mariChips
+        : !hasMessages
+          ? MARI_STARTER_CHIPS
+          : []
+      : [];
+
+  const mariPlan = useAgentStore((s) => s.mariPlan);
+  const mariPlanChatId = useAgentStore((s) => s.mariPlanChatId);
+  const mariPlanCursor = useAgentStore((s) => s.mariPlanCursor);
+  const recordMariPlanAnswer = useAgentStore((s) => s.recordMariPlanAnswer);
+  const clearMariPlan = useAgentStore((s) => s.clearMariPlan);
+  const activeGuidedPlan = professorMariSuggestionsEnabled && mariPlanChatId === activeChatId ? mariPlan : null;
+  const guidedPlanStep = activeGuidedPlan ? (activeGuidedPlan[mariPlanCursor] ?? null) : null;
+  const chipRowChips = guidedPlanStep ? guidedPlanStep.chips : visibleMariChips;
+  const chipRowHint = guidedPlanStep
+    ? `${guidedPlanStep.question} Suggestions only; you can type your own answer.`
+    : chipRowChips.length > 0
+      ? "Suggestions only. Pick one, or type your own."
+      : null;
+
+  const handleMariChipSelect = useCallback(
+    (chip: MariSuggestionChip) => {
+      if (guidedPlanStep) {
+        const result = recordMariPlanAnswer(guidedPlanStep.fieldKey, chip.prompt);
+        if (result === "complete") {
+          const answers = useAgentStore.getState().mariPlanAnswers;
+          const summary = Object.entries(answers)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("; ");
+          clearMariPlan();
+          const el = textareaRef.current;
+          if (el && activeChatId) {
+            const text = `Create it - ${summary}`;
+            el.value = text;
+            resizeChatInputTextarea(el);
+            syncInputState(text);
+            setInputDraft(activeChatId, text);
+            el.focus();
+          }
+        }
+        return;
+      }
+      const el = textareaRef.current;
+      if (!el || !activeChatId) return;
+      const current = el.value;
+      const next = current.trim() ? `${current.trimEnd()} ${chip.prompt}` : chip.prompt;
+      el.value = next;
+      resizeChatInputTextarea(el);
+      syncInputState(next);
+      setInputDraft(activeChatId, next);
+      el.focus();
+    },
+    [activeChatId, setInputDraft, syncInputState, guidedPlanStep, recordMariPlanAnswer, clearMariPlan],
+  );
+  useEffect(() => {
+    if (professorMariSuggestionsEnabled) return;
+    clearMariChips();
+    clearMariPlan();
+  }, [clearMariChips, clearMariPlan, professorMariSuggestionsEnabled]);
   const lastMessage = useMemo(() => {
     const firstPage = messagesData?.pages?.[0];
     return firstPage?.[firstPage.length - 1] ?? null;
@@ -611,15 +712,22 @@ export const ChatInput = memo(function ChatInput({
       chatId: activeChatId,
       mode,
       generate: generateWithNarrativeDirector,
-      createMessage: (data) => createMessage.mutate(data),
+      createMessage: async (data) => {
+        await createMessage.mutateAsync(data);
+        requestChatScrollToBottom({ chatId: activeChatId, behavior: "auto" });
+      },
       invalidate: () => qc.invalidateQueries({ queryKey: chatKeys.all }),
       characterNames: activeCharacterNames,
       characters: activeChatCharacters,
+      requiresManualGuideTarget,
+      removeQueuedResponse: (characterId) => removeFromResponseQueue(activeChatId, characterId),
       latestAssistantMessageId: latestAssistantMessage?.id ?? null,
       lastMessageRole,
       setSpriteExpression: onExpressionChange
         ? (characterId, expression) => onExpressionChange(characterId, expression, { immediate: true })
         : undefined,
+      illustrate: onIllustrate,
+      availableCapabilityIds,
     };
   }, [
     activeChatId,
@@ -628,9 +736,13 @@ export const ChatInput = memo(function ChatInput({
     createMessage,
     activeCharacterNames,
     activeChatCharacters,
+    requiresManualGuideTarget,
+    removeFromResponseQueue,
     latestAssistantMessage,
     lastMessageRole,
     onExpressionChange,
+    onIllustrate,
+    availableCapabilityIds,
     qc,
   ]);
 
@@ -665,7 +777,7 @@ export const ChatInput = memo(function ChatInput({
     const hasFiles = attachments.length > 0;
 
     // If input is empty, check if we should retry or continue
-    if (!hasText && !hasFiles) {
+    if (!hasText && !hasFiles && !canSubmitSpatialMove) {
       // Manual mode: no auto-retry/continue — use the character picker instead
       if (groupResponseOrder === "manual") return;
       const queuedCharacterId = groupResponseOrder === "smart" ? responseQueue[0] : null;
@@ -718,7 +830,7 @@ export const ChatInput = memo(function ChatInput({
     }
 
     // Check for slash command
-    const match = matchSlashCommand(normalized);
+    const match = matchSlashCommand(normalized, { mode, availableCapabilityIds });
     if (match) {
       const ctx = buildContext();
       if (!ctx) return;
@@ -839,11 +951,17 @@ export const ChatInput = memo(function ChatInput({
     // Manual mode: only create the user message, no auto-generation
     if (groupResponseOrder === "manual") {
       try {
-        const created = await createMessage.mutateAsync({
-          role: "user",
-          content: message,
-          characterId: null,
-        });
+        if (canSubmitSpatialMove && pendingSpatialTransition) {
+          await commitSpatialOwnerTurn.mutateAsync({
+            chatId: activeChatId,
+            content: message,
+            transition: pendingSpatialTransition.transition,
+            ...(pendingAttachments.length ? { attachments: pendingAttachments } : {}),
+          });
+          requestChatScrollToBottom({ chatId: activeChatId, behavior: "auto" });
+          return;
+        }
+        const created = await createMessage.mutateAsync({ role: "user", content: message, characterId: null });
         requestChatScrollToBottom({ chatId: activeChatId, behavior: "auto" });
         if (pendingAttachments.length) {
           await updateMessageExtra.mutateAsync({
@@ -865,6 +983,9 @@ export const ChatInput = memo(function ChatInput({
         connectionId: null,
         userMessage: message,
         ...(pendingAttachments.length ? { attachments: pendingAttachments } : {}),
+        ...(canSubmitSpatialMove && pendingSpatialTransition
+          ? { pendingSpatialTransition: pendingSpatialTransition.transition }
+          : {}),
       });
       if (succeeded === false) {
         restoreSubmittedDraft();
@@ -891,6 +1012,7 @@ export const ChatInput = memo(function ChatInput({
     removeFromResponseQueue,
     clearResponseQueue,
     createMessage,
+    commitSpatialOwnerTurn,
     updateMessageExtra,
     syncInputState,
     replaceAttachments,
@@ -899,13 +1021,16 @@ export const ChatInput = memo(function ChatInput({
     completions,
     onPeekPrompt,
     quoteFormat,
+    canSubmitSpatialMove,
+    pendingSpatialTransition,
+    availableCapabilityIds,
   ]);
 
   const runQuickSlashCommand = useCallback(
     async (commandLine: string, fallbackError: string) => {
       if (!activeChatId) return;
       const submittingChatId = activeChatId;
-      const match = matchSlashCommand(commandLine);
+      const match = matchSlashCommand(commandLine, { mode, availableCapabilityIds });
       const baseCtx = buildContext();
       if (!match || !baseCtx) return;
       const generationStatus: { succeeded?: boolean } = {};
@@ -961,7 +1086,16 @@ export const ChatInput = memo(function ChatInput({
         toast.error(msg);
       }
     },
-    [activeChatId, buildContext, clearInputDraft, completions, setInputDraft, syncInputState],
+    [
+      activeChatId,
+      availableCapabilityIds,
+      buildContext,
+      clearInputDraft,
+      completions,
+      mode,
+      setInputDraft,
+      syncInputState,
+    ],
   );
 
   const handleImpersonateQuickButton = useCallback(async () => {
@@ -987,12 +1121,17 @@ export const ChatInput = memo(function ChatInput({
     const hasFiles = attachments.length > 0;
     if (!hasText && !hasFiles) return;
 
+    const normalized = formatTextQuotes(raw.trim(), quoteFormat);
+    if (shouldExecuteQuickPostAsCommand(normalized, { mode, availableCapabilityIds })) {
+      await handleSend();
+      return;
+    }
+
     if (draftTimerRef.current) {
       clearTimeout(draftTimerRef.current);
       draftTimerRef.current = null;
     }
 
-    const normalized = formatTextQuotes(raw.trim(), quoteFormat);
     const chat = useChatStore.getState().activeChat;
     const cachedCharacters = qc.getQueryData<Array<{ id: string; data: unknown }>>(characterKeys.list());
     const cachedPersonas = qc.getQueryData<Array<Record<string, unknown>>>(characterKeys.personas);
@@ -1097,7 +1236,10 @@ export const ChatInput = memo(function ChatInput({
     deleteMessage,
     updateMessageExtra,
     clearResponseQueue,
+    handleSend,
     quoteFormat,
+    mode,
+    availableCapabilityIds,
   ]);
 
   const handleGuidedGenerationButton = useCallback(async () => {
@@ -1260,7 +1402,7 @@ export const ChatInput = memo(function ChatInput({
     // Slash command autocomplete
     const trimmed = fixed.trim();
     if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
-      const matches = getSlashCompletions(trimmed);
+      const matches = getSlashCompletions(trimmed, { mode, availableCapabilityIds });
       setCompletions(matches);
       setSelectedCompletion(0);
     } else {
@@ -1272,8 +1414,6 @@ export const ChatInput = memo(function ChatInput({
   useEffect(() => {
     if (hasInput && feedback) setFeedback(null);
   }, [hasInput, feedback]);
-
-  const _isRP = mode === "roleplay";
 
   const handleEmojiSelect = useCallback(
     (emoji: string) => {
@@ -1426,6 +1566,32 @@ export const ChatInput = memo(function ChatInput({
   }, []);
 
   useEffect(() => {
+    const wasInputBusy = wasInputBusyRef.current;
+    wasInputBusyRef.current = isInputBusy;
+
+    if (isInputBusy) {
+      if (textareaFocusedRef.current) restoreFocusAfterBusyRef.current = true;
+      return;
+    }
+
+    if (!wasInputBusy || !restoreFocusAfterBusyRef.current) return;
+    restoreFocusAfterBusyRef.current = false;
+    if (!activeChatId || shouldShowMobileCollapsedComposer) return;
+
+    const focus = () => {
+      const textarea = textareaRef.current;
+      if (!textarea || textarea.disabled) return;
+      const activeElement = document.activeElement;
+      if (activeElement && activeElement !== document.body && activeElement !== textarea) return;
+      textarea.focus({ preventScroll: true });
+      textareaFocusedRef.current = true;
+      ensureInputVisible();
+    };
+
+    requestAnimationFrame(focus);
+  }, [activeChatId, ensureInputVisible, isInputBusy, shouldShowMobileCollapsedComposer]);
+
+  useEffect(() => {
     if (mobileHistoryCollapsed || !focusAfterMobileRestoreRef.current) return;
     focusAfterMobileRestoreRef.current = false;
     const focus = () => {
@@ -1492,6 +1658,27 @@ export const ChatInput = memo(function ChatInput({
 
       {/* Feedback toast */}
       {feedback && <SlashCommandFeedback feedback={feedback} onDismiss={() => setFeedback(null)} className="mb-2" />}
+
+      {hierarchicalMapsActive && activeChatId ? (
+        <CapabilityElement
+          packageId="hierarchical-maps"
+          view="runtime"
+          capabilityProps={{
+            chatId: activeChatId,
+            disabled: isInputBusy,
+            pendingTransition: pendingSpatialTransition,
+            onPendingTransitionChange: (pending: unknown) => {
+              if (pending && typeof pending === "object") {
+                useChatStore
+                  .getState()
+                  .setPendingSpatialTransition(activeChatId, pending as PendingSpatialTransitionDraft);
+              } else {
+                useChatStore.getState().clearPendingSpatialTransition(activeChatId);
+              }
+            },
+          }}
+        />
+      ) : null}
 
       {showRoleplayAgentActions && (
         <div className="flex flex-wrap justify-center gap-2 py-1">
@@ -1572,6 +1759,14 @@ export const ChatInput = memo(function ChatInput({
         </div>
       )}
 
+      {chipRowHint && (
+        <p className="mb-1 flex items-center gap-1.5 px-0.5 text-xs text-[var(--muted-foreground)]">
+          <Sparkles size="0.75rem" className="shrink-0 text-[var(--primary)]" />
+          <span>{chipRowHint}</span>
+        </p>
+      )}
+      <MariSuggestionChips chips={chipRowChips} onSelect={handleMariChipSelect} disabled={isInputBusy} />
+
       {/* Main input container */}
       <div
         ref={inputBarRef}
@@ -1620,7 +1815,13 @@ export const ChatInput = memo(function ChatInput({
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          onFocus={ensureInputVisible}
+          onFocus={() => {
+            textareaFocusedRef.current = true;
+            ensureInputVisible();
+          }}
+          onBlur={() => {
+            if (!isInputBusy) textareaFocusedRef.current = false;
+          }}
           placeholder={inputPlaceholder}
           disabled={!activeChatId || isInputBusy}
           rows={1}
@@ -1700,10 +1901,7 @@ export const ChatInput = memo(function ChatInput({
         )}
 
         {showQuickRepliesMenu && quickReplyActions.length > 0 && (
-          <QuickReplyMenu
-            actions={quickReplyActions}
-            disabled={!activeChatId || isInputBusy || isReadingAttachments}
-          />
+          <QuickReplyMenu actions={quickReplyActions} disabled={!activeChatId || isInputBusy || isReadingAttachments} />
         )}
 
         {/* Send / Stop button */}
@@ -1712,14 +1910,14 @@ export const ChatInput = memo(function ChatInput({
           onClick={isStreaming ? () => useChatStore.getState().stopGeneration(activeChatId ?? undefined) : handleSend}
           disabled={
             (!isStreaming && (isInputBusy || isReadingAttachments)) ||
-            (!hasInput && !attachments.length && !isStreaming && !canRetry && !canContinue) ||
+            (!hasInput && !attachments.length && !canSubmitSpatialMove && !isStreaming && !canRetry && !canContinue) ||
             !activeChatId
           }
           className={cn(
             "mari-chat-send-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200 sm:h-8 sm:w-8",
             isInputBusy
               ? "text-foreground/75 hover:bg-foreground/10 hover:text-foreground/90"
-              : (hasInput || attachments.length || canRetry || canContinue) &&
+              : (hasInput || attachments.length || canSubmitSpatialMove || canRetry || canContinue) &&
                   activeChatId &&
                   !isInputBusy &&
                   !isReadingAttachments
@@ -1727,8 +1925,10 @@ export const ChatInput = memo(function ChatInput({
                 : "text-foreground/20",
           )}
         >
-          {isInputBusy ? (
+          {isStreaming ? (
             <StopCircle size="1rem" />
+          ) : isInputBusy ? (
+            <Loader2 size="1rem" className="animate-spin" />
           ) : (
             <Send size="0.9375rem" className={cn(hasInput && "translate-x-[1px]")} />
           )}

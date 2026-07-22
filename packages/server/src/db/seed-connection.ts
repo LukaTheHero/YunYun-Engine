@@ -1,11 +1,12 @@
 // ──────────────────────────────────────────────
-// Seed: Default OpenRouter Free Connection
-// Creates a pre-configured OpenRouter free-tier connection for new users.
+// Seed: Default connection placeholder
+// The bundled OpenRouter starter key was removed; keep the seed hook so older
+// installs that already have DEFAULT_CONNECTION_ID remain compatible.
 // ──────────────────────────────────────────────
 import { logger } from "../lib/logger.js";
 import type { DB } from "./connection.js";
 import { apiConnections } from "./schema/connections.js";
-import { eq } from "drizzle-orm";
+import { eq } from "./file-query.js";
 import { DEFAULT_CONNECTION_ID } from "@marinara-engine/shared";
 
 export async function seedDefaultConnection(db: DB) {
