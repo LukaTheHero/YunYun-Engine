@@ -1,4 +1,4 @@
-import type { AgentCategory, AgentPhase, AgentPromptTemplateOption, AgentResultType } from "../../types/agent.js";
+import type { AgentCategory, AgentPhase, AgentPromptTemplateOption } from "../../types/agent.js";
 import type { ChatMode } from "../../types/chat.js";
 
 export interface BuiltInAgentManifest {
@@ -14,7 +14,6 @@ export interface BuiltInAgentManifest {
   libraryHidden?: boolean;
   /** Keep legacy configs recognized, but never run this built-in in generation pipelines. */
   runtimeDisabled?: boolean;
-  resultType?: AgentResultType;
   modeAllowlist?: readonly ChatMode[];
   defaultTools?: readonly string[];
   defaultSettings?: Record<string, unknown>;
@@ -22,6 +21,10 @@ export interface BuiltInAgentManifest {
   runInterval?: number;
   /** Default prompt supplied by an installed package. Bundled compatibility manifests may omit it. */
   defaultPromptTemplate?: string;
-  /** Feature entries use the Agents library for installation/activation but do not run through the LLM pipeline. */
-  execution?: "pipeline" | "feature";
+  /**
+   * Feature entries provide their own package UI/runtime. Host entries use the
+   * normal Agent editor, but are orchestrated by a dedicated Engine workflow
+   * instead of the generic LLM pipeline.
+   */
+  execution?: "pipeline" | "feature" | "host";
 }

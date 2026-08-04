@@ -19,6 +19,11 @@ An agent package may contribute one or more declarative agents and optional trus
 
 Packages target a versioned Marinara capability API. They must not import private source paths from the engine.
 
+Client capability elements receive the Engine's selected UI locale through their `lang` and `dir` attributes and the
+`capabilityProps.localization` object. Package-owned interfaces keep their own locale files and fall back to package
+English; the Engine does not translate package prompts or package-authored machine values. Locale changes reuse the
+existing `marinara-capability-props` event so an installed interface can rerender without an Engine restart.
+
 Capability API 1.1 adds a generic runtime facade to the server activation context.
 Packages can read the effective agent-debug state and write through the Engine's
 Pino logger, including explicit debug-mode overrides, without importing the
@@ -36,6 +41,27 @@ lore-entry selection, JSON-ish response parsing, and resolved language-model cal
 Connection credentials, provider implementations, database handles, and storage
 objects remain private to Engine.
 
+### Capability API 1.7 chat branches
+
+Capability API 1.7 adds normalized branch metadata to `CapabilityChatRecord`:
+
+```ts
+branch: {
+  title: string | null;
+  parentChatId: string | null;
+  parentMessageId: string | null;
+  childMessageId: string | null;
+} | null;
+```
+
+`title` is the trimmed persisted branch name. Roots return `null`. Known
+Engine-created branches expose the immediate parent chat, the source fork
+message, and the copied child message. Empty branches use null message anchors.
+Legacy branches, malformed metadata, and imported group siblings without a
+known relationship return null lineage fields; Engine does not infer historical
+relationships. Generic export/import omits parent and message IDs because IDs
+change between installations. Parent deletion leaves child lineage untouched.
+
 ## Initial packages
 
 - all currently built-in agents;
@@ -48,7 +74,7 @@ objects remain private to Engine.
 - Tic-Tac-Toe;
 - Rock-Paper-Scissors.
 
-The base keeps the package manager, catalog client, generic agent pipeline contracts, generic turn-game host contracts, and inert extension points. Concrete implementations belong to packages.
+The base keeps the package manager, catalog client, generic agent pipeline contracts, generic turn-game host contracts, and inert host interfaces. Concrete implementations belong to packages.
 
 ## Trust and installation
 

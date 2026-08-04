@@ -1,5 +1,6 @@
 import { Loader2, X } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useTranslation as useUiTranslation } from "react-i18next";
 
 interface ProfessorMariWorkingWindowProps {
   visible: boolean;
@@ -8,6 +9,7 @@ interface ProfessorMariWorkingWindowProps {
 }
 
 export function ProfessorMariWorkingWindow({ visible, onDismiss, className }: ProfessorMariWorkingWindowProps) {
+  const { t: localizeUi } = useUiTranslation();
   if (!visible) return null;
 
   return (
@@ -20,16 +22,14 @@ export function ProfessorMariWorkingWindow({ visible, onDismiss, className }: Pr
       aria-live="polite"
     >
       <Loader2 size="1.5rem" className="shrink-0 animate-spin text-[var(--muted-foreground)]" />
-      <p className={cn("min-w-0 text-xs font-medium leading-relaxed text-[var(--foreground)]", onDismiss && "pr-6")}>
-        Prof Mari is working...
-      </p>
+      <p className={cn("min-w-0 text-xs font-medium leading-relaxed text-[var(--foreground)]", onDismiss && "pr-6")}>{localizeUi("ui.ui.professormariworkingwindow.profMariIsWorking")}</p>
       {onDismiss && (
         <button
           type="button"
           onClick={onDismiss}
           className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/60"
-          aria-label="Hide Professor Mari working indicator"
-          title="Hide"
+          aria-label={localizeUi("ui.ui.professormariworkingwindow.hideProfessorMariWorkingIndicator")}
+          title={localizeUi("ui.noodle.stageprofileview.hide")}
         >
           <X size="0.78rem" />
         </button>

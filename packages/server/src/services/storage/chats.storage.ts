@@ -37,6 +37,7 @@ import {
 import { scheduleNeedsRefresh, type CharacterSchedules, type WeekSchedule } from "../conversation/schedule.service.js";
 import { resolveConversationTimeZone, toZonedWallClockDate } from "../conversation/timezone.js";
 import { logger } from "../../lib/logger.js";
+import { galleryFileHasReferences, unlinkGalleryFileIfUnreferenced } from "../image/gallery-file-lifecycle.js";
 
 const GALLERY_DIR = join(DATA_DIR, "gallery");
 const GAME_SCENE_VIDEOS_DIR = join(DATA_DIR, "game-scene-videos");
@@ -189,7 +190,14 @@ function freshSwipeMessageExtra(value: unknown): Record<string, unknown> {
     generationInfo: null,
   };
 
-  for (const key of ["hiddenFromAI", "hiddenFromUser", "isConversationStart", "reactions", "personaSnapshot"]) {
+  for (const key of [
+    "hiddenFromAI",
+    "hiddenFromAICharacterIds",
+    "hiddenFromUser",
+    "isConversationStart",
+    "reactions",
+    "personaSnapshot",
+  ]) {
     if (Object.prototype.hasOwnProperty.call(current, key)) {
       next[key] = current[key];
     }
@@ -425,6 +433,29 @@ export function createChatsStorage(db: DB) {
     }
 
     return sharedSchedules;
+  }
+
+  async function cleanupChatGallery(chatId: string): Promise<void> {
+    const chatGalleryFiles = await db
+      .select({ filePath: chatImages.filePath })
+      .from(chatImages)
+      .where(eq(chatImages.chatId, chatId));
+
+    await db.delete(chatImages).where(eq(chatImages.chatId, chatId));
+    for (const image of chatGalleryFiles) {
+      await unlinkGalleryFileIfUnreferenced({ db, filePath: image.filePath });
+    }
+
+    const localPathPrefix = `${chatId}/`;
+    const hasSharedLocalFile = (
+      await Promise.all(
+        chatGalleryFiles
+          .filter((image) => image.filePath.replace(/\\/g, "/").startsWith(localPathPrefix))
+          .map((image) => galleryFileHasReferences(db, image.filePath)),
+      )
+    ).some(Boolean);
+    const galleryDir = join(GALLERY_DIR, chatId);
+    if (!hasSharedLocalFile && existsSync(galleryDir)) rmSync(galleryDir, { recursive: true, force: true });
   }
 
   return {
@@ -746,9 +777,7 @@ export function createChatsStorage(db: DB) {
       await db.delete(gameSceneVideos).where(eq(gameSceneVideos.chatId, id));
 
       // Clean up gallery images (DB records + files on disk)
-      await db.delete(chatImages).where(eq(chatImages.chatId, id));
-      const galleryDir = join(GALLERY_DIR, id);
-      if (existsSync(galleryDir)) rmSync(galleryDir, { recursive: true, force: true });
+      await cleanupChatGallery(id);
       const videoDir = join(GAME_SCENE_VIDEOS_DIR, id);
       if (existsSync(videoDir)) rmSync(videoDir, { recursive: true, force: true });
 
@@ -779,9 +808,7 @@ export function createChatsStorage(db: DB) {
         }
         await db.delete(gameTurnStoryboards).where(eq(gameTurnStoryboards.chatId, chat.id));
         await db.delete(gameSceneVideos).where(eq(gameSceneVideos.chatId, chat.id));
-        await db.delete(chatImages).where(eq(chatImages.chatId, chat.id));
-        const galleryDir = join(GALLERY_DIR, chat.id);
-        if (existsSync(galleryDir)) rmSync(galleryDir, { recursive: true, force: true });
+        await cleanupChatGallery(chat.id);
         const videoDir = join(GAME_SCENE_VIDEOS_DIR, chat.id);
         if (existsSync(videoDir)) rmSync(videoDir, { recursive: true, force: true });
       }
@@ -1241,6 +1268,18 @@ export function createChatsStorage(db: DB) {
 
     async getSwipes(messageId: string) {
       return db.select().from(messageSwipes).where(eq(messageSwipes.messageId, messageId)).orderBy(messageSwipes.index);
+    },
+
+    /**
+     * Read swipe rows for a message set with one linear file-store scan.
+     * The file-native store scans the table for `inArray` too, where membership
+     * is O(ids) per row; chunking that query would also rescan the table.
+     */
+    async listSwipesByMessageIds(messageIds: string[]) {
+      if (messageIds.length === 0) return [];
+      const wanted = new Set(messageIds);
+      const rows = await db.select().from(messageSwipes);
+      return rows.filter((row) => wanted.has(row.messageId));
     },
 
     async addSwipe(messageId: string, content: string, silent?: boolean) {

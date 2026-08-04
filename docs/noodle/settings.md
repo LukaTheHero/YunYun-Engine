@@ -12,6 +12,46 @@ Noodle is the in-app social media timeline in Marinara Engine. If you are new to
 
 All Noodle settings are global. They apply to every persona and every chat, not to one chat at a time. Changes save as soon as you make them.
 
+## NoodleR Access
+
+- **Enable NoodleR**: a toggle, default **off**. Turn it on to expose the NoodleR account hub. While it is off, opening NoodleR shows the opt-in screen, NoodleR account queries are unavailable, and NoodleR account data stays separate from the Noodle timeline.
+
+NoodleR and Noodle are two separate simulated apps, and an account belongs to exactly one of them. That separation keeps NoodleR content out of the Noodle timeline; it is **not** a privacy or security feature. Everything stays on this machine either way, and anyone with access to the app or its data directory can read it. Who may read an individual NoodleR post is a separate, per-post setting — see **Subscriptions and post access** below.
+
+The **Manage stage profiles** screen, reached from **Noodle Settings** > **NoodleR Access**, lists the stage profiles currently available to the installation, including loading, failure, and empty states. A stage profile belongs to one public persona or character account but presents its own name, handle, bio, stage voice, and disclosure mode. Existing NoodleR accounts created before stage profiles were introduced show **Setup needed** until their profile is completed.
+
+### Stage identity disclosure
+
+Disclosure controls how the linked public identity may appear in a stage profile and AI-generated post. It does not decide who can view a profile or post.
+
+- **Publicly connected (Open)**: the stage profile may openly be the same person. Generated text and image prompts may use the linked public name, handle, and recognizable continuity.
+- **Inspired alter ego (Hinted)**: broad personality, interests, and themes may carry over, but the exact public name and handle are removed from generation context and filtered from generated text and image prompts before the post is saved. Distinctive traits may still feel recognizable. On the creator profile, hover, focus, or tap the **Hinted** badge to reveal the linked Noodle identity.
+- **Separate persona (Secret)**: the linked identity is treated as confidential authoring inspiration only. Profile generation receives a reduced, non-identifying brief and avoids canonical occupations, relationships, locations, signature phrases, and distinctive details. Exact identifiers are also filtered from generated output. This is not a formal anonymity guarantee; review the draft before saving.
+
+Use **New profile** in **Manage stage profiles** to search and choose an eligible character or persona. The setup then explains disclosure and asks you to choose Open, Hinted, or Secret before showing the editable stage-profile form. You can fill the form yourself or ask AI to generate an editable draft from the source character, disclosure choice, and optional guidance. AI never saves the draft automatically; review the fields and select **Save stage profile** yourself. Open an existing profile and select **Edit profile** to change its presentation or use AI to refill the current draft. Viewer-facing hinted profiles expose only the linked identity's display name and handle through the deliberate badge hint; they do not expose its account ID. Viewer-facing secret profiles expose no linked identity metadata.
+
+### Guided NoodleR posts
+
+Each stage profile has an inline, collapsed composer for NoodleR posts. Enter an optional title and body, then select **Post** to publish those literal values without provider work. A body, image, or poll is required, so an image or a two-to-four-option poll may be posted on its own. Uploaded images stay in NoodleR's own media storage rather than the Noodle gallery.
+
+Select **Guide** to transform the current title and body draft through the existing NoodleR generator. It preserves the image, poll, access level, and PPV price you selected, and generated output remains title/body-only; it does not generate or replace attachments. Unpublished image files and URLs stay in the current client draft until Post or Guide succeeds. If Post, Guide, or media persistence fails, the current draft remains available for correction or retry.
+
+The post's access level protects the complete post. Locked subscriber and PPV posts do not expose their image, poll choices, or votes. A viewer who can read the post may vote once and later change that vote; the persona linked to the creator cannot vote on its own stage-profile post.
+
+## Subscriptions and post access
+
+The NoodleR hub always shows creator pages as whichever persona is currently selected globally. Subscriptions and PPV unlocks belong to that viewer persona, so switching your active persona may change which creators and posts are available. Use **Noodle Settings** > **NoodleR Access** > **Manage stage profiles** to create, edit, or delete your own stage profiles instead.
+
+When guiding a post, choose one access level:
+
+- **Public**: every persona that can see the stage profile can read the post.
+- **Subscribers**: the post stays locked until the selected viewer persona subscribes to that stage profile.
+- **PPV**: the post has a simulated price and stays locked until that viewer persona unlocks it. No real payment is processed.
+
+Each stage profile has its own **Subscriber access** settings. **Subscriptions include PPV** lets subscribers read that profile's PPV posts without unlocking each one. It is off by default. **Hidden from personas** removes the stage profile and all its posts from selected viewer personas, including direct subscribe and unlock requests. Hidden-from settings apply to the NoodleR stage profile only and do not hide its linked public Noodle account.
+
+Use **Delete profile** on a managed stage profile to remove that stage profile, all posts published under it, its subscriptions, and its PPV unlock records. The linked public Noodle account is not deleted and can be used to create a new stage profile later.
+
 ## Invites
 
 The **Invites** section chooses which characters can take part in a Noodle refresh. A refresh is when the AI writes a batch of posts, replies, reposts, and likes for the invited accounts.
@@ -87,6 +127,7 @@ The template Noodle uses to write these image prompts is called **Noodle Post Im
 The **Timeline Writing** section tunes the refresh writer's tone and long-term memory behavior.
 
 - **Enhanced tone & continuity**: a toggle, default **off**. When on, each account's voice is grounded more strongly in its own Personality/Description/Backstory instead of a default upbeat tone, accounts are encouraged to react to, quote, or argue with each other's posts within the same refresh, older-post recall happens more often (and favors posts relevant to currently active accounts instead of picking purely at random), and the recall instruction allows rather than discourages references. Off reproduces Noodle's original tone and recall behavior exactly, so turning this on is the only way your timelines change.
+- **Use generated character schedules**: a toggle, default **off**. When on, Noodle includes today's existing generated Conversation schedule for each participating character when available. Noodle does not generate or refresh schedules itself. The user's current local date and time are included in every timeline refresh whether this toggle is on or off.
 
 ## Customizing the timeline writer's voice
 
@@ -151,6 +192,7 @@ This table lists every Noodle setting with its default and range.
 
 | Setting | Default | Range or options |
 |---|---|---|
+| **Enable NoodleR** | off | on or off |
 | **Generation connection** | none | any text connection (required for refresh) |
 | **Professor Mari participates** | on | on or off |
 | **Refreshes/day** | 2 | 0 to 24 (0 turns automatic refreshes off) |

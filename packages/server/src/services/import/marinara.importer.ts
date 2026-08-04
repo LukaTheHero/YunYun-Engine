@@ -7,9 +7,16 @@ import {
   getFolderImportEntries,
   getFolderManifestConfig,
   isJsonRecord,
+  characterDataSchema,
   lorebookFilterModeSchema,
 } from "@marinara-engine/shared";
-import type { ExportEnvelope, ExportType, LorebookFilterMode, LorebookMatchingSource } from "@marinara-engine/shared";
+import type {
+  CharacterData,
+  ExportEnvelope,
+  ExportType,
+  LorebookFilterMode,
+  LorebookMatchingSource,
+} from "@marinara-engine/shared";
 import { createCharactersStorage } from "../storage/characters.storage.js";
 import { createCharacterGalleryStorage } from "../storage/character-gallery.storage.js";
 import { createLorebooksStorage } from "../storage/lorebooks.storage.js";
@@ -29,9 +36,10 @@ function resolveNativePosition(value: unknown): number {
   if (typeof value === "string") {
     if (value === "after_char") return 1;
     if (value === "at_depth" || value === "depth") return 2;
+    if (value === "outlet") return 7;
     return 0;
   }
-  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 2 ? value : 0;
+  return typeof value === "number" && Number.isInteger(value) && [0, 1, 2, 7].includes(value) ? value : 0;
 }
 
 function normalizeDefaultChoices(value: unknown): Record<string, string | string[]> {
@@ -270,6 +278,12 @@ function unwrapFolderManifestEnvelope(value: unknown): ExportEnvelope | null {
 
 // ── Character ────────────────────────────────
 
+/** Validate and default a native character payload before it reaches storage. */
+export function normalizeNativeCharacterData(data: unknown): CharacterData | null {
+  const parsed = characterDataSchema.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
 async function importCharacter(data: unknown, db: DB) {
   const storage = createCharactersStorage(db);
   const galleryStorage = createCharacterGalleryStorage(db);
@@ -282,7 +296,7 @@ async function importCharacter(data: unknown, db: DB) {
     sprites?: unknown;
     gallery?: unknown;
   };
-  const charData = d?.data ? { ...(d.data as Record<string, unknown>) } : undefined;
+  const charData = isJsonRecord(d?.data) ? { ...d.data } : undefined;
   const metadata = d?.metadata && typeof d.metadata === "object" ? (d.metadata as Record<string, unknown>) : null;
   const comment = typeof metadata?.comment === "string" ? metadata.comment : undefined;
   if (!charData || typeof charData !== "object") {
@@ -334,7 +348,12 @@ async function importCharacter(data: unknown, db: DB) {
     charData.extensions = extensions;
   }
 
-  const result = await storage.create(charData as any, undefined, readTimestampOverrides(d), comment);
+  const normalizedCharacterData = normalizeNativeCharacterData(charData);
+  if (!normalizedCharacterData) {
+    return { success: false, type: "marinara_character" as const, error: "Invalid character data" };
+  }
+
+  const result = await storage.create(normalizedCharacterData, undefined, readTimestampOverrides(d), comment);
   if (result?.id) {
     const avatarPath = await saveAvatarFromDataUrl(d.avatar, "character", result.id);
     if (avatarPath) {
@@ -347,7 +366,7 @@ async function importCharacter(data: unknown, db: DB) {
     success: true,
     type: "marinara_character" as const,
     id: result?.id,
-    name: (charData as any).name ?? "Imported character",
+    name: normalizedCharacterData.name,
   };
 }
 
@@ -560,6 +579,7 @@ async function importLorebookPayload(data: unknown, db: DB) {
           : [],
         additionalMatchingSources: readMatchingSources(e.additionalMatchingSources),
         position: resolveNativePosition(e.position),
+        outletName: String(e.outletName ?? ""),
         depth: Number(e.depth ?? 4),
         order: Number(e.order ?? 100),
         role: resolveLorebookEntryRole(e.role),

@@ -131,6 +131,7 @@ function stSelectiveLogic(value: unknown): number {
 
 function stPosition(value: unknown): number {
   const position = Number(value ?? 0);
+  if (position === 7) return 7;
   if (position === 2) return 4;
   if (position === 1) return 1;
   return 0;
@@ -303,6 +304,7 @@ function buildCompatibleLorebookExport(lb: Record<string, unknown>, entries: Arr
         selectiveLogic: stSelectiveLogic(entry.selectiveLogic),
         order: Number(entry.order ?? 100),
         position: stPosition(entry.position),
+        outletName: String(entry.outletName ?? ""),
         depth: Number(entry.depth ?? 4),
         probability: entry.probability ?? null,
         scanDepth: entry.scanDepth ?? null,
@@ -367,6 +369,7 @@ function buildTransferredEntryInput(
     generationTriggerFilters: entry.generationTriggerFilters,
     additionalMatchingSources: entry.additionalMatchingSources,
     position: entry.position,
+    outletName: entry.outletName,
     depth: entry.depth,
     order,
     role: entry.role,
@@ -848,7 +851,7 @@ export async function lorebooksRoutes(app: FastifyInstance) {
 
   // ── Scan chat for activated entries ──
 
-  app.get<{ Params: { chatId: string } }>("/scan/:chatId", async (req, reply) => {
+  app.get<{ Params: { chatId: string } }>("/scan/:chatId", async (req) => {
     const { chatId } = req.params;
     const chatsStorage = createChatsStorage(app.db);
     const chatMessages = await chatsStorage.listMessages(chatId);

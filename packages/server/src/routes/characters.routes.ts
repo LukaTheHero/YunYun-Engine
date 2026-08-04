@@ -2,6 +2,7 @@
 // Routes: Characters, Personas & Groups
 // ──────────────────────────────────────────────
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { z } from "zod";
 import {
   createCharacterSchema,
   updateCharacterSchema,
@@ -12,7 +13,7 @@ import {
   PROFESSOR_MARI_ID,
   CONVERSATION_CALL_CHARACTER_VIDEO_CLIP_KINDS,
 } from "@marinara-engine/shared";
-import type { ConversationCallCharacterVideoClipKind, ExportEnvelope } from "@marinara-engine/shared";
+import type { CharacterData, ConversationCallCharacterVideoClipKind, ExportEnvelope } from "@marinara-engine/shared";
 import { createCharactersStorage } from "../services/storage/characters.storage.js";
 import { createCharacterGalleryStorage } from "../services/storage/character-gallery.storage.js";
 import { createPersonaGalleryStorage } from "../services/storage/persona-gallery.storage.js";
@@ -20,10 +21,12 @@ import { createChatsStorage } from "../services/storage/chats.storage.js";
 import { createGameSceneVideosStorage } from "../services/storage/game-scene-videos.storage.js";
 import { createConnectionsStorage } from "../services/storage/connections.storage.js";
 import { createLorebooksStorage } from "../services/storage/lorebooks.storage.js";
+import { createNoodleStorage } from "../services/storage/noodle.storage.js";
 import { generateImage } from "../services/image/image-generation.js";
 import { resolveConnectionImageDefaults } from "../services/image/image-generation-defaults.js";
 import { loadImageGenerationUserSettings } from "../services/image/image-generation-settings.js";
 import { compileImagePrompt } from "../services/image/image-prompt-compiler.js";
+import { resolveImagePromptReviewSize } from "../services/image/image-prompt-review.js";
 import { resolveImageConnectionFallback } from "../services/generation/media-connection-fallback.js";
 import {
   ConversationCallVideoClipAvatarMismatchError,
@@ -58,9 +61,16 @@ import { extname } from "path";
 import { pipeline } from "stream/promises";
 import { newId } from "../utils/id-generator.js";
 import { createReplyFallbackNotifier } from "./generate/fallback-notification.js";
+import {
+  findGalleryRowByFilename,
+  galleryFileHasReferences,
+  resolveStoredGalleryFile,
+  unlinkGalleryFileIfUnreferenced,
+} from "../services/image/gallery-file-lifecycle.js";
 
 const CHARACTER_GALLERY_ROOT = join(DATA_DIR, "gallery", "characters");
 const PERSONA_GALLERY_ROOT = join(DATA_DIR, "gallery", "personas");
+const AVATAR_ROOT = join(DATA_DIR, "avatars");
 const CHARACTER_GALLERY_VIDEO_ROOT = join(DATA_DIR, "gallery", "character-videos");
 const PERSONA_GALLERY_VIDEO_ROOT = join(DATA_DIR, "gallery", "persona-videos");
 const ALLOWED_GALLERY_EXTS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
@@ -81,7 +91,25 @@ const CALL_VIDEO_CLIP_LABELS = {
 } as const;
 const CALL_VIDEO_CLIP_UPLOAD_MAX_BYTES = 250 * 1024 * 1024;
 const ALLOWED_CALL_VIDEO_CLIP_UPLOAD_EXTS = new Set([".mp4"]);
+const renameCardVersionSchema = z.object({ version: z.string().trim().min(1).max(100) });
 type UploadedMultipartFile = NonNullable<Awaited<ReturnType<FastifyRequest["file"]>>>;
+
+function applyTrackerCardPaint(
+  currentValue: unknown,
+  paint: Record<string, unknown>,
+  preserveStatIcons = true,
+) {
+  const current = parseCharacterDataRecord(currentValue);
+  const next = { ...paint };
+  const preservedKeys = preserveStatIcons
+    ? (["portraitFocusX", "portraitFocusY", "portraitZoom", "statIcons"] as const)
+    : (["portraitFocusX", "portraitFocusY", "portraitZoom"] as const);
+  for (const key of preservedKeys) {
+    if (Object.hasOwn(current, key)) next[key] = current[key];
+    else delete next[key];
+  }
+  return next;
+}
 
 type GalleryVideoEntry = {
   id: string;
@@ -414,6 +442,37 @@ async function readAvatarDataUrl(avatarPath: string | null | undefined): Promise
   return readImageAsDataUrl(join(DATA_DIR, "avatars"), filename);
 }
 
+async function copyGalleryImageToAvatar(
+  entityKind: "character" | "persona",
+  entityId: string,
+  galleryFilePath: string,
+): Promise<string> {
+  const galleryRoot = join(DATA_DIR, "gallery");
+  const sourcePath = assertInsideDir(galleryRoot, join(galleryRoot, galleryFilePath));
+  const imageBuffer = await readFile(sourcePath);
+  const imageInfo = isAllowedImageBuffer(imageBuffer, extname(sourcePath));
+  if (!imageInfo) throw new Error("Unsupported or invalid gallery image");
+
+  await mkdir(AVATAR_ROOT, { recursive: true });
+  const filename = `${entityKind}-${entityId}-${newId()}.${imageInfo.ext}`;
+  const avatarFilePath = assertInsideDir(AVATAR_ROOT, join(AVATAR_ROOT, filename));
+  await writeFile(avatarFilePath, imageBuffer);
+  return `/api/avatars/file/${filename}`;
+}
+
+// Remove an avatar file created by copyGalleryImageToAvatar when the record
+// update it was copied for did not go through, so failures cannot strand
+// orphaned files in the avatars directory.
+async function removeCopiedAvatarFile(avatarPath: string) {
+  const filename = avatarPath.split("/").pop();
+  if (!filename) return;
+  try {
+    await unlink(assertInsideDir(AVATAR_ROOT, join(AVATAR_ROOT, filename)));
+  } catch {
+    // The copy may not exist if the failure happened before the write.
+  }
+}
+
 // Read every sprite file in data/sprites/<id>/ and return it as
 // { filename, data } so import can restore the same expression set under a
 // new id.
@@ -551,6 +610,24 @@ export async function charactersRoutes(app: FastifyInstance) {
   const personaGallery = createPersonaGalleryStorage(app.db);
   const lorebooksStorage = createLorebooksStorage(app.db);
   const connections = createConnectionsStorage(app.db);
+  const characterUpdateQueues = new Map<string, Promise<unknown>>();
+  const personaUpdateQueues = new Map<string, Promise<unknown>>();
+
+  function enqueueUpdate<T>(
+    queues: Map<string, Promise<unknown>>,
+    id: string,
+    update: () => Promise<T>,
+  ): Promise<T> {
+    const previous = queues.get(id);
+    const next = previous ? previous.catch(() => undefined).then(update) : update();
+    queues.set(id, next);
+    void next
+      .finally(() => {
+        if (queues.get(id) === next) queues.delete(id);
+      })
+      .catch(() => undefined);
+    return next;
+  }
 
   // ── Characters ──
 
@@ -602,6 +679,13 @@ export async function charactersRoutes(app: FastifyInstance) {
       styleProfileId: body.styleProfileId,
       imageDefaults,
     });
+    const previewSize = resolveImagePromptReviewSize({
+      connection: resolved.conn,
+      prompt: compiled.prompt,
+      width,
+      height,
+      imageDefaults,
+    });
 
     return {
       items: [
@@ -611,8 +695,8 @@ export async function charactersRoutes(app: FastifyInstance) {
           title: `Avatar: ${body.name?.trim() || "Character"}`,
           prompt: compiled.prompt,
           negativePrompt: compiled.negativePrompt,
-          width,
-          height,
+          width: previewSize.width,
+          height: previewSize.height,
         },
       ],
     };
@@ -720,6 +804,21 @@ export async function charactersRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
+  app.patch<{ Params: { id: string; versionId: string } }>("/:id/versions/:versionId", async (req, reply) => {
+    const { version } = renameCardVersionSchema.parse(req.body);
+    const renamed = await storage.renameVersion(req.params.id, req.params.versionId, version);
+    if (!renamed) return reply.status(404).send({ error: "Character version not found" });
+    return renamed;
+  });
+
+  app.post<{ Params: { id: string } }>("/:id/versions/reset", async (req, reply) => {
+    const reset = await enqueueUpdate(characterUpdateQueues, req.params.id, () =>
+      storage.resetVersions(req.params.id),
+    );
+    if (!reset) return reply.status(404).send({ error: "Character not found" });
+    return reset;
+  });
+
   app.post("/", async (req) => {
     const input = createCharacterSchema.parse(req.body);
     const body = req.body as Record<string, unknown>;
@@ -744,24 +843,87 @@ export async function charactersRoutes(app: FastifyInstance) {
     const versionSource = typeof body.versionSource === "string" ? body.versionSource : undefined;
     const versionReason = typeof body.versionReason === "string" ? body.versionReason : undefined;
     const skipVersionSnapshot = body.skipVersionSnapshot === true;
-    return storage.update(req.params.id, update.data ?? {}, avatarPath, {
-      comment,
-      versionSource,
-      versionReason,
-      skipVersionSnapshot,
-      mergeExtensions: false,
+    return enqueueUpdate(characterUpdateQueues, req.params.id, () =>
+      storage.update(req.params.id, update.data ?? {}, avatarPath, {
+        comment,
+        versionSource,
+        versionReason,
+        skipVersionSnapshot,
+      }),
+    );
+  });
+
+  app.patch<{ Params: { id: string }; Body: { paint?: unknown } }>("/:id/tracker-card-colors", async (req, reply) => {
+    const body = req.body;
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body) ||
+      !Object.hasOwn(body, "paint") ||
+      Object.keys(body).length !== 1 ||
+      body.paint === null ||
+      typeof body.paint !== "object" ||
+      Array.isArray(body.paint)
+    ) {
+      return reply.status(400).send({ error: "Tracker-card paint must be a JSON object" });
+    }
+
+    const updated = await enqueueUpdate(characterUpdateQueues, req.params.id, async () => {
+      const char = await storage.getById(req.params.id);
+      if (!char) return null;
+      const currentData = parseCharacterDataRecord(char.data);
+      const currentExtensions =
+        currentData.extensions && typeof currentData.extensions === "object" && !Array.isArray(currentData.extensions)
+          ? (currentData.extensions as Record<string, unknown>)
+          : {};
+
+      const trackerCardColors = JSON.stringify(
+        applyTrackerCardPaint(currentExtensions.trackerCardColors, body.paint as Record<string, unknown>),
+      );
+      const extensions: Record<string, unknown> = { trackerCardColors };
+      return storage.update(
+        req.params.id,
+        { extensions } as Partial<CharacterData>,
+        undefined,
+        {
+          skipVersionSnapshot: true,
+          versionSource: "settings-tracker-card-colors",
+          mergeExtensions: true,
+        },
+      );
     });
+    if (!updated) return reply.status(404).send({ error: "Character not found" });
+    return updated;
   });
 
   app.delete<{ Params: { id: string } }>("/:id", async (req, reply) => {
     if (req.params.id === PROFESSOR_MARI_ID) {
       return reply.status(403).send({ error: "Professor Mari is a built-in character and cannot be deleted" });
     }
+    const galleryImages = await characterGallery.listByCharacterId(req.params.id);
+    await storage.remove(req.params.id);
+    // Cascade the character's Noodle presence, otherwise its account and posts stay
+    // in the timeline forever as a ghost (issue #4295).
+    try {
+      await createNoodleStorage(app.db).deleteAccountByEntity("character", req.params.id);
+    } catch (err) {
+      logger.error(err, "Failed to clean up Noodle account for deleted character %s", req.params.id);
+    }
+    for (const image of galleryImages) {
+      await unlinkGalleryFileIfUnreferenced({ db: app.db, filePath: image.filePath });
+    }
+    const localPathPrefix = `characters/${req.params.id}/`;
+    const hasSharedLocalFile = (
+      await Promise.all(
+        galleryImages
+          .filter((image) => image.filePath.replace(/\\/g, "/").startsWith(localPathPrefix))
+          .map((image) => galleryFileHasReferences(app.db, image.filePath)),
+      )
+    ).some(Boolean);
     const galleryDir = join(CHARACTER_GALLERY_ROOT, req.params.id);
-    if (existsSync(galleryDir)) {
+    if (!hasSharedLocalFile && existsSync(galleryDir)) {
       rmSync(galleryDir, { recursive: true, force: true });
     }
-    await storage.remove(req.params.id);
     return reply.status(204).send();
   });
 
@@ -1178,16 +1340,24 @@ export async function charactersRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { id: string; filename: string } }>("/:id/gallery/file/:filename", async (req, reply) => {
     const { id, filename } = req.params;
-    if (filename.includes("..") || filename.includes("/") || id.includes("..") || id.includes("/")) {
+    if (
+      filename.includes("..") ||
+      filename.includes("/") ||
+      filename.includes("\\") ||
+      id.includes("..") ||
+      id.includes("/") ||
+      id.includes("\\")
+    ) {
       return reply.status(400).send({ error: "Invalid path" });
     }
 
-    const filePath = join(CHARACTER_GALLERY_ROOT, id, filename);
-    if (!existsSync(filePath)) {
+    const image = findGalleryRowByFilename(await characterGallery.listByCharacterId(id), filename);
+    const storedFile = image ? resolveStoredGalleryFile(image.filePath) : null;
+    if (!storedFile || !existsSync(storedFile.absolutePath)) {
       return reply.status(404).send({ error: "Not found" });
     }
 
-    return reply.sendFile(filename, join(CHARACTER_GALLERY_ROOT, id));
+    return reply.sendFile(storedFile.filename, storedFile.directory);
   });
 
   app.delete<{ Params: { id: string; imageId: string } }>("/:id/gallery/:imageId", async (req, reply) => {
@@ -1197,13 +1367,32 @@ export async function charactersRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Not found" });
     }
 
-    const filePath = join(DATA_DIR, "gallery", image.filePath);
-    if (existsSync(filePath)) {
-      unlinkSync(filePath);
+    await characterGallery.remove(imageId);
+    await unlinkGalleryFileIfUnreferenced({ db: app.db, filePath: image.filePath });
+    return { success: true };
+  });
+
+  app.post<{ Params: { id: string; imageId: string } }>("/:id/gallery/:imageId/avatar", async (req, reply) => {
+    const { id, imageId } = req.params;
+    const image = await characterGallery.getById(imageId);
+    if (!image || image.characterId !== id) {
+      return reply.status(404).send({ error: "Gallery image not found" });
     }
 
-    await characterGallery.remove(imageId);
-    return { success: true };
+    let avatarPath: string | null = null;
+    try {
+      avatarPath = await copyGalleryImageToAvatar("character", id, image.filePath);
+      const updated = await storage.updateAvatar(id, avatarPath);
+      if (!updated) {
+        await removeCopiedAvatarFile(avatarPath);
+        return reply.status(404).send({ error: "Character not found" });
+      }
+      return updated;
+    } catch (error) {
+      if (avatarPath) await removeCopiedAvatarFile(avatarPath);
+      logger.warn(error, "Failed to set character %s avatar from gallery image %s", id, imageId);
+      return reply.status(400).send({ error: "Gallery image could not be used as an avatar" });
+    }
   });
 
   app.patch<{
@@ -1584,6 +1773,24 @@ export async function charactersRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
+  app.patch<{ Params: { id: string; versionId: string } }>(
+    "/personas/:id/versions/:versionId",
+    async (req, reply) => {
+      const { version } = renameCardVersionSchema.parse(req.body);
+      const renamed = await storage.renamePersonaVersion(req.params.id, req.params.versionId, version);
+      if (!renamed) return reply.status(404).send({ error: "Persona version not found" });
+      return renamed;
+    },
+  );
+
+  app.post<{ Params: { id: string } }>("/personas/:id/versions/reset", async (req, reply) => {
+    const reset = await enqueueUpdate(personaUpdateQueues, req.params.id, () =>
+      storage.resetPersonaVersions(req.params.id),
+    );
+    if (!reset) return reply.status(404).send({ error: "Persona not found" });
+    return reset;
+  });
+
   app.post("/personas", async (req) => {
     const { name, description, createdAt, updatedAt, ...extra } = req.body as {
       name: string;
@@ -1618,9 +1825,104 @@ export async function charactersRoutes(app: FastifyInstance) {
     );
   });
 
-  app.patch<{ Params: { id: string } }>("/personas/:id", async (req) => {
+  app.patch<{ Params: { id: string } }>("/personas/:id", async (req, reply) => {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      return reply.status(400).send({ error: "Persona update must be a JSON object" });
+    }
     const body = req.body as Record<string, unknown>;
-    return storage.updatePersona(req.params.id, body);
+    let parsedPaint: Record<string, unknown> | null = null;
+    if (typeof body.trackerCardColors === "string") {
+      try {
+        const parsed = JSON.parse(body.trackerCardColors) as unknown;
+        if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+          parsedPaint = parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Preserve generic PATCH behavior for malformed tracker-card colors.
+      }
+    }
+
+    const updated = await enqueueUpdate(personaUpdateQueues, req.params.id, async () => {
+      if (!parsedPaint) return storage.updatePersona(req.params.id, body);
+      const currentPersona = await storage.getPersona(req.params.id);
+      if (!currentPersona) return null;
+      return storage.updatePersona(req.params.id, {
+        ...body,
+        trackerCardColors: JSON.stringify(
+          applyTrackerCardPaint(currentPersona.trackerCardColors, parsedPaint, false),
+        ),
+      });
+    });
+    if (!updated) return reply.status(404).send({ error: "Persona not found" });
+    return updated;
+  });
+
+  app.patch<{ Params: { id: string } }>("/personas/:id/tracker-card-colors", async (req, reply) => {
+    const body = (req.body ?? {}) as {
+      paint?: unknown;
+      portrait?: unknown;
+    };
+    const hasPaint = body.paint !== undefined;
+    const portrait = body.portrait;
+    const hasPortrait = portrait !== undefined;
+    if (hasPaint === hasPortrait) {
+      return reply.status(400).send({ error: "Provide exactly one tracker-card paint or portrait update" });
+    }
+    const portraitRecord =
+      portrait !== null && typeof portrait === "object" && !Array.isArray(portrait)
+        ? (portrait as Record<string, unknown>)
+        : null;
+    const hasValidPortrait =
+      hasPortrait &&
+      portraitRecord !== null &&
+      typeof portraitRecord.portraitFocusX === "number" &&
+      Number.isFinite(portraitRecord.portraitFocusX) &&
+      typeof portraitRecord.portraitFocusY === "number" &&
+      Number.isFinite(portraitRecord.portraitFocusY) &&
+      typeof portraitRecord.portraitZoom === "number" &&
+      Number.isFinite(portraitRecord.portraitZoom);
+    if (hasPortrait && !hasValidPortrait) {
+      return reply.status(400).send({ error: "Tracker-card portrait values must be finite numbers" });
+    }
+
+    let paint: Record<string, unknown> | null = null;
+    if (hasPaint) {
+      if (body.paint === null || typeof body.paint !== "object" || Array.isArray(body.paint)) {
+        return reply.status(400).send({ error: "Tracker-card paint must be a JSON object" });
+      }
+      paint = body.paint as Record<string, unknown>;
+    }
+
+    const updated = await enqueueUpdate(personaUpdateQueues, req.params.id, async () => {
+      const currentPersona = await storage.getPersona(req.params.id);
+      if (!currentPersona) return null;
+
+      let current: Record<string, unknown> = { mode: "chat" };
+      try {
+        const parsed = JSON.parse(currentPersona.trackerCardColors) as unknown;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          current = parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Preserve the storage default when legacy data is malformed.
+      }
+
+      const next = paint
+        ? applyTrackerCardPaint(current, paint)
+        : {
+            ...current,
+            portraitFocusX: portraitRecord!.portraitFocusX,
+            portraitFocusY: portraitRecord!.portraitFocusY,
+            portraitZoom: portraitRecord!.portraitZoom,
+          };
+      return storage.updatePersona(
+        req.params.id,
+        { trackerCardColors: JSON.stringify(next) },
+        { skipVersionSnapshot: true },
+      );
+    });
+    if (!updated) return reply.status(404).send({ error: "Persona not found" });
+    return updated;
   });
 
   app.post<{ Params: { id: string } }>("/personas/:id/avatar", async (req, reply) => {
@@ -1663,11 +1965,23 @@ export async function charactersRoutes(app: FastifyInstance) {
     const persona = await storage.getPersona(id);
     if (!persona) return reply.status(404).send({ error: "Persona not found" });
 
+    const galleryImages = await personaGallery.listByPersonaId(id);
+    await storage.removePersona(id);
+    for (const image of galleryImages) {
+      await unlinkGalleryFileIfUnreferenced({ db: app.db, filePath: image.filePath });
+    }
+    const localPathPrefix = `personas/${id}/`;
+    const hasSharedLocalFile = (
+      await Promise.all(
+        galleryImages
+          .filter((image) => image.filePath.replace(/\\/g, "/").startsWith(localPathPrefix))
+          .map((image) => galleryFileHasReferences(app.db, image.filePath)),
+      )
+    ).some(Boolean);
     const galleryDir = assertInsideDir(PERSONA_GALLERY_ROOT, join(PERSONA_GALLERY_ROOT, id));
-    if (existsSync(galleryDir)) {
+    if (!hasSharedLocalFile && existsSync(galleryDir)) {
       rmSync(galleryDir, { recursive: true, force: true });
     }
-    await storage.removePersona(id);
     return reply.status(204).send();
   });
 
@@ -2099,13 +2413,13 @@ export async function charactersRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Invalid path" });
     }
 
-    const galleryDir = assertInsideDir(PERSONA_GALLERY_ROOT, join(PERSONA_GALLERY_ROOT, id));
-    const filePath = assertInsideDir(galleryDir, join(galleryDir, filename));
-    if (!existsSync(filePath)) {
+    const image = findGalleryRowByFilename(await personaGallery.listByPersonaId(id), filename);
+    const storedFile = image ? resolveStoredGalleryFile(image.filePath) : null;
+    if (!storedFile || !existsSync(storedFile.absolutePath)) {
       return reply.status(404).send({ error: "Not found" });
     }
 
-    return reply.sendFile(filename, galleryDir);
+    return reply.sendFile(storedFile.filename, storedFile.directory);
   });
 
   app.delete<{ Params: { id: string; imageId: string } }>("/personas/:id/gallery/:imageId", async (req, reply) => {
@@ -2115,20 +2429,42 @@ export async function charactersRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Not found" });
     }
 
-    // assertInsideDir guards against a poisoned stored filePath escaping the gallery dir.
-    try {
-      const galleryRoot = join(DATA_DIR, "gallery");
-      const filePath = assertInsideDir(galleryRoot, join(galleryRoot, image.filePath));
-      if (existsSync(filePath)) {
-        unlinkSync(filePath);
-      }
-    } catch (err) {
-      logger.warn(err, "Skipped persona gallery file unlink for %s: path escapes gallery dir", imageId);
-    }
-
     await personaGallery.remove(imageId);
+    await unlinkGalleryFileIfUnreferenced({ db: app.db, filePath: image.filePath });
     return { success: true };
   });
+
+  app.post<{ Params: { id: string; imageId: string } }>(
+    "/personas/:id/gallery/:imageId/avatar",
+    async (req, reply) => {
+      const { id, imageId } = req.params;
+      const image = await personaGallery.getById(imageId);
+      if (!image || image.personaId !== id) {
+        return reply.status(404).send({ error: "Gallery image not found" });
+      }
+
+      let avatarPath: string | null = null;
+      try {
+        avatarPath = await copyGalleryImageToAvatar("persona", id, image.filePath);
+        // The previous crop was normalized against the old image's framing, so
+        // it must not carry over to the replacement avatar.
+        const updated = await storage.updatePersona(
+          id,
+          { avatarPath, avatarCrop: "" },
+          { versionReason: "Avatar update" },
+        );
+        if (!updated) {
+          await removeCopiedAvatarFile(avatarPath);
+          return reply.status(404).send({ error: "Persona not found" });
+        }
+        return updated;
+      } catch (error) {
+        if (avatarPath) await removeCopiedAvatarFile(avatarPath);
+        logger.warn(error, "Failed to set persona %s avatar from gallery image %s", id, imageId);
+        return reply.status(400).send({ error: "Gallery image could not be used as an avatar" });
+      }
+    },
+  );
 
   app.patch<{
     Params: { id: string; imageId: string };
@@ -2313,7 +2649,10 @@ function buildChunk(type: string, data: Buffer): Buffer {
 }
 
 function readPngTextKeyword(chunkType: string, chunkData: Buffer): string | null {
-  if (chunkType !== "tEXt" && chunkType !== "iTXt") return null;
+  // zTXt keywords sit at the same null-terminated position; without it, a
+  // re-exported Character Tavern card would keep stale compressed chara data
+  // alongside the freshly injected tEXt chunk.
+  if (chunkType !== "tEXt" && chunkType !== "iTXt" && chunkType !== "zTXt") return null;
 
   const nullIdx = chunkData.indexOf(0);
   if (nullIdx <= 0) return null;

@@ -28,6 +28,41 @@ export interface CompileImagePromptInput {
   hardNegative?: string | null;
   /** Apply the selected grammar to generated prose that is normally preserved for review/readability. */
   applyPromptModeToSourcePrompt?: boolean;
+  /**
+   * Suppress appending the profile's raw styleText to the prompt. Used when the
+   * style is already conveyed another way (e.g. fed to the prompt-building LLM
+   * as guidance), so it is not duplicated verbatim into the final image prompt.
+   */
+  omitProfileStyleText?: boolean;
+  /**
+   * Suppress generic per-kind composition tags when a dedicated prompt template
+   * already owns layout and framing (for example Comic Page versus Illustration).
+   */
+  omitProfileSubjectTags?: boolean;
+}
+
+/**
+ * The active profile's style text when it should steer generation (a real base
+ * style, not "auto"). Empty when there is no explicit style to apply.
+ */
+export function resolveImageStyleGuidanceText(
+  styleProfiles: ImageStyleProfileSettings,
+  styleProfileId?: string | null,
+): string {
+  const profile = findImageStyleProfile(styleProfiles, styleProfileId || styleProfiles.defaultProfileId);
+  const styleText = profile.styleText?.trim() ?? "";
+  return styleText && profile.baseStyle !== "auto" ? styleText : "";
+}
+
+/**
+ * Guidance block appended to an image prompt-builder's system prompt so the
+ * generated prompt reflects the configured style instead of having the raw
+ * style text pasted verbatim into the final prompt.
+ */
+export function formatImageStylePromptGuidance(styleText: string): string {
+  const trimmed = styleText.trim();
+  if (!trimmed) return "";
+  return `\n\nVisual style guidance: compose the image prompt so it naturally reflects this style: ${trimmed}. Weave the style into the description; do not copy this guidance verbatim into your output.`;
 }
 
 export function compileImagePrompt(input: CompileImagePromptInput): CompiledImagePrompt {
@@ -83,9 +118,11 @@ function compileImagePromptPass(
   const negativePromptPrefix = imageNegativePromptPrefixFromDefaults(input.imageDefaults);
   const sourceCueText = [input.prompt, input.userPositive].filter(Boolean).join("\n");
   const sourceCues = compactPrompt ? deriveTaggedSourceCues(sourceCueText) : [];
-  const profileSubjectTags = reconcileProfileSubjectTags(profile.subjectTags[input.kind] ?? "", sourceCues);
+  const profileSubjectTags = input.omitProfileSubjectTags
+    ? ""
+    : reconcileProfileSubjectTags(profile.subjectTags[input.kind] ?? "", sourceCues);
   const profileStyleText =
-    compactPrompt || (profile.styleText && generatedStyle)
+    input.omitProfileStyleText || compactPrompt || (profile.styleText && generatedStyle)
       ? ""
       : profile.styleText && profile.baseStyle !== "auto"
         ? profile.styleText
@@ -325,9 +362,15 @@ function splitPromptListItems(value: string): string[] {
   return parts;
 }
 
-function splitNaturalPromptClauses(value: string): string[] {
-  const parts: string[] = [];
+type NaturalPromptClause = {
+  value: string;
+  startsAtBoundary: boolean;
+};
+
+function splitNaturalPromptClauses(value: string): NaturalPromptClause[] {
+  const parts: NaturalPromptClause[] = [];
   let current = "";
+  let startsAtBoundary = true;
   let parenDepth = 0;
   let bracketDepth = 0;
   let braceDepth = 0;
@@ -336,7 +379,7 @@ function splitNaturalPromptClauses(value: string): string[] {
 
   const pushCurrent = () => {
     const clean = current.trim();
-    if (clean) parts.push(clean);
+    if (clean) parts.push({ value: clean, startsAtBoundary });
     current = "";
   };
 
@@ -375,10 +418,20 @@ function splitNaturalPromptClauses(value: string): string[] {
     else if (char === "}" && braceDepth > 0) braceDepth -= 1;
 
     const insideGroup = parenDepth > 0 || bracketDepth > 0 || braceDepth > 0;
-    const startsNegativeClause = /^\s*(?:avoid|no|without)\b/i.test(value.slice(index + 1));
-    if (!insideGroup && (char === "\n" || (char === "," && startsNegativeClause))) {
+    if (!insideGroup && char === "\n") {
       pushCurrent();
+      startsAtBoundary = true;
       continue;
+    }
+    if (!insideGroup && char === ",") {
+      const startsNegativeClause = /^\s*(?:avoid|no|without|exclude|do not include|don't include)\b/i.test(
+        value.slice(index + 1),
+      );
+      if (startsNegativeClause) {
+        pushCurrent();
+        startsAtBoundary = false;
+        continue;
+      }
     }
 
     current += char;
@@ -386,6 +439,71 @@ function splitNaturalPromptClauses(value: string): string[] {
 
   pushCurrent();
   return parts;
+}
+
+function isStandaloneNegativeListInstruction(value: string): boolean {
+  return /^(?:avoid|exclude|do not include|don't include)\b/i.test(value.trim());
+}
+
+function splitStandaloneNegativeInstruction(value: string): string[] {
+  const clean = value.trim();
+  const match = clean.match(/^(?:avoid|exclude|do not include|don't include)\s+(.+)$/i);
+  if (!match?.[1]) return [clean];
+
+  const body = match[1].trim();
+  const sentenceBoundary = findTopLevelSentenceBoundary(body);
+  const listText = (sentenceBoundary >= 0 ? body.slice(0, sentenceBoundary) : body)
+    .replace(/[.!?]+$/g, "")
+    .trim();
+  const trailingText = sentenceBoundary >= 0 ? body.slice(sentenceBoundary + 1).trim() : "";
+  const negativeItems = splitPromptListItems(listText)
+    .map((item) => item.replace(/^(?:and|or)\s+/i, "").trim())
+    .filter(Boolean)
+    .map((item) => `avoid ${item}`);
+
+  return [...negativeItems, ...(trailingText ? [trailingText] : [])];
+}
+
+function findTopLevelSentenceBoundary(value: string): number {
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let braceDepth = 0;
+  let quote: '"' | null = null;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index]!;
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"') {
+      quote = char;
+      continue;
+    }
+
+    if (char === "(") parenDepth += 1;
+    else if (char === ")" && parenDepth > 0) parenDepth -= 1;
+    else if (char === "[") bracketDepth += 1;
+    else if (char === "]" && bracketDepth > 0) bracketDepth -= 1;
+    else if (char === "{") braceDepth += 1;
+    else if (char === "}" && braceDepth > 0) braceDepth -= 1;
+
+    const insideGroup = parenDepth > 0 || bracketDepth > 0 || braceDepth > 0;
+    if (!insideGroup && /[.!?]/.test(char) && (!value[index + 1] || /\s/.test(value[index + 1]!))) {
+      return index;
+    }
+  }
+
+  return -1;
 }
 
 export function mergeCompiledPromptMeta(
@@ -423,6 +541,7 @@ function splitPromptFragments(
   const normalized = text
     .replace(/\r\n?/g, "\n")
     .replace(/[.!?]\s+(?=(?:avoid|no|without|exclude|do not include|don't include)\b)/gi, "\n")
+    .replace(/((?:^|\n)(?:avoid|no|without|exclude|do not include|don't include)\s+[^.!?\n]+[.!?])\s+(?=\S)/gim, "$1\n")
     .replace(/\b(?:avoid|negative prompt|undesired content)\s*:/gi, "\navoid ")
     .replace(/\b(?:SD|Stable Diffusion)\/Illustrious\s+tags?\s*:/gi, "\n")
     .replace(/\b(?:positive prompt|tags?)\s*:/gi, "\n");
@@ -430,10 +549,16 @@ function splitPromptFragments(
   if (promptMode === "natural") {
     const fragments: string[] = [];
     for (const part of splitNaturalPromptClauses(normalized)) {
-      const clean = part.trim();
+      const clean = part.value.trim();
       if (!clean) continue;
       if (hasAvoidInstructionPrefix(clean)) {
-        fragments.push(...splitPromptListItems(clean));
+        // Generated prompts use sentence-level avoid lists; inline clauses must retain the
+        // one-item negation behavior that keeps following positive descriptors intact.
+        const listItems =
+          part.startsAtBoundary && isStandaloneNegativeListInstruction(clean)
+            ? splitStandaloneNegativeInstruction(clean)
+            : splitPromptListItems(clean);
+        fragments.push(...listItems);
       } else {
         fragments.push(clean);
       }
@@ -819,7 +944,8 @@ function extractNegativeFragment(fragment: string): string | null {
   const clean = fragment.trim();
   const match = clean.match(/^(?:avoid|no|without|exclude|do not include|don't include)\s+(.+)/i);
   if (!match?.[1]) return null;
-  const negative = (splitPromptListItems(match[1])[0] ?? "")
+  const firstSentence = match[1].split(/[.!?]+(?:\s+|$)/u, 1)[0] ?? match[1];
+  const negative = (splitPromptListItems(firstSentence)[0] ?? "")
     .replace(/[.]+$/g, "")
     .replace(/^(?:any|all)\s+/i, "")
     .trim();
