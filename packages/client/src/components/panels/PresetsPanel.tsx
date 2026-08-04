@@ -104,8 +104,8 @@ type PresetRow = {
   updatedAt?: string;
 };
 
-const MARINARA_UNIVERSAL_PRESET_NAME = "Marinara's Universal Preset";
-const MARINARA_UNIVERSAL_PRESET_AUTHOR = "Marinara";
+const MARINARA_UNIVERSAL_PRESET_NAME = "YunYun's Universal Preset";
+const MARINARA_UNIVERSAL_PRESET_AUTHOR = "YunYun";
 const MARINARA_UNIVERSAL_PRESET_ARTWORK = "/illustrations/marinara-universal-preset.webp";
 
 function isMarinaraUniversalPreset(preset: PresetRow) {

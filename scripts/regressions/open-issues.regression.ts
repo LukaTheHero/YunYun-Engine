@@ -3166,7 +3166,7 @@ assert.throws(
 );
 assert.throws(
   () => parseGameSetupShareFileJson(JSON.stringify({ format: "other", version: 1 })),
-  /not a Marinara Game Mode setup file/u,
+  /not a YunYun Game Mode setup file/u,
 );
 assert.throws(
   () =>

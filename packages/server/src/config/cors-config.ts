@@ -10,7 +10,7 @@
 //  2. Same-origin requests are auto-allowed regardless of CORS_ORIGINS.
 //     If the browser's Origin header matches the URL the request actually
 //     reached (the Host header), it's by definition same-origin and CORS
-//     restrictions don't apply. This means a user who visits Marinara at
+//     restrictions don't apply. This means a user who visits YunYun at
 //     http://localhost:7860 OR http://100.x.y.z:7860 (Tailscale) doesn't
 //     have to add either URL to CORS_ORIGINS — same-origin "just works."
 //     They only need CORS_ORIGINS for genuine cross-origin frontends (a
@@ -54,7 +54,7 @@ function selfOriginFromRequest(req: FastifyRequest): string | null {
   const host = firstHeader(req.headers.host);
   if (!host) return null;
   // Honour the proxy-forwarded protocol when present, otherwise fall back
-  // to the protocol Marinara is actually serving on.
+  // to the protocol YunYun is actually serving on.
   const forwardedProto = firstHeader(req.headers["x-forwarded-proto"]);
   const protocol = forwardedProto === "https" || forwardedProto === "http" ? forwardedProto : getServerProtocol();
   try {

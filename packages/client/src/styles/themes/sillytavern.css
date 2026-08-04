@@ -232,7 +232,7 @@
   --app-font-size: 0.875rem;
 }
 
-/* ─── Restore native cursors when the Marinara custom pointer is off ─── */
+/* ─── Restore native cursors when the YunYun custom pointer is off ─── */
 :where(:root:not([data-marinara-custom-cursor="enabled"])[data-visual-theme="sillytavern"] *),
 :where(:root:not([data-marinara-custom-cursor="enabled"])[data-visual-theme="sillytavern"] a),
 :where(:root:not([data-marinara-custom-cursor="enabled"])[data-visual-theme="sillytavern"] button),

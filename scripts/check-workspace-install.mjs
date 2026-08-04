@@ -77,7 +77,7 @@ function main() {
   const missing = getWorkspaceInstallProblems();
   if (missing.length > 0) {
     console.error(
-      `Incomplete Marinara dependency install. Missing: ${missing.join(", ")}. Run \`pnpm install --frozen-lockfile\` from the repository root.`,
+      `Incomplete YunYun dependency install. Missing: ${missing.join(", ")}. Run \`pnpm install --frozen-lockfile\` from the repository root.`,
     );
     process.exitCode = 1;
   }

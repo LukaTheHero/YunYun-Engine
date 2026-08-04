@@ -1,12 +1,12 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ──────────────────────────────────────────────
-# Marinara Engine — Start Script (Termux / Android)
+# YunYun Engine — Start Script (Termux / Android)
 # ──────────────────────────────────────────────
 set -e
 
 echo ""
 echo "  ╔══════════════════════════════════════════╗"
-echo "  ║   Marinara Engine  —  Termux Launcher    ║"
+echo "  ║   YunYun Engine  —  Termux Launcher    ║"
 echo "  ╚══════════════════════════════════════════╝"
 echo ""
 
@@ -22,7 +22,7 @@ for arg in "$@"; do
         -h|--help)
             echo "Usage: ./start-termux.sh [--skip-update]"
             echo ""
-            echo "  ./start-termux.sh               Check for updates, then start Marinara Engine"
+            echo "  ./start-termux.sh               Check for updates, then start YunYun Engine"
             echo "  ./start-termux.sh --skip-update Start the current local install without checking for updates"
             exit 0
             ;;
@@ -430,7 +430,7 @@ fi
 # ── Start ──
 echo ""
 echo "  ══════════════════════════════════════════"
-echo "    Starting Marinara Engine on ${PROTOCOL}://${HOST}:${PORT}"
+echo "    Starting YunYun Engine on ${PROTOCOL}://${HOST}:${PORT}"
 if [ "$BROWSER_HOST" != "$HOST" ]; then
 echo "    Local browser URL: ${PROTOCOL}://${BROWSER_HOST}:${PORT}"
 fi

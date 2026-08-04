@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────
-# Marinara Engine — Start Script (macOS / Linux)
+# YunYun Engine — Start Script (macOS / Linux)
 # ──────────────────────────────────────────────
 set -e
 
 echo ""
 echo "  ╔══════════════════════════════════════════╗"
-echo "  ║       Marinara Engine  —  Launcher        ║"
+echo "  ║       YunYun Engine  —  Launcher        ║"
 echo "  ╚══════════════════════════════════════════╝"
 echo ""
 
@@ -347,7 +347,7 @@ fi
 
 echo ""
 echo "  ══════════════════════════════════════════"
-echo "    Starting Marinara Engine on ${PROTOCOL}://${HOST}:$PORT"
+echo "    Starting YunYun Engine on ${PROTOCOL}://${HOST}:$PORT"
 if [ "$BROWSER_HOST" != "$HOST" ]; then
 echo "    Local browser URL: ${PROTOCOL}://${BROWSER_HOST}:$PORT"
 fi

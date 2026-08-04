@@ -1577,7 +1577,7 @@ function buildMinimalCharacterData(
     const val = flagString(flags, flagName);
     if (val !== undefined) data[fieldName] = val;
   }
-  // backstory and appearance are Marinara extensions stored under data.extensions.*
+  // backstory and appearance are YunYun extensions stored under data.extensions.*
   const extensions = data.extensions as Record<string, unknown>;
   const extMap: Array<[string, string]> = [
     ["backstory", "backstory"],
@@ -3327,8 +3327,8 @@ export class MariDbService {
           kind === "client"
             ? ["Reload the browser tab or rely on Vite HMR if it already updated.", "Continue after the UI reconnects."]
             : kind === "server"
-              ? ["Restart the Marinara server or wait for tsx watch/dev launcher to restart it.", "Run mari code health after reconnecting."]
-              : ["Restart the Marinara server and reload the browser client.", "Run mari code health after reconnecting."],
+              ? ["Restart the YunYun server or wait for tsx watch/dev launcher to restart it.", "Run mari code health after reconnecting."]
+              : ["Restart the YunYun server and reload the browser client.", "Run mari code health after reconnecting."],
       },
     };
   }

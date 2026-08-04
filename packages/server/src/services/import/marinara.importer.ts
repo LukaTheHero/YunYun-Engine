@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Import: Marinara Engine native format (.marinara.json)
+// Import: YunYun Engine native format (.marinara.json)
 // ──────────────────────────────────────────────
 import type { DB } from "../../db/connection.js";
 import {
@@ -226,7 +226,7 @@ function readFilterMode(value: unknown): LorebookFilterMode {
 }
 
 /**
- * Import a Marinara `.marinara.json` export envelope.
+ * Import a YunYun `.marinara.json` export envelope.
  * Dispatches to the correct handler based on the `type` field.
  */
 export async function importMarinara(
@@ -240,7 +240,7 @@ export async function importMarinara(
     !normalizedEnvelope.type ||
     normalizedEnvelope.version !== 1
   ) {
-    return { success: false, type: "marinara_character" as ExportType, error: "Invalid Marinara export file" };
+    return { success: false, type: "marinara_character" as ExportType, error: "Invalid YunYun export file" };
   }
 
   switch (normalizedEnvelope.type) {

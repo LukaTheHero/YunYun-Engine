@@ -466,7 +466,7 @@ export const XAI_MODELS: KnownModel[] = [
 
 // ── Grok CLI (Subscription via local Grok Build auth) ──
 // Account-tier availability is discovered from the installed CLI with
-// `grok models`. Keep this empty so Marinara does not hand the CLI stale API
+// `grok models`. Keep this empty so YunYun does not hand the CLI stale API
 // aliases such as `grok-build-latest` that some Grok CLI installs reject.
 export const GROK_SUBSCRIPTION_MODELS: KnownModel[] = [];
 

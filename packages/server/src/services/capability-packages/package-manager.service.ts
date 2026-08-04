@@ -378,7 +378,7 @@ async function installCatalogPackage(entry: CapabilityCatalogPackage, activateDu
   const capabilityApiIssue = getCapabilityApiCompatibilityIssue(manifest);
   if (capabilityApiIssue) throw new Error(capabilityApiIssue);
   if (!supportsEngineVersion(entry, APP_VERSION)) {
-    throw new Error(`Package requires Marinara Engine ${manifest.engine.min} to below ${manifest.engine.maxExclusive}`);
+    throw new Error(`Package requires YunYun Engine ${manifest.engine.min} to below ${manifest.engine.maxExclusive}`);
   }
   const archive = await fetchBytes(artifact.url, Math.min(artifact.bytes + 1, MAX_ARTIFACT_BYTES));
   if (archive.byteLength !== artifact.bytes) throw new Error("Downloaded package size does not match the catalog");

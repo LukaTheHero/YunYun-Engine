@@ -333,7 +333,7 @@ function buildCompatibleLorebookExport(lb: Record<string, unknown>, entries: Arr
     extensions: {
       marinara: {
         exportedAt: new Date().toISOString(),
-        source: "Marinara Engine compatibility export",
+        source: "YunYun Engine compatibility export",
       },
     },
     entries: exportedEntries,

@@ -6,7 +6,7 @@ export type NoodlerAccountOperationResult<T> =
 
 /**
  * Serializes identity-sensitive work for one NoodleR account in this server process.
- * It intentionally does not coordinate multiple Marinara processes.
+ * It intentionally does not coordinate multiple YunYun processes.
  */
 export async function tryNoodlerAccountOperation<T>(
   accountId: string,

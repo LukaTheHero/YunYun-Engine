@@ -43,7 +43,7 @@ export function buildLocalSidecarUnavailableWarning(agentNames: string[]): Agent
     severity: "warning",
     agentNames: normalizedNames,
     fallbackPrevented: true,
-    message: `${agentList} requested Local Model, but the local sidecar is unavailable. Marinara skipped ${noun} instead of falling back to a paid API connection.`,
+    message: `${agentList} requested Local Model, but the local sidecar is unavailable. YunYun skipped ${noun} instead of falling back to a paid API connection.`,
   };
 }
 
@@ -84,6 +84,6 @@ export function buildAgentConnectionUnavailableWarning(args: {
     agentNames: normalizedNames,
     fallbackPrevented: true,
     connectionName: args.connectionName,
-    message: `${agentList} could not use agent connection${connectionText}: ${args.reason}. Marinara skipped ${noun} instead of falling back to the main chat model.`,
+    message: `${agentList} could not use agent connection${connectionText}: ${args.reason}. YunYun skipped ${noun} instead of falling back to the main chat model.`,
   };
 }

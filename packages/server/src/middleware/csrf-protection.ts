@@ -287,7 +287,7 @@ export function csrfProtectionHook(request: FastifyRequest, reply: FastifyReply,
       hint:
         origin || referer
           ? appendOriginHint(offender)
-          : "Browser did not send an Origin or Referer header — Marinara cannot verify this is a same-origin request.",
+          : "Browser did not send an Origin or Referer header — YunYun cannot verify this is a same-origin request.",
     });
     return;
   }
@@ -323,7 +323,7 @@ export function csrfProtectionHook(request: FastifyRequest, reply: FastifyReply,
     reply.status(403).send({
       code: "CSRF_MISSING_HEADER",
       error: `Missing ${CSRF_HEADER} header`,
-      hint: `Marinara's frontend sends this header automatically. If you're calling the API from a script, set ${CSRF_HEADER}: ${CSRF_HEADER_VALUE}.`,
+      hint: `YunYun's frontend sends this header automatically. If you're calling the API from a script, set ${CSRF_HEADER}: ${CSRF_HEADER_VALUE}.`,
     });
     return;
   }

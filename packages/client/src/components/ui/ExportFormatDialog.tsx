@@ -20,7 +20,7 @@ interface ExportFormatDialogProps {
 export function ExportFormatDialog({
   open,
   title,
-  description = "Choose how Marinara should package this export.",
+  description = "Choose how YunYun should package this export.",
   nativeDescription = "Keeps Marinara-specific fields, folders, metadata, and import fidelity.",
   compatibleDescription = "Uses folderless, platform-friendly JSON where possible for tools like SillyTavern and Chub.",
   pngDescription = "Chara Card V2 PNG with the avatar baked in — works in SillyTavern, Chub, and Risu.",
@@ -35,7 +35,7 @@ export function ExportFormatDialog({
     icon: typeof Layers;
     description: string;
   }> = [
-    { id: "native", label: "Marinara Native", icon: Layers, description: nativeDescription },
+    { id: "native", label: "YunYun Native", icon: Layers, description: nativeDescription },
     { id: "compatible", label: "Compatible JSON", icon: FileJson, description: compatibleDescription },
     ...(showPngOption
       ? [{ id: "compatible-png" as const, label: "Compatible PNG Card", icon: ImageDown, description: pngDescription }]

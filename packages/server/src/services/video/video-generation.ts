@@ -1429,7 +1429,7 @@ async function seedanceReferenceImageUrl(
       let message = `Seedance ${label} reference URL must be public HTTPS.`;
       try {
         const parsed = new URL(raw);
-        message = `Seedance ${label} reference URL must be public HTTPS, but Marinara resolved ${parsed.protocol}//${parsed.host}.`;
+        message = `Seedance ${label} reference URL must be public HTTPS, but YunYun resolved ${parsed.protocol}//${parsed.host}.`;
       } catch {
         // Keep the generic message for malformed URLs.
       }
@@ -1453,7 +1453,7 @@ async function seedanceReferenceImageUrl(
 
   throw new Error(
     `Seedance image-to-video references require a publicly reachable HTTPS image URL for the ${label}. ` +
-      "Expose Marinara through a public HTTPS tunnel such as Cloudflare Tunnel or ngrok, then set " +
+      "Expose YunYun through a public HTTPS tunnel such as Cloudflare Tunnel or ngrok, then set " +
       "VIDEO_REFERENCE_PUBLIC_BASE_URL to that origin, or turn on Upload Seedance reference frames temporarily " +
       "in this Video Generation connection before generating first/last-frame Seedance clips.",
   );

@@ -136,7 +136,7 @@ function formatBytes(bytes: number): string {
 
 function describeSpeechRuntimeUnavailable(runtime: SidecarSpeechRuntimeDiagnostics | null): string {
   if (!runtime) {
-    return "Local Whisper needs the native ONNX runtime for this platform. Reinstall dependencies with the same Node architecture used to run Marinara.";
+    return "Local Whisper needs the native ONNX runtime for this platform. Reinstall dependencies with the same Node architecture used to run YunYun.";
   }
 
   const runtimeTuple = `${runtime.platform}/${runtime.arch}`;
@@ -146,18 +146,18 @@ function describeSpeechRuntimeUnavailable(runtime: SidecarSpeechRuntimeDiagnosti
       : "";
 
   if (runtime.liteMode) {
-    return "Local Whisper is disabled in Lite mode. Use a full Marinara install to download and run the local speech model.";
+    return "Local Whisper is disabled in Lite mode. Use a full YunYun install to download and run the local speech model.";
   }
 
   if (!runtime.packageFound) {
-    return `Local Whisper needs onnxruntime-node. Run pnpm install with Node ${runtime.nodeVersion} (${runtimeTuple}), then restart Marinara.`;
+    return `Local Whisper needs onnxruntime-node. Run pnpm install with Node ${runtime.nodeVersion} (${runtimeTuple}), then restart YunYun.`;
   }
 
   if (installed && !runtime.installedBindingArchs.includes(runtime.arch)) {
-    return `Marinara is running with ${runtimeTuple} Node, but this install has ONNX runtime for ${installed}. Restart Marinara with the matching Node architecture, or reinstall dependencies using the same Node architecture you use to run Marinara.`;
+    return `YunYun is running with ${runtimeTuple} Node, but this install has ONNX runtime for ${installed}. Restart YunYun with the matching Node architecture, or reinstall dependencies using the same Node architecture you use to run YunYun.`;
   }
 
-  return `Local Whisper cannot find the ONNX runtime for ${runtimeTuple}. Run pnpm install --force --frozen-lockfile with the same Node architecture used to run Marinara, then restart.`;
+  return `Local Whisper cannot find the ONNX runtime for ${runtimeTuple}. Run pnpm install --force --frozen-lockfile with the same Node architecture used to run YunYun, then restart.`;
 }
 
 function formatRuntimeVariantLabel(variant: string | null): string | null {
@@ -629,7 +629,7 @@ function SidecarCard() {
             <div className="mt-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
               <div className="text-[0.6875rem] font-medium text-amber-200">{localizeUi("ui.panels.sidecarcard.localRuntimeUnavailable")}</div>
               <div className="mt-1 text-[0.6875rem] text-[var(--muted-foreground)]/75">
-                {startupError ?? "Marinara will keep running without the local model until you retry."}
+                {startupError ?? "YunYun will keep running without the local model until you retry."}
               </div>
               {failedRuntimeVariant && (
                 <div className="mt-1 text-[0.6875rem] text-[var(--muted-foreground)]/60">{localizeUi("ui.panels.sidecarcard.runtime")} {formatRuntimeVariantLabel(failedRuntimeVariant)}

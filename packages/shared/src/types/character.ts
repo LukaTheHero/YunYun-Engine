@@ -34,40 +34,40 @@ export interface CharacterExtensions {
   fav: boolean;
   world: string;
   depth_prompt: DepthPrompt;
-  /** Marinara Engine extension: character backstory / lore */
+  /** YunYun Engine extension: character backstory / lore */
   backstory: string;
-  /** Marinara Engine extension: physical appearance description */
+  /** YunYun Engine extension: physical appearance description */
   appearance: string;
-  /** Marinara Engine: Name display color/gradient (CSS value, e.g. "linear-gradient(90deg, #ff6b6b, #ffd93d)" or "#ff6b6b") */
+  /** YunYun Engine: Name display color/gradient (CSS value, e.g. "linear-gradient(90deg, #ff6b6b, #ffd93d)" or "#ff6b6b") */
   nameColor?: string;
-  /** Marinara Engine: Dialogue highlight color — text in quotation marks is bold + colored with this */
+  /** YunYun Engine: Dialogue highlight color — text in quotation marks is bold + colored with this */
   dialogueColor?: string;
-  /** Marinara Engine: Chat bubble / dialogue box background color */
+  /** YunYun Engine: Chat bubble / dialogue box background color */
   boxColor?: string;
-  /** Marinara Engine: RPG stats toggle + custom attributes */
+  /** YunYun Engine: RPG stats toggle + custom attributes */
   rpgStats?: RPGStatsConfig;
-  /** Marinara Engine: per-character Tracker fields copied into each new Roleplay chat. */
+  /** YunYun Engine: per-character Tracker fields copied into each new Roleplay chat. */
   trackerCustomFieldDefaults?: CharacterTrackerCustomFieldDefault[];
-  /** Marinara Engine: Conversation-mode availability status */
+  /** YunYun Engine: Conversation-mode availability status */
   conversationStatus?: import("./chat.js").ConversationPresenceStatus;
-  /** Marinara Engine: pronunciation override used when sending this character's name to TTS. */
+  /** YunYun Engine: pronunciation override used when sending this character's name to TTS. */
   phoneticName?: string;
-  /** Marinara Engine (Conversation mode ONLY): display name shown as the sender label
+  /** YunYun Engine (Conversation mode ONLY): display name shown as the sender label
    *  in Convo and used for attribution in the convo prompt. Never read in RP/VN/Game. */
   convoDisplayName?: string;
-  /** Marinara Engine (Conversation mode ONLY): when true, prepend a line declaring the
+  /** YunYun Engine (Conversation mode ONLY): when true, prepend a line declaring the
    *  convo display name to this character's card so the model can map the display name
    *  to this specific card. No effect without a convoDisplayName. Never read in RP/VN/Game. */
   convoDisplayNameInCard?: boolean;
-  /** Marinara Engine (Conversation mode ONLY): public "about me" profile. The
+  /** YunYun Engine (Conversation mode ONLY): public "about me" profile. The
    *  cross-chat default; a per-chat override can supersede it. Never read in RP/VN/Game. */
   aboutMe?: string;
-  /** Marinara Engine (Conversation mode ONLY): behavior directive + insertion strategy.
+  /** YunYun Engine (Conversation mode ONLY): behavior directive + insertion strategy.
    *  Never read in RP/VN/Game. */
   convoBehavior?: ConvoBehaviorConfig;
-  /** Marinara Engine: character-specific direction for Conversation selfie image prompts. */
+  /** YunYun Engine: character-specific direction for Conversation selfie image prompts. */
   conversationImageInstructions?: string;
-  /** Marinara Engine: also apply conversationImageInstructions to this character's Noodle images. */
+  /** YunYun Engine: also apply conversationImageInstructions to this character's Noodle images. */
   applyConversationImageInstructionsToNoodle?: boolean;
   [key: string]: unknown;
 }

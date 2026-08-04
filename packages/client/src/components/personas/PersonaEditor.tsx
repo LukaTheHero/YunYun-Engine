@@ -1432,7 +1432,7 @@ export function PersonaEditor() {
         description={localizeUi(
           "ui.personas.personaeditor.nativeKeepsMarinaraPersonaMetadataSpritesAndAttachedLorebooks",
         )}
-        compatibleDescription="Exports persona fields directly without the Marinara wrapper."
+        compatibleDescription="Exports persona fields directly without the YunYun wrapper."
         onClose={() => setExportDialogOpen(false)}
         onSelect={(format: ExportFormatChoice) => {
           if (!personaId) return;

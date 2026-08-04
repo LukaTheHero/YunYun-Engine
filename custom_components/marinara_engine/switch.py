@@ -1,4 +1,4 @@
-"""Switch platform for Marinara Engine — one switch per agent."""
+"""Switch platform for YunYun Engine — one switch per agent."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ async def async_setup_entry(
 
 
 class MarinaraAgentSwitch(CoordinatorEntity[MarinaraCoordinator], SwitchEntity):
-    """Toggle the global enabled state of a Marinara Engine agent."""
+    """Toggle the global enabled state of a YunYun Engine agent."""
 
     _attr_icon = "mdi:robot"
 
@@ -40,14 +40,14 @@ class MarinaraAgentSwitch(CoordinatorEntity[MarinaraCoordinator], SwitchEntity):
         self._entry = entry
         self._agent_id: str = agent["id"]
         self._attr_unique_id = f"{entry.entry_id}_agent_{agent['id']}"
-        self._attr_name = f"Marinara Agent: {agent.get('name', agent['id'])}"
+        self._attr_name = f"YunYun Agent: {agent.get('name', agent['id'])}"
 
     @property
     def device_info(self) -> dict:
         return {
             "identifiers": {(DOMAIN, self._entry.entry_id)},
-            "name": "Marinara Engine",
-            "manufacturer": "Marinara Engine",
+            "name": "YunYun Engine",
+            "manufacturer": "YunYun Engine",
             "model": "Local AI Engine",
         }
 

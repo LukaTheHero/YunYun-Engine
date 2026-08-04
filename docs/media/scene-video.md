@@ -1,6 +1,6 @@
 # Scene Video Generation
 
-This guide explains how Marinara Engine turns a scene illustration into a short MP4 video clip. It covers the video providers, how to generate a clip from the Gallery, the Game Mode controls, and the video settings. A scene video is a brief animated clip made from one still image.
+This guide explains how YunYun Engine turns a scene illustration into a short MP4 video clip. It covers the video providers, how to generate a clip from the Gallery, the Game Mode controls, and the video settings. A scene video is a brief animated clip made from one still image.
 
 ## What scene video does
 
@@ -39,7 +39,7 @@ For **ComfyUI**, use the usual local address `http://127.0.0.1:8188` and paste a
 
 ### Make it the default video connection
 
-The connection editor for a Video Generation connection shows a **Default for Videos** group. Turn on **Use as default video connection** so Marinara can use this connection when a chat has no video connection of its own. Only mark one connection as the default video connection.
+The connection editor for a Video Generation connection shows a **Default for Videos** group. Turn on **Use as default video connection** so YunYun can use this connection when a chat has no video connection of its own. Only mark one connection as the default video connection.
 
 ### Connection video defaults
 
@@ -59,11 +59,11 @@ Gemini Omni has no resolution field, and its length is written into the prompt t
 
 ### Seedance reference frames
 
-Seedance must fetch your reference image over a public web link before it can animate it. A local Marinara server has no public link, so plain local setups need one extra step.
+Seedance must fetch your reference image over a public web link before it can animate it. A local YunYun server has no public link, so plain local setups need one extra step.
 
 Open the Seedance connection and turn on **Upload Seedance reference frames temporarily**. This uploads the reference frame to a temporary public link so Seedance can read it. You can pick how long that link lasts under **Temporary link lifetime**, which defaults to 12 hours.
 
-If your Marinara server already has a public web address, you can set an environment variable instead of using temporary uploads. See the [Server Configuration Reference](../CONFIGURATION.md) for the video reference setting.
+If your YunYun server already has a public web address, you can set an environment variable instead of using temporary uploads. See the [Server Configuration Reference](../CONFIGURATION.md) for the video reference setting.
 
 ## Choosing a provider
 
@@ -75,9 +75,9 @@ All six services make short clips from your image. They differ in speed, clip le
 - **OpenRouter Video**: 1 to 60 seconds, and lets you type any video model your OpenRouter account supports.
 - **Atlas Cloud**: 1 to 60 seconds with curated Veo 3.1 and Seedance 2.0 starter models. You can type another exact Atlas Cloud video model ID; model-specific duration, resolution, and reference-image limits still apply.
 - **Seedance 2.0**: 4 to 15 second clips with first-frame and first and last frame modes. It needs a public link to your reference image.
-- **ComfyUI**: local generation through your own API-format workflow. Marinara uploads the reference image directly to ComfyUI when the workflow uses `%reference_image_name%`.
+- **ComfyUI**: local generation through your own API-format workflow. YunYun uploads the reference image directly to ComfyUI when the workflow uses `%reference_image_name%`.
 
-Expect video jobs to take a while. The provider starts the job, then Marinara waits and checks until the clip is ready. This can take several minutes per clip, longer than a still image. Large local WAN models may need more than the 30-minute default; raise `VIDEO_GEN_TIMEOUT_MS` and restart Marinara when necessary.
+Expect video jobs to take a while. The provider starts the job, then YunYun waits and checks until the clip is ready. This can take several minutes per clip, longer than a still image. Large local WAN models may need more than the 30-minute default; raise `VIDEO_GEN_TIMEOUT_MS` and restart YunYun when necessary.
 
 ## Generate a video from the Gallery
 
@@ -103,7 +103,7 @@ The same **Review Video Prompt** window appears for **Animate illustration** whe
 
 Under the **Videos** tab, each clip plays inline and shows its length and model name. You can pin a clip with **Pin video to chat**, or save it with **Download scene video**. If there are no clips yet, the tab reads **No videos yet**.
 
-If you try to make a video with no picture in the chat, Marinara shows this message: "Add or generate a gallery image before generating a scene video." Generate or upload a picture first, then try again.
+If you try to make a video with no picture in the chat, YunYun shows this message: "Add or generate a gallery image before generating a scene video." Generate or upload a picture first, then try again.
 
 ## Game Mode scene video
 
@@ -136,7 +136,7 @@ The **Game Video Prompt** continues to control manual Gallery and Game Assets vi
 
 When you first create a Game Mode chat, the setup wizard also has a **Video Generation Connection** picker. It is on the **Features** step, and it appears after you turn on **Visual Generation**.
 
-If a chat has no video connection of its own, Marinara falls back to the connection you marked **Use as default video connection**. If there is no chat connection and no default, video actions show a warning telling you to pick one.
+If a chat has no video connection of its own, YunYun falls back to the connection you marked **Use as default video connection**. If there is no chat connection and no default, video actions show a warning telling you to pick one.
 
 ## Video generation settings
 
@@ -150,7 +150,7 @@ The same section has an **Animated expression length** setting. That belongs to 
 
 ## Storyboards
 
-Game Mode can also build a storyboard, which is an ordered set of keyframe pictures for one game turn. When storyboard animations are turned on, Marinara animates each keyframe into a clip using your video connection and the **Storyboard Video Prompt**. It inherits the **Game Video Prompt** unless you choose a separate template. A keyframe is one still frame in that ordered set.
+Game Mode can also build a storyboard, which is an ordered set of keyframe pictures for one game turn. When storyboard animations are turned on, YunYun animates each keyframe into a clip using your video connection and the **Storyboard Video Prompt**. It inherits the **Game Video Prompt** unless you choose a separate template. A keyframe is one still frame in that ordered set.
 
 Storyboards have their own controls and their own guide. See [Game Mode Storyboards](../game/storyboard.md) for the full setup and workflow.
 
@@ -166,7 +166,7 @@ Scene video always animates an existing picture. Use **Illustrate**, upload a pi
 
 ### The video takes a long time
 
-This is normal. The provider starts the job, and Marinara waits and checks until the clip is ready. Veo, xAI, OpenRouter, Atlas Cloud, and Seedance all work this way, and a clip can take several minutes.
+This is normal. The provider starts the job, and YunYun waits and checks until the clip is ready. Veo, xAI, OpenRouter, Atlas Cloud, and Seedance all work this way, and a clip can take several minutes.
 
 ### Seedance fails to read the reference image
 

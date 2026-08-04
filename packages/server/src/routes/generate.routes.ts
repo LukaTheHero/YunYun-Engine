@@ -3157,7 +3157,7 @@ export async function generateRoutes(app: FastifyInstance) {
             [
               `<dm_commands>`,
               `Optional hidden command, use only when it naturally fits the scene:`,
-              `- [dm: character="${dmTargetHint}" message="short text"] - only if a roleplay character sends {{user}} a direct message through a phone, communicator, letter app, terminal, or similar in-world channel. Marinara strips the command from the roleplay reply and posts the full message into the linked conversation when one exists; otherwise it creates a new DM conversation with that character.`,
+              `- [dm: character="${dmTargetHint}" message="short text"] - only if a roleplay character sends {{user}} a direct message through a phone, communicator, letter app, terminal, or similar in-world channel. YunYun strips the command from the roleplay reply and posts the full message into the linked conversation when one exists; otherwise it creates a new DM conversation with that character.`,
               `Only use one of the listed character names/IDs. Do not use this command for incidental NPCs without a character card.`,
               `Do not also quote the exact same direct-message text in the roleplay narration unless the user should see it in both places.`,
               `</dm_commands>`,

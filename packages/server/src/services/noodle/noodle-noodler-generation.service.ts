@@ -144,7 +144,7 @@ export function buildNoodlerPostMessages(input: {
     protectNoodlerGeneratedIdentity(value, input.disclosureMode, input.publicIdentity) ?? "";
   const guidance = input.generationGuidance.trim();
   const system = [
-    "You write exactly one post for one NoodleR creator page in Marinara Engine.",
+    "You write exactly one post for one NoodleR creator page in YunYun Engine.",
     "Write only as the supplied NoodleR account. Do not create other accounts, interactions, follows, or public timeline activity.",
     "Use the NoodleR stage profile as supplied.",
     ...(guidance ? [guidance] : []),

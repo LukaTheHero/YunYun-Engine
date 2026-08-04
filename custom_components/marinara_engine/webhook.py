@@ -1,4 +1,4 @@
-"""Webhook handler: receives tool calls from Marinara Engine and executes HA actions."""
+"""Webhook handler: receives tool calls from YunYun Engine and executes HA actions."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def async_register_webhook(hass: HomeAssistant, webhook_id: str) -> None:
     async_register(
         hass,
         DOMAIN,
-        "Marinara Engine",
+        "YunYun Engine",
         webhook_id,
         _handle_webhook,
         allowed_methods=["POST"],
@@ -57,17 +57,17 @@ async def _handle_webhook(
     tool: str = body.get("tool", "")
     args: dict[str, Any] = body.get("arguments", {})
 
-    _LOGGER.debug("Marinara webhook: tool=%s args=%s", tool, _redact_args(args))
+    _LOGGER.debug("YunYun webhook: tool=%s args=%s", tool, _redact_args(args))
 
     handler = _DISPATCH.get(tool)
     if handler is None:
-        _LOGGER.warning("Marinara webhook: unknown tool '%s'", tool)
+        _LOGGER.warning("YunYun webhook: unknown tool '%s'", tool)
         return web.json_response({"error": f"Unknown tool: {tool}"}, status=400)
 
     try:
         result = await handler(hass, args)
     except Exception as err:
-        _LOGGER.error("Marinara webhook: tool '%s' failed: %s", tool, err)
+        _LOGGER.error("YunYun webhook: tool '%s' failed: %s", tool, err)
         return web.json_response({"error": str(err)}, status=500)
 
     return web.json_response(result)

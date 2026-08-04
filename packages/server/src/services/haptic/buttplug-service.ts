@@ -183,7 +183,7 @@ class ButtplugService {
   private patternTimerCounter = 0;
 
   constructor() {
-    this.client = new ButtplugClient("Marinara Engine");
+    this.client = new ButtplugClient("YunYun Engine");
 
     // Track device events
     this.client.addListener("deviceadded", (device: ButtplugClientDevice) => {

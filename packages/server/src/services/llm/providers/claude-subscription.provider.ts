@@ -11,7 +11,7 @@
 // useful as a safety net if subscription auth is unavailable.
 //
 // This provider only supports text chat — built-in agent tools (Bash, Read,
-// Write, etc.) are explicitly disabled because Marinara drives its own
+// Write, etc.) are explicitly disabled because YunYun drives its own
 // agent/tool layer.
 //
 // References:
@@ -119,7 +119,7 @@ function formatClaudeSdkError(err: unknown): string {
   const parts = collectSdkErrorDetails(err);
   const message = parts.length > 0 ? parts.join(" | ") : err instanceof Error ? err.message : String(err);
   if (/Claude Code request failed/i.test(message)) {
-    return `${message}. Confirm \`claude login\` was run by the same OS user/HOME as the Marinara server, or set ANTHROPIC_API_KEY/CLAUDE_CODE_OAUTH_TOKEN in the server environment. HOME=${process.env.HOME ?? "unset"}.`;
+    return `${message}. Confirm \`claude login\` was run by the same OS user/HOME as the YunYun server, or set ANTHROPIC_API_KEY/CLAUDE_CODE_OAUTH_TOKEN in the server environment. HOME=${process.env.HOME ?? "unset"}.`;
   }
   return message;
 }
@@ -271,7 +271,7 @@ function buildResumeSelection(messages: ChatMessage[], model: string): PromptSel
   // Mint a fresh sessionId per request; it keys the in-process SessionStore
   // and is what the SDK resumes by. The SDK calls `sessionStore.load()` once
   // before subprocess spawn, materializes the entries to its own temp JSONL,
-  // and resumes from there — Marinara writes nothing to disk itself.
+  // and resumes from there — YunYun writes nothing to disk itself.
   const sessionId = randomUUID();
   const cwd = resumeScratchCwd();
   const entries = assembleEntries(
@@ -324,7 +324,7 @@ export class ClaudeSubscriptionProvider extends BaseLLMProvider {
      * Connection-level fast-mode preference. When `true`, the SDK is asked to
      * route the request through its faster (and quality-degraded) path. When
      * `false`, fast mode is explicitly forced off so a persisted CLI setting
-     * can't downgrade Marinara queries silently.
+     * can't downgrade YunYun queries silently.
      */
     private readonly fastMode: boolean = false,
   ) {
@@ -651,7 +651,7 @@ export class ClaudeSubscriptionProvider extends BaseLLMProvider {
       ].join(", ");
       logger.warn("[claude-subscription] SDK completed without usable text (%s)", diagnostic);
       throw new Error(
-        `Claude (Subscription) returned no content. Check that \`claude login\` was run for the same HOME/user as the Marinara server, then retry with LOG_LEVEL=debug if needed (${diagnostic}).`,
+        `Claude (Subscription) returned no content. Check that \`claude login\` was run for the same HOME/user as the YunYun server, then retry with LOG_LEVEL=debug if needed (${diagnostic}).`,
       );
     }
 

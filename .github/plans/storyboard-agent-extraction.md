@@ -99,7 +99,7 @@ Legacy Game chat metadata remains readable during migration, but new writes go t
 - Default prompt libraries, template descriptions, provider compatibility metadata, and default selection IDs.
 - Built artifact and catalog entry.
 
-### Marinara Engine owns
+### YunYun Engine owns
 
 - Agent manifest/schema support for Storyboard's named prompt libraries and selections.
 - Generic global Agent editor and per-chat agent assignment UI.

@@ -593,7 +593,7 @@ assert.match(
 );
 assert.match(
   NOODLE_TIMELINE_BASE_DEFAULT_PROMPT,
-  /^You write a fake social media timeline for Marinara Engine's in-app parody site called Noodle\./u,
+  /^You write a fake social media timeline for YunYun Engine's in-app parody site called Noodle\./u,
 );
 assert.equal(NOODLE_TIMELINE_BASE_DEFAULT_PROMPT.includes(NOODLE_ADULT_PLATFORM_POLICY), true);
 assert.equal(NOODLE_TIMELINE_BASE_DEFAULT_PROMPT.includes(NOODLE_PERSONA_AUTHORSHIP_INSTRUCTION), true);

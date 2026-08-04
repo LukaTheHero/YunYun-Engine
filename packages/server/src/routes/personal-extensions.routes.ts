@@ -205,7 +205,7 @@ export function fullPageExtensionSource(extension: PersonalExtension) {
   const extension = ${identity};
   const run = window.__marinaraRunFullPageExtension;
   if (typeof run !== "function") {
-    throw new Error("Marinara full-page extension host is unavailable");
+    throw new Error("YunYun full-page extension host is unavailable");
   }
   run(extension, async (marinara) => {
     "use strict";
@@ -508,7 +508,7 @@ export function browserWorkerSource(extension: PersonalExtension) {
     };
   };
   // Host contributions are declarative records only. The extension can ask
-  // Marinara to place trusted controls in fixed slots, but it never supplies
+  // YunYun to place trusted controls in fixed slots, but it never supplies
   // markup, styles, component code, URLs, or host callbacks.
   const contributionKinds = new Set(contributionContract.kinds);
   const contributionIcons = new Set(contributionContract.icons);
@@ -784,9 +784,9 @@ export function sandboxDocument(extension: PersonalExtension, nonce: string) {
   // Host-rendered window layer. The worker only sends element descriptors;
   // everything below builds DOM with textContent (never parsed markup) inside
   // this opaque-origin iframe, so the extension can present interactive UI
-  // without touching Marinara's page or being able to inject markup. The iframe
+  // without touching YunYun's page or being able to inject markup. The iframe
   // is sized by the host to just this floating panel — it does not cover or
-  // take over Marinara's page.
+  // take over YunYun's page.
   const theme = { accent: "#a855f7", accentText: "#ffffff", surface: "rgba(24,24,27,0.98)", text: "#f4f4f5", border: "rgba(127,127,127,0.35)", muted: "rgba(127,127,127,0.15)" };
   const root = document.createElement("div");
   root.setAttribute("data-ext-root", "");
@@ -1072,7 +1072,7 @@ export function sandboxDocument(extension: PersonalExtension, nonce: string) {
       worker.postMessage(message);
     }
     if (message.type === "ui-theme" && message.theme && typeof message.theme === "object") {
-      // The host forwards Marinara's resolved accent/surface colors so the
+      // The host forwards YunYun's resolved accent/surface colors so the
       // in-iframe window matches the app; values are only ever used as CSS.
       for (const key of ["accent", "accentText", "surface", "text", "border", "muted"]) {
         if (typeof message.theme[key] === "string" && message.theme[key]) theme[key] = message.theme[key];

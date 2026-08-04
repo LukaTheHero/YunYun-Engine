@@ -3,11 +3,11 @@
 // ──────────────────────────────────────────────
 //
 // The Claude Agent SDK's `resume` option replays a JSONL transcript as the
-// conversation history the model sees. Marinara builds these entries in-process
+// conversation history the model sees. YunYun builds these entries in-process
 // from its `ChatMessage[]` history and hands them to the SDK through a
 // `SessionStore` adapter (see `session-store.ts`), so prior turns reach the
 // model as real multi-turn context instead of being folded into one big
-// `User: ... / Assistant: ...` string prompt. The SDK — not Marinara — owns
+// `User: ... / Assistant: ...` string prompt. The SDK — not YunYun — owns
 // the on-disk materialization of these entries.
 //
 // Schema mirrors what the CLI writes (observed in SDK v2.1.x sessions) but
@@ -157,7 +157,7 @@ function imageBlocksFromDataUrls(urls: readonly string[]): ImageBlock[] {
 }
 
 /**
- * Build a JSONL user entry from a Marinara `ChatMessage`.
+ * Build a JSONL user entry from a YunYun `ChatMessage`.
  *
  * Handles three shapes:
  *  - role "tool" with `tool_call_id` → single `tool_result` block.
@@ -222,7 +222,7 @@ export function buildUserEntry(args: {
 }
 
 /**
- * Build a JSONL assistant entry from a Marinara `ChatMessage`.
+ * Build a JSONL assistant entry from a YunYun `ChatMessage`.
  *
  * `tool_calls` from the agent loop become `tool_use` blocks; their string
  * `arguments` are parsed back into the object shape Anthropic expects on
@@ -323,7 +323,7 @@ export function assembleEntries(
 const SYNTHETIC_START = "[Start]";
 /**
  * Build the closest in-SDK approximation of Anthropic Messages API native
- * assistant prefill. The Claude Agent SDK `prompt` is user-only, and Marinara
+ * assistant prefill. The Claude Agent SDK `prompt` is user-only, and YunYun
  * already streams/saves the prefill before provider output, so the synthetic
  * turn tells Claude to continue after the prefilled text rather than repeat it.
  *
@@ -371,7 +371,7 @@ export interface SplitResult {
  *   not the JSONL); prompt source = synthetic "[Start]" user turn.
  *
  * No "drop trailing assistants" logic. Load-bearing upstream contract:
- * Marinara's regen flow (generate.routes.ts) removes the to-be-regenerated
+ * YunYun's regen flow (generate.routes.ts) removes the to-be-regenerated
  * assistant turn from `finalMessages` BEFORE calling provider.chat(). Any
  * trailing assistant reaching this function is therefore intentional —
  * specifically the `assistantPrefill` feature (see
@@ -442,7 +442,7 @@ export interface SdkUserMessageForPrompt {
 }
 
 /**
- * Convert a Marinara `ChatMessage` into an `SDKUserMessage`-shaped object the
+ * Convert a YunYun `ChatMessage` into an `SDKUserMessage`-shaped object the
  * SDK accepts as the yielded prompt value.
  *
  *  - role "tool" → single `tool_result` block (with empty `tool_use_id` if

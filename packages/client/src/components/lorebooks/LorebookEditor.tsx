@@ -1542,7 +1542,7 @@ export function LorebookEditor() {
   }, [lorebookDirty, closeDetail]);
 
   // If the editor is opened with a `lorebookId` that no longer resolves on
-  // the server (a stale pointer carried over from another Marinara
+  // the server (a stale pointer carried over from another YunYun
   // instance's character export, or one that survived an auto-import that
   // errored), the loading branch — `isLoading || !lorebook` — would render
   // a shimmer forever. Detect the 404 explicitly and bail back to the

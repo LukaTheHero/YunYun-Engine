@@ -598,7 +598,7 @@ function buildCompatiblePersonaExport(persona: Record<string, unknown>) {
     extensions: {
       marinara: {
         exportedAt: new Date().toISOString(),
-        source: "Marinara Engine compatibility export",
+        source: "YunYun Engine compatibility export",
       },
     },
   };

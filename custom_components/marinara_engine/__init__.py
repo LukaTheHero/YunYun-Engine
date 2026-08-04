@@ -1,4 +1,4 @@
-"""Marinara Engine Home Assistant Integration."""
+"""YunYun Engine Home Assistant Integration."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Auto-sync HA tools into Marinara on every startup, updating existing tools so schema changes propagate.
+    # Auto-sync HA tools into YunYun on every startup, updating existing tools so schema changes propagate.
     enabled_categories = entry.options.get(CONF_ENABLED_CATEGORIES, DEFAULT_ENABLED_CATEGORIES)
     hass.async_create_task(
         _async_sync_tools(hass, coordinator, webhook_id, enabled_categories)
@@ -94,15 +94,15 @@ async def _async_sync_tools(
     try:
         created, updated = await coordinator.sync_tools(webhook_url, enabled_categories)
         _LOGGER.info(
-            "Marinara Engine: tool sync complete — %d created, %d updated",
+            "YunYun Engine: tool sync complete — %d created, %d updated",
             created,
             updated,
         )
         agent_status = await coordinator.sync_agent(enabled_categories)
         if agent_status != "unchanged":
-            _LOGGER.info("Marinara Engine: Home Assistant agent %s", agent_status)
+            _LOGGER.info("YunYun Engine: Home Assistant agent %s", agent_status)
     except Exception as err:
-        _LOGGER.warning("Marinara Engine: could not auto-sync tools: %s", err)
+        _LOGGER.warning("YunYun Engine: could not auto-sync tools: %s", err)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

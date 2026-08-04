@@ -44,7 +44,7 @@ export function getPersonalExtensionSandboxStatus(): PersonalExtensionSandboxSta
     reason:
       process.platform === "linux"
         ? "Server extensions are disabled because Bubblewrap (bwrap) is unavailable."
-        : `Server extensions are disabled because Marinara has no supported OS sandbox on ${process.platform}.`,
+        : `Server extensions are disabled because YunYun has no supported OS sandbox on ${process.platform}.`,
   };
 }
 

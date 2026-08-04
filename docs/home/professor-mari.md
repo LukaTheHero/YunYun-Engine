@@ -1,6 +1,6 @@
 # Professor Mari, Your In-App Assistant
 
-Professor Mari is Marinara Engine's built-in assistant on the Home screen. This guide shows where to find her, what she can do, how she keeps her changes reversible, and how to fix common problems.
+Professor Mari is YunYun Engine's built-in assistant on the Home screen. This guide shows where to find her, what she can do, how she keeps her changes reversible, and how to fix common problems.
 
 ## Where to find her
 
@@ -38,24 +38,24 @@ Guided flows ask one focused question at a time instead of presenting a long for
 
 ## She can also read and edit the app's own files
 
-Professor Mari can look inside Marinara's own program files, change them, and run sandboxed commands. This is a real and powerful ability, so it is worth understanding clearly.
+Professor Mari can look inside YunYun's own program files, change them, and run sandboxed commands. This is a real and powerful ability, so it is worth understanding clearly.
 
 Here is the trust boundary in plain terms:
 
-- Her file tools stay inside the folder where Marinara is installed. Raw shell commands may read the workspace and required system programs, but cannot read your other personal files.
+- Her file tools stay inside the folder where YunYun is installed. Raw shell commands may read the workspace and required system programs, but cannot read your other personal files.
 - Environment-secret files such as `.env` and Git's internal files are not available to her file tools or raw shell.
 - She cannot write straight into your saved data folder, where your characters and chats live. Instead she uses the reviewable change flow described below.
 - Raw shell commands have no network access, do not inherit server secrets, and may write only ordinary workspace files and a private temporary directory.
-- She can keep editing normal source files directly. Changes to dependency manifests, lockfiles, launchers, installers, and CI workflows are staged and shown to you before Marinara applies them.
-- If a source change needs a public npm library, she requests a specific package target. Marinara resolves `latest` to an exact version, shows its registry integrity in a review card, and installs it only after you approve. Package lifecycle scripts stay disabled.
-- If Marinara cannot provide its macOS or Linux shell sandbox, raw shell commands are disabled. She can still use the safer structured file and app-data tools.
+- She can keep editing normal source files directly. Changes to dependency manifests, lockfiles, launchers, installers, and CI workflows are staged and shown to you before YunYun applies them.
+- If a source change needs a public npm library, she requests a specific package target. YunYun resolves `latest` to an exact version, shows its registry integrity in a review card, and installs it only after you approve. Package lifecycle scripts stay disabled.
+- If YunYun cannot provide its macOS or Linux shell sandbox, raw shell commands are disabled. She can still use the safer structured file and app-data tools.
 - Commands she runs stop on their own after a short time, so a stuck command cannot run forever.
 
 Most people never need this. It exists so she can inspect or repair the app itself when something is broken.
 
 ## Picking a connection
 
-Professor Mari needs a connection to think. A connection links Marinara to an AI provider using an API key. An API key is a secret code from that provider.
+Professor Mari needs a connection to think. A connection links YunYun to an AI provider using an API key. An API key is a secret code from that provider.
 
 Click the link icon next to the paperclip to open the **Connections** dropdown. Pick any text generation connection you have set up. If you have downloaded the built in local model, it appears here too as **Local Model (sidecar)**. If the app knows the model's name, that name shows in the parentheses instead. Your choice is remembered in your browser.
 
@@ -93,7 +93,7 @@ Two higher-risk changes wait instead of being applied first:
 - **Sensitive file changes** show the path and proposed content with **Apply change** and **Discard**. This covers dependency files, launchers, installers, and CI workflows. Ordinary TypeScript, React, CSS, prompt, route, and documentation edits remain available without this extra gate.
 - **Dependencies** show the exact public npm package, version, target workspace, dependency type, registry integrity, and declared direct dependencies with **Install** and **Not now**. Raw `npm`, `pnpm`, `yarn`, `pip`, and similar install commands are blocked inside her shell, including cached installs.
 
-Approving a library means trusting its code when Marinara later imports or runs it. Disabling lifecycle scripts prevents installation-time execution, but it cannot make a library harmless at runtime.
+Approving a library means trusting its code when YunYun later imports or runs it. Disabling lifecycle scripts prevents installation-time execution, but it cannot make a library harmless at runtime.
 
 ## Custom Skills
 
@@ -138,11 +138,11 @@ Professor Mari is a helper, not the full documentation. Keep these limits in min
 
 - She cannot promise her built in knowledge matches your exact app version. When something is version specific or recently changed, trust the guides and release notes first.
 - Creating new content is usually safe, since nothing gets overwritten. Editing existing content deserves more care.
-- A reviewed dependency is third-party code with the same runtime access as the Marinara code that imports it. Check the package name, exact version, purpose, and integrity shown in the approval card.
+- A reviewed dependency is third-party code with the same runtime access as the YunYun code that imports it. Check the package name, exact version, purpose, and integrity shown in the approval card.
 - For edits, name the exact item and the exact field you want changed. A request like "rewrite this whole character" is riskier than "make Luna's greeting shorter, keep her personality the same."
 - For multi-step creation, use the suggestion chips to answer one focused question at a time instead of trying to provide every field at once.
 - If she says she finished a task but the app does not show it, trust the app. Finish the task yourself from the matching panel.
-- If you reach Marinara from another device instead of the same computer, her editing actions need remote access set up. See the remote access guide.
+- If you reach YunYun from another device instead of the same computer, her editing actions need remote access set up. See the remote access guide.
 
 ## Troubleshooting
 
@@ -150,11 +150,11 @@ Professor Mari is a helper, not the full documentation. Keep these limits in min
 - "You haven't set up a connection yet" pop-up message: pick a connection from the link icon dropdown, or add one first.
 - She cannot read your attached image: your model must support image input. Switch to a connection whose model can see images.
 - Fandom lookups fail: these need an internet connection, since Fandom is an outside website.
-- Her actions are blocked with a permission error: you are reaching Marinara over a network, not from the same computer. Set up remote access first.
+- Her actions are blocked with a permission error: you are reaching YunYun over a network, not from the same computer. Set up remote access first.
 
 ## Related guides
 
-- [Getting Started with Marinara Engine](welcome.md)
+- [Getting Started with YunYun Engine](welcome.md)
 - [The First-Time Tutorial](tutorial.md)
 - [Connecting to an AI Provider](../connections/connecting-to-a-provider.md)
 - [Creating and Editing Characters](../characters/creating-and-editing-characters.md)

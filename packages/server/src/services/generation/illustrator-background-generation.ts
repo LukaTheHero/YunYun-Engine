@@ -18,7 +18,7 @@ import { resolveImageConnectionFallback } from "./media-connection-fallback.js";
 const ROLEPLAY_BACKGROUND_MODES = new Set(["roleplay"]);
 const BACKGROUND_PLAN_MAX_TOKENS = 1_200;
 const BACKGROUND_PLAN_SYSTEM_PROMPT = [
-  "You write one reusable, character-free scene background prompt for Marinara Roleplay.",
+  "You write one reusable, character-free scene background prompt for YunYun Roleplay.",
   "The first-stage Illustrator or a committed tracker update has already established that the scene entered a meaningfully new location. Do not reconsider that decision.",
   "Treat the current tracker location as authoritative when it is present. Otherwise infer the current location from the latest assistant response and recent context.",
   "Describe a single full-frame environment with a readable spatial layout: architecture or nature, important props, weather, time of day, lighting, atmosphere, and environmental storytelling.",

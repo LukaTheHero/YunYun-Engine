@@ -665,7 +665,7 @@ export async function importRoutes(app: FastifyInstance) {
     return { ...result, groupId };
   });
 
-  /** Import a Marinara Engine export (.marinara.json). */
+  /** Import a YunYun Engine export (.marinara.json). */
   app.post("/marinara", async (req) => {
     const body = req.body as Record<string, unknown>;
     const timestampOverrides = readTimestampOverridesFromBody(body);
@@ -689,7 +689,7 @@ export async function importRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Import a Marinara Engine native package (.marinara file — a zip with
+   * Import a YunYun Engine native package (.marinara file — a zip with
    * data.json plus the avatar binary). Single-file multipart upload.
    */
   app.post("/marinara-package", async (req, reply) => {

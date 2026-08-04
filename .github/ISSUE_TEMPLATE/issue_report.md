@@ -26,7 +26,7 @@ assignees: ""
 
 ## Environment
 
-- Marinara Engine version:
+- YunYun Engine version:
 - Install type: (source / installer / docker / termux / other)
 - OS + version:
 - Browser or app shell:

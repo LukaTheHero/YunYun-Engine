@@ -180,7 +180,7 @@ function IdStep({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[0.6rem] font-bold uppercase tracking-widest text-[var(--noodle-accent)]">
-              {tt("idHeader", "Marinara Republic · Adult ID")}
+              {tt("idHeader", "YunYun Republic · Adult ID")}
             </p>
             <p className="truncate text-base font-black">{displayName}</p>
             <p className="text-[0.65rem] text-[var(--muted-foreground)]">

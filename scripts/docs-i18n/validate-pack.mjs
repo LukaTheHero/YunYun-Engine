@@ -4,7 +4,7 @@
 // Usage: node scripts/docs-i18n/validate-pack.mjs <pack-dir>
 //   <pack-dir> is one language folder of a docs-i18n checkout, e.g. ../docs-i18n/es
 //
-// Run from the Marinara Engine repo root (it reads docs/ for the English
+// Run from the YunYun Engine repo root (it reads docs/ for the English
 // source of truth). Fails when the pack has orphan files that no longer exist
 // in English, files missing a leading H1, rewritten relative link targets, or
 // a stale/missing manifest.json. Missing translations are reported but do not
@@ -39,7 +39,7 @@ if (!packDir || !existsSync(packDir)) {
 }
 const docsDir = resolve("docs");
 if (!existsSync(docsDir)) {
-  console.error("Run from the Marinara Engine repo root — docs/ not found.");
+  console.error("Run from the YunYun Engine repo root — docs/ not found.");
   process.exit(1);
 }
 

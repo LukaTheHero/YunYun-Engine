@@ -36,7 +36,7 @@ const reminder = await checkForLauncherUpdate({
     return { ok: true, url: releaseUrl };
   },
 });
-assert.match(reminder, /Marinara Engine v2\.3\.4 is available/);
+assert.match(reminder, /YunYun Engine v2\.3\.4 is available/);
 assert.match(reminder, /installed: v2\.3\.3/);
 assert.match(reminder, /Automatic updates are disabled/);
 assert.match(reminder, new RegExp(releaseUrl.replaceAll(".", "\\.")));

@@ -22,7 +22,7 @@ function isValidDnsName(hostname: string): boolean {
 /**
  * Parse an HTTP Host value without URL parser ambiguities. The returned value
  * intentionally excludes the port because rebinding protection is about the
- * authority name, while Marinara can be served on a configured or proxied port.
+ * authority name, while YunYun can be served on a configured or proxied port.
  */
 export function parseRequestHostname(value: string | null | undefined): string | null {
   const raw = value?.trim();
@@ -128,7 +128,7 @@ function announceRejectedHost(rawHost: string) {
   }
   announcedRejectedHosts.add(rawHost);
   logger.warn(
-    "[host-validation] Rejected request Host '%s'. Add the exact hostname to TRUSTED_HOSTS if this is an intentional Marinara address.",
+    "[host-validation] Rejected request Host '%s'. Add the exact hostname to TRUSTED_HOSTS if this is an intentional YunYun address.",
     rawHost,
   );
 }
@@ -143,6 +143,6 @@ export function hostValidationHook(request: FastifyRequest, reply: FastifyReply,
   announceRejectedHost(rawHost);
   reply.status(421).send({
     error: "Untrusted request host",
-    message: `Host '${rawHost}' is not an allowed Marinara address. Use an IP address, a local hostname, or add the exact hostname to TRUSTED_HOSTS.`,
+    message: `Host '${rawHost}' is not an allowed YunYun address. Use an IP address, a local hostname, or add the exact hostname to TRUSTED_HOSTS.`,
   });
 }

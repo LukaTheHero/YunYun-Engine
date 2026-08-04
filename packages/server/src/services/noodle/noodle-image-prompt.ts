@@ -6,7 +6,7 @@ function stripCodeFence(value: string): string {
 
 /**
  * Recover the visual idea when a weaker timeline model wraps imagePrompt in
- * JSON or repeats Marinara's legacy prompt-assembly labels inside the field.
+ * JSON or repeats YunYun's legacy prompt-assembly labels inside the field.
  */
 export function normalizeNoodleImagePrompt(value: string | null | undefined): string | null {
   if (!value?.trim()) return null;

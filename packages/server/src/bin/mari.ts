@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ──────────────────────────────────────────────
-// Marinara local CLI
+// YunYun local CLI
 // ──────────────────────────────────────────────
 import { CSRF_HEADER, CSRF_HEADER_VALUE } from "@marinara-engine/shared";
 

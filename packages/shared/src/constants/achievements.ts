@@ -49,7 +49,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   {
     id: "one_of_us",
     title: "One Of Us",
-    description: "Visited the Marinara Engine Discord invite.",
+    description: "Visited the YunYun Engine Discord invite.",
     category: "community",
     icon: "discord",
   },

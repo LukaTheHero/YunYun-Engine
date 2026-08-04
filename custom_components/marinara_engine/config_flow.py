@@ -1,4 +1,4 @@
-"""Config flow for Marinara Engine."""
+"""Config flow for YunYun Engine."""
 
 from __future__ import annotations
 
@@ -44,20 +44,20 @@ _STEP_USER_SCHEMA = vol.Schema(
 
 
 def _chat_options_from_payload(chats: list[object]) -> dict[str, str]:
-    """Build safe chat selector options from Marinara's /api/chats payload."""
+    """Build safe chat selector options from YunYun's /api/chats payload."""
     options: dict[str, str] = {}
     for chat in chats:
         if not isinstance(chat, Mapping):
-            _LOGGER.debug("Skipping malformed Marinara chat entry: %s", chat)
+            _LOGGER.debug("Skipping malformed YunYun chat entry: %s", chat)
             continue
         chat_id = chat.get("id")
         name = chat.get("name")
         if chat_id is None or not name:
-            _LOGGER.debug("Skipping incomplete Marinara chat entry: %s", chat)
+            _LOGGER.debug("Skipping incomplete YunYun chat entry: %s", chat)
             continue
         key = str(chat_id)
         if key in options:
-            _LOGGER.debug("Skipping duplicate Marinara chat id: %s", key)
+            _LOGGER.debug("Skipping duplicate YunYun chat id: %s", key)
             continue
         options[key] = str(name)
     return options
@@ -81,7 +81,7 @@ async def _test_connection(host: str, port: int) -> str | None:
 
 
 class MarinaraConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Marinara Engine."""
+    """Handle a config flow for YunYun Engine."""
 
     VERSION = 1
 
@@ -102,7 +102,7 @@ class MarinaraConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
 
                 return self.async_create_entry(
-                    title=f"Marinara Engine ({host}:{port})",
+                    title=f"YunYun Engine ({host}:{port})",
                     data={
                         CONF_HOST: host,
                         CONF_PORT: port,

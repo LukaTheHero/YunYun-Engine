@@ -453,8 +453,8 @@ const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   {
     id: "profile-marinara",
     tab: "import",
-    label: "Profile & Marinara",
-    description: "Restore full profiles or import individual Marinara files.",
+    label: "Profile & YunYun",
+    description: "Restore full profiles or import individual YunYun files.",
     aliases: ["profile", "import", "restore", "marinara", "json", "zip"],
   },
   {
@@ -523,7 +523,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "docs-language",
     sectionId: "application",
     label: "Documentation Language",
-    description: "Choose the language for Marinara's built-in guides.",
+    description: "Choose the language for YunYun's built-in guides.",
     aliases: ["documentation", "guides", "docs", "manual", "spanish", "español", "german", "deutsch", "french", "français", "portuguese", "português", "brazilian", "polish", "polski", "russian", "русский", "japanese", "日本語", "korean", "한국어", "chinese", "simplified", "简体中文", "中文"],
     kind: "Select",
   },
@@ -594,8 +594,8 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
   {
     id: "notification-unfocused-only",
     sectionId: "notifications",
-    label: "Only when Marinara is unfocused",
-    description: "Play notification sounds only while Marinara is not focused.",
+    label: "Only when YunYun is unfocused",
+    description: "Play notification sounds only while YunYun is not focused.",
     aliases: ["sound", "background", "unfocused"],
     kind: "Toggle",
   },
@@ -839,7 +839,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "visual-theme",
     sectionId: "app-style",
     label: "Visual Style",
-    description: "Switch between Marinara and SillyTavern visual themes.",
+    description: "Switch between YunYun and SillyTavern visual themes.",
     aliases: ["theme", "style", "sillytavern", "marinara"],
     kind: "Button group",
   },
@@ -855,7 +855,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "custom-cursor",
     sectionId: "app-style",
     label: "Custom Mouse Pointer",
-    description: "Use Marinara's accent-colored cursor.",
+    description: "Use YunYun's accent-colored cursor.",
     aliases: ["cursor", "mouse", "pointer"],
     kind: "Toggle",
   },
@@ -887,7 +887,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "rgb-mode",
     sectionId: "app-style",
     label: "RGB Mode",
-    description: "Cycle the app accent through Marinara's rainbow palette.",
+    description: "Cycle the app accent through YunYun's rainbow palette.",
     aliases: ["rainbow", "accent", "color"],
     kind: "Toggle",
   },
@@ -1314,10 +1314,10 @@ function isStandaloneIosInstall(): boolean {
 function getNativeConsoleShortcutHelp(): string {
   const bridge = getMarinaraAndroidBridge();
   if (typeof bridge?.openConsole === "function") {
-    return "Opens Termux from the Android APK so you can view Marinara server logs while Debug mode is enabled.";
+    return "Opens Termux from the Android APK so you can view YunYun server logs while Debug mode is enabled.";
   }
   if (isMarinaraAndroidShell()) {
-    return "This Android APK build cannot expose the Termux console shortcut yet. Update Marinara, or open Termux manually.";
+    return "This Android APK build cannot expose the Termux console shortcut yet. Update YunYun, or open Termux manually.";
   }
   if (isStandaloneIosInstall()) {
     return "iPhone installations do not expose a native console shortcut yet. Use the host server logs or Safari Web Inspector.";
@@ -4340,7 +4340,7 @@ function AppearanceSettings() {
                 [
                   {
                     id: "default" as VisualTheme,
-                    label: "Default (Marinara)",
+                    label: "Default (YunYun)",
                     desc: "Y2K / retro aesthetic with glow effects",
                   },
                   {
@@ -6888,7 +6888,7 @@ function AdvancedSettings() {
             suggestedName,
             types: [
               {
-                description: "Marinara backup archive",
+                description: "YunYun backup archive",
                 accept: { "application/zip": [".zip"] },
               },
             ],
@@ -7139,7 +7139,7 @@ function AdvancedSettings() {
         open={exportProfileDialogOpen}
         title={localizeUi("settings.transfer.exportProfile.title")}
         description={localizeUi("settings.transfer.exportProfile.description")}
-        nativeDescription="Keeps Marinara fields, lorebook folders, character/persona metadata, presets, agents, themes, and inline assets for re-import."
+        nativeDescription="Keeps YunYun fields, lorebook folders, character/persona metadata, presets, agents, themes, and inline assets for re-import."
         compatibleDescription="Exports direct character JSON, simple persona JSON, and folderless lorebooks for other roleplay tools."
         onClose={() => setExportProfileDialogOpen(false)}
         onSelect={handleExportProfileChoice}

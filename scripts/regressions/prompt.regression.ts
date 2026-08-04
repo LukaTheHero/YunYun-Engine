@@ -3176,7 +3176,7 @@ const cases: RegressionCase[] = [
       assert.equal(normalizeGameStoryboardKeyframeCount(undefined), 3);
       assert.equal(normalizeGameStoryboardKeyframeCount(0), 1);
       assert.equal(normalizeGameStoryboardKeyframeCount(12), 6);
-      assert.doesNotMatch(sharedPlannerSource, /You are Marinara's/u);
+      assert.doesNotMatch(sharedPlannerSource, /You are YunYun's/u);
       assert.doesNotMatch(sharedImageSource, /promptTemplate:/u);
       assert.equal(listPromptOverrideKeys().includes("game.storyboardIllustrationDirector"), false);
       assert.equal(listPromptOverrideKeys().includes("game.storyboardAnimationDirector"), false);
@@ -3852,7 +3852,7 @@ const cases: RegressionCase[] = [
         characterAppearanceContextBlock: appearanceContextBlock,
       });
       const narrationSummarySystemPrompt = narrationSummaryMessages[0]?.content ?? "";
-      assert.match(narrationSummarySystemPrompt, /^You are Marinara's Game Mode narration summarizer/u);
+      assert.match(narrationSummarySystemPrompt, /^You are YunYun's Game Mode narration summarizer/u);
       assert.ok(narrationSummarySystemPrompt.indexOf(appearanceContextBlock) > 0);
       assert.ok(
         narrationSummarySystemPrompt.indexOf(appearanceContextBlock) <
@@ -3876,7 +3876,7 @@ const cases: RegressionCase[] = [
               id: "regression-still-planner",
               name: "Regression Still Planner",
               promptTemplate: [
-                "You are Marinara's Game Mode Storyboard Illustrator.",
+                "You are YunYun's Game Mode Storyboard Illustrator.",
                 "Turn exactly one completed GM narration into a concise storyboard.",
                 "If a visual trait is not supplied, omit it instead of guessing.",
               ].join("\n"),
@@ -3903,7 +3903,7 @@ const cases: RegressionCase[] = [
         maxVisibleCharacters: 1,
         characterAppearanceContextBlock: appearanceContextBlock,
       });
-      assert.match(storyboardMessages.systemPrompt, /^You are Marinara's Game Mode Storyboard Illustrator/u);
+      assert.match(storyboardMessages.systemPrompt, /^You are YunYun's Game Mode Storyboard Illustrator/u);
       assert.ok(storyboardMessages.systemPrompt.indexOf(appearanceContextBlock) > 0);
       assert.ok(
         storyboardMessages.systemPrompt.indexOf(appearanceContextBlock) <

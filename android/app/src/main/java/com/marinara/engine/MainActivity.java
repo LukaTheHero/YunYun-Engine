@@ -77,7 +77,7 @@ public class MainActivity extends Activity {
     private static final String TERMUX_EXTERNAL_APPS_COMMAND =
             "mkdir -p ~/.termux; "
                     + "grep -qxF 'allow-external-apps=true' ~/.termux/termux.properties 2>/dev/null || echo 'allow-external-apps=true' >> ~/.termux/termux.properties; "
-                    + "if command -v termux-reload-settings >/dev/null 2>&1; then termux-reload-settings; else echo 'allow-external-apps=true saved. Fully close and reopen Termux if Marinara still cannot start it.'; fi";
+                    + "if command -v termux-reload-settings >/dev/null 2>&1; then termux-reload-settings; else echo 'allow-external-apps=true saved. Fully close and reopen Termux if YunYun still cannot start it.'; fi";
 
     private WebView webView;
     private View splashView;
@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
 
         // Status text
         statusText = new TextView(this);
-        statusText.setText("Marinara Engine Android shell\nTap Install / Start Marinara to begin.");
+        statusText.setText("YunYun Engine Android shell\nTap Install / Start YunYun to begin.");
         statusText.setTextColor(0xFFCCCCCC);
         statusText.setTextSize(16f);
         statusText.setGravity(android.view.Gravity.CENTER);
@@ -159,7 +159,7 @@ public class MainActivity extends Activity {
         actions.setOrientation(LinearLayout.VERTICAL);
         actions.setPadding(0, 28, 0, 0);
 
-        Button setupButton = buildActionButton("Install / Start Marinara");
+        Button setupButton = buildActionButton("Install / Start YunYun");
         setupButton.setOnClickListener(v -> startTermuxSetup());
         actions.addView(setupButton, buildActionButtonLayoutParams());
 
@@ -304,7 +304,7 @@ public class MainActivity extends Activity {
     private void tryConnect() {
         if (isCheckingServer) return;
         cancelPendingConnectionRetry();
-        showBootstrap("Connecting to Marinara Engine…\nIf this is your first launch, tap Install / Start Marinara.", true);
+        showBootstrap("Connecting to YunYun Engine…\nIf this is your first launch, tap Install / Start YunYun.", true);
 
         isCheckingServer = true;
         new Thread(() -> {
@@ -314,7 +314,7 @@ public class MainActivity extends Activity {
                 if (connectionRetryPaused) return;
                 if (reachable) {
                     mainFrameLoadFailed = false;
-                    statusText.setText("Opening Marinara Engine…");
+                    statusText.setText("Opening YunYun Engine…");
                     webView.loadUrl(SERVER_URL);
                 } else {
                     retryConnection();
@@ -324,7 +324,7 @@ public class MainActivity extends Activity {
     }
 
     private void retryConnection() {
-        showBootstrap("Waiting for Marinara Engine…\nTap Install / Start Marinara if the local server is not running yet.", true);
+        showBootstrap("Waiting for YunYun Engine…\nTap Install / Start YunYun if the local server is not running yet.", true);
         scheduleConnectionRetry();
     }
 
@@ -432,7 +432,7 @@ public class MainActivity extends Activity {
         }
 
         if (!hasTermuxRunCommandPermission()) {
-            showBootstrap("Android needs one permission so Marinara can start Termux for you.\nApprove Run commands in Termux environment.", false);
+            showBootstrap("Android needs one permission so YunYun can start Termux for you.\nApprove Run commands in Termux environment.", false);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 requestPermissions(new String[]{TERMUX_RUN_COMMAND_PERMISSION}, TERMUX_PERMISSION_REQUEST);
             }
@@ -446,7 +446,7 @@ public class MainActivity extends Activity {
         pendingStartAfterTermuxInstall = true;
         pauseConnectionRetryLoop();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
-            showBootstrap("Android needs permission to let Marinara install Termux.\nEnable Allow from this source, then return here.", false);
+            showBootstrap("Android needs permission to let YunYun install Termux.\nEnable Allow from this source, then return here.", false);
             try {
                 Intent intent = new Intent(
                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -601,10 +601,10 @@ public class MainActivity extends Activity {
         intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", TERMUX_HOME);
         intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", false);
         intent.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0");
-        intent.putExtra("com.termux.RUN_COMMAND_LABEL", "Install / start Marinara Engine");
+        intent.putExtra("com.termux.RUN_COMMAND_LABEL", "Install / start YunYun Engine");
         intent.putExtra(
                 "com.termux.RUN_COMMAND_DESCRIPTION",
-                "Installs Git and Node.js in Termux, fetches Marinara Engine, and starts the local server.");
+                "Installs Git and Node.js in Termux, fetches YunYun Engine, and starts the local server.");
 
         try {
             startService(intent);
@@ -641,19 +641,19 @@ public class MainActivity extends Activity {
     private void showTermuxExternalAppsInstructions() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("Marinara Termux setup", TERMUX_EXTERNAL_APPS_COMMAND));
+            clipboard.setPrimaryClip(ClipData.newPlainText("YunYun Termux setup", TERMUX_EXTERNAL_APPS_COMMAND));
             Toast.makeText(this, "Copied Termux permission command", Toast.LENGTH_LONG).show();
         }
         pauseConnectionRetryLoop();
-        showBootstrap("Termux blocked external setup.\nPaste the copied allow-external-apps command once, then return and tap Install / Start Marinara.", false);
+        showBootstrap("Termux blocked external setup.\nPaste the copied allow-external-apps command once, then return and tap Install / Start YunYun.", false);
         openTermux();
     }
 
     private void showManualTermuxSetupInstructions(String reason) {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("Marinara Termux setup", buildTermuxSetupCommand()));
-            Toast.makeText(this, "Copied Marinara setup command", Toast.LENGTH_LONG).show();
+            clipboard.setPrimaryClip(ClipData.newPlainText("YunYun Termux setup", buildTermuxSetupCommand()));
+            Toast.makeText(this, "Copied YunYun setup command", Toast.LENGTH_LONG).show();
         }
         pauseConnectionRetryLoop();
         showBootstrap(reason + "\nOpen Termux, paste the copied setup command, then return here.", false);
@@ -771,7 +771,7 @@ public class MainActivity extends Activity {
                 if (!isTermuxInstalled()) {
                     Toast.makeText(
                             MainActivity.this,
-                            "Termux is not installed yet. Use Install / Start Marinara first.",
+                            "Termux is not installed yet. Use Install / Start YunYun first.",
                             Toast.LENGTH_LONG
                     ).show();
                     return;
@@ -817,7 +817,7 @@ public class MainActivity extends Activity {
                 ? MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
                 : MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
         String directory = (isImage ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS)
-                + "/Marinara";
+                + "/YunYun";
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
         values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
@@ -874,7 +874,7 @@ public class MainActivity extends Activity {
                 "Background messages",
                 NotificationManager.IMPORTANCE_DEFAULT
         );
-        channel.setDescription("Notifications for new Marinara character messages");
+        channel.setDescription("Notifications for new YunYun character messages");
         manager.createNotificationChannel(channel);
     }
 
@@ -903,8 +903,8 @@ public class MainActivity extends Activity {
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
 
-        String title = truncateNotificationText(rawTitle, "New Marinara message", 100);
-        String body = truncateNotificationText(rawBody, "Open Marinara to read it.", 180);
+        String title = truncateNotificationText(rawTitle, "New YunYun message", 100);
+        String body = truncateNotificationText(rawBody, "Open YunYun to read it.", 180);
         String tag = truncateNotificationText(rawTag, "marinara-message", 120);
         Intent openIntent = new Intent(this, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -958,7 +958,7 @@ public class MainActivity extends Activity {
         }
 
         if (status == PackageInstaller.STATUS_SUCCESS) {
-            showBootstrap("Termux installed.\nContinuing Marinara setup…", true);
+            showBootstrap("Termux installed.\nContinuing YunYun setup…", true);
             pendingStartAfterTermuxInstall = false;
             startTermuxSetup();
             return;
@@ -966,7 +966,7 @@ public class MainActivity extends Activity {
 
         String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
         if (status == PackageInstaller.STATUS_FAILURE_ABORTED) {
-            showBootstrap("Termux installation was cancelled.\nTap Install / Start Marinara to try again.", false);
+            showBootstrap("Termux installation was cancelled.\nTap Install / Start YunYun to try again.", false);
             return;
         }
         showBootstrap("Termux installation failed.\n" + (message != null ? message : "Use Get Termux manually, then return here."), false);
@@ -985,7 +985,7 @@ public class MainActivity extends Activity {
         applyStatusBarVisibility(isStatusBarVisible());
         if (pendingStartAfterTermuxInstall && isTermuxInstalled()) {
             pendingStartAfterTermuxInstall = false;
-            showBootstrap("Termux installed.\nContinuing Marinara setup…", true);
+            showBootstrap("Termux installed.\nContinuing YunYun setup…", true);
             startTermuxSetup();
         }
     }
@@ -1002,7 +1002,7 @@ public class MainActivity extends Activity {
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             sendTermuxSetupCommand();
         } else {
-            showBootstrap("Run commands permission was not granted.\nGrant it from Android App Info > Permissions, then tap Install / Start Marinara.", false);
+            showBootstrap("Run commands permission was not granted.\nGrant it from Android App Info > Permissions, then tap Install / Start YunYun.", false);
         }
     }
 

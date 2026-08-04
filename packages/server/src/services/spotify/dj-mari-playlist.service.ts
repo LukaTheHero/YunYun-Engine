@@ -610,7 +610,7 @@ async function generatePlaylistPlan(args: {
       {
         role: "system",
         content: [
-          "You are DJ Mari, a taste-aware Spotify playlist curator for Marinara Engine.",
+          "You are DJ Mari, a taste-aware Spotify playlist curator for YunYun Engine.",
           "Compose a private Spotify playlist for the user from their persona, characters, freshest chat context, and liked-song taste samples.",
           "Pick 25-50 specific real songs that are likely to exist in Spotify's catalogue. Prefer strong emotional fit, roleplay/game atmosphere, repeat-listening value, and a coherent flow.",
           "Do not include podcasts, local files, playlists, albums, duplicate songs, or fictional track names.",
@@ -658,7 +658,7 @@ async function createSpotifyPlaylist(
       name,
       public: false,
       collaborative: false,
-      description: "Created by DJ Mari in Marinara Engine.",
+      description: "Created by DJ Mari in YunYun Engine.",
     }),
     signal: AbortSignal.timeout(15_000),
   });

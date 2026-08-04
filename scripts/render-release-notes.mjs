@@ -6,7 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
 
 const ANDROID_APK_NOTICE = `> [!IMPORTANT]
-> **Android APK notice:** The APK is a Termux bootstrap + WebView shell, not a native Android server build. It opens an already-running local Marinara server, and on first launch it can download Termux from F-Droid, hand it to Android's installer, and start Marinara through Termux after Android permission prompts. Follow the [Android wrapper guide](https://github.com/Pasta-Devs/Marinara-Engine/blob/main/android/README.md) if Android blocks the bootstrap handoff.
+> **Android APK notice:** The APK is a Termux bootstrap + WebView shell, not a native Android server build. It opens an already-running local YunYun server, and on first launch it can download Termux from F-Droid, hand it to Android's installer, and start YunYun through Termux after Android permission prompts. Follow the [Android wrapper guide](https://github.com/Pasta-Devs/Marinara-Engine/blob/main/android/README.md) if Android blocks the bootstrap handoff.
 
 `;
 

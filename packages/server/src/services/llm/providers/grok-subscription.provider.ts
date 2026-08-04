@@ -4,7 +4,7 @@
 //
 // Routes chat requests through the locally-installed `grok` CLI so users can
 // use their SuperGrok / X Premium+ CLI subscription without an xAI API key.
-// This provider deliberately runs Grok in one-shot, no-tool mode: Marinara owns
+// This provider deliberately runs Grok in one-shot, no-tool mode: YunYun owns
 // the prompt pipeline, command parsing, and tool execution.
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -19,7 +19,7 @@ import { DATA_DIR } from "../../../utils/data-dir.js";
 // The scratch cwd must live OUTSIDE any git checkout: the grok CLI walks up
 // from its working directory to the nearest repo root and indexes the whole
 // working tree on every one-shot call (45k+ file opens and ~10s of startup
-// CPU on a full Marinara checkout — paid by every chat AND agent request
+// CPU on a full YunYun checkout — paid by every chat AND agent request
 // when this lived under DATA_DIR). The OS temp dir is never inside a repo;
 // a unique process-local directory prevents another local user from pre-creating
 // the cwd or replacing a predictable path with a symlink.
@@ -39,7 +39,7 @@ const GROK_CLI_DEFAULT_CONTEXT_TOKENS = 32_000;
 const GROK_CLI_MAX_TURNS = 8;
 const GROK_CLI_SAFE_HEADLESS_MODEL_ID = "grok-composer-2.5-fast";
 const GROK_CLI_SYSTEM_PROMPT =
-  "You are Marinara Engine's one-shot chat completion backend. Return exactly one assistant response for the transcript. Do not inspect files, run tools, ask clarifying questions, plan, or continue beyond the final answer.";
+  "You are YunYun Engine's one-shot chat completion backend. Return exactly one assistant response for the transcript. Do not inspect files, run tools, ask clarifying questions, plan, or continue beyond the final answer.";
 const STALE_GROK_CLI_MODEL_IDS = new Set(["grok-build-latest", "grok-build-0.1"]);
 
 function getGrokScratchDir(): Promise<string> {
@@ -207,7 +207,7 @@ function buildGrokPrompt(messages: ChatMessage[]): string {
     .join("\n\n");
 
   return [
-    "You are responding as the assistant for Marinara Engine.",
+    "You are responding as the assistant for YunYun Engine.",
     "Follow the system/developer/user instructions in the transcript exactly.",
     "Return only the assistant response for the latest user turn. Do not describe these wrapper tags.",
     "",
@@ -221,7 +221,7 @@ function compactGrokError(stderr: string, stdout: string, fallback: string): str
 }
 
 function grokInstallHint(): string {
-  return "Confirm `grok` is installed and `grok login` was run by the same OS user/HOME as the Marinara server.";
+  return "Confirm `grok` is installed and `grok login` was run by the same OS user/HOME as the YunYun server.";
 }
 
 async function runGrokCliCommand(
@@ -293,7 +293,7 @@ async function runGrokCliCommand(
   } catch (err) {
     if (err instanceof Error && /ENOENT/.test(err.message)) {
       throw new Error(
-        "Grok CLI is not installed or not on PATH. Install it with `curl -fsSL https://x.ai/cli/install.sh | bash`, then run `grok login` as the same OS user that starts Marinara.",
+        "Grok CLI is not installed or not on PATH. Install it with `curl -fsSL https://x.ai/cli/install.sh | bash`, then run `grok login` as the same OS user that starts YunYun.",
       );
     }
     throw err;

@@ -214,7 +214,7 @@ function getShuffleTitle(shuffle: boolean) {
 }
 
 function isBrowserSpotifyDeviceName(name: string | null | undefined): boolean {
-  return name === "Marinara Engine";
+  return name === "YunYun Engine";
 }
 
 function isPersonalMobileSpotifyDeviceType(type: string | null | undefined): boolean {
@@ -455,7 +455,7 @@ export function SpotifyMiniPlayer({
       .then(() => {
         if (disposed || !window.Spotify?.Player) return;
         sdkPlayer = new window.Spotify.Player({
-          name: "Marinara Engine",
+          name: "YunYun Engine",
           volume: 0.5,
           getOAuthToken: (callback) => {
             void api

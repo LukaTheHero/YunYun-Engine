@@ -6,7 +6,7 @@ You manage profiles at the top of **Chat Settings**. They work in Conversation a
 
 ## Settings profiles and prompt presets
 
-Marinara uses **preset** for prompt templates only:
+YunYun uses **preset** for prompt templates only:
 
 - A **prompt preset** controls the system prompt structure and generation parameters. You edit it in the Presets panel. See [Preset Editor and Prompt Manager](../prompts/presets.md).
 - A **settings profile** is the wider reusable configuration. It can include the selected prompt preset along with the connection, agents, and other chat settings.
@@ -71,7 +71,7 @@ Profiles store settings, not provider secrets.
 
 ## The Default profile
 
-Conversation and Roleplay modes each have a built-in **Default** profile. Applying it restores the profile-controlled settings to Marinara's defaults for that mode.
+Conversation and Roleplay modes each have a built-in **Default** profile. Applying it restores the profile-controlled settings to YunYun's defaults for that mode.
 
 The Default profile cannot be renamed, overwritten, or deleted. The disabled controls explain this with **Cannot save into the Default profile**, **Cannot rename the Default profile**, and **Cannot delete the Default profile**.
 

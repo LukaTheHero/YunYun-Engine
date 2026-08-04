@@ -37,7 +37,7 @@ export function getVersionFromReleaseUrl(value) {
 
 export function formatUpdateReminder(currentVersion, latestVersion, releaseUrl) {
   return [
-    `  [UPDATE] Marinara Engine v${latestVersion} is available (installed: v${currentVersion}).`,
+    `  [UPDATE] YunYun Engine v${latestVersion} is available (installed: v${currentVersion}).`,
     "           Automatic updates are disabled. Download the new version from:",
     `           ${releaseUrl}`,
   ].join("\n");
@@ -79,7 +79,7 @@ async function main() {
     const reminder = await checkForLauncherUpdate({ currentVersion: packageJson.version });
     if (reminder) process.stdout.write(`${reminder}\n`);
   } catch {
-    // Update reminders are best-effort and must never prevent Marinara from starting.
+    // Update reminders are best-effort and must never prevent YunYun from starting.
   }
 }
 

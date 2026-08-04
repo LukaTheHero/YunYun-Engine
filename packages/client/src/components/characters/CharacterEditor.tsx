@@ -169,7 +169,7 @@ const CHARACTER_CARD_SECTIONS = [
 ] as const;
 
 const CHARACTER_METADATA_HELP =
-  "Use metadata for identity, sharing, and library organization. The avatar identifies the character throughout Marinara, name is used as {{char}}, creator/version help track authorship and revisions, tags make the card searchable, talkativeness affects group chat response frequency, and creator notes stay private.";
+  "Use metadata for identity, sharing, and library organization. The avatar identifies the character throughout YunYun, name is used as {{char}}, creator/version help track authorship and revisions, tags make the card searchable, talkativeness affects group chat response frequency, and creator notes stay private.";
 
 const CHARACTER_CARD_HELP =
   "Write the fields that define how the model sees and plays the character. Description, personality, backstory, appearance, scenario, and dialogue are kept together here so you can treat the card as one writing document.";
@@ -208,7 +208,7 @@ const CHARACTER_COLORS_HELP =
   "Name color is applied to the character's display name in chat. Gradients use CSS linear-gradient. Dialogue color applies to text inside dialogue quotation marks and can optionally be bolded from Settings. Box color sets the background color of the character's message bubble in roleplay mode. An empty dialogue color uses the default from Settings > Appearance; other empty fields use theme colors.";
 
 const CHARACTER_LOREBOOK_HELP =
-  "Attach lorebook/world-info entries to this character. Entries trigger from keywords during conversation; embedded card lorebooks can be imported into Marinara as linked lorebooks for deeper editing.";
+  "Attach lorebook/world-info entries to this character. Entries trigger from keywords during conversation; embedded card lorebooks can be imported into YunYun as linked lorebooks for deeper editing.";
 
 interface ParsedCharacter {
   id: string;
@@ -947,7 +947,7 @@ export function CharacterEditor() {
         description={localizeUi(
           "ui.characters.charactereditor.nativeKeepsMarinaraMetadataSpritesGalleryImagesAndAttached",
         )}
-        compatibleDescription="Exports direct Chara Card V2 JSON without the Marinara wrapper."
+        compatibleDescription="Exports direct Chara Card V2 JSON without the YunYun wrapper."
         showPngOption
         onClose={() => setExportDialogOpen(false)}
         onSelect={(format: ExportFormatChoice) => {
@@ -2360,7 +2360,7 @@ function characterGalleryClipDeleteMessage(clip: CharacterGalleryClip) {
   if (clip.source === "conversation-call") {
     return "Delete this call clip? The standard slot will stay available for regeneration or upload.";
   }
-  return "Delete this clip everywhere it appears in Marinara? This cannot be undone.";
+  return "Delete this clip everywhere it appears in YunYun? This cannot be undone.";
 }
 
 function isCharacterCallVideoClip(clip: CharacterGalleryClip) {
@@ -4799,7 +4799,7 @@ function LorebookTab({
   const rawLinkedLorebookId =
     typeof embeddedLorebookMetadata.lorebookId === "string" ? embeddedLorebookMetadata.lorebookId : null;
   // Verify the pointed-to lorebook actually exists. Cards exported from
-  // another Marinara instance can carry a stale `lorebookId` in their
+  // another YunYun instance can carry a stale `lorebookId` in their
   // extensions, and an auto-import that errored silently can leave the
   // pointer set without a real DB row. If we trust the raw pointer the
   // "Edit Embedded Lorebook" button opens an editor that can never resolve

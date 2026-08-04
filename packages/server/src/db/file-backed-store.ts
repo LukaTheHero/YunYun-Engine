@@ -2,7 +2,7 @@
 // File-Native Storage
 // ──────────────────────────────────────────────
 //
-// Marinara stores user data as JSON table snapshots under DATA_DIR/storage.
+// YunYun stores user data as JSON table snapshots under DATA_DIR/storage.
 // This in-memory table store persists dirty tables back to those files.
 import { existsSync, mkdirSync, openSync, closeSync, readFileSync, readSync, statSync } from "node:fs";
 import { copyFile, open, rename, unlink, writeFile } from "node:fs/promises";

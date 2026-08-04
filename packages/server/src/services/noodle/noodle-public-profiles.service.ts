@@ -119,7 +119,7 @@ export async function generateMissingNoodleProfiles(input: {
     {
       role: "system",
       content: [
-        "You set up fake Noodle social media profiles for existing Marinara Engine characters.",
+        "You set up fake Noodle social media profiles for existing YunYun Engine characters.",
         NOODLE_ADULT_PLATFORM_POLICY,
         "Create concise profile metadata only. Do not write posts, replies, likes, or timeline content.",
         "Use each character's personality, setting, and appearance to make the profile feel natural and in character.",

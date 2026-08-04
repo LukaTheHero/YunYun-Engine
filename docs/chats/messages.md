@@ -2,7 +2,7 @@
 
 This guide covers what you can do with a single message in a chat. It explains the message toolbar, how to edit and delete a message, and how swipes and regeneration work. It also covers the display toggles that show token counts and message numbers.
 
-Every message in Marinara Engine, whether you wrote it or the AI did, has a small toolbar. The toolbar appears when you hover over the message on a computer, or when you tap the message on a phone or tablet.
+Every message in YunYun Engine, whether you wrote it or the AI did, has a small toolbar. The toolbar appears when you hover over the message on a computer, or when you tap the message on a phone or tablet.
 
 ## The message toolbar
 
@@ -71,7 +71,7 @@ These three actions look similar but do different things. Choose the one that ma
 
 The **/continue** command extends the same message. Type `/continue` (or its short form `/cont`) in the input box and send it. The AI picks up where its last reply stopped and adds more text to that same message, instead of making a new swipe.
 
-By default, Marinara inserts a blank line before the added text. To make continuations attach directly to the final character of the previous response, turn off **Settings → General → Responses → Add a new line before /continue text**. Marinara then tells the model to continue exactly from the cutoff without a separator.
+By default, YunYun inserts a blank line before the added text. To make continuations attach directly to the final character of the previous response, turn off **Settings → General → Responses → Add a new line before /continue text**. YunYun then tells the model to continue exactly from the cutoff without a separator.
 
 ```
 /continue
@@ -105,4 +105,4 @@ A related toggle in the same **Message Tools** section, **Show model name on mes
 - [Text to Speech (TTS) Setup](../media/tts-setup.md)
 - [Message Translation](../integrations/message-translation.md)
 - [Settings Overview](../settings/settings-overview.md)
-- [Troubleshooting Marinara Engine](../TROUBLESHOOTING.md)
+- [Troubleshooting YunYun Engine](../TROUBLESHOOTING.md)

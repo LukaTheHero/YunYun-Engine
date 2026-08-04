@@ -90,7 +90,7 @@ export async function ensureProfessorMariAccount(
       displayName: account.displayName || "Professor Mari",
       bio: PROFESSOR_MARI_NOODLE_BIO,
       avatarUrl: account.avatarUrl || row?.avatarPath || "/sprites/mari/Mari_profile.png",
-      profile: generatedProfileSettings("Marinara Engine", null),
+      profile: generatedProfileSettings("YunYun Engine", null),
     });
   }
 }

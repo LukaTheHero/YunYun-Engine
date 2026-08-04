@@ -1,7 +1,7 @@
 send_message:
   name: Send Message
   description: >
-    Send a message to a Marinara Engine chat. If no chat_id is provided, the
+    Send a message to a YunYun Engine chat. If no chat_id is provided, the
     primary chat configured in the integration options is used.
   fields:
     chat_id:
@@ -44,7 +44,7 @@ send_message:
 trigger_generation:
   name: Trigger Generation
   description: >
-    Start an AI generation turn in a Marinara Engine chat. If no chat_id is
+    Start an AI generation turn in a YunYun Engine chat. If no chat_id is
     provided, the primary chat configured in the integration options is used.
   fields:
     chat_id:

@@ -1,6 +1,6 @@
 # Chat Branches
 
-This guide explains chat branches in Marinara Engine: what a branch is and how to make one. It also covers switching, renaming, deleting, exporting, and importing branches. A branch lets you try a different path in a chat without losing the original.
+This guide explains chat branches in YunYun Engine: what a branch is and how to make one. It also covers switching, renaming, deleting, exporting, and importing branches. A branch lets you try a different path in a chat without losing the original.
 
 ## What a branch is
 
@@ -19,7 +19,7 @@ You create a branch from any message in the chat.
 1. Hover over a message (or tap it on mobile) to show the message action bar.
 2. Click the **Branch from here** button. It uses a small branching icon.
 
-Marinara copies the chat up to and including that message into a new branch. The new branch:
+YunYun copies the chat up to and including that message into a new branch. The new branch:
 
 - Keeps the same mode, characters, persona, prompt preset, and connection as the source chat.
 - Copies every message, including all swipes (alternate replies) and which swipe was active. See the [Message Actions guide](messages.md) for how swipes work.
@@ -82,9 +82,9 @@ You can bring a saved chat log in as a new branch of the chat you have open.
 
 1. Open the **Chat Branches** popover.
 2. Click the **Import** button.
-3. Pick a JSONL file (`.jsonl`) exported from SillyTavern or from Marinara.
+3. Pick a JSONL file (`.jsonl`) exported from SillyTavern or from YunYun.
 
-Marinara adds the file as a new branch in the current chat's group. You should see a message like "Imported N messages as a new branch". The app then switches to the new branch.
+YunYun adds the file as a new branch in the current chat's group. You should see a message like "Imported N messages as a new branch". The app then switches to the new branch.
 
 ## Related guides
 

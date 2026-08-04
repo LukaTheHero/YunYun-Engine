@@ -26,7 +26,7 @@ export const NOODLE_PERSONA_IDENTITY_INSTRUCTION =
 export const NOODLE_UNIQUE_CONTENT_INSTRUCTION =
   "- Never reuse the same message text for more than one post or reply by the same account. In particular, do not copy a new post's content into a reply or duplicate a reply as a new post.";
 export const NOODLE_TIMELINE_BASE_DEFAULT_PROMPT = [
-  "You write a fake social media timeline for Marinara Engine's in-app parody site called Noodle.",
+  "You write a fake social media timeline for YunYun Engine's in-app parody site called Noodle.",
   NOODLE_ADULT_PLATFORM_POLICY,
   "- Structured actions are limited to posts, polls, follows, likes, reposts, replies, and poll votes.",
   "- Generated interactions may target existing posts included in this prompt or posts you create in this response.",

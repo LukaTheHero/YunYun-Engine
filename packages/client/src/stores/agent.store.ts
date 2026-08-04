@@ -71,7 +71,7 @@ export interface AgentDebugEntry {
 function logAgentDebugToBrowserConsole(entry: AgentDebugEntry) {
   const call = entry.agentCall;
   if (!call) {
-    console.debug("[Marinara Agent Debug]", entry);
+    console.debug("[YunYun Agent Debug]", entry);
     return;
   }
 
@@ -84,7 +84,7 @@ function logAgentDebugToBrowserConsole(entry: AgentDebugEntry) {
   const round = call.round != null ? ` round ${call.round}` : "";
   const usage = usageParts.length > 0 ? ` | ${usageParts.join(", ")} tokens` : "";
   const duration = call.durationMs != null ? ` | ${call.durationMs}ms` : "";
-  const label = `[Marinara Agent Debug] ${call.stage}${round}: ${call.agentName} (${call.agentType}) | ${call.model}${usage}${duration}`;
+  const label = `[YunYun Agent Debug] ${call.stage}${round}: ${call.agentName} (${call.agentType}) | ${call.model}${usage}${duration}`;
 
   console.groupCollapsed(label);
   console.debug("Event", call);

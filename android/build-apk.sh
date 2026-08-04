@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Marinara Engine Android APK
+# Build the YunYun Engine Android APK
 # Requires: Android SDK (ANDROID_HOME or ANDROID_SDK_ROOT set) and Java 17+
 #
 # Usage:
@@ -40,7 +40,7 @@ if ! command -v java &>/dev/null; then
     exit 1
 fi
 
-echo "Building Marinara Engine APK ($BUILD_TYPE)..."
+echo "Building YunYun Engine APK ($BUILD_TYPE)..."
 
 # Use gradlew if available, otherwise system gradle
 if [ -f "./gradlew" ]; then

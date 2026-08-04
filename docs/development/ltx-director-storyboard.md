@@ -4,7 +4,7 @@ Status: Simplification follow-up under local review.
 
 ## Problem
 
-Marinara's first LTX Director Storyboard integration split each planned shot into a stable global prompt and multiple pipe-delimited local prompts. The Storyboard route then recognized the built-in template IDs and bypassed the normal video-prompt contract to assemble an LTX-specific payload.
+YunYun's first LTX Director Storyboard integration split each planned shot into a stable global prompt and multiple pipe-delimited local prompts. The Storyboard route then recognized the built-in template IDs and bypassed the normal video-prompt contract to assemble an LTX-specific payload.
 
 That design made prompt customization surprising: copying or editing a built-in template changed its ID and silently disabled the special handoff. It also encouraged the planner to distribute too many actions across a short clip. When planning failed, the generic fallback storyboard could pass a large excerpt of raw narration to video generation, producing the overloaded prompts seen in runtime logs.
 
@@ -60,7 +60,7 @@ There is no LTX-only Storyboard route branch in this flow.
 
 ## ComfyUI contract
 
-Use the known-working LTX 2.3 image-to-video workflow with the normal Marinara placeholders. Its Director inputs should be:
+Use the known-working LTX 2.3 image-to-video workflow with the normal YunYun placeholders. Its Director inputs should be:
 
 ```json
 {
@@ -70,7 +70,7 @@ Use the known-working LTX 2.3 image-to-video workflow with the normal Marinara p
 }
 ```
 
-Keep `%reference_image_name%`, `%duration_seconds%`, `%length%`, `%width%`, `%height%`, `%seed%`, and `%model%` where the workflow already expects them. A six-second request remains 96 frames under Marinara's existing 16 FPS contract.
+Keep `%reference_image_name%`, `%duration_seconds%`, `%length%`, `%width%`, `%height%`, `%seed%`, and `%model%` where the workflow already expects them. A six-second request remains 96 frames under YunYun's existing 16 FPS contract.
 
 Older saved workflows using `%global_prompt%`, `%local_prompts%`, and `%segment_lengths%` remain compatible: the adapter maps an ordinary request prompt to the global value and leaves local prompts and segment lengths empty. Those placeholders are compatibility support, not the recommended Storyboard configuration.
 

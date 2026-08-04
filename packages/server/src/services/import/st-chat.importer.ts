@@ -87,7 +87,7 @@ function normalizeTranscriptTimestamps(
   fallbackStart?: TimestampOverrides | null,
 ): Array<ParsedSTChatMessageInput & { createdAt: string }> {
   // ST exports may contain identical or even backward send_date values.
-  // Marinara sorts messages by createdAt, so make the imported transcript
+  // YunYun sorts messages by createdAt, so make the imported transcript
   // strictly monotonic while preserving the source file's line order.
   const fallback = normalizeTimestampOverrides(fallbackStart);
   const firstParsedIndex = inputs.findIndex((input) => input.parsedCreatedAt);
@@ -337,7 +337,7 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
       const storedMessageExtra = Object.keys(messageExtra).length > 0 ? messageExtra : undefined;
       const swipeContents = normalizeSwipeContents(stMsg.swipes, rawContent);
       const activeSwipeIndex = normalizeSwipeIndex(stMsg.swipe_id, swipeContents.length);
-      // Marinara exports store the currently displayed message in `mes`.
+      // YunYun exports store the currently displayed message in `mes`.
       // Older/broken exports could leave `swipes[swipe_id]` stale after a manual
       // edit, so prefer `mes` for the active swipe while preserving alternates.
       swipeContents[activeSwipeIndex] = rawContent;

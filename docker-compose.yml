@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────
-# Marinara Engine — Docker Compose
+# YunYun Engine — Docker Compose
 # ──────────────────────────────────────────────
 services:
   marinara:

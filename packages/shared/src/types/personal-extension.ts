@@ -188,7 +188,7 @@ export interface PersonalExtensionRevision {
 }
 
 /**
- * User-owned code stored by Marinara.
+ * User-owned code stored by YunYun.
  *
  * Browser code runs in an opaque-origin sandboxed iframe with a message-only
  * capability API. Server code runs in a separate OS-sandboxed process with

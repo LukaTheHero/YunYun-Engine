@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Modal: Import Persona (JSON / Marinara export)
+// Modal: Import Persona (JSON / YunYun export)
 // ──────────────────────────────────────────────
 import { useState, useRef } from "react";
 import { Modal } from "../ui/Modal";
@@ -53,7 +53,7 @@ export function ImportPersonaModal({ open, onClose }: Props) {
     const nextResults: Array<{ filename: string; success: boolean; message: string }> = [];
     for (const file of files) {
       try {
-        // Marinara native packages are .marinara files (zip with data.json +
+        // YunYun native packages are .marinara files (zip with data.json +
         // avatar binary). Detect via the zip signature so a renamed file
         // still works.
         if (await isZipFile(file)) {

@@ -383,7 +383,7 @@ function buildCompatibleLorebookExport(lb: Record<string, any>) {
     extensions: {
       marinara: {
         exportedAt: new Date().toISOString(),
-        source: "Marinara Engine compatibility export",
+        source: "YunYun Engine compatibility export",
       },
     },
     entries,
@@ -1945,7 +1945,7 @@ async function readProfileEnvelopeFromArchive(zip: ProfileZipArchive) {
     throw new ProfileImportRequestError(
       [
         "Profile archive is missing marinara-profile.json.",
-        "Select a Marinara profile export or a full backup ZIP downloaded from Settings -> Advanced -> Backups.",
+        "Select a YunYun profile export or a full backup ZIP downloaded from Settings -> Advanced -> Backups.",
         sampleEntries ? `This ZIP starts with: ${sampleEntries}` : "This ZIP did not contain any readable files.",
       ].join(" "),
     );
@@ -2130,14 +2130,14 @@ async function readProfileImportRequest(req: FastifyRequest): Promise<ProfileImp
 
 function buildBackupRestoreNotes() {
   return [
-    "Marinara Engine backup",
+    "YunYun Engine backup",
     "",
     "This archive contains a raw filesystem backup for manual recovery.",
     "Treat it as sensitive: full backups include local secret material such as .encryption-key when that file exists.",
     "Restore .encryption-key together with the storage files to keep saved API keys decryptable.",
     "If this install used an ENCRYPTION_KEY environment variable instead of a persisted key file, restore that environment variable separately.",
     "",
-    "For one-click import inside Marinara:",
+    "For one-click import inside YunYun:",
     "1. Open Settings -> Import.",
     "2. Use Import Profile and select the downloaded backup zip archive.",
     "3. Keep the ZIP intact so its streamed table shards and assets remain available to the importer.",

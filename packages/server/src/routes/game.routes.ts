@@ -3843,7 +3843,7 @@ function buildGameLorebookKeeperMessages(args: {
     .join("\n");
 
   const systemPrompt = [
-    "You are Marinara's Game Lorebook Keeper.",
+    "You are YunYun's Game Lorebook Keeper.",
     "You run only after a Game Mode session concludes. This is separate from the chat/roleplay Lorebook Keeper agent.",
     "Create game-scoped lorebook entries only for durable continuity that helps future GM sessions: revealed world lore, meaningful locations, party discoveries, player revelations, important NPCs, exact exchanges, powers, factions, items, or consequences.",
     "Do not write a recap, invent future plot, record mundane rooms, transient actions, temporary combat states, or things the player did not learn.",

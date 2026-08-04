@@ -1,21 +1,21 @@
 // ──────────────────────────────────────────────
 // Taskbar Shortcut Migration (Windows-only)
 // ──────────────────────────────────────────────
-// Re-points the user's Start Menu and Desktop "Marinara Engine" shortcuts at
+// Re-points the user's Start Menu and Desktop "YunYun Engine" shortcuts at
 // the bundled MarinaraLauncher.exe and stamps an AppUserModelID on the .lnk,
 // so that pinning the shortcut to the taskbar groups the running console
 // under the pinned icon (instead of spawning a separate generic cmd entry).
 //
 // Idempotent: if a shortcut already targets the launcher we skip it. Only
 // shortcuts that currently point at *this* install's start.bat are touched —
-// other Marinara installs and unrelated shortcuts are left alone.
+// other YunYun installs and unrelated shortcuts are left alone.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { logger } from "../../lib/logger.js";
 
 const AUMID = "Pasta-Devs.MarinaraEngine";
-const SHORTCUT_TITLE = "Marinara Engine";
+const SHORTCUT_TITLE = "YunYun Engine";
 
 // Hard timeout per child-process hop. The migration is scheduled after the
 // server starts listening, and child processes are async so slow shortcut COM
@@ -174,11 +174,11 @@ export async function migrateTaskbarShortcuts(installDir: string): Promise<void>
   const candidates: string[] = [];
   if (appData) {
     candidates.push(
-      join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "Marinara Engine", "Marinara Engine.lnk"),
+      join(appData, "Microsoft", "Windows", "Start Menu", "Programs", "YunYun Engine", "YunYun Engine.lnk"),
     );
   }
   if (userProfile) {
-    candidates.push(join(userProfile, "Desktop", "Marinara Engine.lnk"));
+    candidates.push(join(userProfile, "Desktop", "YunYun Engine.lnk"));
   }
   // Test-only escape hatch — comma/semicolon-delimited extra .lnk paths to consider.
   const extra = process.env.MARINARA_LAUNCHER_TEST_LNKS;

@@ -93,7 +93,7 @@ export function getEnvFilePath() {
   return dataEnvPath;
 }
 
-const EMPTY_ENV_HEADER = `# Marinara Engine - runtime configuration.
+const EMPTY_ENV_HEADER = `# YunYun Engine - runtime configuration.
 # This file is empty by design. Copy any setting you want to change from
 # .env.example (same folder) and edit the value here. Most changes take
 # effect within ~2 seconds without a restart.
@@ -356,7 +356,7 @@ export function getBasicAuthConfig() {
   return {
     user: normalizeEnvValue(process.env.BASIC_AUTH_USER),
     pass: normalizeEnvValue(process.env.BASIC_AUTH_PASS),
-    realm: normalizeEnvValue(process.env.BASIC_AUTH_REALM) ?? "Marinara Engine",
+    realm: normalizeEnvValue(process.env.BASIC_AUTH_REALM) ?? "YunYun Engine",
   };
 }
 

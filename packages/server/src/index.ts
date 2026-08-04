@@ -67,7 +67,7 @@ async function main() {
     }
 
     isShuttingDown = true;
-    logger.info("Received %s; shutting down Marinara Engine", signal);
+    logger.info("Received %s; shutting down YunYun Engine", signal);
 
     try {
       envWatcher.stop();
@@ -89,7 +89,7 @@ async function main() {
 
   try {
     await app.listen({ port, host });
-    logger.info(`Marinara Engine server listening on ${protocol}://${host}:${port}`);
+    logger.info(`YunYun Engine server listening on ${protocol}://${host}:${port}`);
     logCsrfTrustSummary();
     scheduleTaskbarShortcutMigration();
   } catch (err) {
@@ -101,7 +101,7 @@ async function main() {
     if (isAddressInUseError(err)) {
       logger.error(
         err,
-        "Port %d is already in use. Marinara Engine could not start. Close the app using that port or set PORT to another value, for example PORT=7869 bash ./start.sh on macOS/Linux or set PORT=7869 && start.bat in Windows cmd.",
+        "Port %d is already in use. YunYun Engine could not start. Close the app using that port or set PORT to another value, for example PORT=7869 bash ./start.sh on macOS/Linux or set PORT=7869 && start.bat in Windows cmd.",
         port,
       );
     } else {

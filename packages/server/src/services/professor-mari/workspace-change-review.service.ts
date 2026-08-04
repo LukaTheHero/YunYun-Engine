@@ -472,7 +472,7 @@ export class WorkspaceChangeReviewService {
     const requestedVersion = input.version?.trim() || "latest";
     if (!packageNameIsValid(packageName)) throw new Error("Use a valid public npm package name.");
     if (requestedVersion !== "latest" && !exactVersionIsValid(requestedVersion)) {
-      throw new Error("Dependency versions must be exact semver values or latest so Marinara can resolve an exact version.");
+      throw new Error("Dependency versions must be exact semver values or latest so YunYun can resolve an exact version.");
     }
     if (!(input.target in TARGET_MANIFESTS)) throw new Error("Dependency target must be root, client, server, or shared.");
 

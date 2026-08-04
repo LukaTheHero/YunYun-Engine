@@ -404,7 +404,7 @@ function isMobileGameViewport(): boolean {
 }
 
 function isBrowserSpotifyDeviceName(name: string | null | undefined): boolean {
-  return name === "Marinara Engine";
+  return name === "YunYun Engine";
 }
 
 function isPersonalMobileSpotifyDeviceType(type: string | null | undefined): boolean {

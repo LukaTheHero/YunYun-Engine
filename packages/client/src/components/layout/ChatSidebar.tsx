@@ -1344,8 +1344,8 @@ export function ChatSidebar() {
           onClick={() => chatImportInputRef.current?.click()}
           disabled={isImportingChat}
           className="mari-chrome-control mari-chrome-control--primary flex-1 text-xs"
-          title={localize(isImportingChat ? "Importing chat" : "Import SillyTavern or Marinara chat JSONL")}
-          aria-label={localize(isImportingChat ? "Importing chat" : "Import SillyTavern or Marinara chat JSONL")}
+          title={localize(isImportingChat ? "Importing chat" : "Import SillyTavern or YunYun chat JSONL")}
+          aria-label={localize(isImportingChat ? "Importing chat" : "Import SillyTavern or YunYun chat JSONL")}
         >
           <Download size="0.8125rem" />
         </button>

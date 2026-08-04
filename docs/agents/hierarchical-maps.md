@@ -1,7 +1,7 @@
 # World Maps: Setup, Authoring, and Travel
 
 > **Current compatibility:** This guide matches World Maps **1.2.5** on
-> Marinara Engine **2.3.5 or later**. The package supports Roleplay and Game
+> YunYun Engine **2.3.5 or later**. The package supports Roleplay and Game
 > chats.
 
 World Maps adds persistent world state to Roleplay and Game. Instead of
@@ -16,7 +16,7 @@ The Shattered Coast
     └── Old Sewers
 ```
 
-Marinara keeps an authoritative current location in this hierarchy. The current
+YunYun keeps an authoritative current location in this hierarchy. The current
 breadcrumb, exact location details, nearby destinations, and eligible linked
 lore can ground the next response. Maps can also follow explicit movement or
 discovery established by the latest user message. The visible AI narration can
@@ -75,7 +75,7 @@ to chat** in the library attach the chat to the canonical shared world.
 ## Quick start
 
 1. Open **Agents**, click **Download Agents**, and install **World Maps**.
-2. Restart Marinara when prompted. The package contains server code.
+2. Restart YunYun when prompted. The package contains server code.
 3. Open a Roleplay or Game chat.
 4. Open the dedicated **World Maps** globe when your Engine provides it, or use
    **Agents → World Maps**, and enable it for the current chat. You can also
@@ -204,7 +204,7 @@ copy**. A shared world itself cannot be deleted until all linked chats are
 detached or relinked.
 
 Shared worlds and templates retain Global Gallery artwork references without
-copying the image file into every chat. Marinara blocks deletion of a Global
+copying the image file into every chat. YunYun blocks deletion of a Global
 Gallery image while a saved template, shared world, independent chat map, or
 linked-chat draft still references it. Remove the artwork links first when you
 intend to delete the asset itself.
@@ -354,7 +354,7 @@ the awareness summary alone.
 
 Maps supports queued travel, planned routes, and validated user-led arrival.
 Movement is saved with the turn so the location follows the selected message
-history and swipe. Restarting Marinara does not intentionally reset the current
+history and swipe. Restarting YunYun does not intentionally reset the current
 location; switching to a message branch or swipe restores the spatial snapshot
 saved with that selected history.
 
@@ -608,7 +608,7 @@ The main **Agents → World Maps** page owns two global prompt systems:
   preview uses live setup, character, lore, and map context without making a
   model request.
 - **Turn prompt insert** controls the global Roleplay/Game system text that
-  presents the current location during ordinary turns. Marinara keeps the
+  presents the current location during ordinary turns. YunYun keeps the
   application-owned `<spatial_context>` wrapper and required authority
   variables around it.
 
@@ -667,7 +667,7 @@ JSON to bypass these protections.
 
 ### World Maps is missing from Chat Settings
 
-Confirm that the package is installed and Marinara was restarted. The active
+Confirm that the package is installed and YunYun was restarted. The active
 chat must be Roleplay or Game. Turn on **Enable Agents**, then enable
 **World Maps** under **Tracker Agents**.
 
@@ -681,7 +681,7 @@ and **Use shared world**.
 If the library lists shared worlds during Game setup but does not show **Use
 shared world**, the browser may still be running an older package client from
 before the update. In any open map editor, save the map or intentionally discard
-its draft, then close the editor. Save unrelated work, hard-refresh Marinara
+its draft, then close the editor. Save unrelated work, hard-refresh YunYun
 once, and reopen Game setup. Newer Engine builds explicitly report when a
 package update needs that refresh.
 

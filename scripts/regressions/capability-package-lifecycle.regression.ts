@@ -214,7 +214,7 @@ try {
   const agentDetailFixture = {
     name: "Agent detail fixture",
     description: "Capability lifecycle regression fixture.",
-    author: "Marinara",
+    author: "YunYun",
     phase: "post_processing" as const,
     enabledByDefault: false,
     category: "misc" as const,

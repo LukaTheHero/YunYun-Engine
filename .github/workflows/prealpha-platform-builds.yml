@@ -16,9 +16,9 @@ env:
   NODE_VERSION: "22"
   PNPM_VERSION: "10.33.2"
   PREALPHA_CONFIG: src-tauri/tauri.prealpha.conf.json
-  PREALPHA_PRODUCT_NAME: Marinara Engine Pre-Alpha
+  PREALPHA_PRODUCT_NAME: YunYun Engine Pre-Alpha
   PREALPHA_ANDROID_APPLICATION_ID: com.marinara_engine.prealpha
-  PREALPHA_ANDROID_APP_NAME: Marinara Engine Pre-Alpha
+  PREALPHA_ANDROID_APP_NAME: YunYun Engine Pre-Alpha
 
 jobs:
   refactor-only:
@@ -55,7 +55,7 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           short_sha="${GITHUB_SHA::7}"
           tag_name="prealpha-refactor-v${version}-run${GITHUB_RUN_NUMBER}-attempt${GITHUB_RUN_ATTEMPT}-${short_sha}"
-          release_name="Marinara Engine Pre-Alpha Test Build v${version} #${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          release_name="YunYun Engine Pre-Alpha Test Build v${version} #${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
           {
             echo "version=${version}"
             echo "tag_name=${tag_name}"
@@ -84,7 +84,7 @@ jobs:
               '## 🚨 Read before downloading',
               '',
               '- **Almost everything may be broken.** Expect crashes, missing behavior, unfinished UI, incomplete migration paths, broken imports/exports, provider/runtime issues, and platform-specific failures.',
-              '- **Use throwaway data only.** Back up existing Marinara data before launching this build. Do not use this for real saves, production stories, or important chats.',
+              '- **Use throwaway data only.** Back up existing YunYun data before launching this build. Do not use this for real saves, production stories, or important chats.',
               '- **Unsigned and unnotarized.** Windows SmartScreen, macOS Gatekeeper, Linux package trust warnings, and Android debug-build warnings are expected.',
               '- **No stable-update promise.** These artifacts do not publish updater metadata and should not be treated as an official update channel.',
               '- **Built only from the `refactor` branch.** This workflow does not publish from `main` and does not replace the main branch or stable releases.',
@@ -99,7 +99,7 @@ jobs:
               '',
               '## Build identity',
               '',
-              '- App label: **Marinara Engine Pre-Alpha**',
+              '- App label: **YunYun Engine Pre-Alpha**',
               '- Desktop Tauri identifier: `com.marinara-engine.prealpha`',
               '- Android application id: `com.marinara_engine.prealpha`',
               `- Source branch: \`${branch}\``,

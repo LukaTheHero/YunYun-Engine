@@ -128,7 +128,7 @@
       "checks": [
         "Parent records must not collect IDs, metadata, counts, or relationships from child rows that later skip import or fail to persist.",
         "Pre-scan logic should use the same eligibility criteria as the write loop, especially for imports, migrations, and rollback-sensitive storage paths.",
-        "Existing user data and SillyTavern/Marinara exports must remain importable; old persisted shapes still need to load.",
+        "Existing user data and SillyTavern/YunYun exports must remain importable; old persisted shapes still need to load.",
         "file-backed-store autosave and JSON snapshot durability must survive partial writes and rollback without leaving inconsistent message, chat, character, branch, or asset metadata."
       ]
     },

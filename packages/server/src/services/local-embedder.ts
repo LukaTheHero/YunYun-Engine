@@ -44,7 +44,7 @@ function hasNativeOnnxRuntimeBinding(): boolean {
   if (!nativeBindingChecked) {
     nativeBindingChecked = true;
     logger.info(
-      "[local-embedder] Local memory embeddings disabled: onnxruntime-node native binding is unavailable for %s/%s. Reinstall dependencies with the same Node architecture used to run Marinara.",
+      "[local-embedder] Local memory embeddings disabled: onnxruntime-node native binding is unavailable for %s/%s. Reinstall dependencies with the same Node architecture used to run YunYun.",
       process.platform,
       process.arch,
     );

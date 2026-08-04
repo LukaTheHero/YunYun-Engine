@@ -132,7 +132,7 @@ function verifyRequirementsLock(): void {
     .digest("hex");
   if (actualSha256 !== MLX_RUNTIME_MANIFEST.mlxLm.requirementsLockSha256) {
     throw new Error(
-      "The bundled MLX dependency lock failed integrity verification. Update or reinstall Marinara Engine before retrying; do not bypass the runtime integrity check.",
+      "The bundled MLX dependency lock failed integrity verification. Update or reinstall YunYun Engine before retrying; do not bypass the runtime integrity check.",
     );
   }
 }
@@ -508,7 +508,7 @@ class MlxRuntimeService {
       const message = error instanceof Error ? error.message : String(error);
       if (/(?:file size|SHA-256) mismatch/iu.test(message)) {
         throw new Error(
-          `The ${label} download no longer matches the Engine-approved runtime manifest. Update or reinstall Marinara Engine before retrying; do not bypass the integrity check. Original verification error: ${message}`,
+          `The ${label} download no longer matches the Engine-approved runtime manifest. Update or reinstall YunYun Engine before retrying; do not bypass the integrity check. Original verification error: ${message}`,
         );
       }
       throw error;

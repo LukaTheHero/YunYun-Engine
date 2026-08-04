@@ -25,7 +25,7 @@ The **Chat Name** section holds the name shown in your chat list. This name is o
 
 ## Connection
 
-The **Connection** section picks which AI provider and model answers in this chat. A connection is a saved link to an AI provider, including its API key and chosen model. An API key is a secret code that lets Marinara Engine use your account with that provider.
+The **Connection** section picks which AI provider and model answers in this chat. A connection is a saved link to an AI provider, including its API key and chosen model. An API key is a secret code that lets YunYun Engine use your account with that provider.
 
 Pick a saved connection from the dropdown. You can also pick **Random**. It chooses a different connection each time from the connections you marked for your random pool.
 
@@ -46,13 +46,13 @@ The bar has a row of small icon buttons with no text labels. Each button shows i
 - The up-arrow icon (**Export settings profile (.json)**) saves the selected profile to a `.json` file.
 - The trash icon (**Delete profile**) removes the selected profile.
 
-Next to the dropdown is a star button. Click it to make a profile the default for new chats in this mode. When you create a new chat in that mode, Marinara applies the starred profile for you. Only one profile per mode can be the default.
+Next to the dropdown is a star button. Click it to make a profile the default for new chats in this mode. When you create a new chat in that mode, YunYun applies the starred profile for you. Only one profile per mode can be the default.
 
 Each mode that supports this feature has a built-in **Default** profile. You cannot rename, save into, or delete the **Default** profile. Applying it resets the profile-controlled settings to the app defaults.
 
 The profile controls do not appear in Game mode.
 
-Marinara reserves **preset** for prompt presets. A prompt preset shapes the system prompt structure and generation parameters; a settings profile bundles the reusable chat configuration listed above. For the full rules, see [Settings Profiles](settings-profiles.md).
+YunYun reserves **preset** for prompt presets. A prompt preset shapes the system prompt structure and generation parameters; a settings profile bundles the reusable chat configuration listed above. For the full rules, see [Settings Profiles](settings-profiles.md).
 
 ## Other sections in the panel
 

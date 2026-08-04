@@ -1,6 +1,6 @@
-// Marinara Engine — Windows taskbar-grouping launcher
+// YunYun Engine — Windows taskbar-grouping launcher
 //
-// Runs the Marinara Engine batch file in a console that's owned by this
+// Runs the YunYun Engine batch file in a console that's owned by this
 // executable, so the running window's AppUserModelID matches the pinned
 // Start Menu / taskbar shortcut and groups under it correctly.
 //

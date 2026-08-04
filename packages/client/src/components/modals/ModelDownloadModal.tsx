@@ -314,11 +314,11 @@ export function ModelDownloadModal({ open, onClose }: Props) {
         : "Downloading your selected GGUF and preparing it for local use."
       : progress?.phase === "runtime"
         ? activeBackend === "mlx"
-          ? "Downloading a private uv bootstrap and creating an isolated MLX environment inside Marinara's sidecar runtime folder."
+          ? "Downloading a private uv bootstrap and creating an isolated MLX environment inside YunYun's sidecar runtime folder."
           : "Downloading the official local runtime for this device."
         : activeBackend === "mlx"
-          ? "Starting the MLX server in the background. You can close this window while Marinara finishes booting it."
-          : "Starting the local sidecar server in the background. You can close this window while Marinara finishes booting it.";
+          ? "Starting the MLX server in the background. You can close this window while YunYun finishes booting it."
+          : "Starting the local sidecar server in the background. You can close this window while YunYun finishes booting it.";
   const runtimeStatusLabel = canFinish
     ? "Ready"
     : isBlockingSetup

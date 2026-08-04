@@ -110,10 +110,10 @@ function formatBytes(bytes: number) {
 function catalogErrorDescription(error: unknown) {
   const offlineSuffix = "Installed agents remain available offline.";
   if (error instanceof ApiError) {
-    return `Marinara Engine returned HTTP ${error.status}: ${error.message}. ${offlineSuffix}`;
+    return `YunYun Engine returned HTTP ${error.status}: ${error.message}. ${offlineSuffix}`;
   }
   if (error instanceof Error && error.message) return `${error.message}. ${offlineSuffix}`;
-  return `Marinara Engine could not load the official catalog. ${offlineSuffix}`;
+  return `YunYun Engine could not load the official catalog. ${offlineSuffix}`;
 }
 
 function kindLabel(kind: CapabilityCatalogPackage["manifest"]["kind"][number]) {

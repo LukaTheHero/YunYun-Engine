@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for Marinara Engine."""
+"""DataUpdateCoordinator for YunYun Engine."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MarinaraCoordinator(DataUpdateCoordinator[dict]):
-    """Polls Marinara Engine for chats and agents."""
+    """Polls YunYun Engine for chats and agents."""
 
     def __init__(self, hass: HomeAssistant, host: str, port: int) -> None:
         self.base_url = f"http://{host}:{port}"
@@ -48,9 +48,9 @@ class MarinaraCoordinator(DataUpdateCoordinator[dict]):
 
             return {"chats": chats, "agents": agents}
         except aiohttp.ClientConnectionError as err:
-            raise UpdateFailed(f"Cannot reach Marinara Engine: {err}") from err
+            raise UpdateFailed(f"Cannot reach YunYun Engine: {err}") from err
         except aiohttp.ClientResponseError as err:
-            raise UpdateFailed(f"Marinara Engine returned error {err.status}") from err
+            raise UpdateFailed(f"YunYun Engine returned error {err.status}") from err
         except Exception as err:
             raise UpdateFailed(f"Unexpected error: {err}") from err
 
@@ -64,7 +64,7 @@ class MarinaraCoordinator(DataUpdateCoordinator[dict]):
                 resp.raise_for_status()
         except Exception as err:
             raise ConfigEntryNotReady(
-                f"Cannot connect to Marinara Engine at {self.base_url}: {err}"
+                f"Cannot connect to YunYun Engine at {self.base_url}: {err}"
             ) from err
 
     async def send_message(self, chat_id: str, content: str, role: str = "user") -> None:
@@ -110,7 +110,7 @@ class MarinaraCoordinator(DataUpdateCoordinator[dict]):
             resp.raise_for_status()
 
     async def sync_agent(self, enabled_categories: list[str]) -> str:
-        """Create or update the Home Assistant agent in Marinara.
+        """Create or update the Home Assistant agent in YunYun.
 
         Returns "created", "updated", or "unchanged".
         """
@@ -185,7 +185,7 @@ class MarinaraCoordinator(DataUpdateCoordinator[dict]):
     async def sync_tools(
         self, webhook_url: str, enabled_categories: list[str]
     ) -> tuple[int, int]:
-        """Upsert HA tool definitions into Marinara for the given categories.
+        """Upsert HA tool definitions into YunYun for the given categories.
 
         Creates missing tools and updates existing ones so schema changes propagate.
         Also PATCHes enabled=false on previously-synced tools whose category was

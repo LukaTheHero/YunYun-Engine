@@ -74,7 +74,7 @@ const MANUAL_GIT_UPDATE_COMMAND =
 const DOCKER_UPDATE_COMMAND = "docker compose pull && docker compose up -d";
 const ANDROID_APK_NOTICE =
   "> [!IMPORTANT]\n" +
-  "> **Android APK notice:** The APK is a Termux bootstrap + WebView shell, not a native Android server build. It opens an already-running local Marinara server, and on first launch it can download Termux from F-Droid, hand it to Android's installer, and start Marinara through Termux after Android permission prompts.";
+  "> **Android APK notice:** The APK is a Termux bootstrap + WebView shell, not a native Android server build. It opens an already-running local YunYun server, and on first launch it can download Termux from F-Droid, hand it to Android's installer, and start YunYun through Termux after Android permission prompts.";
 
 // ── Cached release info (15-min TTL) ──
 let cachedRelease: {
@@ -220,9 +220,9 @@ function getManualUpdateHint(installType: InstallType, platform: ServerPlatform,
   }
   if (installType === "git") {
     const launcher = getGitLauncherCommand(platform);
-    return `Relaunch Marinara with ${launcher} to let the platform launcher fetch the current checkout's update branch, install dependencies, rebuild, and start the new version.`;
+    return `Relaunch YunYun with ${launcher} to let the platform launcher fetch the current checkout's update branch, install dependencies, rebuild, and start the new version.`;
   }
-  return "Download the release asset or update the host install manually, then restart Marinara.";
+  return "Download the release asset or update the host install manually, then restart YunYun.";
 }
 
 async function fetchUpdateRef(root: string, channel = UPDATE_CHANNELS.stable) {
@@ -444,7 +444,7 @@ function buildFallbackRelease(tag: string) {
 }
 
 function withAndroidApkNotice(notes: string) {
-  if (/Android APK notice|not a standalone Marinara Engine app|requires Termux/i.test(notes)) {
+  if (/Android APK notice|not a standalone YunYun Engine app|requires Termux/i.test(notes)) {
     return notes;
   }
 

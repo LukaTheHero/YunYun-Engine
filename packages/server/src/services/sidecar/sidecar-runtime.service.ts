@@ -454,7 +454,7 @@ class SidecarRuntimeService {
       if (!match) {
         if (preference !== "auto") {
           throw new Error(
-            `Marinara could not find ${formatRuntimePreference(preference)} for ${process.platform}/${process.arch}.`,
+            `YunYun could not find ${formatRuntimePreference(preference)} for ${process.platform}/${process.arch}.`,
           );
         }
         throw new Error(
@@ -517,7 +517,7 @@ class SidecarRuntimeService {
           throw new Error(
             `The downloaded CUDA sidecar runtime is missing required CUDA DLLs (${missingDlls.join(
               ", ",
-            )}). Reinstall the local runtime so Marinara can download the CUDA runtime package with bundled DLLs.`,
+            )}). Reinstall the local runtime so YunYun can download the CUDA runtime package with bundled DLLs.`,
           );
         }
       }

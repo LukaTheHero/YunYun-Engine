@@ -185,7 +185,7 @@ class SidecarProcessService {
       } else {
         if (sidecarRuntimeService.getStatus(sidecarModelService.getConfig().runtimePreference).source === "system") {
           throw new Error(
-            "The local runtime is using a system llama-server from PATH. Reinstall that runtime outside Marinara.",
+            "The local runtime is using a system llama-server from PATH. Reinstall that runtime outside YunYun.",
           );
         }
         sidecarRuntimeService.resetRuntime();

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-05-03T00:00:00.000Z",
-  "title": "Design System: Marinara Engine",
+  "title": "Design System: YunYun Engine",
   "extensions": {
     "northStar": "The Velvet Game Console",
-    "overview": "Marinara Engine is a dark blush-violet story surface for AI conversation, roleplay, and game mode. It should feel immersive, pretty, playful, and capable, with compact tools that remain clear for nontechnical users.",
+    "overview": "YunYun Engine is a dark blush-violet story surface for AI conversation, roleplay, and game mode. It should feel immersive, pretty, playful, and capable, with compact tools that remain clear for nontechnical users.",
     "colorMeta": {
       "void-night": {
         "role": "neutral",
@@ -44,7 +44,7 @@
         "Use solid or near-solid surfaces for long text and editors."
       ],
       "dont": [
-        "Do not make Marinara a sterile SaaS dashboard.",
+        "Do not make YunYun a sterile SaaS dashboard.",
         "Do not clone SillyTavern as the default identity.",
         "Do not rely on hover for important mobile actions.",
         "Do not use nested cards, side-stripe borders, or glassmorphism as the default layout answer."

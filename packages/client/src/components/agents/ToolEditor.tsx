@@ -43,7 +43,7 @@ const EXEC_TYPES = [
 ] as const;
 
 const SCRIPT_TOOLS_DISABLED_MESSAGE =
-  "Script tools are disabled. Set CUSTOM_TOOL_SCRIPT_ENABLED=true in your .env and restart Marinara only for trusted in-process script tools.";
+  "Script tools are disabled. Set CUSTOM_TOOL_SCRIPT_ENABLED=true in your .env and restart YunYun only for trusted in-process script tools.";
 
 // ═══════════════════════════════════════════════
 //  Main Editor

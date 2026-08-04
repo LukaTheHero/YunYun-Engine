@@ -134,7 +134,7 @@ async function buildCharacterContext(chars: ReturnType<typeof createCharactersSt
     ctx += `<character="${data.name}">\n`;
     if (data.description) ctx += `${data.description}\n`;
     if (data.personality) ctx += `${data.personality}\n`;
-    // RPG stats from the character card (Marinara extension). Surface the
+    // RPG stats from the character card (YunYun extension). Surface the
     // configured max HP so the combat-init AI honors the user-defined value
     // instead of inventing one for allies. Only `max` is exposed because
     // combat should always start at full HP regardless of the card's stale

@@ -1,16 +1,16 @@
 # Storyboard Engine Guide
 
-This guide explains storyboards in Marinara Engine. A storyboard turns completed story text into a short run of keyframe images and can add animated clips. Game Mode storyboards follow one finished GM turn. Roleplay storyboards combine completed exchanges into an inline episode. Conversation chats do not use Storyboards.
+This guide explains storyboards in YunYun Engine. A storyboard turns completed story text into a short run of keyframe images and can add animated clips. Game Mode storyboards follow one finished GM turn. Roleplay storyboards combine completed exchanges into an inline episode. Conversation chats do not use Storyboards.
 
 ## What storyboards are
 
 Game Mode is the chat mode where an AI Game Master (GM) narrates a turn-based adventure. When the GM finishes a narration turn, the Storyboard Engine can illustrate that single turn. In Roleplay, the Storyboard Agent reads completed user and assistant messages since its previous successful episode.
 
-Marinara reads the GM narration and splits it into a short run of ordered keyframes. Each keyframe is one picture of a moment in the turn. A storyboard holds 1 to 6 keyframes. The default is 3.
+YunYun reads the GM narration and splits it into a short run of ordered keyframes. Each keyframe is one picture of a moment in the turn. A storyboard holds 1 to 6 keyframes. The default is 3.
 
 Each keyframe is tied to a range of the turn's text. These text ranges are called reader sections. As you read down the turn, a small viewer shows the keyframe that matches your current spot in the text.
 
-Before it plans the images, Marinara strips the turn's GM command tags. GM command tags are hidden instruction tags in a GM message, such as dice rolls or game-state updates. They are removed so they do not show up in the picture.
+Before it plans the images, YunYun strips the turn's GM command tags. GM command tags are hidden instruction tags in a GM message, such as dice rolls or game-state updates. They are removed so they do not show up in the picture.
 
 Keyframe still images are saved in the **Gallery**, under the **Images** tab. Keyframe clips are saved as scene videos, under the **Videos** tab. Because they are normal Gallery items, you can preview, download, pin, or copy the prompt of any keyframe on its own.
 
@@ -24,7 +24,7 @@ Roleplay Storyboards are separate from Illustrator. Illustrator can keep making 
 4. Select the prompt, image, and optional video connections. The image connection is required.
 5. For a manual episode, open **Gallery** and choose **Create storyboard**. Automatic episodes run after the configured number of user and assistant messages has accumulated and an assistant response completes.
 
-The default interval is 1, so an automatic episode can appear after every newly completed assistant response. A larger **Messages per episode** value lets dialogue and back-and-forth accumulate. User and assistant messages both advance the interval. When the interval is reached, Marinara combines the messages since the previous successful Storyboard, within a bounded recent window. Opening an existing chat does not backfill old messages, and a failed episode does not advance the successful cadence anchor.
+The default interval is 1, so an automatic episode can appear after every newly completed assistant response. A larger **Messages per episode** value lets dialogue and back-and-forth accumulate. User and assistant messages both advance the interval. When the interval is reached, YunYun combines the messages since the previous successful Storyboard, within a bounded recent window. Opening an existing chat does not backfill old messages, and a failed episode does not advance the successful cadence anchor.
 
 Roleplay keyframes render inline after the assistant response that ends the episode. Use the arrows on multi-keyframe Storyboards to move between frames. Images and clips are also saved in the Gallery.
 
@@ -73,7 +73,7 @@ While a storyboard is generating, the **Gallery** shows this banner: "Storyboard
 
 ## Automatic and manual storyboards
 
-You can make storyboards by hand, or have Marinara make them for you.
+You can make storyboards by hand, or have YunYun make them for you.
 
 Manual is the **Create storyboard** button in the **Gallery**. It builds a storyboard for the latest finished GM narration turn, only when you ask. You can also use it to refresh or re-illustrate the current turn, even when automatic storyboards are off.
 
@@ -170,7 +170,7 @@ The **NovelAI Keyframes** preset writes compact Danbooru tags. Danbooru tags are
 
 Game setup generates a campaign-level art style for visual consistency. For an existing game, open **Chat Settings > Agents > Illustrator** to see it under **Campaign art style**. You can edit it, clear it, restore the original setup-generated wording, or turn off **Use Campaign Art Style**.
 
-The campaign art style and **Image Style** profile are separate prompt layers. When both are enabled, Marinara includes both. Turning off or clearing the campaign style leaves the selected Image Style profile in place. This setting applies to storyboard keyframes and the game's other generated visual assets.
+The campaign art style and **Image Style** profile are separate prompt layers. When both are enabled, YunYun includes both. Turning off or clearing the campaign style leaves the selected Image Style profile in place. This setting applies to storyboard keyframes and the game's other generated visual assets.
 
 With **Expose image prompts before sending** enabled in **Settings > Generation**, manual **Create storyboard** requests first show the exact compiled positive and negative prompts for all planned keyframes. Changes in that review are one-off overrides for that storyboard only; they do not replace the campaign style or Image Style profile settings.
 
@@ -199,7 +199,7 @@ The floating viewer has these controls:
 
 **Background** fills the whole game surface with the active keyframe instead of a floating card. The image or clip sits behind the game controls. It uses the same reading-position logic as the floating viewer.
 
-Background mode has a trade-off. It turns off Marinara's normal generated scene location background. While it is on, the **Generate background** button in the illustrator popover is disabled. The button shows this note: "Storyboard background display is active, so scene background generation is disabled."
+Background mode has a trade-off. It turns off YunYun's normal generated scene location background. While it is on, the **Generate background** button in the illustrator popover is disabled. The button shows this note: "Storyboard background display is active, so scene background generation is disabled."
 
 ## Getting better results
 
@@ -217,7 +217,7 @@ For steadier results:
 
 For a compact NovelAI request, choose **NovelAI Keyframes** and turn off **Use Storyboard Template** in the **Storyboards** card. This sends the planned scene prompt directly while keeping the separate appearance, reference-image, image-instruction, and style settings available.
 
-**Use NovelAI Character Prompts** sends each visible character through native NovelAI Add Character captions and positions. This is on by default. Important: it only takes effect for an official NovelAI connection using a V4 or V4.5 model on novelai.net. For any other provider or model, the toggle does nothing, and Marinara uses the shared legacy prompt instead.
+**Use NovelAI Character Prompts** sends each visible character through native NovelAI Add Character captions and positions. This is on by default. Important: it only takes effect for an official NovelAI connection using a V4 or V4.5 model on novelai.net. For any other provider or model, the toggle does nothing, and YunYun uses the shared legacy prompt instead.
 
 ## Troubleshooting
 
@@ -229,9 +229,9 @@ For a compact NovelAI request, choose **NovelAI Keyframes** and turn off **Use S
 
 **Images appear, but no videos.** Videos need both **Automatic Storyboard Animations** on and a **Video Generation** connection selected. With animations off, storyboards make still keyframes only.
 
-**Automatic storyboards do not run.** Check that **Automatic Storyboard Illustrations** or **Automatic Storyboard Animations** is on. Check that the image connection is set and the GM turn has finished streaming. Marinara will not make a second storyboard for a turn that already has one. You can still remake it by hand with **Create storyboard** in the **Gallery**.
+**Automatic storyboards do not run.** Check that **Automatic Storyboard Illustrations** or **Automatic Storyboard Animations** is on. Check that the image connection is set and the GM turn has finished streaming. YunYun will not make a second storyboard for a turn that already has one. You can still remake it by hand with **Create storyboard** in the **Gallery**.
 
-**The storyboard is partial or stuck.** This usually means one or more image or video jobs failed, timed out, or hit a provider rate limit. Prohibited content can also block a job. If a provider is slow, raise the image and video generation timeouts in your `.env` file, then restart Marinara. See the [configuration guide](../CONFIGURATION.md) for the exact variable names.
+**The storyboard is partial or stuck.** This usually means one or more image or video jobs failed, timed out, or hit a provider rate limit. Prohibited content can also block a job. If a provider is slow, raise the image and video generation timeouts in your `.env` file, then restart YunYun. See the [configuration guide](../CONFIGURATION.md) for the exact variable names.
 
 For deeper diagnosis, set your log level to debug and watch the server log. The storyboard log lines are tagged `[debug/game/storyboard-illustrator]`, `[debug/game/storyboard-image-preview]`, `[debug/game/storyboard-image-assets]`, and `[debug/game/storyboard-video]`.
 

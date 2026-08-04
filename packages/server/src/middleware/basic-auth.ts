@@ -20,7 +20,7 @@
 //
 // Optional:
 //   BASIC_AUTH_REALM            — string shown in the browser password prompt
-//                                 (default: "Marinara Engine")
+//                                 (default: "YunYun Engine")
 //   ALLOW_UNAUTHENTICATED_PRIVATE_NETWORK — set to "true" to allow LAN/Docker/
 //                                           Tailscale clients without auth
 //                                           (NOT recommended on shared networks)
@@ -145,7 +145,7 @@ function renderLockdownPage(clientIp: string): string {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>Marinara Engine — Set up access</title>
+<title>YunYun Engine — Set up access</title>
 <style>
   :root {
     color-scheme: dark;
@@ -262,7 +262,7 @@ function renderLockdownPage(clientIp: string): string {
   <main>
     <header>
       <span class="badge">Access blocked</span>
-      <h1>This Marinara Engine install needs access control before remote devices can connect.</h1>
+      <h1>This YunYun Engine install needs access control before remote devices can connect.</h1>
       <p class="lede">You're connecting from <span class="ip-pill">${safeIp}</span>, which isn't loopback. To protect your data, the server refuses non-local traffic until you choose how this device should authenticate. Pick one of the options below, save <code>.env</code>, wait a couple of seconds, then refresh this page.</p>
     </header>
 
@@ -270,7 +270,7 @@ function renderLockdownPage(clientIp: string): string {
       <h2>Option 1 — Basic Auth (recommended)</h2>
       <p class="hint">Best for shared networks, Tailscale, or any device you don't fully control. The browser will prompt for the username and password once, then remember it.</p>
       <ol>
-        <li>Open your <code>.env</code> file in the Marinara Engine folder.</li>
+        <li>Open your <code>.env</code> file in the YunYun Engine folder.</li>
         <li>Add (or edit) these two lines, picking your own values:
           <pre>BASIC_AUTH_USER=yourname
 BASIC_AUTH_PASS=a-long-random-password</pre>
@@ -284,7 +284,7 @@ BASIC_AUTH_PASS=a-long-random-password</pre>
       <h2>Option 2 — IP allowlist</h2>
       <p class="hint">Best when you only need a few known devices to connect — e.g. your phone on a home network, or specific Tailscale peers.</p>
       <ol>
-        <li>Open your <code>.env</code> file in the Marinara Engine folder.</li>
+        <li>Open your <code>.env</code> file in the YunYun Engine folder.</li>
         <li>Add this line. Your current IP is already filled in — add more entries (comma-separated, CIDR allowed) for other devices:
           <pre>IP_ALLOWLIST=${safeIp}</pre>
         </li>

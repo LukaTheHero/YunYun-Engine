@@ -163,7 +163,7 @@ test.beforeEach(async ({ page }) => {
   await prepareFreshClient(page);
 });
 
-test("What's New opens once for each Marinara Engine version", async ({ page }) => {
+test("What's New opens once for each YunYun Engine version", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(
     ({ bypassKey, seenKey }) => {
@@ -183,7 +183,7 @@ test("What's New opens once for each Marinara Engine version", async ({ page }) 
   await expect(announcement.getByText(/three new Agents/)).toBeVisible();
   await expect(announcement.getByText(/many bug fixes and QoL updates/)).toBeVisible();
   await expect(announcement.locator('[data-release-story="2.4.0"] img')).toHaveCount(12);
-  await expect(announcement.getByAltText("The new Personas icon in Marinara Engine")).toHaveAttribute(
+  await expect(announcement.getByAltText("The new Personas icon in YunYun Engine")).toHaveAttribute(
     "src",
     "https://i.imgur.com/K4Z9rSA.png",
   );
@@ -192,7 +192,7 @@ test("What's New opens once for each Marinara Engine version", async ({ page }) 
   await expect
     .poll(() => announcementScrollArea.evaluate((element) => element.scrollHeight > element.clientHeight))
     .toBe(true);
-  await expect(announcement.getByText("Marinara Engine has been updated.", { exact: true })).toHaveCount(0);
+  await expect(announcement.getByText("YunYun Engine has been updated.", { exact: true })).toHaveCount(0);
   await expect(announcement.getByText("Tactical Combat Mode in Games")).toHaveCount(0);
   await expect(announcement.getByRole("link", { name: "View release" })).toHaveAttribute(
     "href",
@@ -3494,7 +3494,7 @@ test("generation fallbacks identify the replacement connection in a toast", asyn
     await page.locator("button.mari-chat-send-btn").click();
     await expect(page.getByText("Main switched to Backup API (fallback-model).")).toBeVisible();
     await expect(
-      page.getByText("The primary generation failed, so Marinara retried with your configured fallback."),
+      page.getByText("The primary generation failed, so YunYun retried with your configured fallback."),
     ).toBeVisible();
   } finally {
     await page.request.delete(`/api/chats/${chat.id}`);
@@ -5726,14 +5726,14 @@ test("PocketTTS discovers server voices and uses its speech endpoint", async ({ 
     });
 
     const speechResponse = await request.post("/api/tts/speak", {
-      data: { text: "Hello from Marinara." },
+      data: { text: "Hello from YunYun." },
     });
     expect(speechResponse.ok()).toBeTruthy();
     expect(receivedPath).toBe("/v1/audio/speech");
     expect(receivedContentType).toContain("application/json");
     expect(JSON.parse(receivedBody)).toMatchObject({
       model: "pocket-tts",
-      input: "Hello from Marinara.",
+      input: "Hello from YunYun.",
       voice: "alba",
       response_format: "mp3",
       speed: 1,
@@ -6133,7 +6133,7 @@ test("home shell and primary topbar panels open without client errors", async ({
   await page.goto("/");
 
   await expect(page.locator('[data-component="TopBar"]')).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Marinara Engine" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "YunYun Engine" })).toBeVisible();
 
   const charactersButton = page.locator('[data-tour="panel-characters"]');
   await expect(charactersButton.locator("svg")).toHaveClass(/mari-topbar-accent-icon/);
@@ -6190,7 +6190,7 @@ test("Professor Mari introduces Browser, Characters, and Personas in topbar orde
   });
 
   const next = page.getByRole("button", { name: "Next", exact: true });
-  await expect(page.getByRole("heading", { name: "Welcome to Marinara Engine!", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to YunYun Engine!", exact: true })).toBeVisible();
   await next.click();
   await expect(page.locator("h3").filter({ hasText: /^Browser$/ })).toBeVisible();
   await next.click();
@@ -6915,7 +6915,7 @@ test("downloadable agent catalog is usable on desktop and mobile", async ({ page
   } else {
     await expect(allAgentsButton).toBeHidden();
   }
-  await expect(catalogView.getByText("Marinara Engine v2.3.0+")).toBeVisible();
+  await expect(catalogView.getByText("YunYun Engine v2.3.0+")).toBeVisible();
   const documentationLink = catalogView.getByRole("link", { name: "Read how this agent works" });
   await expect(documentationLink).toHaveAttribute(
     "href",
@@ -7117,7 +7117,7 @@ test("agent catalog reports API failures without diagnosing an internet outage",
 
   const catalogView = page.locator('[data-component="AgentCatalogView"]');
   await expect(catalogView.getByText("The agent catalog is unavailable.")).toBeVisible();
-  await expect(catalogView.getByText(/Marinara Engine returned HTTP 400: Validation Error\./)).toBeVisible();
+  await expect(catalogView.getByText(/YunYun Engine returned HTTP 400: Validation Error\./)).toBeVisible();
   await expect(catalogView.getByText(/Check the server internet connection/)).toHaveCount(0);
 });
 
@@ -10071,7 +10071,7 @@ test("Noodle settings edit and restore the timeline base prompt", async ({ page 
     await expect(editor.getByRole("heading", { name: "Edit Noodle Prompt" })).toBeVisible();
     const promptTextarea = editor.locator("textarea");
     await expect(promptTextarea).toHaveValue(
-      /You write a fake social media timeline for Marinara Engine's in-app parody site called Noodle\./,
+      /You write a fake social media timeline for YunYun Engine's in-app parody site called Noodle\./,
     );
     await promptTextarea.fill(customPrompt);
     const saveResponse = page.waitForResponse(
@@ -10095,7 +10095,7 @@ test("Noodle settings edit and restore the timeline base prompt", async ({ page 
 
     await promptSetting.getByRole("button", { name: "Edit prompt" }).click();
     await expect(page.locator('[data-component="ExpandedTextarea"] textarea')).toHaveValue(
-      /You write a fake social media timeline for Marinara Engine's in-app parody site called Noodle\./,
+      /You write a fake social media timeline for YunYun Engine's in-app parody site called Noodle\./,
     );
   } finally {
     if (initialDetail.override) {

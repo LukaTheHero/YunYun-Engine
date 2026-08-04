@@ -1,4 +1,4 @@
-"""Constants for the Marinara Engine integration."""
+"""Constants for the YunYun Engine integration."""
 
 DOMAIN = "marinara_engine"
 

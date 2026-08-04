@@ -173,7 +173,7 @@ function ensureOnnxRuntime() {
   }
 
   warn(
-    "Local Whisper may be unavailable. Run `pnpm install --force --frozen-lockfile` with the same Node architecture used to run Marinara.",
+    "Local Whisper may be unavailable. Run `pnpm install --force --frozen-lockfile` with the same Node architecture used to run YunYun.",
   );
 }
 

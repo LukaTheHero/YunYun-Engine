@@ -19,7 +19,7 @@ export type SidecarBackend = "llama_cpp" | "mlx";
 export const SIDECAR_EMBEDDING_POOLING_TYPES = ["none", "mean", "cls", "last", "rank"] as const;
 export type SidecarEmbeddingPooling = (typeof SIDECAR_EMBEDDING_POOLING_TYPES)[number];
 
-/** Which runtime target Marinara should prepare for llama.cpp-based local inference. */
+/** Which runtime target YunYun should prepare for llama.cpp-based local inference. */
 export const SIDECAR_RUNTIME_PREFERENCES = ["auto", "nvidia", "amd", "intel", "vulkan", "cpu", "system"] as const;
 export type SidecarRuntimePreference = (typeof SIDECAR_RUNTIME_PREFERENCES)[number];
 
@@ -76,7 +76,7 @@ export interface SidecarConfig {
   useForGameScene: boolean;
   /** Context size for the model. Default 8192. */
   contextSize: number;
-  /** Maximum completion tokens Marinara should request from the local runtime. */
+  /** Maximum completion tokens YunYun should request from the local runtime. */
   maxTokens: number;
   /** Sampling temperature for local inference. */
   temperature: number;

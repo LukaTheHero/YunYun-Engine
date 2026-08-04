@@ -21,7 +21,7 @@ export function requirePrivilegedAccess(
   if (!isRequestHostTrusted(request)) {
     reply.status(421).send({
       error: "Untrusted request host",
-      message: "Privileged APIs require an allowed Marinara hostname.",
+      message: "Privileged APIs require an allowed YunYun hostname.",
     });
     return false;
   }

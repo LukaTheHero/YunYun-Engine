@@ -1,11 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
-title Marinara Engine
+title YunYun Engine
 color 0A
 echo.
 echo  +==========================================+
-echo  ^|       Marinara Engine  -  Launcher        ^|
+echo  ^|       YunYun Engine  -  Launcher        ^|
 echo  +==========================================+
 echo.
 
@@ -94,7 +94,7 @@ if not defined CURRENT_PNPM_VERSION (
 
 if not defined CURRENT_PNPM_VERSION (
     echo  [ERROR] Failed to make pnpm %PNPM_VERSION% available.
-    echo          Marinara can run without a global pnpm install, but Node.js must provide Corepack or npx/npm.
+    echo          YunYun can run without a global pnpm install, but Node.js must provide Corepack or npx/npm.
     echo          Reinstall Node.js 24 LTS with npm enabled, or run: npm install -g pnpm
     pause
     exit /b 1
@@ -338,7 +338,7 @@ if "!BUILD_REQUIRED!"=="1" (
     if errorlevel 1 echo  [ERROR] Failed to clean server build artifacts. & pause & exit /b 1
     call :run_pnpm --filter @marinara-engine/client run clean
     if errorlevel 1 echo  [ERROR] Failed to clean client build artifacts. & pause & exit /b 1
-    echo  [..] Building Marinara Engine...
+    echo  [..] Building YunYun Engine...
     call :run_pnpm --filter @marinara-engine/shared build
     if errorlevel 1 echo  [ERROR] Failed to build shared package. & pause & exit /b 1
     call :run_pnpm --filter @marinara-engine/server --filter @marinara-engine/client --parallel run build
@@ -376,7 +376,7 @@ if errorlevel 1 (
 
 echo.
 echo  ==========================================
-echo    Starting Marinara Engine on %PROTOCOL%://%HOST%:%PORT%
+echo    Starting YunYun Engine on %PROTOCOL%://%HOST%:%PORT%
 if not "%BROWSER_HOST%"=="%HOST%" echo    Local browser URL: %PROTOCOL%://%BROWSER_HOST%:%PORT%
 echo    Press Ctrl+C to stop
 echo  ==========================================

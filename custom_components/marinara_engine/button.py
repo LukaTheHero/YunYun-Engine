@@ -1,4 +1,4 @@
-"""Button platform for Marinara Engine."""
+"""Button platform for YunYun Engine."""
 
 from __future__ import annotations
 
@@ -38,14 +38,14 @@ class MarinaraAbortButton(CoordinatorEntity[MarinaraCoordinator], ButtonEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_abort_generation"
-        self._attr_name = "Marinara Abort Generation"
+        self._attr_name = "YunYun Abort Generation"
 
     @property
     def device_info(self) -> dict:
         return {
             "identifiers": {(DOMAIN, self._entry.entry_id)},
-            "name": "Marinara Engine",
-            "manufacturer": "Marinara Engine",
+            "name": "YunYun Engine",
+            "manufacturer": "YunYun Engine",
             "model": "Local AI Engine",
         }
 
@@ -54,7 +54,7 @@ class MarinaraAbortButton(CoordinatorEntity[MarinaraCoordinator], ButtonEntity):
 
 
 class MarinaraSyncToolsButton(CoordinatorEntity[MarinaraCoordinator], ButtonEntity):
-    """Push the enabled HA tool definitions into Marinara's Custom Tools.
+    """Push the enabled HA tool definitions into YunYun's Custom Tools.
 
     23 tool definitions exist in total; Locks and Generic Service Calls are
     excluded by default, so 20 sync unless the user opts them in via Options.
@@ -66,14 +66,14 @@ class MarinaraSyncToolsButton(CoordinatorEntity[MarinaraCoordinator], ButtonEnti
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_sync_tools"
-        self._attr_name = "Marinara Sync HA Tools"
+        self._attr_name = "YunYun Sync HA Tools"
 
     @property
     def device_info(self) -> dict:
         return {
             "identifiers": {(DOMAIN, self._entry.entry_id)},
-            "name": "Marinara Engine",
-            "manufacturer": "Marinara Engine",
+            "name": "YunYun Engine",
+            "manufacturer": "YunYun Engine",
             "model": "Local AI Engine",
         }
 
@@ -96,10 +96,10 @@ class MarinaraSyncToolsButton(CoordinatorEntity[MarinaraCoordinator], ButtonEnti
                 webhook_url, enabled_categories
             )
             _LOGGER.info(
-                "Marinara tool sync: %d created, %d updated", created, updated
+                "YunYun tool sync: %d created, %d updated", created, updated
             )
             agent_status = await self.coordinator.sync_agent(enabled_categories)
             if agent_status != "unchanged":
-                _LOGGER.info("Marinara tool sync: Home Assistant agent %s", agent_status)
+                _LOGGER.info("YunYun tool sync: Home Assistant agent %s", agent_status)
         except Exception:
-            _LOGGER.exception("Marinara tool sync failed")
+            _LOGGER.exception("YunYun tool sync failed")

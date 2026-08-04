@@ -322,7 +322,7 @@ export function buildSceneAnalyzerUserPrompt(
             `2. AUDIO DIRECTION — Choose locationKind for ambient scoring, and set music to a concise prompt for instrumental scene music. The prompt should describe genre, mood, intensity, and useful transitions. Use null only when the current music should continue.`,
           ]
       : [
-          `2. AUDIO DIRECTION — Choose compact musicGenre/musicIntensity/locationKind hints. Do NOT choose music or ambient file tags; Marinara maps these hints to assets deterministically. Do NOT output spotifyTrack.`,
+          `2. AUDIO DIRECTION — Choose compact musicGenre/musicIntensity/locationKind hints. Do NOT choose music or ambient file tags; YunYun maps these hints to assets deterministically. Do NOT output spotifyTrack.`,
         ]),
     `3. REPUTATION — If an NPC relationship shifted, note it. Otherwise empty array.`,
     `4. PER-BEAT EFFECTS — Scan the provided narration beats using their original indices [0]-[${maxSegmentIndex}]. For each beat you can optionally add:`,

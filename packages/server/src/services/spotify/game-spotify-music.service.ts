@@ -600,8 +600,8 @@ async function findAvailablePlaybackDevice(
       ? (pick((d) => d.is_active === true && isPersonalMobileSpotifyDeviceType(d.type)) ??
         pick((d) => isPersonalMobileSpotifyDeviceType(d.type)))
       : (pick((d) => d.is_active === true) ??
-        pick((d) => d.name !== "Marinara Engine") ??
-        pick((d) => d.name === "Marinara Engine"));
+        pick((d) => d.name !== "YunYun Engine") ??
+        pick((d) => d.name === "YunYun Engine"));
 
   if (!candidate?.id) return null;
   return { deviceId: candidate.id, deviceName: candidate.name ?? "Spotify device" };

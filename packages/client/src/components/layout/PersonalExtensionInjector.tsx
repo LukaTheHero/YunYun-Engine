@@ -93,7 +93,7 @@ type SandboxMessage = {
 
 // The sandbox iframe is a hidden 0×0 element until the extension opens a
 // window; then it becomes a small floating panel docked bottom-right. It never
-// covers Marinara's page — the rest of the app stays visible and interactive.
+// covers YunYun's page — the rest of the app stays visible and interactive.
 function setSandboxIframeHidden(iframe: HTMLIFrameElement) {
   iframe.hidden = true;
   iframe.setAttribute("aria-hidden", "true");
@@ -129,7 +129,7 @@ function sizeSandboxPanel(iframe: HTMLIFrameElement, width?: number, height?: nu
   });
 }
 
-// Forward Marinara's resolved accent/surface colors so the in-iframe window
+// Forward YunYun's resolved accent/surface colors so the in-iframe window
 // matches the current theme. Only color strings cross the boundary.
 function postSandboxTheme(iframe: HTMLIFrameElement) {
   const styles = getComputedStyle(document.documentElement);

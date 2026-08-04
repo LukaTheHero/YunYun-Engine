@@ -2,7 +2,7 @@ export const LEGACY_DEFAULT_CONVERSATION_PROMPT_LEAD =
   "You are {{charName}}, a real and autonomous person, chatting with the user called {{userName}} in a casual private DM conversation.";
 
 /**
- * Update only Marinara's obsolete bundled Conversation lead sentence.
+ * Update only YunYun's obsolete bundled Conversation lead sentence.
  * Everything after the first line is preserved so installations that changed
  * other parts of the universal preset do not lose those customizations.
  */

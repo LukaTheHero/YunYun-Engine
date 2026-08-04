@@ -1,6 +1,6 @@
 # Creating and Editing Characters
 
-This guide shows you how to make a character in Marinara Engine. It also shows how to use the Character Editor to write, save, and manage card versions. It covers the Metadata, Card, and Advanced tabs, avatars, and saved version history.
+This guide shows you how to make a character in YunYun Engine. It also shows how to use the Character Editor to write, save, and manage card versions. It covers the Metadata, Card, and Advanced tabs, avatars, and saved version history.
 
 ## What a character card is
 
@@ -67,7 +67,7 @@ The **Card** tab is the main writing workspace. It holds the fields the AI reads
 - **Description**. The character's general identity and role. This is sent in every prompt.
 - **Personality**. A short summary of temperament, speech habits, and behavior patterns.
 - **Backstory**. History, origin, and important relationships.
-- **Appearance**. Physical description, clothing, and visual details. Marinara also uses this text to seed an AI avatar prompt.
+- **Appearance**. Physical description, clothing, and visual details. YunYun also uses this text to seed an AI avatar prompt.
 - **Scenario**. The default setting for new chats with this character.
 
 The **Dialogue & Greetings** section sets how a chat opens and how the character sounds:
@@ -140,7 +140,7 @@ To go back to an older version:
 
 Restoring replaces your current card with that snapshot. It does not add a new history entry. Use the pencil icon to correct a saved snapshot's card-version label without restoring it. You can also delete a saved snapshot from the list; deleting one does not change your current card.
 
-Use **Reset** in the **Version history** header when you want to restart the card's versioning. After confirmation, Marinara deletes every saved snapshot and sets the current card version to `0.0`. This cannot be undone.
+Use **Reset** in the **Version history** header when you want to restart the card's versioning. After confirmation, YunYun deletes every saved snapshot and sets the current card version to `0.0`. This cannot be undone.
 
 ## Reviewing agent-proposed card updates
 
@@ -156,7 +156,7 @@ If the underlying text changed since the proposal was made, the app warns you be
 
 ## A note on Professor Mari
 
-**Professor Mari** is a built-in assistant character that ships with Marinara. You cannot delete her. If you try, the app blocks it and tells you she is a built-in character. To learn what she does, see [Professor Mari, Your In-App Assistant](../home/professor-mari.md).
+**Professor Mari** is a built-in assistant character that ships with YunYun. You cannot delete her. If you try, the app blocks it and tells you she is a built-in character. To learn what she does, see [Professor Mari, Your In-App Assistant](../home/professor-mari.md).
 
 ## Related guides
 

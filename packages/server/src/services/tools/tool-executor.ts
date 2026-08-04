@@ -824,7 +824,7 @@ async function webSearch(args: Record<string, unknown>): Promise<Record<string, 
     const res = await safeFetch(url, {
       headers: {
         Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "Marinara Engine web_search tool",
+        "User-Agent": "YunYun Engine web_search tool",
       },
       signal: AbortSignal.timeout(10_000),
       policy: { allowedProtocols: ["https:"], maxRedirects: 2 },

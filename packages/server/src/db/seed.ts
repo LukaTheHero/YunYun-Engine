@@ -1,6 +1,6 @@
 // ──────────────────────────────────────────────
-// Seed: Marinara's Universal Prompt Preset
-// Creates or refreshes Marinara's bundled universal roleplay preset.
+// Seed: YunYun's Universal Prompt Preset
+// Creates or refreshes YunYun's bundled universal roleplay preset.
 // Reads the exported preset JSON and imports it via the standard importer.
 // ──────────────────────────────────────────────
 import { logger } from "../lib/logger.js";
@@ -21,9 +21,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const LEGACY_MARINARA_PRESET_NAME = "Default";
-const MARINARA_PRESET_NAME = "Marinara's Universal Preset";
-const MARINARA_PRESET_DESCRIPTION = "Marinara's universal roleplay preset. Serves as a good base.";
-const MARINARA_PRESET_AUTHOR = "Marinara";
+const MARINARA_PRESET_NAME = "YunYun's Universal Preset";
+const MARINARA_PRESET_DESCRIPTION = "YunYun's universal roleplay preset. Serves as a good base.";
+const MARINARA_PRESET_AUTHOR = "YunYun";
 const MARINARA_PRESET_SEED_HASH_KEY = "seed:marinara-universal-preset:sha256";
 const MARINARA_PRESET_SNAPSHOT_KEY = "seed:marinara-universal-preset:snapshot-sha256";
 
@@ -372,11 +372,11 @@ export async function seedDefaultPreset(db: DB) {
       await appSettings.set(MARINARA_PRESET_SEED_HASH_KEY, bundled.hash);
       await appSettings.set(MARINARA_PRESET_SNAPSHOT_KEY, computeBundledPresetSnapshotHash(bundled.envelope));
       logger.info(
-        "[seed] Preserved existing Marinara universal preset without prior snapshot while recording bundled hash %s",
+        "[seed] Preserved existing YunYun universal preset without prior snapshot while recording bundled hash %s",
         bundled.hash.slice(0, 12),
       );
       if (migratedConversationPrompt) {
-        logger.info("[seed] Updated the legacy Marinara Conversation prompt lead sentence");
+        logger.info("[seed] Updated the legacy YunYun Conversation prompt lead sentence");
       }
       return;
     }
@@ -390,11 +390,11 @@ export async function seedDefaultPreset(db: DB) {
       );
       await appSettings.set(MARINARA_PRESET_SEED_HASH_KEY, bundled.hash);
       logger.info(
-        "[seed] Preserved customized Marinara universal preset while recording bundled hash %s",
+        "[seed] Preserved customized YunYun universal preset while recording bundled hash %s",
         bundled.hash.slice(0, 12),
       );
       if (migratedConversationPrompt) {
-        logger.info("[seed] Updated the legacy Marinara Conversation prompt lead sentence");
+        logger.info("[seed] Updated the legacy YunYun Conversation prompt lead sentence");
       }
       return;
     }
@@ -405,7 +405,7 @@ export async function seedDefaultPreset(db: DB) {
     await appSettings.set(MARINARA_PRESET_SEED_HASH_KEY, bundled.hash);
     const nextSnapshotHash = await computePresetSnapshotHash(storage, existingMarinaraPreset.id);
     if (nextSnapshotHash) await appSettings.set(MARINARA_PRESET_SNAPSHOT_KEY, nextSnapshotHash);
-    logger.info("[seed] Updated bundled Marinara universal preset to %s", bundled.hash.slice(0, 12));
+    logger.info("[seed] Updated bundled YunYun universal preset to %s", bundled.hash.slice(0, 12));
     return;
   }
 
@@ -417,7 +417,7 @@ export async function seedDefaultPreset(db: DB) {
       bundledConversationPromptValue,
     ))
   ) {
-    logger.info("[seed] Updated the legacy Marinara Conversation prompt lead sentence");
+    logger.info("[seed] Updated the legacy YunYun Conversation prompt lead sentence");
   }
 
   if (existingMarinaraPreset && !appliedSnapshotHash) {

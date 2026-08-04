@@ -416,7 +416,7 @@ export function ConversationView({
 
   // Per-scheme conversation gradient from settings. When a scheme's values are
   // still the defaults, use CSS variables so visual themes can override the
-  // default stops without collapsing Marinara's two-color background.
+  // default stops without collapsing YunYun's two-color background.
   const convoGradient = useUIStore((s) => s.convoGradient);
   const theme = useUIStore((s) => s.theme);
   const gradientStyle = useMemo(() => {

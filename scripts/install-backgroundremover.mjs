@@ -127,7 +127,7 @@ function torchInstallArgs() {
 
 function main() {
   console.log("");
-  console.log("  Installing optional Marinara background remover runtime");
+  console.log("  Installing optional YunYun background remover runtime");
   console.log(`  Runtime: ${runtimeDir}`);
   console.log("");
 
@@ -169,7 +169,7 @@ function main() {
   writeFileSync(
     join(runtimeDir, "README.txt"),
     [
-      "Marinara Engine optional backgroundremover runtime",
+      "YunYun Engine optional backgroundremover runtime",
       "",
       "This directory is managed by scripts/install-backgroundremover.mjs.",
       "It contains a local Python virtual environment and downloaded U2Net models.",
@@ -181,7 +181,7 @@ function main() {
   console.log("");
   console.log("  [OK] backgroundremover is installed.");
   console.log(`       CLI: ${venvCliPath()}`);
-  console.log("       Marinara will use it automatically for sprite cleanup.");
+  console.log("       YunYun will use it automatically for sprite cleanup.");
   console.log("");
 }
 

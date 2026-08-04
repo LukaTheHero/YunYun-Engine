@@ -32,7 +32,7 @@ The one thing that keeps the word: post-level `access: "public" | "subscriber" |
 
 ## Product charter
 
-NoodleR is Marinara's standalone **18+ adult creator-platform simulation**, analogous
+NoodleR is YunYun's standalone **18+ adult creator-platform simulation**, analogous
 to how Noodle simulates Twitter-like social media. Its purpose is to give users a new,
 exciting way to interact with their personas and characters through creator/stage
 profiles, including exploring sides of those characters that their ordinary public
@@ -423,7 +423,7 @@ No temporary browser artifacts remain.
 
 ## Slice 8 — Text-only automatic creator posting
 
-**Goal:** make characters autonomously produce content while Marinara is running,
+**Goal:** make characters autonomously produce content while YunYun is running,
 with per-character toggles and an accepted user control plane, using the same private-
 generation pipeline as user-triggered posts.
 

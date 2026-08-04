@@ -725,7 +725,7 @@ export class AnthropicProvider extends BaseLLMProvider {
 
   override async embed(_texts: string[], _model: string, _signal?: AbortSignal): Promise<number[][]> {
     throw new Error(
-      "Anthropic connections do not support embeddings through Marinara's OpenAI-compatible /embeddings path. Configure a dedicated OpenAI-compatible or local embedding connection.",
+      "Anthropic connections do not support embeddings through YunYun's OpenAI-compatible /embeddings path. Configure a dedicated OpenAI-compatible or local embedding connection.",
     );
   }
 

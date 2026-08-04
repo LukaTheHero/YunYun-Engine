@@ -2,7 +2,7 @@
 // Theme Types
 // ──────────────────────────────────────────────
 
-/** A synced custom theme stored on the Marinara server. */
+/** A synced custom theme stored on the YunYun server. */
 export interface Theme {
   id: string;
   name: string;

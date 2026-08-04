@@ -321,7 +321,7 @@ export function useLoadNoodlerPostImage() {
     mutationFn: async ({ imageUrl }: { imageUrl: string }) => {
       const url = new URL(imageUrl, window.location.origin);
       if (url.origin !== window.location.origin || !url.pathname.startsWith("/api/")) {
-        throw new Error("This post image is not stored by Marinara.");
+        throw new Error("This post image is not stored by YunYun.");
       }
       const response = await api.raw(`${url.pathname.slice(4)}${url.search}`);
       if (!response.ok) throw new Error("Could not load this post image for editing.");

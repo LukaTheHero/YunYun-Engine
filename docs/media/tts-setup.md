@@ -1,6 +1,6 @@
 # Text to Speech (TTS) Setup
 
-This guide shows you how to set up Text to Speech in Marinara Engine so the app can read messages and game narration out loud. Text to Speech (TTS) turns written chat text into spoken audio. This guide covers picking a voice provider, choosing voices, auto-play, and the per-message playback controls.
+This guide shows you how to set up Text to Speech in YunYun Engine so the app can read messages and game narration out loud. Text to Speech (TTS) turns written chat text into spoken audio. This guide covers picking a voice provider, choosing voices, auto-play, and the per-message playback controls.
 
 ## Where TTS settings live
 
@@ -23,7 +23,7 @@ A **Source** is the service that makes the audio. The four choices are:
 - **PocketTTS**: a free voice server you run on your own computer.
 - **xAI Voice**: xAI's voice service.
 
-The default Source is **OpenAI-compatible**. Marinara keeps a separate saved profile for each Source, including its encrypted API key, endpoint, model, voices, and provider parameters. Switching Sources restores that Source's previous setup; a Source you have not configured yet starts with its defaults.
+The default Source is **OpenAI-compatible**. YunYun keeps a separate saved profile for each Source, including its encrypted API key, endpoint, model, voices, and provider parameters. Switching Sources restores that Source's previous setup; a Source you have not configured yet starts with its defaults.
 
 ## Step 2: Enter the Base URL, API Key, and Model
 
@@ -46,7 +46,7 @@ For **ElevenLabs**, the **Model** field loads the speech-capable models availabl
 
 ### PocketTTS is a separate program
 
-PocketTTS is not built into Marinara Engine. Marinara's adapter uses the [PocketTTS OpenAI-compatible server](https://github.com/teddybear082/pocket-tts-openai_streaming_server), which exposes both the speech and voice-list endpoints Marinara needs. Install and run that server by following its instructions; Marinara does not download or manage it for you.
+PocketTTS is not built into YunYun Engine. YunYun's adapter uses the [PocketTTS OpenAI-compatible server](https://github.com/teddybear082/pocket-tts-openai_streaming_server), which exposes both the speech and voice-list endpoints YunYun needs. Install and run that server by following its instructions; YunYun does not download or manage it for you.
 
 The compatible server uses `http://localhost:49112` by default. Leave the **Base URL** on that value unless you changed the server port. Existing custom PocketTTS URLs remain unchanged.
 
@@ -63,7 +63,7 @@ Pick the voice in the **All Characters Voice** field. PocketTTS shows voices ret
 
 To load the real voice list from your provider, enter the connection details and click the **Refresh voices** button (the circular-arrow icon). You can do this before enabling playback. Refresh saves the current card first, so a newly entered API key is used immediately. Before you connect, the app shows a short built-in fallback list so the field is not empty. A provider error is shown instead of silently presenting that fallback as a successful refresh.
 
-For **ElevenLabs**, you must pick a voice. Marinara loads the paginated account library, including personal, workspace, saved, and default voices. The picker has a search box and a permanently visible scrollbar when the library is longer than the panel. It also reports how many voices were loaded. The picker starts on "Select an ElevenLabs voice", and playback is blocked until you choose a real one.
+For **ElevenLabs**, you must pick a voice. YunYun loads the paginated account library, including personal, workspace, saved, and default voices. The picker has a search box and a permanently visible scrollbar when the library is longer than the panel. It also reports how many voices were loaded. The picker starts on "Select an ElevenLabs voice", and playback is blocked until you choose a real one.
 
 ### Selected per character
 

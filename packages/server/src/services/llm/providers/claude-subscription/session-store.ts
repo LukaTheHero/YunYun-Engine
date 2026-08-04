@@ -6,7 +6,7 @@
 // inject prior conversation turns without touching the filesystem: the SDK
 // calls `sessionStore.load()` once before it spawns the Claude Code
 // subprocess, materializes the returned entries to its own temp JSONL, and
-// resumes the subprocess from there. Marinara uses this to feed its
+// resumes the subprocess from there. YunYun uses this to feed its
 // `ChatMessage[]` history to the model as real multi-turn context (so prompt
 // caching holds across turns) instead of folding it into one string prompt.
 //
@@ -33,7 +33,7 @@ import { getDataDir } from "../../../../config/runtime-config.js";
  * wrong on Windows.
  *
  * `append()` is a required part of the `SessionStore` contract but is
- * intentionally a no-op: Marinara persists chat history in its own database
+ * intentionally a no-op: YunYun persists chat history in its own database
  * and has no use for the SDK's transcript-mirror feature.
  */
 export class ResumeSessionStore implements SessionStore {
@@ -68,7 +68,7 @@ let cachedScratchCwd: string | null = null;
  * unavoidable, `sessionStore` cannot be combined with `persistSession: false`.
  * Pointing `cwd` at this dedicated scratch directory keeps those files in
  * their own project bucket instead of intermingling with the user's real
- * `claude` CLI sessions for the Marinara repo. They are reaped by Claude
+ * `claude` CLI sessions for the YunYun repo. They are reaped by Claude
  * Code's own `cleanupPeriodDays` setting.
  *
  * Throws if the directory cannot be created (read-only / permission-locked

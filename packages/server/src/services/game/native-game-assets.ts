@@ -5,7 +5,7 @@ import { GAME_ASSETS_DIR } from "./asset-manifest.service.js";
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
-/** Canonical read-only assets shipped with Marinara Engine. */
+/** Canonical read-only assets shipped with YunYun Engine. */
 export const BUNDLED_GAME_ASSETS_DIR = resolve(moduleDir, "../../assets/default-game-assets");
 
 function safeRelativeAssetPath(relativePath: string): string | null {

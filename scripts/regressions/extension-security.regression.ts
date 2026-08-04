@@ -49,7 +49,7 @@ assert.match(localizationSource, /It also requests: \{\{permissions\}\}\./u);
 assert.match(localizationSource, /Read active Character cards/u);
 assert.match(localizationSource, /Read active Persona/u);
 assert.match(localizationSource, /Full page access/u);
-assert.match(localizationSource, /call same-origin Marinara APIs with your current session/u);
+assert.match(localizationSource, /call same-origin YunYun APIs with your current session/u);
 assert.match(clientSettingsSource, /mode="personal"/u);
 assert.match(clientSettingsSource, /mode="external"/u);
 assert.match(clientSettingsSource, /isExternal && \(/u);
@@ -689,7 +689,7 @@ try {
       backstory: "History",
       appearance: "Red hair",
       tags: ["maintainer"],
-      aboutMe: "Builds Marinara",
+      aboutMe: "Builds YunYun",
       convoDisplayName: "Mari",
       creatorNotes: "private creator notes",
       avatarPath: "/private/avatar.png",
