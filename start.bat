@@ -279,7 +279,13 @@ echo  [OK] pnpm !CURRENT_PNPM_VERSION! ready
 if not exist "packages\shared\dist\constants\defaults.js" goto :skip_version_check
 for /f "usebackq delims=" %%i in (`node -p "require('./package.json').version" 2^>nul`) do set "SOURCE_VER=%%i"
 for /f "usebackq delims=" %%i in (`node -e "try{const m=require('./packages/shared/dist/constants/defaults.js');console.log(m.APP_VERSION)}catch{}" 2^>nul`) do set "DIST_VER=%%i"
-for /f "usebackq delims=" %%i in (`git rev-parse --short=12 HEAD 2^>nul`) do set "SOURCE_COMMIT=%%i"
+:: Read HEAD without an "=" in the command. cmd's for /f backtick parser
+:: mangles an unescaped "=" (e.g. `--short=12`), which made git return nothing,
+:: left SOURCE_COMMIT empty, and silently skipped the mismatch check below --
+:: so a half-finished update would serve a stale dist forever while the
+:: launcher reported "Already up to date". Take the full hash and trim instead.
+for /f "usebackq delims=" %%i in (`git rev-parse HEAD 2^>nul`) do set "SOURCE_COMMIT=%%i"
+if defined SOURCE_COMMIT set "SOURCE_COMMIT=!SOURCE_COMMIT:~0,12!"
 for /f "usebackq delims=" %%i in (`node -e "try{const m=require('./packages/server/dist/config/build-meta.json');console.log(m.commit || '')}catch{}" 2^>nul`) do set "DIST_COMMIT=%%i"
 if not "!SOURCE_VER!"=="" if not "!DIST_VER!"=="" if not "!SOURCE_VER!"=="!DIST_VER!" (
     echo  [WARN] Version mismatch: source v!SOURCE_VER! but dist has v!DIST_VER!
@@ -292,6 +298,13 @@ if not "!SOURCE_COMMIT!"=="" if /I not "!SOURCE_COMMIT!"=="!DIST_COMMIT!" (
     echo  [..] Dependencies and build will be refreshed before startup.
     set "INSTALL_REQUIRED=1"
     set "BUILD_REQUIRED=1"
+)
+:: Fail loudly rather than open. If this is a git checkout but HEAD could not be
+:: read, the staleness check above is unenforceable -- say so instead of starting
+:: a possibly stale build in silence.
+if exist ".git" if "!SOURCE_COMMIT!"=="" (
+    echo  [WARN] Could not read the current git commit, so the build-freshness
+    echo         check was skipped. If the UI looks out of date, run: pnpm build
 )
 :skip_version_check
 
