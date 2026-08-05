@@ -2,7 +2,7 @@
 // Taskbar Shortcut Migration (Windows-only)
 // ──────────────────────────────────────────────
 // Re-points the user's Start Menu and Desktop "YunYun Engine" shortcuts at
-// the bundled MarinaraLauncher.exe and stamps an AppUserModelID on the .lnk,
+// the bundled YunYunLauncher.exe and stamps an AppUserModelID on the .lnk,
 // so that pinning the shortcut to the taskbar groups the running console
 // under the pinned icon (instead of spawning a separate generic cmd entry).
 //
@@ -157,9 +157,9 @@ async function stampAumid(launcherExe: string, lnkPath: string): Promise<boolean
 export async function migrateTaskbarShortcuts(installDir: string): Promise<void> {
   if (process.platform !== "win32") return;
 
-  const launcherExe = join(installDir, "MarinaraLauncher.exe");
+  const launcherExe = join(installDir, "YunYunLauncher.exe");
   if (!existsSync(launcherExe)) {
-    logger.debug("Taskbar migration: MarinaraLauncher.exe not present, skipping");
+    logger.debug("Taskbar migration: YunYunLauncher.exe not present, skipping");
     return;
   }
 

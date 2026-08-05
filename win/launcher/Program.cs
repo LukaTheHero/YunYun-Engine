@@ -4,7 +4,7 @@
 // executable, so the running window's AppUserModelID matches the pinned
 // Start Menu / taskbar shortcut and groups under it correctly.
 //
-// Build: csc /target:winexe /platform:x64 /out:MarinaraLauncher.exe Program.cs
+// Build: csc /target:winexe /platform:x64 /win32icon:wininstallerapp-icon.ico /out:YunYunLauncher.exe Program.cs
 using System;
 using System.Diagnostics;
 using System.IO;

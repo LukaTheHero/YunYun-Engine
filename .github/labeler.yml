@@ -22,7 +22,7 @@ windows:
   - changed-files:
       - any-glob-to-any-file:
           - win/**
-          - MarinaraLauncher.exe
+          - YunYunLauncher.exe
           - start.bat
 
 docs:

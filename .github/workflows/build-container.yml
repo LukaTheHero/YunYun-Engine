@@ -36,7 +36,7 @@ on:
       # Platform-specific sources
       - "android/**"
       - "win/**"
-      - "MarinaraLauncher.exe"
+      - "YunYunLauncher.exe"
       # GitHub community files
       - ".github/ISSUE_TEMPLATE/**"
       - ".github/PULL_REQUEST_TEMPLATE/**"

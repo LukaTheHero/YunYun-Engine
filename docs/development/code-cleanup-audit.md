@@ -238,7 +238,7 @@ The largest active modules are `server/routes/game.routes.ts`, `client/component
 - Generated capability registries and manifests. Regenerate them through their scripts; do not hand-prune them.
 - Downloadable Illustrator, Music DJ, Lorebook Keeper, and other agent package code. Agent-owned runtime/prompt cleanup belongs in `Pasta-Devs/Marinara-Agents`; only host integration belongs here.
 - Home Assistant modules under `custom_components`, whose discovery is convention- and manifest-driven.
-- `MarinaraLauncher.exe`, which is consumed by taskbar-shortcut migration code.
+- `YunYunLauncher.exe`, which is consumed by taskbar-shortcut migration code.
 - `start-local.bat`, which is not referenced by package scripts but remains a plausible human-facing local launcher. Remove only after a maintainer intent check.
 - Schema declarations that appear unreferenced but execute as part of module initialization or table registration.
 - Server routes merely because a convenience React hook is unused; downloadable packages or API consumers may still call them.
