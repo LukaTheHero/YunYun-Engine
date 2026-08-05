@@ -59,6 +59,11 @@ const PROTECT = [
   // Docs example demonstrating case-insensitive comparison — renaming one side
   // of it destroys the point being made.
   `\`${OLD_ASSISTANT}\` equals \`mari\``,
+  // The assistant's identity block deliberately NAMES her former names so she
+  // refuses them. Rebranding these turns the instruction into nonsense
+  // ("never YunYun, never YunYun"), so they must survive verbatim.
+  `Former names she must never use for herself: ${OLD_ASSISTANT}, ${OLD_NAME}, Professor ${OLD_ASSISTANT}.`,
+  `Former names you must never use for yourself: ${OLD_ASSISTANT}, ${OLD_NAME}, Professor ${OLD_ASSISTANT}.`,
 ];
 const SENTINEL = "YYP";
 

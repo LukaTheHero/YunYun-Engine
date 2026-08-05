@@ -776,6 +776,8 @@ interface UIState {
   roleplayAvatarScale: number;
   /** When true, Roleplay message avatars stay visible while scrolling through long messages. */
   roleplayAvatarsScrollable: boolean;
+  /** When true, merged-group Narrator avatars cycle instead of appearing together. */
+  roleplayNarratorAvatarCycling: boolean;
   /** Default scale multiplier for Roleplay full-body sprites. */
   roleplaySpriteScale: number;
   /** Scale multiplier for Game mode VN dialogue portraits. */
@@ -1055,6 +1057,7 @@ interface UIState {
   setRoleplayAvatarStyle: (v: RoleplayAvatarStyle) => void;
   setRoleplayAvatarScale: (v: number) => void;
   setRoleplayAvatarsScrollable: (v: boolean) => void;
+  setRoleplayNarratorAvatarCycling: (v: boolean) => void;
   setRoleplaySpriteScale: (v: number) => void;
   setGameAvatarScale: (v: number) => void;
   setGameFullBodySpriteScale: (v: number) => void;
@@ -1261,6 +1264,7 @@ export function pickSyncedSettings(state: UIState) {
     roleplayAvatarStyle: state.roleplayAvatarStyle,
     roleplayAvatarScale: state.roleplayAvatarScale,
     roleplayAvatarsScrollable: state.roleplayAvatarsScrollable,
+    roleplayNarratorAvatarCycling: state.roleplayNarratorAvatarCycling,
     roleplaySpriteScale: state.roleplaySpriteScale,
     gameAvatarScale: state.gameAvatarScale,
     gameFullBodySpriteScale: state.gameFullBodySpriteScale,
@@ -1459,6 +1463,7 @@ export const useUIStore = create<UIState>()(
       roleplayAvatarStyle: "circles" as RoleplayAvatarStyle,
       roleplayAvatarScale: 1,
       roleplayAvatarsScrollable: false,
+      roleplayNarratorAvatarCycling: true,
       roleplaySpriteScale: 1,
       gameAvatarScale: 1,
       gameFullBodySpriteScale: 1.35,
@@ -2265,6 +2270,7 @@ export const useUIStore = create<UIState>()(
       setRoleplayAvatarScale: (v) =>
         set({ roleplayAvatarScale: Math.max(ROLEPLAY_AVATAR_SCALE_MIN, Math.min(ROLEPLAY_AVATAR_SCALE_MAX, v)) }),
       setRoleplayAvatarsScrollable: (v) => set({ roleplayAvatarsScrollable: v }),
+      setRoleplayNarratorAvatarCycling: (v) => set({ roleplayNarratorAvatarCycling: v }),
       setRoleplaySpriteScale: (v) =>
         set({ roleplaySpriteScale: Math.max(ROLEPLAY_SPRITE_SCALE_MIN, Math.min(ROLEPLAY_SPRITE_SCALE_MAX, v)) }),
       setGameAvatarScale: (v) => set({ gameAvatarScale: Math.max(0.75, Math.min(1.75, v)) }),
@@ -2318,6 +2324,7 @@ export const useUIStore = create<UIState>()(
           roleplayAvatarStyle: "circles" as RoleplayAvatarStyle,
           roleplayAvatarScale: 1,
           roleplayAvatarsScrollable: false,
+          roleplayNarratorAvatarCycling: true,
           roleplaySpriteScale: 1,
           gameDialogueDisplayMode: "classic" as GameDialogueDisplayMode,
           chatListBackgrounds: "hover" as ChatListBackgroundMode,
@@ -2430,7 +2437,7 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: "marinara-engine-ui",
-      version: 87,
+      version: 88,
       // Debounce localStorage writes to avoid sync I/O on every state change
       storage: createJSONStorage(() => {
         let timer: ReturnType<typeof setTimeout> | null = null;
@@ -3017,6 +3024,10 @@ export const useUIStore = create<UIState>()(
           persisted.echoChamberSizeByChatId = {};
         }
         persisted.echoChamberSizeByChatId = normalizeEchoChamberSizes(persisted.echoChamberSizeByChatId);
+        // v87 -> v88: enable Narrator avatar cycling by default for older stores.
+        if (version <= 87 && persisted.roleplayNarratorAvatarCycling === undefined) {
+          persisted.roleplayNarratorAvatarCycling = true;
+        }
         // v84 -> v85: keep the historical blank-line behavior for /continue by default.
         if (version <= 84 && persisted.continueAddsNewline === undefined) {
           persisted.continueAddsNewline = true;
@@ -3026,6 +3037,7 @@ export const useUIStore = create<UIState>()(
         persisted.professorMariSuggestionsEnabled = persisted.professorMariSuggestionsEnabled !== false;
         persisted.includeReasoningInExports = persisted.includeReasoningInExports === true;
         persisted.roleplayReducedPaintEffects = persisted.roleplayReducedPaintEffects === true;
+        persisted.roleplayNarratorAvatarCycling = persisted.roleplayNarratorAvatarCycling !== false;
         persisted.gameTextEffectsEnabled = persisted.gameTextEffectsEnabled !== false;
         persisted.defaultDialogueColor =
           typeof persisted.defaultDialogueColor === "string" ? persisted.defaultDialogueColor : "";
@@ -3054,8 +3066,7 @@ export const useUIStore = create<UIState>()(
         gameAssetsBrowserOpen: state.gameAssetsBrowserOpen,
         noodleOpen: state.noodleOpen,
         noodleSelectedPersonaId: state.noodleSelectedPersonaId,
-        noodleNavigation:
-          state.noodleNavigation.mode === "verification" ? { mode: "noodler", view: "hub" } : state.noodleNavigation,
+        noodleNavigation: state.noodleNavigation,
         characterLibraryOpen: state.characterLibraryOpen,
         cardLibraryKind: state.cardLibraryKind,
         agentCatalogOpen: state.agentCatalogOpen,
@@ -3175,6 +3186,7 @@ export const useUIStore = create<UIState>()(
         roleplayAvatarStyle: state.roleplayAvatarStyle,
         roleplayAvatarScale: state.roleplayAvatarScale,
         roleplayAvatarsScrollable: state.roleplayAvatarsScrollable,
+        roleplayNarratorAvatarCycling: state.roleplayNarratorAvatarCycling,
         roleplaySpriteScale: state.roleplaySpriteScale,
         gameAvatarScale: state.gameAvatarScale,
         gameFullBodySpriteScale: state.gameFullBodySpriteScale,
