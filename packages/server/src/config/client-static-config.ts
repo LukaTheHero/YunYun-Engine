@@ -36,7 +36,17 @@ export function createClientStaticOptions(clientDist: string): FastifyStaticOpti
       // lazy JS chunks, CSS, and fonts. Those URLs are safe to cache forever.
       if (filePath.startsWith(immutableAssetPrefix)) {
         res.header("Cache-Control", "public, max-age=31536000, immutable");
+        return;
       }
+
+      // Everything else served from dist/ is unfingerprinted and CAN change in
+      // place between builds: logo.png, favicon.png, icon-192/512.png and
+      // /sprites/**. With no Cache-Control at all the browser falls back to
+      // heuristic freshness and keeps serving the old bytes from disk cache
+      // without revalidating, so a rebranded logo or sprite silently never
+      // appears. Force a revalidation instead; ETag/Last-Modified make the
+      // common case a cheap 304.
+      res.header("Cache-Control", "no-cache, must-revalidate");
     },
   };
 }
