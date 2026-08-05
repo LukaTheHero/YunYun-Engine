@@ -584,8 +584,8 @@ const MODE_INTRO_KEYS: Record<ChatMode, string> = {
   game: "settings.chat.modeIntro.game",
 };
 
-const MARINARA_UNIVERSAL_PRESET_NAME = "YunYun's Universal Preset";
-const MARINARA_UNIVERSAL_PRESET_AUTHOR = "YunYun";
+const MARINARA_UNIVERSAL_PRESET_NAME = "Marinara's Universal Preset";
+const MARINARA_UNIVERSAL_PRESET_AUTHOR = "Marinara";
 
 const CHAT_SETTINGS_ORDER = {
   settingsPresets: -1600,
