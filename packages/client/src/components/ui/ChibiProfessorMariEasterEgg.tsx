@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useUIStore } from "../../stores/ui.store";
 import { translate } from "../../localization/i18n";
 
-const CHIBI_PROFESSOR_MARI_IMAGE = "/sprites/mari/chibi-professor-mari.png";
+const CHIBI_PROFESSOR_MARI_IMAGE = "/sprites/yunyun/chibi-yunyun.png";
 const CHIBI_PROFESSOR_MARI_SEEN_KEY = "marinara:chibi-professor-mari-toast-seen";
 const CHIBI_PROFESSOR_MARI_ROLL_CHANCE = 0.001;
 const CHIBI_PROFESSOR_MARI_ROLL_COOLDOWN_MS = 3_000;

@@ -295,7 +295,7 @@ export function WhatsNewModal({
             className="absolute left-1/2 top-1/2 h-32 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--marinara-chat-chrome-accent)] opacity-10 blur-3xl"
           />
           <img
-            src="/illustrations/professor-mari-whats-new.webp"
+            src="/illustrations/yunyun-whats-new.webp"
             alt={localizeUi("ui.modals.whatsnewmodal.professorMariWinkingAndWaving")}
             className="relative mx-auto h-44 w-auto max-w-full object-contain object-bottom drop-shadow-[0_12px_24px_rgba(0,0,0,0.28)] sm:h-52"
           />

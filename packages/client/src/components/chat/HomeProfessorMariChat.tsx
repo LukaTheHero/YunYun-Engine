@@ -92,7 +92,7 @@ import { MariSuggestionChips } from "./MariSuggestionChips";
 import { useTranslation, useTranslation as useUiTranslation } from "react-i18next";
 
 const MARI_AVATAR_URL = "/sprites/mari/Mari_profile.png";
-const MARI_CHIBI_URL = "/sprites/mari/chibi-professor-mari.png";
+const MARI_CHIBI_URL = "/sprites/yunyun/chibi-yunyun.png";
 const MARI_CONNECTION_STORAGE_KEY = "marinara:home-professor-mari-connection-id";
 const PROFESSOR_MARI_ERROR_TOAST_DURATION_MS = 120_000;
 const WORKSPACE_SETTLE_POLL_MS = 1_500;

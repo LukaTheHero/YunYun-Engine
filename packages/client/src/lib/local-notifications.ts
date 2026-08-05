@@ -107,7 +107,7 @@ export async function showLocalMessageNotification({
 
   const notification = new window.Notification(resolveMessageNotificationTitle(title, characterName), {
     body: "Open YunYun to read it.",
-    icon: "/icon-192.png",
+    icon: "/yunyun-icon-192.png",
     tag,
   });
 

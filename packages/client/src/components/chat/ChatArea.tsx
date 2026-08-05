@@ -2878,7 +2878,7 @@ export function ChatArea() {
                     )}
                   >
                     <img
-                      src={showEmptyStateEffects ? "/logo-splash.gif" : "/logo.png"}
+                      src={showEmptyStateEffects ? "/yunyun-logo-splash.gif" : "/yunyun-logo.png"}
                       alt={localizeUi("app.documentTitle")}
                       width={80}
                       height={80}

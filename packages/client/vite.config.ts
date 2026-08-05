@@ -96,7 +96,7 @@ export default defineConfig({
             globPatterns: ["**/*.{js,css,json,png,svg,ico,woff2}"],
             navigateFallback: null,
             // Keep the offline shell lean. Large decorative sprites and splash art are fetched on demand.
-            globIgnores: ["**/sprites/**", "logo.png", "logo-splash.gif"],
+            globIgnores: ["**/sprites/**", "yunyun-logo.png", "yunyun-logo-splash.gif"],
             navigateFallbackAllowlist: [],
             runtimeCaching: [
               {

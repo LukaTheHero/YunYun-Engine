@@ -2,7 +2,7 @@
 from PIL import Image
 import struct, io, os
 
-src = os.path.join(os.path.dirname(__file__), '..', 'packages', 'client', 'public', 'logo.png')
+src = os.path.join(os.path.dirname(__file__), '..', 'packages', 'client', 'public', 'yunyun-logo.png')
 dst = os.path.join(os.path.dirname(__file__), 'app-icon.ico')
 
 img = Image.open(src).convert('RGBA')
