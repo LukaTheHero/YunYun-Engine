@@ -172,7 +172,7 @@ try {
 const status = getWorkspaceShellSandboxStatus();
 if (!status.available) {
   assert.ok(status.reason.length > 0);
-  console.log(`Professor Mari shell sandbox regression skipped runtime proof: ${status.reason}`);
+  console.log(`Professor YunYun shell sandbox regression skipped runtime proof: ${status.reason}`);
 } else {
   const workspace = mkdtempSync(join(tmpdir(), "marinara-mari-sandbox-workspace-"));
   const outside = mkdtempSync(join(tmpdir(), "marinara-mari-sandbox-outside-"));
@@ -216,7 +216,7 @@ if (!status.available) {
     assert.equal(readFileSync(outsideSecret, "utf8"), "outside-secret");
     assert.equal(readFileSync(workspaceSecret, "utf8"), "WORKSPACE_SECRET=must-not-leak");
     assert.equal(readFileSync(protectedManifest, "utf8"), '{"name":"sandbox-fixture"}\n');
-    console.log(`Professor Mari shell sandbox regression passed with ${sandboxed.backend}.`);
+    console.log(`Professor YunYun shell sandbox regression passed with ${sandboxed.backend}.`);
   } finally {
     rmSync(workspace, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });

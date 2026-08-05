@@ -15,7 +15,7 @@ The Local Model is deliberately small. It is meant for background helper work, n
 
 The setup window calls it the **Local AI Model**. The connection dropdowns call it **Local Model (sidecar)**. These are the same feature.
 
-You should not use the Local Model for main chat, roleplay, Game Master narration, or Professor Mari edits. It is too small for good results there. Use a stronger connection for those. See [Connecting to an AI Provider](connecting-to-a-provider.md).
+You should not use the Local Model for main chat, roleplay, Game Master narration, or Professor YunYun edits. It is too small for good results there. Use a stronger connection for those. See [Connecting to an AI Provider](connecting-to-a-provider.md).
 
 ## Opening the Local Model card
 
@@ -119,7 +119,7 @@ Notes on the trickier fields:
 - **Pooling Type** and **Physical Batch Size** also appear only on the GGUF runtime, under the **Embedding Endpoint** heading. They tune lorebook embeddings only. They do not change normal chat replies.
 - **Pooling Type** defaults to **None**. Switch it to **Mean** when you use the Local Model for lorebook embeddings.
 - **Physical Batch Size** sets how much text the embedding endpoint takes in one batch. Raise it when long lorebook entries fail to vectorize. The app suggests 1024 for Gemma.
-- **Native Tool Calls** must be on for tools to work. The warning reads that Professor Mari and custom agents need this enabled before the local model can run tools. This option is not available on the MLX runtime.
+- **Native Tool Calls** must be on for tools to work. The warning reads that Professor YunYun and custom agents need this enabled before the local model can run tools. This option is not available on the MLX runtime.
 - **Max Response Tokens** caps normal chat and agent replies. It does not limit Game Mode scene analysis, which has its own internal cap.
 
 ## Send Test Message

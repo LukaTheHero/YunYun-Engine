@@ -137,7 +137,7 @@ interface AgentState {
   mariChips: MariSuggestionChip[];
   mariChipsChatId: string | null;
   /**
-   * A guided-creation plan Mari returned in one call: an ordered list of question+chip
+   * A guided-creation plan YunYun returned in one call: an ordered list of question+chip
    * steps. The client walks these locally (see recordMariPlanAnswer) with zero further
    * LLM calls until the plan is exhausted and a summary message is sent back to her.
    */

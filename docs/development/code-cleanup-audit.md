@@ -53,7 +53,7 @@ The original audit's first cleanup lane identified:
 - two completed phase-task briefs left at the repository root (235 lines);
 - 60 compiler-proven unused declarations, imports, parameters, and locals;
 - eight likely orphaned direct dependencies, subject to a fresh-install/build check;
-- one likely unused static Mari sprite, after a browser smoke check.
+- one likely unused static YunYun sprite, after a browser smoke check.
 
 The four unreachable modules, stale script, no-op runner, and task briefs alone account for 1,361 tracked lines. The proposed work should still be split into small cleanup PRs so each deletion has narrow proof and an easy rollback.
 
@@ -121,7 +121,7 @@ These direct dependencies have no current import, registration, configuration, o
 | --- | --- | --- |
 | client | `class-variance-authority` | **High.** No source/config use. Earlier dependency cleanup history also treated it as unused. |
 | client | `autoprefixer` | **High with build proof.** No PostCSS configuration or import; the client uses the Tailwind Vite plugin. |
-| server | `@earendil-works/pi-ai` | **High.** The Professor Mari runtime was refactored away from the Pi dependency. Repository history explicitly records it as already unimported and left for a follow-up cleanup. |
+| server | `@earendil-works/pi-ai` | **High.** The Professor YunYun runtime was refactored away from the Pi dependency. Repository history explicitly records it as already unimported and left for a follow-up cleanup. |
 | server | `@fastify/websocket` | **High.** No plugin registration, websocket route, or import. |
 | server | `png-chunk-text` | **High.** No import. Current PNG metadata handling is implemented directly. |
 | server | `png-chunks-encode` | **High.** No import. |
@@ -203,9 +203,9 @@ Do not apply this “one textual occurrence” test wholesale to `packages/share
 
 ## 5. Static asset candidate
 
-`packages/client/public/sprites/mari/Mari_point_down_left.png` is the only bundled Mari sprite whose basename/path has no repository reference. The neighboring Mari assets are referenced.
+`packages/client/public/sprites/mari/Mari_point_down_left.png` is the only bundled YunYun sprite whose basename/path has no repository reference. The neighboring YunYun assets are referenced.
 
-**Recommendation (medium confidence):** verify that no runtime naming convention or externally-authored theme addresses it directly, then remove it and browser-check every Mari tutorial/onboarding pose. Public assets can be loaded by constructed URLs, so text absence alone is not enough for high confidence.
+**Recommendation (medium confidence):** verify that no runtime naming convention or externally-authored theme addresses it directly, then remove it and browser-check every YunYun tutorial/onboarding pose. Public assets can be loaded by constructed URLs, so text absence alone is not enough for high confidence.
 
 Do not use basename searches to prune bundled game assets. Server seeders and manifests scan some asset directories dynamically.
 
@@ -247,7 +247,7 @@ The largest active modules are `server/routes/game.routes.ts`, `client/component
 
 Keep the work simple and reviewable:
 
-1. **PR A — artifacts:** remove the four unreachable modules, stale component documentation entry, obsolete sidecar script, completed task briefs, and—after manual confirmation—the unused Mari sprite.
+1. **PR A — artifacts:** remove the four unreachable modules, stale component documentation entry, obsolete sidecar script, completed task briefs, and—after manual confirmation—the unused YunYun sprite.
 2. **PR B — honest test surface:** remove the zero-test runner and rename/redefine package scripts so successful commands represent real checks.
 3. **PR C — compiler cleanup:** resolve the 60 TypeScript diagnostics, then enable unused checks in client/server configs.
 4. **PR D — dependencies:** remove the eight high-confidence packages, repair the workspace-install check and troubleshooting text, regenerate the lockfile, and prove a clean install/build.

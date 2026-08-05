@@ -781,7 +781,7 @@ export function HomeFaq({
             type="button"
             onClick={() => setMobileModalOpen(true)}
             className="flex w-full items-center gap-2 rounded-lg border border-[var(--border)]/60 bg-[var(--card)]/70 px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            aria-label={localize("Open Professor Mari's FAQ")}
+            aria-label={localize("Open Professor YunYun's FAQ")}
           >
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--primary)]/25 bg-[linear-gradient(135deg,rgba(235,137,81,0.18),rgba(77,229,221,0.14))] text-[var(--primary)]">
               <HelpCircle size="0.875rem" />
@@ -800,7 +800,7 @@ export function HomeFaq({
         <Modal
           open={mobileModalOpen}
           onClose={() => setMobileModalOpen(false)}
-          title={localize("Professor Mari's FAQ")}
+          title={localize("Professor YunYun's FAQ")}
           width="max-w-5xl"
         >
           <HomeFaq
@@ -837,7 +837,7 @@ export function HomeFaq({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold tracking-tight text-[var(--foreground)]">
-                  {localize("Professor Mari's FAQ")}
+                  {localize("Professor YunYun's FAQ")}
                 </p>
                 <span className="rounded-full border border-[var(--border)]/60 bg-black/5 px-2 py-0.5 text-[0.5625rem] uppercase tracking-[0.16em] text-[var(--muted-foreground)]/80 dark:bg-white/6">
                   {HOME_FAQ_ITEMS.length} {localize("answers")}

@@ -722,9 +722,9 @@ interface UIState {
   speechToTextEnabled: boolean;
   /** User-set TTS line playback volume (0-100). */
   ttsLineVolume: number;
-  /** When true, allow the rare Chibi Professor Mari scroll toast. */
+  /** When true, allow the rare Chibi Professor YunYun scroll toast. */
   chibiProfessorMariEnabled: boolean;
-  /** When true, Professor Mari shows generated suggestion chips and guided-plan options. */
+  /** When true, Professor YunYun shows generated suggestion chips and guided-plan options. */
   professorMariSuggestionsEnabled: boolean;
   /** When true, achievements appear on Home and announce unlocks. Backend tracking stays silent either way. */
   achievementsEnabled: boolean;
@@ -2700,7 +2700,7 @@ export const useUIStore = create<UIState>()(
           persisted.showQuickReplyGuide = false;
           persisted.showQuickReplyImpersonate = true;
         }
-        // v29 -> v30: allow users to disable the rare Chibi Professor Mari toast.
+        // v29 -> v30: allow users to disable the rare Chibi Professor YunYun toast.
         if (version <= 29 && persisted.chibiProfessorMariEnabled === undefined) {
           persisted.chibiProfessorMariEnabled = true;
         }

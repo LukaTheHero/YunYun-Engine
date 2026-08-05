@@ -528,7 +528,7 @@ export function AgentSuiteModal({ chat, open, onClose, onCloseGuardChange, agent
   const excludedLorebookIds = useMemo(() => getChatExcludedLorebookIds({ metadata: chat.metadata }), [chat.metadata]);
   // chat.characterIds arrives as a JSON string from the API despite the shared type.
   const chatCharacterIds = useMemo(() => getChatCharacterIds({ characterIds: chat.characterIds }), [chat.characterIds]);
-  // includeBuiltIn matches the drawer's query so built-ins (Professor Mari)
+  // includeBuiltIn matches the drawer's query so built-ins (Professor YunYun)
   // resolve and the already-cached list is reused instead of refetched.
   const { data: allCharacters, isLoading: charactersLoading } = useCharacters({ enabled: open, includeBuiltIn: true });
   const { data: allLorebooks } = useLorebooks();

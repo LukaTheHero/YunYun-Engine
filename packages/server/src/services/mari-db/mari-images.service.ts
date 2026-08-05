@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari image command service
+// Professor YunYun image command service
 // ──────────────────────────────────────────────
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";

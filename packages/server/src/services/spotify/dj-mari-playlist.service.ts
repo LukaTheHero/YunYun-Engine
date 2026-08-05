@@ -1,4 +1,4 @@
-// DJ Mari - Spotify playlist composer
+// DJ YunYun - Spotify playlist composer
 import { PROVIDERS, localAuthProviderBaseUrl } from "@marinara-engine/shared";
 import type { DB } from "../../db/connection.js";
 import { logger } from "../../lib/logger.js";
@@ -434,7 +434,7 @@ async function resolveProviderConnection(db: DB) {
   const spotifyAgent = await agents.getByType("spotify");
   const connId = spotifyAgent?.connectionId ?? null;
   if (!connId) {
-    fail(400, "Configure a model connection on the Music DJ agent before using DJ Mari.");
+    fail(400, "Configure a model connection on the Music DJ agent before using DJ YunYun.");
   }
 
   const conn = await connections.getWithKey(connId);
@@ -610,7 +610,7 @@ async function generatePlaylistPlan(args: {
       {
         role: "system",
         content: [
-          "You are DJ Mari, a taste-aware Spotify playlist curator for YunYun Engine.",
+          "You are DJ YunYun, a taste-aware Spotify playlist curator for YunYun Engine.",
           "Compose a private Spotify playlist for the user from their persona, characters, freshest chat context, and liked-song taste samples.",
           "Pick 25-50 specific real songs that are likely to exist in Spotify's catalogue. Prefer strong emotional fit, roleplay/game atmosphere, repeat-listening value, and a coherent flow.",
           "Do not include podcasts, local files, playlists, albums, duplicate songs, or fictional track names.",
@@ -637,10 +637,10 @@ async function generatePlaylistPlan(args: {
     tracks = parseGeneratedTracks(result.content ?? "");
   } catch (err) {
     logger.warn(err, "[spotify/dj-mari] Failed to parse playlist JSON");
-    fail(502, "DJ Mari returned a playlist plan that could not be parsed.");
+    fail(502, "DJ YunYun returned a playlist plan that could not be parsed.");
   }
   if (tracks.length === 0) {
-    fail(502, "DJ Mari returned no usable tracks.");
+    fail(502, "DJ YunYun returned no usable tracks.");
   }
   return tracks;
 }
@@ -658,7 +658,7 @@ async function createSpotifyPlaylist(
       name,
       public: false,
       collaborative: false,
-      description: "Created by DJ Mari in YunYun Engine.",
+      description: "Created by DJ YunYun in YunYun Engine.",
     }),
     signal: AbortSignal.timeout(15_000),
   });
@@ -776,7 +776,7 @@ export async function composeDjMariPlaylist(args: {
   credentials: SpotifyCredentialsResult;
   deviceId?: string | null;
 }): Promise<DjMariPlaylistResult> {
-  const playlistName = `DJ Mari ${todayLabel()}`;
+  const playlistName = `DJ YunYun ${todayLabel()}`;
   const context = await buildDjMariContext(args.db, args.credentials);
   const generatedTracks = await generatePlaylistPlan({ db: args.db, context, playlistName });
   const matchedTracks = await matchGeneratedTracks(args.credentials, generatedTracks, context.likedSongs);
@@ -784,7 +784,7 @@ export async function composeDjMariPlaylist(args: {
   if (matchedTracks.length < DJ_MARI_MIN_TRACKS) {
     fail(
       502,
-      `DJ Mari only matched ${matchedTracks.length} Spotify tracks. Need at least ${DJ_MARI_MIN_TRACKS}; try again after adding more Liked Songs or using a broader model prompt.`,
+      `DJ YunYun only matched ${matchedTracks.length} Spotify tracks. Need at least ${DJ_MARI_MIN_TRACKS}; try again after adding more Liked Songs or using a broader model prompt.`,
     );
   }
 

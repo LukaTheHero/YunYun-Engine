@@ -590,7 +590,7 @@ export async function spotifyAuthRoutes(app: FastifyInstance) {
     const missingScopes = requiredScopes.filter((scope) => !spotifyHasScope(credentials.scopes, scope));
     if (missingScopes.length > 0) {
       return reply.status(400).send({
-        error: `Reconnect Spotify to let DJ Mari create playlists. Missing scopes: ${missingScopes.join(", ")}`,
+        error: `Reconnect Spotify to let DJ YunYun create playlists. Missing scopes: ${missingScopes.join(", ")}`,
         missingScopes,
       });
     }
@@ -601,8 +601,8 @@ export async function spotifyAuthRoutes(app: FastifyInstance) {
       if (err instanceof DjMariPlaylistError) {
         return reply.status(err.status).send({ error: err.message });
       }
-      logger.error(err, "DJ Mari playlist creation failed");
-      return reply.status(500).send({ error: err instanceof Error ? err.message : "DJ Mari playlist creation failed" });
+      logger.error(err, "DJ YunYun playlist creation failed");
+      return reply.status(500).send({ error: err instanceof Error ? err.message : "DJ YunYun playlist creation failed" });
     }
   });
 

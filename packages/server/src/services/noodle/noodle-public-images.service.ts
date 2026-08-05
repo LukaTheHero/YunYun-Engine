@@ -60,7 +60,7 @@ export type StagedNoodlePostMedia = {
 const NOODLE_SERVICE_DIR = dirname(fileURLToPath(import.meta.url));
 const CLIENT_PUBLIC_DIR = resolve(NOODLE_SERVICE_DIR, "../../../../client/public");
 const PROFESSOR_MARI_REFERENCE_ASSETS = [
-  "sprites/mari/Mari_profile.png",
+  "sprites/yunyun/yunyun-profile.png",
   "sprites/yunyun/chibi-yunyun.png",
 ] as const;
 const REVIEWED_IMAGE_CLAIM_LEASE_MS = 2 * 60 * 1000;

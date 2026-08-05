@@ -17,7 +17,7 @@ const { hostValidationHook, parseRequestHostname } =
 
 assert.equal(parseRequestHostname("192.168.1.50:7860"), "192.168.1.50");
 assert.equal(parseRequestHostname("[fd7a:115c:a1e0::1]:7860"), "fd7a:115c:a1e0::1");
-assert.equal(parseRequestHostname("Mari-Box.local.:7860"), "mari-box.local");
+assert.equal(parseRequestHostname("YunYun-Box.local.:7860"), "mari-box.local");
 assert.equal(parseRequestHostname("attacker.example/path"), null);
 assert.equal(parseRequestHostname("attacker.example:0"), null);
 assert.equal(parseRequestHostname("attacker.example:99999"), null);

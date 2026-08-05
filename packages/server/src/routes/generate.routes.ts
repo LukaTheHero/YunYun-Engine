@@ -1474,13 +1474,13 @@ export async function generateRoutes(app: FastifyInstance) {
         return groupHistoryCharacterNamesByIdPromise;
       };
 
-      // ── Professor Mari fetch follow-up loop ──
-      // After Mari executes a [fetch:], the fetched data is persisted to
+      // ── Professor YunYun fetch follow-up loop ──
+      // After YunYun executes a [fetch:], the fetched data is persisted to
       // chatMeta.mariContext but only injected into the prompt at the START
       // of a generation pass. Without a follow-up turn she goes silent
       // ("snackbar without follow-up", #898). The loop re-runs the generation
       // up to MAX_FOLLOW_UP_ITERATIONS additional times if a fetch fired in
-      // the previous pass, so Mari can speak to the data she just pulled.
+      // the previous pass, so YunYun can speak to the data she just pulled.
       let runningMessagesForFollowUp: GenerationPromptMessage[] = [...mappedMessages];
       let followUpIteration = 0;
       const MAX_FOLLOW_UP_ITERATIONS = 2;
@@ -1501,7 +1501,7 @@ export async function generateRoutes(app: FastifyInstance) {
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        // Per-iteration flag: set when a Mari [fetch:] command actually returned
+        // Per-iteration flag: set when a YunYun [fetch:] command actually returned
         // data AND persisted mariContext. The follow-up branch at the bottom of
         // the loop body gates on this so a fetch that found nothing or threw
         // doesn't burn an extra generation pass with no new context to read.
@@ -1737,9 +1737,9 @@ export async function generateRoutes(app: FastifyInstance) {
         // ── Apply regex scripts to prompt message content ──
         // Macro context is available now, so regex find/replace/trim fields can use prompt macros.
         // Gated to iteration 0 because applyRegexScriptsToPromptMessages mutates
-        // message.content in place — running it again on a Mari follow-up pass
+        // message.content in place — running it again on a YunYun follow-up pass
         // would stack non-idempotent user regex scripts on already-rewritten text.
-        // The newly appended Mari turn is run through the same transforms below
+        // The newly appended YunYun turn is run through the same transforms below
         // before it lands in runningMessagesForFollowUp, so each message still
         // gets exactly one pass.
         if (followUpIteration === 0) {
@@ -2345,7 +2345,7 @@ export async function generateRoutes(app: FastifyInstance) {
             resolvePromptMacros,
           });
 
-          // ── Home Professor Mari: inject assistant knowledge & commands ──
+          // ── Home Professor YunYun: inject assistant knowledge & commands ──
           if (isHomeProfessorMariAssistantChat) {
             conversationSystemPrompt +=
               "\n\n" + (await resolveProfessorMariPromptContext({ chatMeta, chars, lorebooksStore, chats, presets }));
@@ -4694,7 +4694,7 @@ export async function generateRoutes(app: FastifyInstance) {
         // were already resolved earlier for the agent pipeline and are reused here.
 
         // ── Impersonate: inject instruction to respond as the user's character ──
-        // Only on the user's actual turn (iteration 0). A Mari follow-up pass
+        // Only on the user's actual turn (iteration 0). A YunYun follow-up pass
         // is a continuation of the assistant's prior message, not a new user
         // turn, so re-injecting impersonate/prefill would scramble the prompt.
         if (input.impersonate && followUpIteration === 0) {
@@ -9148,10 +9148,10 @@ export async function generateRoutes(app: FastifyInstance) {
           }
         }
 
-        // ── Trigger follow-up generation if Professor Mari's fetch landed ──
-        // Mari's fetched payload was persisted to chatMeta.mariContext by the
+        // ── Trigger follow-up generation if Professor YunYun's fetch landed ──
+        // YunYun's fetched payload was persisted to chatMeta.mariContext by the
         // fetch handler above, but mariContext is only read into the prompt at
-        // the start of a generation pass — without a follow-up turn Mari would
+        // the start of a generation pass — without a follow-up turn YunYun would
         // go silent right after the fetch snackbar. Gating on the success flag
         // (rather than just the presence of a parsed [fetch:]) avoids burning
         // an extra pass when the fetch handler found nothing or threw.
@@ -9165,12 +9165,12 @@ export async function generateRoutes(app: FastifyInstance) {
         ) {
           followUpIteration++;
           logger.info(
-            "[generate] Professor Mari fetch succeeded; triggering follow-up generation (iteration %d)",
+            "[generate] Professor YunYun fetch succeeded; triggering follow-up generation (iteration %d)",
             followUpIteration,
           );
 
           // Carry the just-streamed assistant turn into the next prompt so
-          // Mari sees her own prior message before speaking again. Apply the
+          // YunYun sees her own prior message before speaking again. Apply the
           // same regex-script + blank-line compaction transforms here, since
           // the iteration-0 block above only runs on the original history.
           const lastResponseText = allResponses.join("\n\n");
@@ -9226,7 +9226,7 @@ export async function generateRoutes(app: FastifyInstance) {
           }
         }
         break;
-      } // end of Professor Mari follow-up loop
+      } // end of Professor YunYun follow-up loop
 
       // ── Post OOC messages to connected conversation (Roleplay → Conversation) ──
       if (collectedOocMessages.length > 0 && chat.connectedChatId && !abortController.signal.aborted) {

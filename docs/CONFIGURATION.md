@@ -60,7 +60,7 @@ External Extension imports require two independent opt-ins. Set `ENABLE_EXTERNAL
 
 The environment variable is the host-operator permission; the Danger Zone toggle is the user's explicit acceptance. The section, import routes, approval routes, and both runtime loaders all enforce the combined policy. Closing either gate disables external records and stops running external code. Manually stored, legacy, profile-imported, and unknown-source extension records are treated as external, so dropping files into an extension-related folder cannot bypass the gates.
 
-Professor Mari drafts remain available without this flag. They are created disabled and still require approval of their exact code hash.
+Professor YunYun drafts remain available without this flag. They are created disabled and still require approval of their exact code hash.
 
 Sandboxed Browser Extensions remain the default. Some older third-party packages are marked **Full page access** because they depend on YunYun's DOM. That mode runs the exact approved code inside YunYun's page and can access page content, browser storage, network APIs, and the current same-origin session. It is available only to External Extensions after both gates are open and requires a separate warning acknowledgement. Disable it and reload the page if the extension leaves visual or behavioral changes behind.
 
@@ -312,9 +312,9 @@ Scene video providers are set up as connections inside the app, not as environme
 | `GIPHY_API_KEY`                   | empty                                      | Giphy key for GIF search in Conversation mode. Search is off when unset.          |
 | `INTIFACE_URL`                    | `ws://127.0.0.1:12345`                     | Default address for the Intiface haptic app.                                      |
 | `SPOTIFY_REDIRECT_URI`            | derived from request                       | Override for the Spotify login callback URL. Set it when TLS is handled upstream. |
-| `MARI_WIKI_CONTENT_MAX_BYTES`     | `50000`                                    | Largest wiki page content Professor Mari reads before trimming.                   |
-| `MARI_WIKI_REQUEST_TIMEOUT_MS`    | `30000`                                    | Time allowed for one wiki request by Professor Mari.                              |
-| `MARI_WIKI_CACHE_TTL_MS`          | `300000`                                   | How long Professor Mari caches a wiki read.                                       |
+| `MARI_WIKI_CONTENT_MAX_BYTES`     | `50000`                                    | Largest wiki page content Professor YunYun reads before trimming.                   |
+| `MARI_WIKI_REQUEST_TIMEOUT_MS`    | `30000`                                    | Time allowed for one wiki request by Professor YunYun.                              |
+| `MARI_WIKI_CACHE_TTL_MS`          | `300000`                                   | How long Professor YunYun caches a wiki read.                                       |
 | `SIDECAR_RUNTIME_INSTALL_ENABLED` | `false` (the Windows launcher sets `true`) | Allows installing the local model runtime without an admin header on loopback.    |
 | `SSL_CERT`                        | empty                                      | Path to a TLS certificate. See Access control above.                              |
 | `SSL_KEY`                         | empty                                      | Path to a TLS private key. See Access control above.                              |

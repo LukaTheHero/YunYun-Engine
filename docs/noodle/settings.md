@@ -56,7 +56,7 @@ Use **Delete profile** on a managed stage profile to remove that stage profile, 
 
 The **Invites** section chooses which characters can take part in a Noodle refresh. A refresh is when the AI writes a batch of posts, replies, reposts, and likes for the invited accounts.
 
-- **Professor Mari participates**: a toggle, default **on**. Turn it off to hide Professor Mari from Noodle account discovery and exclude her from future generated posts, replies, reactions, mentions, profile generation, and chat carryover. Existing timeline history is preserved, and turning the toggle back on restores her account.
+- **Professor YunYun participates**: a toggle, default **on**. Turn it off to hide Professor YunYun from Noodle account discovery and exclude her from future generated posts, replies, reactions, mentions, profile generation, and chat carryover. Existing timeline history is preserved, and turning the toggle back on restores her account.
 - **Characters to Invite**: a search box. Type here to filter both the folder list and the character list below it.
 - **Add from Folder**: click to expand a list of your character folders. Check one or more folders, then click the invite button at the bottom. The button label changes with your selection:
   - **Select folders to invite** when nothing is checked.
@@ -88,7 +88,7 @@ The **Active Accounts** section sets how many eligible accounts take part in one
 - With **Exact count**, one field appears: **Active count** (1 to 100). It sets a fixed number of accounts.
 - With **All invited**, every eligible account takes part, with no cap.
 
-Your active persona is always eligible on top of these accounts. Professor Mari is eligible while **Professor Mari participates** is on.
+Your active persona is always eligible on top of these accounts. Professor YunYun is eligible while **Professor YunYun participates** is on.
 
 Noodle chooses the active accounts before it prepares first-time profiles. Only active characters without an existing generated Noodle profile receive a profile-generation request; inactive invited characters are not included. The timeline-writing request likewise receives character cards only for the accounts selected for that refresh.
 
@@ -120,7 +120,7 @@ The **Image Generation** section lets Noodle attach AI-made images to some posts
 
 If you turn on **Image generation** but have no usable image connection, a refresh is blocked. You will see the message "Choose an image generation connection for Noodle first." A failed image is retried once. If the second attempt also fails, the refresh continues and publishes a clean text-only post instead of exposing the unused image prompt.
 
-The template Noodle uses to write these image prompts is called **Noodle Post Image**. You can edit it under **Settings** > **Generations** > **Image Generation Prompt Overrides**. Your **Prompt instructions** text is passed into that template, and the result then goes through your normal image style profile. See [Prompt Overrides for Image and Video](../prompts/prompt-overrides.md) and [Image Style Profiles](../media/style-profiles.md). Professor Mari has no character card, so her image posts use her built-in avatar and reference art instead.
+The template Noodle uses to write these image prompts is called **Noodle Post Image**. You can edit it under **Settings** > **Generations** > **Image Generation Prompt Overrides**. Your **Prompt instructions** text is passed into that template, and the result then goes through your normal image style profile. See [Prompt Overrides for Image and Video](../prompts/prompt-overrides.md) and [Image Style Profiles](../media/style-profiles.md). Professor YunYun has no character card, so her image posts use her built-in avatar and reference art instead.
 
 ## Timeline Writing
 
@@ -194,7 +194,7 @@ This table lists every Noodle setting with its default and range.
 |---|---|---|
 | **Enable NoodleR** | off | on or off |
 | **Generation connection** | none | any text connection (required for refresh) |
-| **Professor Mari participates** | on | on or off |
+| **Professor YunYun participates** | on | on or off |
 | **Refreshes/day** | 2 | 0 to 24 (0 turns automatic refreshes off) |
 | **Active selection** | Random range | Random range, Exact count, All invited |
 | **Min active** | 2 | 1 to 100 (Random range only) |

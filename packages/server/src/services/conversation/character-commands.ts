@@ -27,7 +27,7 @@
 // - <note>text</note> (durable note for connected roleplay, persists until cleared)
 // - [dm: character="CharName", message="text"] (Roleplay-only: open a direct-message conversation)
 //
-// Assistant commands (Professor Mari):
+// Assistant commands (Professor YunYun):
 // - [create_persona: name="...", description="...", personality="...", appearance="...", about_me="..."]
 // - [create_character: name="...", description="...", personality="...", first_message="...", scenario="...", backstory="...", appearance="...", about_me="...", mes_example="...", creator_notes="...", system_prompt="...", post_history_instructions="...", creator="...", character_version="...", tags="tag1, tag2", alternate_greetings="hello || hi", talkativeness=0.5, fav=true, world="...", depth_prompt="...", depth_prompt_depth=4, depth_prompt_role="system"]
 // - [update_character: name="...", description="...", personality="...", first_message="...", scenario="...", backstory="...", appearance="...", about_me="...", mes_example="...", creator_notes="...", system_prompt="...", post_history_instructions="...", creator="...", character_version="...", tags="tag1, tag2", alternate_greetings="hello || hi", talkativeness=0.5, fav=true, world="...", depth_prompt="...", depth_prompt_depth=4, depth_prompt_role="system"]
@@ -190,7 +190,7 @@ export interface ReactCommand {
   targetCharacter?: string;
 }
 
-// ── Assistant commands (Professor Mari) ──
+// ── Assistant commands (Professor YunYun) ──
 
 export interface CreatePersonaCommand {
   type: "create_persona";
@@ -650,7 +650,7 @@ function parseJsonValue(raw: string): unknown | null {
  * Suggestion-chip payloads come from free-form model output, which commonly drifts from
  * strict JSON (trailing commas, single-quoted strings, smart quotes from a "helpful"
  * autocorrect). A single stray comma would otherwise silently drop the whole chip set with
- * no visible symptom other than "Mari said she had suggestions but none appeared" - so this
+ * no visible symptom other than "YunYun said she had suggestions but none appeared" - so this
  * repairs the common near-miss cases before giving up.
  */
 function parseLenientJsonValue(raw: string): unknown | null {
@@ -1253,7 +1253,7 @@ export function parseCharacterCommands(content: string): {
     if (parsed) commands.push({ type: "react", ...parsed });
   }
 
-  // Parse assistant commands (Professor Mari)
+  // Parse assistant commands (Professor YunYun)
   for (const match of content.matchAll(CREATE_PERSONA_RE)) {
     const params = match[1]!;
     const cmd: CreatePersonaCommand = { type: "create_persona", name: "" };

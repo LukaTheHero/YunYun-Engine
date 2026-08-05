@@ -29,9 +29,15 @@ const DRY = process.argv.includes("--dry");
 //   (?!-)    → protects hyphenated upstream names: the Marinara-Engine URLs
 //              and the Pasta-Devs/Marinara-Agents catalog.
 const OLD_NAME = "Mari" + "nara";
+const OLD_ASSISTANT = "Mar" + "i";
 const RULES = [
   [new RegExp(`${OLD_NAME} Engine`, "g"), "YunYun Engine"],
   [new RegExp(`\\b${OLD_NAME}\\b(?!-)`, "g"), "YunYun"],
+  // The built-in assistant is "Professor YunYun". Capital-M + word boundaries
+  // means this cannot touch the lowercase `mari` CLI binary, sprites/mari/,
+  // .mari-workspace, Mari_profile.png (underscore is a word char),
+  // PROFESSOR_MARI_ID, or the ProfessorMari* component identifiers.
+  [new RegExp(`\\b${OLD_ASSISTANT}\\b`, "g"), "YunYun"],
 ];
 
 // Phrases that must survive verbatim even though they contain the old name.
@@ -47,6 +53,12 @@ const PROTECT = [
   `${OLD_NAME} Conversation prompt`,
   `PRESET_AUTHOR = "${OLD_NAME}"`,
   `MARINARA_UNIVERSAL_PRESET_AUTHOR = "${OLD_NAME}"`,
+  // The workspace CLI binary is literally `mari`; describing it as anything
+  // else in an agent prompt makes the model invoke a command that does not exist.
+  `${OLD_ASSISTANT} CLI`,
+  // Docs example demonstrating case-insensitive comparison — renaming one side
+  // of it destroys the point being made.
+  `\`${OLD_ASSISTANT}\` equals \`mari\``,
 ];
 const SENTINEL = "YYP";
 

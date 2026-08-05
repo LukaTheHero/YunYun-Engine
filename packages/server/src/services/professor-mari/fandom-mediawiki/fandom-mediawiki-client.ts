@@ -748,7 +748,7 @@ export class FandomMediaWikiClient {
           signal: AbortSignal.timeout(this.requestTimeoutMs),
           headers: {
             accept: "application/json",
-            "user-agent": "Marinara-Engine Professor-Mari Fandom-MediaWiki-CLI",
+            "user-agent": "Marinara-Engine Professor-YunYun Fandom-MediaWiki-CLI",
           },
         });
       } catch (err) {

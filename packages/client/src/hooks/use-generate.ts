@@ -1542,7 +1542,7 @@ export function useGenerate() {
         return true;
       };
 
-      // Safety net: guarantees the Mari work-status pill clears for this
+      // Safety net: guarantees the YunYun work-status pill clears for this
       // chat on every termination path (done, error, abort, unexpected
       // throw). The assistant_commands_end SSE event is still the primary
       // clear; this just keeps state sane when the stream dies mid-window.
@@ -1627,7 +1627,7 @@ export function useGenerate() {
                 setDelayedCharacterInfo(null); // Clear delayed indicator too
                 useChatStore.getState().setGenerationPhase(null); // Clear phase indicator
               }
-              // Fire the "Mari is thinking…" pill on the first token — that's
+              // Fire the "YunYun is thinking…" pill on the first token — that's
               // the same moment "X is typing…" clears, so the two indicators
               // never overlap. Also seed the per-chat phase in the store so
               // the indicator can restore the pill on chat-switch-back.
@@ -2773,7 +2773,7 @@ export function useGenerate() {
         return false;
       } finally {
         // Stream has terminated (done, error, abort, or unexpected throw) —
-        // guarantee the Mari indicator clears even if the end SSE never arrived.
+        // guarantee the YunYun indicator clears even if the end SSE never arrived.
         clearMariPhaseForThisChat();
         // A provider can close the SSE immediately after its final agent event.
         // If this generation still owns the visible Roleplay stream, drain the

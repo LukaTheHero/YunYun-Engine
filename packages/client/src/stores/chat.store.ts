@@ -198,15 +198,15 @@ interface ChatState {
   /** The chatId that the current streaming generation belongs to. */
   streamingChatId: string | null;
   /**
-   * Per-chat Mari work phase, used to restore the work-status pill when the
+   * Per-chat YunYun work phase, used to restore the work-status pill when the
    * user switches chats mid-stream. The CustomEvent transport handles the
    * live transitions inside the active chat; this map is the source of truth
    * so the indicator can read the current phase on chat switch.
    *
-   * - "thinking" — Mari's reply is streaming (set on first token).
-   * - "updating" — Mari's embedded commands are executing (set on
+   * - "thinking" — YunYun's reply is streaming (set on first token).
+   * - "updating" — YunYun's embedded commands are executing (set on
    *   assistant_commands_start).
-   * - absent — no Mari work in progress for that chat.
+   * - absent — no YunYun work in progress for that chat.
    */
   mariPhaseByChatId: Map<string, "thinking" | "updating">;
   streamBuffer: string;

@@ -542,7 +542,7 @@ Agent memory tools use `/api/agents/memory/:agentType/:chatId`, where `agentType
 | `/api/prompt-overrides`         | Built-in prompt overrides               |
 | `/api/achievements`             | Achievement unlocks                     |
 | `/api/noodle`                   | Noodle social timeline                  |
-| `/api/professor-mari/workspace` | Professor Mari workspace operations     |
+| `/api/professor-mari/workspace` | Professor YunYun workspace operations     |
 
 ## PWA support
 

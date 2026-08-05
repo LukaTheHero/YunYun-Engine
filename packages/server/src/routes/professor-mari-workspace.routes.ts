@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Routes: Professor Mari Workspace Agent
+// Routes: Professor YunYun Workspace Agent
 // ──────────────────────────────────────────────
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -57,7 +57,7 @@ function privileged(request: FastifyRequest, reply: FastifyReply, loopbackOnly =
   return requirePrivilegedAccess(request, reply, {
     loopbackOnly,
     trustedNetwork: !loopbackOnly,
-    feature: "Professor Mari workspace",
+    feature: "Professor YunYun workspace",
   });
 }
 

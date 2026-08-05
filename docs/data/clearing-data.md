@@ -10,7 +10,7 @@ The clear data tools live in one place.
 2. Go to the **Advanced** tab.
 3. Scroll to the **Danger Zone** section at the bottom.
 
-The **Danger Zone** description reads: "Permanently clear selected categories of local data. Professor Mari is always preserved."
+The **Danger Zone** description reads: "Permanently clear selected categories of local data. Professor YunYun is always preserved."
 
 If you use YunYun from another device (not the computer running the app), clearing data needs admin access. See [Remote Access](../REMOTE_ACCESS.md) for how to set that up.
 
@@ -27,7 +27,7 @@ The **Danger Zone** shows a checklist of eight categories. Each one is a separat
 | Category | What it clears |
 |---|---|
 | **Chats & Messages** | Chats, folders, messages, scene/OOC data, and chat runtime state. |
-| **Characters** | Characters and character groups. Professor Mari is always preserved. |
+| **Characters** | Characters and character groups. Professor YunYun is always preserved. |
 | **Personas** | Personas and persona groups. |
 | **Lorebooks** | Lorebooks and lorebook entries. |
 | **Presets** | Prompt presets, groups, sections, and variables. |
@@ -54,14 +54,14 @@ After a successful clear, you should see a confirmation message. It says the sel
 Use this to wipe all eight categories in one step.
 
 1. Click **Clear All Data**. You do not need to check any boxes first.
-2. A warning box asks: "Delete all supported data categories except Professor Mari? There is no undo."
+2. A warning box asks: "Delete all supported data categories except Professor YunYun? There is no undo."
 3. Click **Cancel** to stop, or **Confirm Delete** to delete everything.
 
 This does the same thing as checking every box and clearing them together.
 
-## Professor Mari is always kept
+## Professor YunYun is always kept
 
-Professor Mari is the built-in helper character. This feature never deletes her. Even if you clear the **Characters** category or use **Clear All Data**, Professor Mari stays in place. You cannot remove her from the **Danger Zone**.
+Professor YunYun is the built-in helper character. This feature never deletes her. Even if you clear the **Characters** category or use **Clear All Data**, Professor YunYun stays in place. You cannot remove her from the **Danger Zone**.
 
 ## Related guides
 

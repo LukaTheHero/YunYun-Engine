@@ -34,7 +34,7 @@ assert.equal(
 );
 
 const personaLibrarySearchDocument = {
-  name: "Mari",
+  name: "YunYun",
   title: "Research partner",
   meta: formatCardLibraryMeta("SpicyMarinara", "2.0"),
   summary: getCardLibrarySummary(["A precise persona card.", "An AI engineer."]),

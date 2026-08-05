@@ -12,14 +12,14 @@ Your progress is saved locally, inside the profile you are using. A different pr
 
 ## Opening the Achievements panel
 
-The **Achievements** button lives on the Home screen. The Home screen is what you see when no chat is open. The button sits just under the Professor Mari chat box, and it shows a trophy icon.
+The **Achievements** button lives on the Home screen. The Home screen is what you see when no chat is open. The button sits just under the Professor YunYun chat box, and it shows a trophy icon.
 
 Under the label, the button shows a live count, like **12 of 23 unlocked**. While it is still loading, it reads **Checking the collection...** instead.
 
 To open the panel, follow these steps:
 
 1. Go to the Home screen.
-2. Find the **Achievements** button under the Professor Mari chat box.
+2. Find the **Achievements** button under the Professor YunYun chat box.
 3. Click it.
 
 You should see the **Achievements** window open. At the top it shows a summary line, such as **12 of 23 achievements unlocked in this profile.** Below that is a grid of achievement cards.
@@ -37,7 +37,7 @@ Some achievements are single unlocks. The **Creation** and **Collection** ones a
 | Achievement | Category | How you unlock it |
 |---|---|---|
 | **Diligent Student** | Milestone | Finish or skip the first-time tutorial. |
-| **Hello World** | Milestone | Send your first message to Professor Mari from the Home screen. |
+| **Hello World** | Milestone | Send your first message to Professor YunYun from the Home screen. |
 | **One Of Us** | Community | Click the **Discord** link in the Home screen footer. |
 | **Based Backer** | Community | Click the **Support** link (it opens Ko-fi) in the Home screen footer. |
 | **Backseat Appreciator** | Community | Click the **Credits** button in the Home screen footer. |
@@ -51,7 +51,7 @@ Some achievements are single unlocks. The **Creation** and **Collection** ones a
 A few notes on the list:
 
 - A persona is the profile that represents you in a chat. A lorebook is a set of background notes the AI can pull in.
-- The **Collection** achievements count everything of that type in your library. Imported and downloaded items count too, not just ones you build yourself. For **Hoarder**, the built-in Professor Mari character is the one exception: it never counts.
+- The **Collection** achievements count everything of that type in your library. Imported and downloaded items count too, not just ones you build yourself. For **Hoarder**, the built-in Professor YunYun character is the one exception: it never counts.
 - For the community achievements, just visiting the link is enough. You do not need to sign up or finish anything on the other site.
 
 ## The Achievements setting
@@ -85,5 +85,5 @@ There is no button anywhere in the app to reset or clear your achievements.
 
 - [Getting Started with YunYun Engine](welcome.md)
 - [The First-Time Tutorial](tutorial.md)
-- [Professor Mari, Your In-App Assistant](professor-mari.md)
+- [Professor YunYun, Your In-App Assistant](professor-mari.md)
 - [Connecting to an AI Provider](../connections/connecting-to-a-provider.md)

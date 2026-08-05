@@ -27,13 +27,13 @@ The `{{convo_display}}` macro puts the responding character's display name into 
 
 The bio is not just decoration. By default, YunYun adds the **About Me** of every present character and persona to the prompt on each turn. The bios go in as a short list of participant profiles. This way, the model always knows how each person presents themselves. You do not need to do anything for this to work.
 
-### Writing an About Me with Professor Mari
+### Writing an About Me with Professor YunYun
 
-You do not have to write the bio yourself. Open Professor Mari from the Home screen and ask her to write or revise the **About Me** for a named character or persona. She reads the saved profile first, writes a short self-authored bio in that person's voice, and saves it directly to the real **About Me** field.
+You do not have to write the bio yourself. Open Professor YunYun from the Home screen and ask her to write or revise the **About Me** for a named character or persona. She reads the saved profile first, writes a short self-authored bio in that person's voice, and saves it directly to the real **About Me** field.
 
 For example, ask: `Write Luna's About Me as a cryptic one-line bio.` You can also ask for a revision, such as making an existing bio funnier, shorter, warmer, or more faithful to the card.
 
-Professor Mari uses her normal configured model. There is no separate About Me connection, source picker, or generation button in the character and persona editors. Her saved change appears in the usual review flow, where you can keep or restore it. Manual edits in the editor still show **Revert**, which restores the text from before your current edit.
+Professor YunYun uses her normal configured model. There is no separate About Me connection, source picker, or generation button in the character and persona editors. Her saved change appears in the usual review flow, where you can keep or restore it. Manual edits in the editor still show **Revert**, which restores the text from before your current edit.
 
 ## Convo Behavior
 

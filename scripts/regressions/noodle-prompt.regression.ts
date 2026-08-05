@@ -696,11 +696,11 @@ const threadedTimeline = formatNoodleTimelineForPrompt(
         kind: "persona",
         entityId: "persona-1",
         handle: "smarinara_spaghetti",
-        displayName: "Mari",
+        displayName: "YunYun",
         avatarUrl: null,
       },
       type: "reply",
-      content: "Mari asks a follow-up question.",
+      content: "YunYun asks a follow-up question.",
       imageUrl: null,
       createdAt: "2026-07-10T10:05:00.000Z",
     },
@@ -709,7 +709,7 @@ const threadedTimeline = formatNoodleTimelineForPrompt(
 );
 assert.match(threadedTimeline, /replyId=persona-comment-1/u);
 assert.match(threadedTimeline, /@smarinara_spaghetti/u);
-assert.match(threadedTimeline, /Mari asks a follow-up question/u);
+assert.match(threadedTimeline, /YunYun asks a follow-up question/u);
 assert.deepEqual(
   noodlePersonaCommentPostIds(
     [

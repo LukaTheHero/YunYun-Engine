@@ -661,7 +661,7 @@ Required indexes and invariants:
 - A bootstrap row uses `messageId: ""` and swipe `0` until a committed message anchor exists.
 - Deleting a chat, message, or swipe removes or shifts the matching spatial rows in the same places that currently maintain Game and turn-game snapshots.
 
-The new table must be registered in the file-table definitions, file-backed table list, cascade graph, profile backup/restore, and Mari DB integrity metadata. Lookup behavior must be covered by file-native regressions.
+The new table must be registered in the file-table definitions, file-backed table list, cascade graph, profile backup/restore, and YunYun DB integrity metadata. Lookup behavior must be covered by file-native regressions.
 
 ### Effective-state and history rules
 

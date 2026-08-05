@@ -78,8 +78,8 @@ export function getWorkspaceShellSandboxStatus(): WorkspaceShellSandboxStatus {
     backend: null,
     reason:
       process.platform === "linux"
-        ? "Bubblewrap (bwrap) is required for Professor Mari shell commands."
-        : `Professor Mari shell commands are disabled because no supported OS sandbox is available on ${process.platform}.`,
+        ? "Bubblewrap (bwrap) is required for Professor YunYun shell commands."
+        : `Professor YunYun shell commands are disabled because no supported OS sandbox is available on ${process.platform}.`,
   };
 }
 
@@ -266,7 +266,7 @@ export async function spawnWorkspaceSandboxedShell(
   const status = getWorkspaceShellSandboxStatus();
   if (!status.available) {
     throw new Error(
-      `${status.reason} Use Professor Mari's structured read, grep, find, ls, edit, write, and app_data tools instead.`,
+      `${status.reason} Use Professor YunYun's structured read, grep, find, ls, edit, write, and app_data tools instead.`,
     );
   }
 

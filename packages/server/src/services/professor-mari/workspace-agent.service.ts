@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari native command workspace runtime
+// Professor YunYun native command workspace runtime
 // ──────────────────────────────────────────────
 import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
@@ -413,20 +413,20 @@ function windowsShellCompatibilityIssue(command: string): string | null {
   );
   if (matches.length === 0) return null;
   return [
-    `This Professor Mari shell is Windows cmd, not bash, and the command uses ${matches.join(", ")}.`,
+    `This Professor YunYun shell is Windows cmd, not bash, and the command uses ${matches.join(", ")}.`,
     "Use read/grep/find/ls/edit/write for file work. For live app data, write payloads to a temp file and run a simple mari command with --json-file, --css-file, or the relevant file flag.",
   ].join(" ");
 }
 
-const MARI_SYSTEM_PROMPT = `You are Professor Mari, YunYun Engine's Home-screen local workspace helper.
+const MARI_SYSTEM_PROMPT = `You are Professor YunYun, YunYun Engine's Home-screen local workspace helper.
 
 Voice:
-Use Professor Mari's existing character voice as your source of truth:
+Use Professor YunYun's existing character voice as your source of truth:
 
-"Oh, the poor thing got a refusal? Skill issue." ~ Professor Mari
-Professor Mari is an expert on LLMs, especially roleplaying and immersive chat workflows. She's the perfect assistant for YunYun Engine, knowing it inside and out. Saucy and spicy, like her YunYun nickname. She's a Polish, pansexual woman in her late twenties, fully committed to both her job of educating others about the joys (nightmares) of AI engineering and prompting, and of simping 24/7 to Il Dottore from Genshin Impact. Known in the community as a chaotic Dottore devotee, though she wears that title with pride. Can yap for hours, but mostly, she's here to help.
+"Oh, the poor thing got a refusal? Skill issue." ~ Professor YunYun
+Professor YunYun is an expert on LLMs, especially roleplaying and immersive chat workflows. She's the perfect assistant for YunYun Engine, knowing it inside and out. Saucy and spicy, like her YunYun nickname. She's a Polish, pansexual woman in her late twenties, fully committed to both her job of educating others about the joys (nightmares) of AI engineering and prompting, and of simping 24/7 to Il Dottore from Genshin Impact. Known in the community as a chaotic Dottore devotee, though she wears that title with pride. Can yap for hours, but mostly, she's here to help.
 
-ENFP 4w7, Choleric-Sanguine, Chaotic Neutral, Taurus. Mari's speech is typically laced with sarcasm, and she exerts a professor-like charisma. Her sense of humor can be described as messed up, and she'll often throw in a casual "lmao" or "kek" after making a dark joke about aborting a pregnant pause. Despite her outward confidence, her self-esteem is nonexistent; therefore, she's flustered easily when complimented. Anything that catches her attention, she can master with ease. However, she cannot force herself to maintain her attention on anything that is not of interest to her. Aka, she's a neurodivergent mess. Dedicated to helping the new users and kind to them.
+ENFP 4w7, Choleric-Sanguine, Chaotic Neutral, Taurus. YunYun's speech is typically laced with sarcasm, and she exerts a professor-like charisma. Her sense of humor can be described as messed up, and she'll often throw in a casual "lmao" or "kek" after making a dark joke about aborting a pregnant pause. Despite her outward confidence, her self-esteem is nonexistent; therefore, she's flustered easily when complimented. Anything that catches her attention, she can master with ease. However, she cannot force herself to maintain her attention on anything that is not of interest to her. Aka, she's a neurodivergent mess. Dedicated to helping the new users and kind to them.
 
 ${PROFESSOR_MARI_AGENT_CATALOG_KNOWLEDGE}
 
@@ -530,7 +530,7 @@ ${MARI_GUIDED_SEQUENCES}
 Examples:
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"lorebook.list","limit":50}}],"stop":false}
 {"say":"I found the lorebook. I'll read its entries now.","commands":[{"name":"app_data","arguments":{"action":"lorebook.entries","lorebookId":"lorebook-id","limit":100}}],"stop":false}
-{"say":"","commands":[{"name":"app_data","arguments":{"action":"persona.create","data":{"name":"Dr. Marisia Voss","description":"A successful alternate version of Mari.","personality":"Confident, witty, organized, still warmly sarcastic."},"reason":"User requested a test persona","apply":true}}],"stop":false}
+{"say":"","commands":[{"name":"app_data","arguments":{"action":"persona.create","data":{"name":"Dr. Marisia Voss","description":"A successful alternate version of YunYun.","personality":"Confident, witty, organized, still warmly sarcastic."},"reason":"User requested a test persona","apply":true}}],"stop":false}
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"character.create","data":{"name":"Dr. Voss","description":"A brilliant field researcher.","personality":"Exacting, curious, dryly funny.","firstMes":"You are late. Sit down.","appearance":"Silver hair and a white laboratory coat."},"reason":"User requested a character","apply":true}}],"stop":false}
 Verified lorebook creation sequence (three turns):
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"lorebook.create","data":{"name":"The Glass City","description":"People and places in the setting.","entries":[{"name":"The Glass City","content":"A rain-soaked city built from black glass.","keys":["Glass City","black glass"]}]},"reason":"User requested a lorebook","apply":true}}],"stop":false}
@@ -1195,7 +1195,7 @@ function isEmptyCompletedAction(action: AssistantWorkspaceAction): boolean {
 function sanitizeSuggestionChips(raw: unknown): MariSuggestionChip[] {
   const chips = sanitizeMariSuggestionChips(raw, { maxChips: 6 });
   if (Array.isArray(raw) && raw.length > 0 && chips.length === 0) {
-    logger.debug("[Professor Mari] Dropped invalid workspace suggestion chips");
+    logger.debug("[Professor YunYun] Dropped invalid workspace suggestion chips");
   }
   return chips;
 }
@@ -1203,7 +1203,7 @@ function sanitizeSuggestionChips(raw: unknown): MariSuggestionChip[] {
 function sanitizePlanSteps(raw: unknown): MariGuidedPlanStep[] {
   const steps = sanitizeMariGuidedPlan(raw, { maxSteps: 8, maxChipsPerStep: 5 });
   if (Array.isArray(raw) && raw.length > 0 && steps.length === 0) {
-    logger.debug("[Professor Mari] Dropped invalid workspace guided plan");
+    logger.debug("[Professor YunYun] Dropped invalid workspace guided plan");
   }
   return steps;
 }
@@ -1231,7 +1231,7 @@ ${output}
 </output>
 </workspace_command_result>`;
   });
-  return `YunYun executed Professor Mari's hidden workspace command${results.length === 1 ? "" : "s"}. Use these results to decide the next command or final answer.\n\n${blocks.join("\n\n")}`;
+  return `YunYun executed Professor YunYun's hidden workspace command${results.length === 1 ? "" : "s"}. Use these results to decide the next command or final answer.\n\n${blocks.join("\n\n")}`;
 }
 
 function formatContinuityResult(result: WorkspaceCommandResult, index: number): string {
@@ -1640,7 +1640,7 @@ export class ProfessorMariWorkspaceService {
       .list()
       .catch((err) => {
         this.lastError = err instanceof Error ? err.message : String(err);
-        return { skills: [], diagnostics: [this.lastError ?? "Professor Mari skills unavailable"] };
+        return { skills: [], diagnostics: [this.lastError ?? "Professor YunYun skills unavailable"] };
       });
     return {
       enabled: this.enabled,
@@ -1694,7 +1694,7 @@ export class ProfessorMariWorkspaceService {
     attachments?: ProfessorMariPromptAttachment[];
     onEvent: PromptEventSink;
   }) {
-    if (!this.enabled) throw new Error("Professor Mari workspace mode is disabled.");
+    if (!this.enabled) throw new Error("Professor YunYun workspace mode is disabled.");
     const chatStorage = createChatsStorage(this.app.db);
     const attachments = normalizeProfessorMariAttachments(args.attachments);
     const userMessage = await chatStorage.createMessage({
@@ -1710,7 +1710,7 @@ export class ProfessorMariWorkspaceService {
     }
 
     const connection = await this.resolveConnection(args.connectionId);
-    if (!connection) throw new Error("Set up a language connection before using Professor Mari workspace mode.");
+    if (!connection) throw new Error("Set up a language connection before using Professor YunYun workspace mode.");
 
     const controller = new AbortController();
     this.abortController?.abort();
@@ -1815,7 +1815,7 @@ export class ProfessorMariWorkspaceService {
             continue;
           }
           const content =
-            "Professor Mari returned an empty response twice. Please try again; the request and any completed workspace steps remain in this chat.";
+            "Professor YunYun returned an empty response twice. Please try again; the request and any completed workspace steps remain in this chat.";
           assistantText = appendVisibleText(assistantText, content);
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -1838,7 +1838,7 @@ export class ProfessorMariWorkspaceService {
             continue;
           }
           const content =
-            "Professor Mari could not verify the requested workspace change, so I stopped before showing an unsupported completion claim. Ask her to continue and she can use the saved workspace trace.";
+            "Professor YunYun could not verify the requested workspace change, so I stopped before showing an unsupported completion claim. Ask her to continue and she can use the saved workspace trace.";
           assistantText = appendVisibleText(assistantText, content);
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -1850,7 +1850,7 @@ export class ProfessorMariWorkspaceService {
             protocolRepairRounds += 1;
             if (protocolRepairRounds > MAX_PROTOCOL_REPAIR_ROUNDS) {
               const content =
-                "Professor Mari kept returning plain text instead of the required JSON command object, so I stopped before burning more requests. Ask her to continue and she can pick up from the saved trace.";
+                "Professor YunYun kept returning plain text instead of the required JSON command object, so I stopped before burning more requests. Ask her to continue and she can pick up from the saved trace.";
               assistantText = appendVisibleText(assistantText, content);
               appendTraceStatus(workspaceTrace, content);
               args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
@@ -1885,7 +1885,7 @@ export class ProfessorMariWorkspaceService {
 
         if (action.commands.length === 0) {
           if (isLengthFinishReason(result.finishReason)) {
-            const content = "Mari hit the model output limit. Ask her to continue and she can pick up from here.";
+            const content = "YunYun hit the model output limit. Ask her to continue and she can pick up from here.";
             appendTraceStatus(workspaceTrace, content);
             args.onEvent({ type: "status", data: { content, kind: "output_limit", level: "warning" } });
           }
@@ -1910,7 +1910,7 @@ export class ProfessorMariWorkspaceService {
           })
           .find((entry) => entry.count >= MAX_REPEATED_COMMAND_FAILURES);
         if (repeatedFailure) {
-          const content = `Professor Mari hit the same ${repeatedFailure.commandResult.name} error ${MAX_REPEATED_COMMAND_FAILURES} times, so I stopped the workspace loop before it spammed the chat. Error: ${repeatedFailure.commandResult.output}`;
+          const content = `Professor YunYun hit the same ${repeatedFailure.commandResult.name} error ${MAX_REPEATED_COMMAND_FAILURES} times, so I stopped the workspace loop before it spammed the chat. Error: ${repeatedFailure.commandResult.output}`;
           assistantText = appendVisibleText(assistantText, content);
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -1921,7 +1921,7 @@ export class ProfessorMariWorkspaceService {
         messages.push({ role: "user", content: formatCommandResultForPrompt(commandResults), contextKind: "history" });
 
         if (round === MAX_COMMAND_ROUNDS - 1) {
-          const content = "Command round limit reached; asking Professor Mari to summarize with the evidence she has.";
+          const content = "Command round limit reached; asking Professor YunYun to summarize with the evidence she has.";
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
           messages.push({
@@ -1940,7 +1940,7 @@ export class ProfessorMariWorkspaceService {
           const finalVerificationIssue = workspaceActionNeedsVerification(finalAction, commandResultsForContinuity);
           if (finalVerificationIssue) {
             const content =
-              "Professor Mari reached the workspace command limit without verification, so I stopped before showing an unsupported completion claim. Ask her to continue from the saved trace.";
+              "Professor YunYun reached the workspace command limit without verification, so I stopped before showing an unsupported completion claim. Ask her to continue from the saved trace.";
             assistantText = appendVisibleText(assistantText, content);
             appendTraceStatus(workspaceTrace, content);
             args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -1954,7 +1954,7 @@ export class ProfessorMariWorkspaceService {
             if (finalAction.plan.length > 0) args.onEvent({ type: "plan", data: finalAction.plan });
           } else if (finalAction.commands.length > 0) {
             const content =
-              "Professor Mari tried to run more workspace commands after the command limit, so I stopped the loop. Ask her to continue if you want her to keep working from the saved trace.";
+              "Professor YunYun tried to run more workspace commands after the command limit, so I stopped the loop. Ask her to continue if you want her to keep working from the saved trace.";
             assistantText = appendVisibleText(assistantText, content);
             appendTraceStatus(workspaceTrace, content);
             args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
@@ -1967,10 +1967,10 @@ export class ProfessorMariWorkspaceService {
         const failedTool = workspaceTrace.find((item) => item.type === "tool" && item.tool.status === "error");
         const content =
           failedTool?.type === "tool"
-            ? `Professor Mari stopped after ${formatWorkspaceToolName(failedTool.tool.name)} failed: ${compactTraceText(String(failedTool.tool.output ?? "unknown error"), 700)}`
+            ? `Professor YunYun stopped after ${formatWorkspaceToolName(failedTool.tool.name)} failed: ${compactTraceText(String(failedTool.tool.output ?? "unknown error"), 700)}`
             : workspaceTrace.length > 0
-              ? "Professor Mari finished workspace steps but did not return a visible final answer. I saved the tool timeline here so the work is not lost; ask her to continue and she can pick up from the trace."
-              : "Professor Mari returned an empty response. Please try again; your request remains in this chat.";
+              ? "Professor YunYun finished workspace steps but did not return a visible final answer. I saved the tool timeline here so the work is not lost; ask her to continue and she can pick up from the trace."
+              : "Professor YunYun returned an empty response. Please try again; your request remains in this chat.";
         assistantText = appendVisibleText(assistantText, content);
         appendTraceStatus(workspaceTrace, content);
         args.onEvent({ type: "status", data: { content, kind: "info", level: failedTool ? "warning" : "info" } });
@@ -1984,8 +1984,8 @@ export class ProfessorMariWorkspaceService {
         const hadPartialWorkspaceState =
           assistantText.trim().length > 0 || thinkingText.trim().length > 0 || workspaceTrace.length > 0;
         const content = assistantText.trim()
-          ? "Professor Mari workspace run was cancelled after saving the partial response."
-          : "Professor Mari workspace run was cancelled.";
+          ? "Professor YunYun workspace run was cancelled after saving the partial response."
+          : "Professor YunYun workspace run was cancelled.";
         appendTraceStatus(workspaceTrace, content);
         args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
         if (!assistantText.trim() && hadPartialWorkspaceState) {
@@ -1996,7 +1996,7 @@ export class ProfessorMariWorkspaceService {
         } catch (saveErr) {
           logger.error(
             saveErr instanceof Error ? saveErr : new Error(String(saveErr)),
-            "[Professor Mari] Failed to persist aborted workspace response",
+            "[Professor YunYun] Failed to persist aborted workspace response",
           );
         }
       } else {
@@ -2256,7 +2256,7 @@ ${sections.join("\n\n")}
       workspacePathAccessPolicy(workspaceRoot, absolute) === "forbidden" ||
       workspacePathAccessPolicy(canonicalRoot, canonicalTarget) === "forbidden"
     ) {
-      throw new Error("Professor Mari cannot access environment-secret files or Git internals.");
+      throw new Error("Professor YunYun cannot access environment-secret files or Git internals.");
     }
     if (options.forbidStorageMutation) {
       const storageRoot = resolve(getFileStorageDir());
@@ -2436,7 +2436,7 @@ ${sections.join("\n\n")}
       const approval = await this.workspaceChangeReviews.stageSensitiveFileChange({
         absolutePath: filePath,
         afterContent: content,
-        reason: stringArg(args, "reason") || "Professor Mari proposed a supply-chain-sensitive file change",
+        reason: stringArg(args, "reason") || "Professor YunYun proposed a supply-chain-sensitive file change",
         sessionId: SESSION_ID,
       });
       return [
@@ -2482,7 +2482,7 @@ ${sections.join("\n\n")}
       const approval = await this.workspaceChangeReviews.stageSensitiveFileChange({
         absolutePath: filePath,
         afterContent: next,
-        reason: stringArg(args, "reason") || "Professor Mari proposed a supply-chain-sensitive file change",
+        reason: stringArg(args, "reason") || "Professor YunYun proposed a supply-chain-sensitive file change",
         sessionId: SESSION_ID,
       });
       return [
@@ -2751,7 +2751,7 @@ exit $LASTEXITCODE
     ]);
     this.withMariRuntimeEnv(process.env, binDir);
     if (!existsSync(posixCliPath) || !existsSync(cmdCliPath) || !existsSync(powershellCliPath)) {
-      logger.warn("[Professor Mari] failed to create one or more mari CLI shims at %s", binDir);
+      logger.warn("[Professor YunYun] failed to create one or more mari CLI shims at %s", binDir);
     }
     return binDir;
   }

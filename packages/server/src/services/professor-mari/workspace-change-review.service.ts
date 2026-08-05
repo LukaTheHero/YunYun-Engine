@@ -612,7 +612,7 @@ export class WorkspaceChangeReviewService {
         approval,
         completed: true,
         outcome: "state_changed",
-        error: "The file changed after Professor Mari staged it. Review a fresh proposal instead.",
+        error: "The file changed after Professor YunYun staged it. Review a fresh proposal instead.",
       };
     }
     try {
@@ -655,7 +655,7 @@ export class WorkspaceChangeReviewService {
         approval,
         completed: true,
         outcome: "state_changed",
-        error: "The dependency manifest or lockfile changed after this request. Ask Professor Mari to resolve it again.",
+        error: "The dependency manifest or lockfile changed after this request. Ask Professor YunYun to resolve it again.",
       };
     }
 

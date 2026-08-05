@@ -12,7 +12,7 @@ The Home screen is what you see when no chat is open. From top to bottom, it sho
 
 - The app logo, the words **YunYun Engine**, and the version number below them.
 - A row of your most recent chats: up to three, shown as chips you can click to reopen. If you have none yet, this row shows "No chats yet".
-- The **Ask Professor Mari** card: a chat box for the built-in assistant who can explain the app and help you set things up. A short **FAQ** sits next to it with common questions and answers.
+- The **Ask Professor YunYun** card: a chat box for the built-in assistant who can explain the app and help you set things up. A short **FAQ** sits next to it with common questions and answers.
 - An **Achievements** button, shown only when the Achievements setting is on.
 - A footer with these buttons: **Discord**, **Support**, **Credits**, **Documentation**, and **Replay Tutorial**.
 
@@ -27,7 +27,7 @@ Follow these steps in order to get to your first chat.
 3. Make or import a character to chat with. Open the **Characters** panel, then click **New** to open the **Create Character** window, or click **Import** to bring in a card from a file. See [Creating and Editing Characters](../characters/creating-and-editing-characters.md).
 4. Start a chat. In the chat sidebar, pick a mode tab, then click the **+** button. The button is named **New Conversation**, **New Roleplay**, or **New Game**, to match the tab. The new chat opens with a setup window that walks you through the rest. If you have no connection saved yet, a **Set Up Conversation**, **Set Up Roleplay**, or **Set Up Game** window appears first. Choose your connection there, then click **Create Chat**.
 
-If you get stuck on any step, ask the built-in assistant. Read [Professor Mari, Your In-App Assistant](professor-mari.md) to see what she can do.
+If you get stuck on any step, ask the built-in assistant. Read [Professor YunYun, Your In-App Assistant](professor-mari.md) to see what she can do.
 
 ## The three chat modes
 
@@ -41,7 +41,7 @@ YunYun has three chat modes. You pick one when you start a new chat.
 
 You have several ways to get help without leaving the app:
 
-- Ask **Professor Mari** on the Home screen for setup help and how-to answers.
+- Ask **Professor YunYun** on the Home screen for setup help and how-to answers.
 - Read the **FAQ** on the Home screen for quick answers to common questions.
 - Open the in-app guides with the **Documentation** button in the Home screen footer.
 - Click **Discord** in the footer to reach the community, or **Support** to back the project.
@@ -54,7 +54,7 @@ If something is broken or does not work, see [Troubleshooting YunYun Engine](../
 - [Connecting to an AI Provider](../connections/connecting-to-a-provider.md)
 - [Creating and Editing Characters](../characters/creating-and-editing-characters.md)
 - [The First-Time Tutorial](tutorial.md)
-- [Professor Mari, Your In-App Assistant](professor-mari.md)
+- [Professor YunYun, Your In-App Assistant](professor-mari.md)
 - [Conversation Mode: Getting Started](../conversation/getting-started.md)
 - [Roleplay Mode: Getting Started](../roleplay/getting-started.md)
 - [Game Mode: Getting Started](../game/getting-started.md)

@@ -9,7 +9,7 @@ export interface OfficialAgentKnowledgeEntry {
 }
 
 /**
- * Compact catalog knowledge for Professor Mari. These are descriptions, not
+ * Compact catalog knowledge for Professor YunYun. These are descriptions, not
  * runtime agent definitions: optional packages still own their code, prompts,
  * settings, artwork, and executable manifests.
  */

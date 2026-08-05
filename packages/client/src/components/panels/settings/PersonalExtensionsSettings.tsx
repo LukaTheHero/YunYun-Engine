@@ -77,7 +77,7 @@ function shortHash(hash: string) {
 }
 
 function sourceLabel(source: PersonalExtension["source"], t: TFunction) {
-  if (source === "professor_mari") return "Professor Mari";
+  if (source === "professor_mari") return "Professor YunYun";
   if (source === "profile_import") return "Profile import";
   if (source === "legacy") return "Recovered legacy";
   return t("settings.externalExtensions.source");

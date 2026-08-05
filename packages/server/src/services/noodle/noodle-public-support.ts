@@ -72,8 +72,8 @@ export async function ensureProfessorMariAccount(
   const account = await noodle.upsertAccountFromProfile({
     kind: "character",
     entityId: PROFESSOR_MARI_ID,
-    displayName: row ? characterNameFromRow(row) : "Professor Mari",
-    avatarUrl: row?.avatarPath ?? "/sprites/mari/Mari_profile.png",
+    displayName: row ? characterNameFromRow(row) : "Professor YunYun",
+    avatarUrl: row?.avatarPath ?? "/sprites/yunyun/yunyun-profile.png",
     avatarCrop: row ? characterAvatarCrop(row) : null,
     bio: PROFESSOR_MARI_NOODLE_BIO,
     invited: true,
@@ -87,9 +87,9 @@ export async function ensureProfessorMariAccount(
   ) {
     await noodle.updateAccountProfile(account.id, {
       handle: account.handle || "professor_mari",
-      displayName: account.displayName || "Professor Mari",
+      displayName: account.displayName || "Professor YunYun",
       bio: PROFESSOR_MARI_NOODLE_BIO,
-      avatarUrl: account.avatarUrl || row?.avatarPath || "/sprites/mari/Mari_profile.png",
+      avatarUrl: account.avatarUrl || row?.avatarPath || "/sprites/yunyun/yunyun-profile.png",
       profile: generatedProfileSettings("YunYun Engine", null),
     });
   }

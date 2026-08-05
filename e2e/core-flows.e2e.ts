@@ -2193,7 +2193,7 @@ test("Character and Persona avatar actions stay separated and visually balanced"
   const connection = (await connectionResponse.json()) as { id: string };
 
   const characterName = `Avatar Character ${suffix}`;
-  const characterCreator = "Professor Mari and the Fatui Research Collective";
+  const characterCreator = "Professor YunYun and the Fatui Research Collective";
   const characterVersion = "12.34";
   const characterResponse = await page.request.post("/api/characters", {
     data: {
@@ -2215,7 +2215,7 @@ test("Character and Persona avatar actions stay separated and visually balanced"
   expect(characterAvatarResponse.ok()).toBeTruthy();
 
   const personaName = `Avatar Persona ${suffix}`;
-  const personaCreator = "Professor Mari and the Snezhnayan Institute";
+  const personaCreator = "Professor YunYun and the Snezhnayan Institute";
   const personaVersion = "56.78";
   const personaResponse = await page.request.post("/api/characters/personas", {
     data: {
@@ -4233,7 +4233,7 @@ test("legacy browser records are cleaned while extension imports stay locked", a
   await expect(
     page
       .getByText(
-        "Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
+        "Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
         { exact: true },
       )
       .first(),
@@ -4250,7 +4250,7 @@ test("legacy browser records are cleaned while extension imports stay locked", a
   await expect(page.getByRole("button", { name: /Export extension/i })).toHaveCount(0);
 });
 
-test("Personal Extensions default to the Professor Mari-only locked workflow", async ({ page }) => {
+test("Personal Extensions default to the Professor YunYun-only locked workflow", async ({ page }) => {
   await page.goto("/");
   await page.locator('[data-tour="panel-settings"]').click();
   await page.getByRole("tab", { name: "Addons" }).click();
@@ -4259,7 +4259,7 @@ test("Personal Extensions default to the Professor Mari-only locked workflow", a
   await expect(
     page
       .getByText(
-        "Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
+        "Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
         { exact: true },
       )
       .first(),
@@ -6182,7 +6182,7 @@ test("home shell and primary topbar panels open without client errors", async ({
   expect(errors).toEqual([]);
 });
 
-test("Professor Mari introduces Browser, Characters, and Personas in topbar order", async ({ page }) => {
+test("Professor YunYun introduces Browser, Characters, and Personas in topbar order", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(async () => {
     const module = await import("/src/stores/ui.store.ts");
@@ -9219,20 +9219,20 @@ test("desktop Connections and Lorebooks folders expand without a React hook erro
   }
 });
 
-test("Professor Mari chat fills the mobile home viewport and keeps its composer visible", async ({
+test("Professor YunYun chat fills the mobile home viewport and keeps its composer visible", async ({
   page,
 }, testInfo) => {
-  test.skip(!testInfo.project.name.includes("mobile"), "Professor Mari mobile viewport regression.");
+  test.skip(!testInfo.project.name.includes("mobile"), "Professor YunYun mobile viewport regression.");
   await page.goto("/");
 
   await page
     .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-    .getByRole("button", { name: "Ask Professor Mari" })
+    .getByRole("button", { name: "Ask Professor YunYun" })
     .click();
 
   const topBar = page.locator('[data-component="TopBar"]');
   const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
-  const composer = window.getByPlaceholder("Ask Professor Mari");
+  const composer = window.getByPlaceholder("Ask Professor YunYun");
   await expect(window).toBeVisible();
   await expect(composer).toBeVisible();
   await expect
@@ -9254,7 +9254,7 @@ test("Professor Mari chat fills the mobile home viewport and keeps its composer 
     .toBe(true);
 });
 
-test("Professor Mari bulk chat deletion follows the active accent", async ({ page }) => {
+test("Professor YunYun bulk chat deletion follows the active accent", async ({ page }) => {
   const firstResponse = await page.request.get("/api/chats/internal/professor-mari");
   expect(firstResponse.ok()).toBeTruthy();
   const firstChat = (await firstResponse.json()) as { id: string };
@@ -9268,7 +9268,7 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
     const activeAccentColor = await readCssVariableColor(page, "--marinara-chat-chrome-button-text-active");
     await page
       .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-      .getByRole("button", { name: "Ask Professor Mari" })
+      .getByRole("button", { name: "Ask Professor YunYun" })
       .click();
 
     const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
@@ -9276,7 +9276,7 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
     await window.getByRole("button", { name: "Select", exact: true }).click();
     await window
       .locator(`[data-professor-mari-chat-id="${firstChat.id}"]`)
-      .getByRole("button", { name: /Professor Mari/u })
+      .getByRole("button", { name: /Professor YunYun/u })
       .click();
 
     const deleteSelected = window.getByRole("button", { name: "Delete selected" });
@@ -9293,7 +9293,7 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
   }
 });
 
-test("Professor Mari dependency and sensitive-file reviews stay explicit across viewports", async ({ page }) => {
+test("Professor YunYun dependency and sensitive-file reviews stay explicit across viewports", async ({ page }) => {
   await page.route("**/api/professor-mari/workspace/status*", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -9349,7 +9349,7 @@ test("Professor Mari dependency and sensitive-file reviews stay explicit across 
   await page.goto("/");
   await page
     .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-    .getByRole("button", { name: "Ask Professor Mari" })
+    .getByRole("button", { name: "Ask Professor YunYun" })
     .click();
 
   const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
@@ -9871,8 +9871,8 @@ test("home page stays fitted while FAQ behavior matches the viewport", async ({ 
     expect(spriteRect!.y).toBeLessThan(panelRect!.y);
     expect(spriteRect!.y).toBeGreaterThanOrEqual(recentRect!.y + recentRect!.height);
 
-    await mobileFaqLauncher.getByRole("button", { name: "Open Professor Mari's FAQ" }).click();
-    const faqDialog = page.getByRole("dialog", { name: "Professor Mari's FAQ" });
+    await mobileFaqLauncher.getByRole("button", { name: "Open Professor YunYun's FAQ" }).click();
+    const faqDialog = page.getByRole("dialog", { name: "Professor YunYun's FAQ" });
     await expect(faqDialog).toBeVisible();
     await expect(faqDialog.getByRole("searchbox", { name: "Search FAQ" })).toBeVisible();
     await expect(faqDialog.getByText("Start here before you go hunting through Discord logs.")).toHaveCount(0);
@@ -10381,7 +10381,7 @@ test("Noodle posts tag invited characters with @handle mentions", async ({ page 
 
     const mentionList = composer.getByRole("listbox", { name: "Tag a character" });
     await expect(mentionList).toBeVisible();
-    await mentionList.getByRole("option", { name: /Professor Mari.*@professor_mari/i }).click();
+    await mentionList.getByRole("option", { name: /Professor YunYun.*@professor_mari/i }).click();
     await expect(textarea).toHaveValue("Dinner with @professor_mari ");
     await textarea.pressSequentially("tonight.");
 
@@ -10411,7 +10411,7 @@ test("Noodle posts tag invited characters with @handle mentions", async ({ page 
     expect(postDigest?.accountIds).toContain(professorMariAccount!.id);
 
     await mention.click();
-    await expect(noodle.getByRole("heading", { name: "Professor Mari", exact: true })).toBeVisible();
+    await expect(noodle.getByRole("heading", { name: "Professor YunYun", exact: true })).toBeVisible();
 
     const replyResponse = await page.request.post(`/api/noodle/posts/${post.id}/interactions`, {
       data: {
@@ -10437,7 +10437,7 @@ test("Noodle posts tag invited characters with @handle mentions", async ({ page 
       .getByRole("button", { name: "View @professor_mari profile" });
     await expect(replyMention).toBeVisible();
     await replyMention.click();
-    await expect(noodle.getByRole("heading", { name: "Professor Mari", exact: true })).toBeVisible();
+    await expect(noodle.getByRole("heading", { name: "Professor YunYun", exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
     if (createdPostId) {
@@ -11190,7 +11190,7 @@ test("Noodle only bumps posts when another account replies to the persona's comm
         actorKind: "character",
         actorEntityId: "__professor_mari__",
         type: "reply",
-        content: "Professor Mari directly replied to the persona comment.",
+        content: "Professor YunYun directly replied to the persona comment.",
         parentInteractionId: personaReply.id,
       },
     });

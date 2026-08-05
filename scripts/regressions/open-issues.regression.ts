@@ -736,7 +736,7 @@ try {
       },
     ],
     macroCtx: {
-      user: "Mari",
+      user: "YunYun",
       char: "Version snapshot fixture",
       characters: ["Version snapshot fixture"],
       variables: {},
@@ -938,12 +938,12 @@ try {
     action: "lorebook.create",
     lorebookId: professorMariLorebookId,
     data: {
-      name: "Professor Mari lorebook regression",
+      name: "Professor YunYun lorebook regression",
       entries: [{ name: "Verified entry", content: "Saved with the lorebook.", keys: ["verified"] }],
     },
     apply: true,
   });
-  assert.equal(professorMariLorebookResult.ok, true, "Professor Mari must create lorebooks after visibility was added");
+  assert.equal(professorMariLorebookResult.ok, true, "Professor YunYun must create lorebooks after visibility was added");
   const professorMariLorebook = await lorebookStorage.getById(professorMariLorebookId);
   assert.equal(professorMariLorebook?.hiddenFromLibrary, false);
   assert.equal((await lorebookStorage.listEntries(professorMariLorebookId)).length, 1);
@@ -999,7 +999,7 @@ try {
   const rangedChatTimestamp = "2026-07-30T12:00:00.000Z";
   await db.insert(chats).values({
     id: rangedChatId,
-    name: "Professor Mari range regression",
+    name: "Professor YunYun range regression",
     mode: "roleplay",
     characterIds: "[]",
     metadata: "{}",
@@ -1031,7 +1031,7 @@ try {
       { postNumber: 5, content: "Message 5" },
       { postNumber: 6, content: "Message 6" },
     ],
-    "Professor Mari must be able to retrieve exactly the last requested messages",
+    "Professor YunYun must be able to retrieve exactly the last requested messages",
   );
   const afterPostResult = await mariDb.executeCli({
     argv: ["chats", "messages", rangedChatId, "--after-post", "2", "--limit", "2", "--offset", "1"],
@@ -1045,7 +1045,7 @@ try {
       { postNumber: 4, content: "Message 4" },
       { postNumber: 5, content: "Message 5" },
     ],
-    "Professor Mari must page inside the requested post-number range",
+    "Professor YunYun must page inside the requested post-number range",
   );
   const invalidRangeResult = await mariDb.executeCli({
     argv: ["chats", "messages", rangedChatId, "--last", "201"],
@@ -1332,7 +1332,7 @@ const completeProfessorMariPersona = buildPersonaCreateRow(
   {
     name: "Complete helper persona",
     phoneticName: "Professor Mah-ree",
-    convoDisplayName: "Prof. Mari",
+    convoDisplayName: "Prof. YunYun",
     aboutMe: "I help people build worlds.",
     convoBehavior: "Speak warmly and precisely.",
   },
@@ -1340,7 +1340,7 @@ const completeProfessorMariPersona = buildPersonaCreateRow(
   "2026-07-13T00:00:00.000Z",
 );
 assert.equal(completeProfessorMariPersona.phoneticName, "Professor Mah-ree");
-assert.equal(completeProfessorMariPersona.convoDisplayName, "Prof. Mari");
+assert.equal(completeProfessorMariPersona.convoDisplayName, "Prof. YunYun");
 assert.equal(completeProfessorMariPersona.aboutMe, "I help people build worlds.");
 assert.deepEqual(completeProfessorMariPersona.convoBehavior, {
   instruction: "Speak warmly and precisely.",
@@ -1948,7 +1948,7 @@ assert.match(professorMariHomeSource, /handleBulkDeleteProfessorChats/u);
 assert.match(
   professorMariHomeSource,
   /Promise\.allSettled\([\s\S]*?api\.delete\(`\/chats\/internal\/professor-mari\/chats\/\$\{id\}`\)/u,
-  "Professor Mari chat history should delete all selected chats through the existing endpoint",
+  "Professor YunYun chat history should delete all selected chats through the existing endpoint",
 );
 const roleplaySurfaceSource = readFileSync(
   new URL("../../packages/client/src/components/chat/ChatRoleplaySurface.tsx", import.meta.url),
@@ -2636,10 +2636,10 @@ const annotatedPartiallyPrefixedReply = annotateContentWithReactions(
   partiallyPrefixedConversationReply,
   [{ emoji: "🔥", by: ["user"], segment: 0, segmentSpeaker: "Paige" }],
   new Map([["paige", "Paige"]]),
-  (reactorId) => (reactorId === "user" ? "Mari" : reactorId),
+  (reactorId) => (reactorId === "user" ? "YunYun" : reactorId),
   "Paige",
 );
-assert.equal(annotatedPartiallyPrefixedReply, `${partiallyPrefixedConversationReply}\n[Mari reacted with 🔥]`);
+assert.equal(annotatedPartiallyPrefixedReply, `${partiallyPrefixedConversationReply}\n[YunYun reacted with 🔥]`);
 
 assert.equal(resolveStandardEmojiShortcode("crying"), "😢");
 assert.equal(resolveStandardEmojiShortcode("test_tube"), "🧪");
@@ -3443,10 +3443,10 @@ assert.equal(Object.hasOwn(characterAssignedDuplicate, "characterId"), false);
 assert.deepEqual(characterAssignedDuplicate.characterIds, ["character-1"]);
 assert.equal(createLorebookSchema.safeParse(characterAssignedDuplicate).success, true);
 assert.equal(normalizeLorebookCategory("World"), "world");
-assert.equal(normalizeLorebookCategory("Professor Mari's Experimental Category"), "uncategorized");
+assert.equal(normalizeLorebookCategory("Professor YunYun's Experimental Category"), "uncategorized");
 assert.equal(
   updateLorebookSchema.safeParse({
-    category: normalizeLorebookCategory("Professor Mari's Experimental Category"),
+    category: normalizeLorebookCategory("Professor YunYun's Experimental Category"),
     isGlobal: false,
     enabled: true,
     scanDepth: 2,
@@ -3891,7 +3891,7 @@ const repositoryDefinition = {
   id: "continuity-helper",
   name: "Continuity Helper",
   description: "Checks recent turns for contradictions.",
-  author: "Mari",
+  author: "YunYun",
   phase: "post_processing" as const,
   enabledByDefault: false,
   defaultInjectAsSection: true,

@@ -131,7 +131,7 @@ function normalizeDescription(value: string | null | undefined, content: string)
     value?.trim() ||
     frontmatter.description?.trim() ||
     firstBodyLine(content) ||
-    "User-defined Professor Mari skill.";
+    "User-defined Professor YunYun skill.";
   return candidate.slice(0, MAX_SKILL_DESCRIPTION_LENGTH);
 }
 
@@ -139,7 +139,7 @@ function buildSkillContent(input: { name: string; description: string; content: 
   const body = skillInstructions(input.content);
   const fallbackBody = `# ${input.name}
 
-Add focused instructions for when Professor Mari should use this skill.`;
+Add focused instructions for when Professor YunYun should use this skill.`;
   return [
     "---",
     `name: ${JSON.stringify(input.name)}`,
@@ -276,7 +276,7 @@ export class ProfessorMariWorkspaceSkillsService {
           description:
             typeof entry.description === "string" && entry.description.trim()
               ? entry.description.slice(0, MAX_SKILL_DESCRIPTION_LENGTH)
-              : "User-defined Professor Mari skill.",
+              : "User-defined Professor YunYun skill.",
           enabled: entry.enabled !== false,
           createdAt: typeof entry.createdAt === "string" ? entry.createdAt : now(),
           updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : now(),
@@ -284,7 +284,7 @@ export class ProfessorMariWorkspaceSkillsService {
       }
       return records;
     } catch (err) {
-      logger.warn(err, "[Professor Mari] failed to read workspace skill index");
+      logger.warn(err, "[Professor YunYun] failed to read workspace skill index");
       return [];
     }
   }

@@ -13,7 +13,7 @@ The panel has six tabs. The table below shows what each tab controls.
 | **General** | App behavior, notifications, responses, input, text rules, and game playback. |
 | **Appearance** | Theme, colors, fonts, chat layout, motion, and backgrounds. |
 | **Generations** | Image and video defaults, and reusable prompt templates. |
-| **Addons** | Professor Mari's sandboxed Personal Extension drafts, optionally unlocked External Extensions, and custom themes. |
+| **Addons** | Professor YunYun's sandboxed Personal Extension drafts, optionally unlocked External Extensions, and custom themes. |
 | **Imports** | Restore full profiles and import from other apps. |
 | **Advanced** | Admin access, updates, message tools, backups, and destructive resets. |
 
@@ -50,7 +50,7 @@ This section is at **Settings** > **General** > **App Behavior**. It controls da
 - **Confirm before deleting**: on by default. When on, YunYun asks before it permanently deletes a chat, a character, or another item. Keep it on to avoid accidental deletes.
 - **Achievements**: on by default. When on, the Home screen shows the achievements button and unlock notices. When off, tracking stays silent. See [Achievements](../home/achievements.md).
 - **Music Player**: on by default. When on, the compact Music Player is shown. See [Music](../media/music.md).
-- **Mini Mari surprise visits**: on by default. When on, a rare Chibi Professor Mari message can appear while you scroll. Turn it off if it gets in the way.
+- **Mini YunYun surprise visits**: on by default. When on, a rare Chibi Professor YunYun message can appear while you scroll. Turn it off if it gets in the way.
 
 ## Text Rules
 

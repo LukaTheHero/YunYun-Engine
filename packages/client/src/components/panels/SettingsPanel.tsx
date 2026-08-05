@@ -440,7 +440,7 @@ const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
     id: "personal-extensions",
     tab: "addons",
     label: "Personal Extensions",
-    description: "Sandboxed extension drafts authored by Professor Mari.",
+    description: "Sandboxed extension drafts authored by Professor YunYun.",
     aliases: ["extensions", "addons", "local code", "browser", "server", "professor mari"],
   },
   {
@@ -562,8 +562,8 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
   {
     id: "mini-mari",
     sectionId: "application",
-    label: "Mini Mari surprise visits",
-    description: "Allow rare Chibi Professor Mari messages while scrolling.",
+    label: "Mini YunYun surprise visits",
+    description: "Allow rare Chibi Professor YunYun messages while scrolling.",
     aliases: ["chibi", "professor", "surprise"],
     kind: "Toggle",
   },
@@ -1450,7 +1450,7 @@ const EXPUNGE_SCOPE_OPTIONS: Array<{ id: ExpungeScope; label: string; descriptio
   {
     id: "characters",
     label: "Characters",
-    description: "Characters and character groups. Professor Mari is always preserved.",
+    description: "Characters and character groups. Professor YunYun is always preserved.",
   },
   { id: "personas", label: "Personas", description: "Personas and persona groups." },
   { id: "lorebooks", label: "Lorebooks", description: "Lorebooks and lorebook entries." },

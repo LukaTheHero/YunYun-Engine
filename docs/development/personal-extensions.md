@@ -1,6 +1,6 @@
 # Personal Extension Architecture
 
-Personal Extensions are disabled-by-default, hash-approved code with two isolated runtimes. Professor Mari drafts are the only extension class available by default. All other sources are External Extensions and require two independent operator gates.
+Personal Extensions are disabled-by-default, hash-approved code with two isolated runtimes. Professor YunYun drafts are the only extension class available by default. All other sources are External Extensions and require two independent operator gates.
 
 ## Security invariants
 
@@ -11,7 +11,7 @@ Keep these properties true:
 3. Any executable change disables the extension and clears `approvedHash`.
 4. Rollback restores a disabled draft.
 5. Backup and profile import clear approval and enabled state.
-6. Professor Mari may create and update drafts but has no action that approves or enables them.
+6. Professor YunYun may create and update drafts but has no action that approves or enables them.
 7. Every source other than `professor_mari` is external, including `external`, `local`, `legacy`, `profile_import`, and unknown values normalized to `legacy`.
 8. External records are absent from management and runtime responses unless `ENABLE_EXTERNAL_EXTENSIONS=true` and the persisted Danger Zone opt-in is also true.
 9. Closing either gate disables stored external records and stops active server processes. Browser runtime polling removes active browser workers.
@@ -21,7 +21,7 @@ Keep these properties true:
 13. Contribution registration, activation, events, updates, and removal remain bound to the enabled extension's exact approved content hash.
 14. Browser context snapshots always contain only the active chat ID and Character IDs at baseline. Optional `read_active_characters` and `read_active_persona` permissions may add bounded, allowlisted fields from only records active in that chat; they never expose messages, full libraries, undeclared fields, metadata, or application access.
 15. Requested permissions are part of the executable hash. Any permission change disables the extension and requires fresh exact-hash approval.
-16. `full_page_access` is external-only, requires both External Extension gates, and is never available to Professor Mari drafts. It is an explicit trust mode, not a claim of sandboxing.
+16. `full_page_access` is external-only, requires both External Extension gates, and is never available to Professor YunYun drafts. It is an explicit trust mode, not a claim of sandboxing.
 
 The gates are enforced in routes and runtime services. Hiding controls is not a security boundary. A manually added, restored, legacy, or out-of-band external record must remain invisible and unexecutable while either gate is closed.
 

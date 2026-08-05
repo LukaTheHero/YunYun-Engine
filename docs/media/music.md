@@ -1,6 +1,6 @@
 # Music DJ: Spotify, YouTube, and Local Music
 
-This guide explains how to play background music in YunYun Engine using the **Music DJ**. You will learn how to connect Spotify, YouTube, or your own local music files. You will also learn how the music player, the **DJ Mari** playlist maker, and Game Mode music work.
+This guide explains how to play background music in YunYun Engine using the **Music DJ**. You will learn how to connect Spotify, YouTube, or your own local music files. You will also learn how the music player, the **DJ YunYun** playlist maker, and Game Mode music work.
 
 ## What Music DJ is
 
@@ -131,18 +131,18 @@ When **Music DJ** runs in a **Roleplay** chat, its settings card shows a **Spoti
 - **Artist**: search only around a named artist. An **Artist** text field appears.
 - **Any Spotify**: let the DJ use Spotify search when it fits.
 
-## DJ Mari: AI playlist maker
+## DJ YunYun: AI playlist maker
 
-The **DJ** button on the Spotify mini player builds a themed playlist for you. Its tooltip reads "DJ Mari composes a playlist for you!"
+The **DJ** button on the Spotify mini player builds a themed playlist for you. Its tooltip reads "DJ YunYun composes a playlist for you!"
 
-**DJ Mari** asks your connected AI model to build a playlist based on your persona, your most-used character, and recent chats across all your conversations. It then adds the matched songs to a new Spotify playlist named "DJ Mari" plus today's date, and starts playing it.
+**DJ YunYun** asks your connected AI model to build a playlist based on your persona, your most-used character, and recent chats across all your conversations. It then adds the matched songs to a new Spotify playlist named "DJ YunYun" plus today's date, and starts playing it.
 
-**DJ Mari** needs two things:
+**DJ YunYun** needs two things:
 
-- A model connection assigned to the **Music DJ** agent. Without one you see "Configure a model connection on the Music DJ agent before using DJ Mari." See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).
+- A model connection assigned to the **Music DJ** agent. Without one you see "Configure a model connection on the Music DJ agent before using DJ YunYun." See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).
 - Enough matched Spotify songs. It needs at least 25 songs and picks up to 50. If it finds fewer than 25, it asks you to add more Liked Songs and try again.
 
-On success you see a "DJ Mari playlist is ready" message with an **Open playlist** button.
+On success you see a "DJ YunYun playlist is ready" message with an **Open playlist** button.
 
 ## Music DJ in Game Mode
 

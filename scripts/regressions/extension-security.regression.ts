@@ -42,7 +42,7 @@ const professorMariSource = readSource("../../packages/server/src/services/profe
 
 assert.match(
   localizationSource,
-  /Ask Professor Mari to create an extension for you\. Nothing runs until you enable it and approve the exact code hash\./u,
+  /Ask Professor YunYun to create an extension for you\. Nothing runs until you enable it and approve the exact code hash\./u,
 );
 assert.match(localizationSource, /read-only active chat and Character IDs\./u);
 assert.match(localizationSource, /It also requests: \{\{permissions\}\}\./u);
@@ -211,7 +211,7 @@ try {
       },
       { source: "professor_mari" },
     ),
-    /Professor Mari extensions cannot request full page access/u,
+    /Professor YunYun extensions cannot request full page access/u,
   );
 
   const capabilityDraft = await storage.create(
@@ -265,7 +265,7 @@ try {
   const mariCreate = await mariDb.executeAction({
     action: "personal_extension.create",
     data: {
-      name: "Professor Mari draft",
+      name: "Professor YunYun draft",
       runtime: "client",
       js: "marinara.log.info('draft');",
     },
@@ -273,7 +273,7 @@ try {
     sessionId: "personal-extension-regression",
   });
   assert.equal(mariCreate.ok, true, JSON.stringify(mariCreate));
-  const mariDraft = await storage.getByName("Professor Mari draft");
+  const mariDraft = await storage.getByName("Professor YunYun draft");
   assert.ok(mariDraft);
   assert.equal(mariDraft.source, "professor_mari");
   assert.equal(mariDraft.enabled, false);
@@ -682,7 +682,7 @@ try {
     ],
     persona: {
       id: "persona-1",
-      name: "Mari",
+      name: "YunYun",
       description: "Engineer",
       personality: "Curious",
       scenario: "A laboratory",
@@ -690,7 +690,7 @@ try {
       appearance: "Red hair",
       tags: ["maintainer"],
       aboutMe: "Builds YunYun",
-      convoDisplayName: "Mari",
+      convoDisplayName: "YunYun",
       creatorNotes: "private creator notes",
       avatarPath: "/private/avatar.png",
     },

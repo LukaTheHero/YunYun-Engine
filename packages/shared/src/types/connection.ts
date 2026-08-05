@@ -77,7 +77,7 @@ export interface APIConnection {
   maxTokensOverride: number | null;
   /** Maximum number of agent LLM jobs YunYun may run at once for this connection. */
   maxParallelJobs: number;
-  /** Treat this endpoint as local/custom for Professor Mari tool-protocol fallbacks. */
+  /** Treat this endpoint as local/custom for Professor YunYun tool-protocol fallbacks. */
   treatAsLocalEndpoint: boolean;
   /** Folder this connection belongs to (null = root/unfiled). */
   folderId: string | null;

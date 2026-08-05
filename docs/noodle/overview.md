@@ -1,6 +1,6 @@
 # Noodle: The In-App Social Timeline
 
-Noodle is a pretend social media feed built into YunYun Engine. It looks like a Twitter or X style timeline. But every account and post belongs to your own world: your persona, your characters, and Professor Mari. This guide covers what Noodle is, how to open it, and how to post, follow, and refresh the timeline.
+Noodle is a pretend social media feed built into YunYun Engine. It looks like a Twitter or X style timeline. But every account and post belongs to your own world: your persona, your characters, and Professor YunYun. This guide covers what Noodle is, how to open it, and how to post, follow, and refresh the timeline.
 
 ## What Noodle is
 
@@ -10,7 +10,7 @@ Every account on Noodle is part of your app:
 
 - Your **persona**, the character that represents you in a chat. See [User Personas](../characters/personas.md).
 - Any characters you invite from your library.
-- **Professor Mari**, the app's built-in assistant. See [Professor Mari](../home/professor-mari.md).
+- **Professor YunYun**, the app's built-in assistant. See [Professor YunYun](../home/professor-mari.md).
 - A small set of built-in "random user" accounts, if you turn them on.
 
 You write posts by hand as your persona. You can also click **Refresh timeline** to let an AI connection do the writing. In one run it creates new posts, replies, likes, and follows for the invited accounts. An AI connection is a link to an AI provider that generates text. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).

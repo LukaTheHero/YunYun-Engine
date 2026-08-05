@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari Workspace Agent Contracts
+// Professor YunYun Workspace Agent Contracts
 // ──────────────────────────────────────────────
 
 export type MariWorkspaceToolName =
@@ -167,9 +167,9 @@ export function sanitizeMariSuggestionChips(raw: unknown, options: { maxChips?: 
 }
 
 /**
- * One question in a guided-creation plan Mari returns in a single call. The client walks
+ * One question in a guided-creation plan YunYun returns in a single call. The client walks
  * these locally (tap a chip -> next step, zero further calls) until exhausted, then sends
- * one summary message back so Mari performs the actual creation with her normal commands.
+ * one summary message back so YunYun performs the actual creation with her normal commands.
  */
 export interface MariGuidedPlanStep {
   fieldKey: string;

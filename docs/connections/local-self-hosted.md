@@ -54,9 +54,9 @@ On Windows, a local server can be blocked even when it is running. The editor sh
 
 The connection editor has a **Local / Custom Endpoint** section with a toggle labeled **Treat as local/custom endpoint**. It is off by default. Turn it on for self-hosted or proxied endpoints, especially a custom web address that points at a model server on your local network.
 
-When this toggle is off, YunYun plays it safe with tool calls for models it does not recognize. Turning the toggle on tells YunYun to always attempt tool calls. It also tells Professor Mari to use a backup tool method (a JSON tool protocol) instead of native tool calls only. Professor Mari is the in-app assistant.
+When this toggle is off, YunYun plays it safe with tool calls for models it does not recognize. Turning the toggle on tells YunYun to always attempt tool calls. It also tells Professor YunYun to use a backup tool method (a JSON tool protocol) instead of native tool calls only. Professor YunYun is the in-app assistant.
 
-Turn this toggle on if Professor Mari stops after using a tool. Turn it on too if your endpoint claims OpenAI compatibility but does not reliably support tool calls. If your local model works fine without it, you can leave it off.
+Turn this toggle on if Professor YunYun stops after using a tool. Turn it on too if your endpoint claims OpenAI compatibility but does not reliably support tool calls. If your local model works fine without it, you can leave it off.
 
 ## Reaching a server on another computer
 

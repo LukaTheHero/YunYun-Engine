@@ -223,7 +223,7 @@ const FILE_BACKED_TABLE_SET = new Set<string>(FILE_BACKED_TABLES);
 const isWindows = process.platform === "win32";
 const warnedFlushFailures = new Set<string>();
 
-// Parent→child delete graph. Exported as the single source of truth: the Mari
+// Parent→child delete graph. Exported as the single source of truth: the YunYun
 // DB CLI (services/mari-db) consumes it for cascade deletes and its
 // dangling-reference validator, so every new relation added here reaches both.
 export const CASCADES: Array<{ parent: FileBackedTable; child: FileBackedTable; parentKey: string; childKey: string }> =

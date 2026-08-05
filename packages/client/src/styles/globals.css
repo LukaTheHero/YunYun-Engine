@@ -920,7 +920,7 @@
  * CTA treatment (that style is tuned for the handful of big panel-nav buttons in the
  * sidebar/topbar). A row of 3-5 solid neon buttons above the chat input reads as loud
  * UI chrome, not a quiet suggestion. Instead this mirrors the tinted-badge language
- * Mari's own tool timeline and mode badge already use elsewhere on this screen
+ * YunYun's own tool timeline and mode badge already use elsewhere on this screen
  * (color-mix tint fill + colored border + soft glow) so chips read as chat-native.
  * Color still comes from the shared --mari-panel-gradient-start token set by the
  * .mari-panel-gradient--<entity> classes, so entity colors stay a single source of truth.

@@ -172,13 +172,13 @@ const RELEASE_ANNOUNCEMENTS: Record<string, ReleaseAnnouncement> = {
   "2.3.5": {
     headline: "More control, polished down to the card.",
     intro:
-      "Professor Mari here! This release adds custom quick replies, richer translation controls, Atlas image and video generation, interface localization, stronger update and extension protections, and a substantial collection of chat, card, launcher, image, and settings fixes. Character and Persona cards also keep their creator and version neatly beside the name, even when space is tight.",
+      "Professor YunYun here! This release adds custom quick replies, richer translation controls, Atlas image and video generation, interface localization, stronger update and extension protections, and a substantial collection of chat, card, launcher, image, and settings fixes. Character and Persona cards also keep their creator and version neatly beside the name, even when space is tight.",
     highlights: [],
   },
   "2.3.4": {
     headline: "A safer engine with finer control.",
     intro:
-      "Professor Mari here! I removed Extensions, sealed their unsafe code path, and arranged for every old record to be cleared automatically. I also added new prompt macros, character-specific Hide From AI controls, and Grouped or Individual response handling for multi-character Conversations, then corrected a generous stack of smaller regressions. Every good experiment deserves a clean bench.",
+      "Professor YunYun here! I removed Extensions, sealed their unsafe code path, and arranged for every old record to be cleared automatically. I also added new prompt macros, character-specific Hide From AI controls, and Grouped or Individual response handling for multi-character Conversations, then corrected a generous stack of smaller regressions. Every good experiment deserves a clean bench.",
     highlights: [],
   },
   "2.3.3": {

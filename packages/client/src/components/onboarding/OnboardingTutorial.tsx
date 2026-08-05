@@ -44,7 +44,7 @@ interface TourStep {
   settingsTab?: string;
   /** Render the documentation-language picker inside this step's card */
   docsLanguagePicker?: boolean;
-  /** Professor Mari sprite to display */
+  /** Professor YunYun sprite to display */
   sprite?: { src: string; flip?: boolean };
 }
 
@@ -52,7 +52,7 @@ const STEPS: TourStep[] = [
   {
     target: null,
     title: "Welcome to YunYun Engine!",
-    body: "Hi! I'm Professor Mari, your assistant and guide! First time around? Allow me to show you around. This is a quick orientation tour, so you can skip it if you already know your way around, but skipping will make me sad a little.",
+    body: "Hi! I'm Professor YunYun, your assistant and guide! First time around? Allow me to show you around. This is a quick orientation tour, so you can skip it if you already know your way around, but skipping will make me sad a little.",
     sprite: { src: "/sprites/mari/Mari_wave.png" },
   },
   {
@@ -418,7 +418,7 @@ function TourCardContent({
   const localizedBody = localize(currentStep.body);
   return (
     <>
-      {/* Professor Mari sprite */}
+      {/* Professor YunYun sprite */}
       {currentStep.sprite && (
         <div className="mb-2 flex justify-center">
           <img

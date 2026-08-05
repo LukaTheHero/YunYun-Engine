@@ -124,7 +124,7 @@ function normalizePayload(input: CreatePersonalExtensionInput, source: PersonalE
     source === "professor_mari" &&
     parsed.capabilities.includes(PERSONAL_EXTENSION_FULL_PAGE_CAPABILITY)
   ) {
-    throw new Error("Professor Mari extensions cannot request full page access");
+    throw new Error("Professor YunYun extensions cannot request full page access");
   }
   return {
     name: parsed.name,

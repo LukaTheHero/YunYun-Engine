@@ -1,12 +1,12 @@
 # Personal Extensions
 
-Personal Extensions are private code drafts created for you by Professor Mari. Open **Settings** > **Addons** > **Personal Extensions**.
+Personal Extensions are private code drafts created for you by Professor YunYun. Open **Settings** > **Addons** > **Personal Extensions**.
 
 The default message is:
 
-> Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.
+> Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.
 
-There is no New Draft action and there are no import controls in this section. Ask Professor Mari to create or revise a draft. She can save code, but she cannot approve or enable it.
+There is no New Draft action and there are no import controls in this section. Ask Professor YunYun to create or revise a draft. She can save code, but she cannot approve or enable it.
 
 ## Review and enable
 
@@ -129,7 +129,7 @@ If an External Extension genuinely depends on host DOM access, it may request:
 }
 ```
 
-**Full page access is not a sandbox capability.** The approved JavaScript and CSS run inside YunYun's page. The code can read or change anything visible to the current browser session, inspect chats and cards, use browser storage, make network requests, and call same-origin YunYun APIs. It has the same practical page authority as code pasted into the browser console. Professor Mari drafts cannot request it.
+**Full page access is not a sandbox capability.** The approved JavaScript and CSS run inside YunYun's page. The code can read or change anything visible to the current browser session, inspect chats and cards, use browser storage, make network requests, and call same-origin YunYun APIs. It has the same practical page authority as code pasted into the browser console. Professor YunYun drafts cannot request it.
 
 YunYun recognizes the older `kind: "marinara.extension"` v1 envelope without an explicit `capabilities` field as a pre-sandbox package and assigns **Full page access** during import. This allows legacy packages such as WeatherTweaker to reach the correct review flow instead of silently failing in a Worker. A modern package that uses that envelope but wants the safe runtime must include `"capabilities": []`.
 
@@ -184,7 +184,7 @@ If an extension misbehaves, choose **Disable**. If the interface is unavailable,
 
 ## Related guides
 
-- [Professor Mari](../home/professor-mari.md)
+- [Professor YunYun](../home/professor-mari.md)
 - [Server Configuration](../CONFIGURATION.md)
 - [Backup and Restore](../data/backup-and-restore.md)
 - [Remote Access](../REMOTE_ACCESS.md)

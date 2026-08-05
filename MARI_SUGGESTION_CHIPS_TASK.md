@@ -1,4 +1,4 @@
-# TASK: Professor Mari — Dynamic Suggestion Chips & Chat-Native Guided Generation
+# TASK: Professor YunYun — Dynamic Suggestion Chips & Chat-Native Guided Generation
 
 > **You are implementing this task.** This document is self-contained: file paths, anchors, code, and
 > ordering are given so you should not need broad exploration. Read the referenced files before editing,
@@ -9,14 +9,14 @@
 - Monorepo (pnpm): `packages/client` (React 19 + TS strict, **Tailwind v4 CSS-vars**, **Zustand** stores, **TanStack Query** hooks, **no URL router**), `packages/server` (Fastify + Pino logger), `packages/shared` (types/constants/schemas).
 - **Read `packages/client/src/components/.instructions.md` before any client edit.** No barrel/index files — use direct imports.
 - Server logging: import the Pino `logger` (`import { logger } from "../lib/logger.js"` — adjust path); **never `console.*`** in server code. Client keeps `console.*`.
-- Validate with `pnpm install` then `pnpm check` (TS + ESLint). No automated test suite. Run `pnpm db:push` if the Mari seed changes.
+- Validate with `pnpm install` then `pnpm check` (TS + ESLint). No automated test suite. Run `pnpm db:push` if the YunYun seed changes.
 - Identity constant: `PROFESSOR_MARI_ID = "__professor_mari__"` in `packages/shared/src/constants/defaults.ts`.
 
 ## Background (why)
-Mari can already create characters/lorebooks/personas/presets/chats, navigate, edit the DB, and generate images — but the chat input is a bare textarea, so **none of it is discoverable**, and there is no guided creation flow. We add **color-themed suggestion chips above Mari's chat input**: curated starters on an empty chat, then **model-emitted contextual chips** per turn (CYOA-like). The text input always stays; clicking a chip drops its prompt into the draft so the user can refine and send. Guided generation is achieved conversationally (Mari asks one thing at a time, offers answer chips) — **no new wizard/modal**.
+YunYun can already create characters/lorebooks/personas/presets/chats, navigate, edit the DB, and generate images — but the chat input is a bare textarea, so **none of it is discoverable**, and there is no guided creation flow. We add **color-themed suggestion chips above YunYun's chat input**: curated starters on an empty chat, then **model-emitted contextual chips** per turn (CYOA-like). The text input always stays; clicking a chip drops its prompt into the draft so the user can refine and send. Guided generation is achieved conversationally (YunYun asks one thing at a time, offers answer chips) — **no new wizard/modal**.
 
-Mari has **two surfaces**, both get chips from one shared component/type:
-- **System A** — the in-chat Mari *character*: actions are bracket/XML commands embedded in her generated text, parsed server-side, streamed to the client as `assistant_action` SSE events over `/api/generate`.
+YunYun has **two surfaces**, both get chips from one shared component/type:
+- **System A** — the in-chat YunYun *character*: actions are bracket/XML commands embedded in her generated text, parsed server-side, streamed to the client as `assistant_action` SSE events over `/api/generate`.
 - **System B** — the Home-screen *workspace agent* (`HomeProfessorMariChat.tsx`): a real tool-loop agent; the model replies with a JSON envelope `{ say, commands, stop }`; server streams `MariWorkspacePromptEvent` SSE events over `/api/professor-mari/workspace/prompt`.
 
 ## Color rule (do not break existing meaning)
@@ -106,13 +106,13 @@ Keep it optional/back-compat: no `suggestions` ⇒ emit nothing. Log parse issue
 
 ---
 
-### Step 3 — Backend System A (in-chat Mari character)
+### Step 3 — Backend System A (in-chat YunYun character)
 
 3a. `packages/server/src/db/seed-mari.ts` — inside `MARI_ASSISTANT_PROMPT`, in the `<assistant_commands>` block (~L352–418), add a `suggestions` command form + guidance mirroring 2b:
 ```
 <suggestions>[{"label":"...","prompt":"...","entity":"characters","tone":"default"}]</suggestions>
 ```
-State: emit at most 5; use when guiding creation; ask one thing at a time; tag entity for color; tone:"danger" only for irreversible actions. **Changing the seed requires `pnpm db:push`** (and note in the PR that existing installs re-seed / may need the Mari character updated).
+State: emit at most 5; use when guiding creation; ask one thing at a time; tag entity for color; tone:"danger" only for irreversible actions. **Changing the seed requires `pnpm db:push`** (and note in the PR that existing installs re-seed / may need the YunYun character updated).
 
 3b. `packages/server/src/services/conversation/character-commands.ts` — add `suggestions` to the `CharacterCommand` type definitions and its bracket+XML parser so the `<suggestions>...</suggestions>` block is recognized and its JSON payload parsed.
 
@@ -190,7 +190,7 @@ Consider a smaller-size modifier for chips in compact mode (reduce `min-height`/
 ---
 
 ## Guided generation
-No extra code — it emerges from the Step 2b / Step 3a prompt guidance: Mari asks for one attribute at a time (name → vibe → description → greeting …) and returns 3–5 answer chips per turn, each tagged with the entity so the flow stays color-themed (pink while building a character, amber for a lorebook, green for a persona).
+No extra code — it emerges from the Step 2b / Step 3a prompt guidance: YunYun asks for one attribute at a time (name → vibe → description → greeting …) and returns 3–5 answer chips per turn, each tagged with the entity so the flow stays color-themed (pink while building a character, amber for a lorebook, green for a persona).
 
 ## Reuse (don't reinvent)
 - `.mari-panel-gradient-button` + `.mari-panel-gradient--<entity>` tokens (`globals.css` L791–872).
@@ -200,12 +200,12 @@ No extra code — it emerges from the Step 2b / Step 3a prompt guidance: Mari as
 
 ## Definition of done / verification
 1. `pnpm install`; `pnpm check` clean (TS + ESLint). Run `pnpm db:push` if `seed-mari.ts` changed.
-2. Home Mari chat (System B):
+2. Home YunYun chat (System B):
    - Empty chat shows curated starter chips above the input, correctly colored (character pink, lorebook amber, persona green).
    - Clicking a starter inserts its prompt into the textarea (focused, editable), does NOT auto-send; Enter sends.
-   - Asking to create a character → Mari asks step-by-step and emits contextual pink answer chips each turn; a destructive suggestion renders red.
+   - Asking to create a character → YunYun asks step-by-step and emits contextual pink answer chips each turn; a destructive suggestion renders red.
    - Same works in the floating assistant window (compact chips).
-3. Normal chat with the Mari character (System A): chips render above the standard input; verify they are gated OFF for non-Mari characters.
+3. Normal chat with the YunYun character (System A): chips render above the standard input; verify they are gated OFF for non-YunYun characters.
 4. Existing semantic colors unchanged (Keep/Restore red, warnings amber, success emerald).
 
 ## PR notes (per CLAUDE.md)

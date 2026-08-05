@@ -898,7 +898,7 @@ export async function charactersRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>("/:id", async (req, reply) => {
     if (req.params.id === PROFESSOR_MARI_ID) {
-      return reply.status(403).send({ error: "Professor Mari is a built-in character and cannot be deleted" });
+      return reply.status(403).send({ error: "Professor YunYun is a built-in character and cannot be deleted" });
     }
     const galleryImages = await characterGallery.listByCharacterId(req.params.id);
     await storage.remove(req.params.id);

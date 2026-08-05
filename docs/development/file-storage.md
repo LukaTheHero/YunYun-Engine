@@ -51,4 +51,4 @@ When adding persistent data:
 7. Confirm profile backup and restore behavior.
 8. Run `pnpm check` and the relevant storage regressions.
 
-Keep table definitions, relation metadata, profile portability, and Mari DB validation aligned in the same change.
+Keep table definitions, relation metadata, profile portability, and YunYun DB validation aligned in the same change.

@@ -15,7 +15,7 @@ An agent package may contribute one or more declarative agents and optional trus
 - server entry points for routes, lifecycle hooks, prompt providers, result handlers, and storage migrations;
 - client entry points for panels, chat surfaces, settings sections, setup choices, and runtime displays;
 - shared JSON schemas and stable wire contracts;
-- package-owned assets, documentation, and Professor Mari knowledge fragments.
+- package-owned assets, documentation, and Professor YunYun knowledge fragments.
 
 Packages target a versioned YunYun capability API. They must not import private source paths from the engine.
 

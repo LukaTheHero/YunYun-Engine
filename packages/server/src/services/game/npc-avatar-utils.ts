@@ -1,6 +1,6 @@
 import type { GameNpc } from "@marinara-engine/shared";
 
-export const BUILT_IN_MARI_AVATAR = "/sprites/mari/Mari_profile.png";
+export const BUILT_IN_MARI_AVATAR = "/sprites/yunyun/yunyun-profile.png";
 
 export function npcAvatarSlug(name: string): string {
   return name

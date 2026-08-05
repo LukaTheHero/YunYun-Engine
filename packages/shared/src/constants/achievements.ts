@@ -42,7 +42,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   {
     id: "diligent_student",
     title: "Diligent Student",
-    description: "Completed Professor Mari's tutorial.",
+    description: "Completed Professor YunYun's tutorial.",
     category: "milestone",
     icon: "graduation",
   },
@@ -70,7 +70,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   {
     id: "hello_world",
     title: "Hello World",
-    description: "Sent a message to Professor Mari.",
+    description: "Sent a message to Professor YunYun.",
     category: "milestone",
     icon: "mari",
   },

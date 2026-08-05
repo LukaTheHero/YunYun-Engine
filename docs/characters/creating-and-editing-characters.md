@@ -154,9 +154,9 @@ For each proposed edit you can:
 
 If the underlying text changed since the proposal was made, the app warns you before it lets you force the edit. To learn how to turn these agents on or off, see [Agents: AI Helpers for Your Chats](../agents/agents-overview.md).
 
-## A note on Professor Mari
+## A note on Professor YunYun
 
-**Professor Mari** is a built-in assistant character that ships with YunYun. You cannot delete her. If you try, the app blocks it and tells you she is a built-in character. To learn what she does, see [Professor Mari, Your In-App Assistant](../home/professor-mari.md).
+**Professor YunYun** is a built-in assistant character that ships with YunYun. You cannot delete her. If you try, the app blocks it and tells you she is a built-in character. To learn what she does, see [Professor YunYun, Your In-App Assistant](../home/professor-mari.md).
 
 ## Related guides
 

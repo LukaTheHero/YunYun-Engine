@@ -423,7 +423,7 @@ async function createPreset(command: CreatePresetCommand, args: Parameters<typeo
         description: command.description ?? "",
         wrapFormat: resolveAssistantPresetWrapFormat(command.wrapFormat),
         isDefault: false,
-        author: command.author ?? "Professor Mari",
+        author: command.author ?? "Professor YunYun",
       });
       if (!created) return null;
 
@@ -569,7 +569,7 @@ function navigate(command: NavigateCommand, args: Parameters<typeof handleProfes
 function sendSuggestions(command: SuggestionsCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
   const suggestions = sanitizeMariSuggestionChips(command.suggestions, { maxChips: 6 });
   if (suggestions.length === 0) {
-    logger.debug("[commands] Dropped invalid Professor Mari suggestions payload");
+    logger.debug("[commands] Dropped invalid Professor YunYun suggestions payload");
     return;
   }
   args.sendAssistantAction({ action: "suggestions", suggestions });
@@ -578,7 +578,7 @@ function sendSuggestions(command: SuggestionsCommand, args: Parameters<typeof ha
 function sendPlan(command: PlanCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
   const plan = sanitizeMariGuidedPlan(command.plan, { maxSteps: 8, maxChipsPerStep: 5 });
   if (plan.length === 0) {
-    logger.debug("[commands] Dropped invalid Professor Mari guided plan payload");
+    logger.debug("[commands] Dropped invalid Professor YunYun guided plan payload");
     return;
   }
   args.sendAssistantAction({ action: "plan", plan });

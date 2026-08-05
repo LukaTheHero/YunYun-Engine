@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari DB service
+// Professor YunYun DB service
 // ──────────────────────────────────────────────
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -874,7 +874,7 @@ function normalizePersonaConvoBehavior(value: unknown): unknown {
     const parsed = JSON.parse(trimmed) as unknown;
     if (isRecord(parsed)) return parsed;
   } catch {
-    // A plain directive is still useful input from Professor Mari or the CLI.
+    // A plain directive is still useful input from Professor YunYun or the CLI.
   }
   return { instruction: trimmed, insertionStrategy: "constant_after" };
 }
@@ -2567,7 +2567,7 @@ export class MariDbService {
             requiresApproval: false,
             personalExtensionDraftMutation: true,
             cascade: false,
-            reason: firstString(args, ["reason"]) ?? "Professor Mari created a Personal Extension draft",
+            reason: firstString(args, ["reason"]) ?? "Professor YunYun created a Personal Extension draft",
             cwd: context.cwd,
           },
           context.command,
@@ -2662,7 +2662,7 @@ export class MariDbService {
             apply: firstBoolean(args, ["apply"]) === true,
             personalExtensionDraftMutation: true,
             cascade: false,
-            reason: firstString(args, ["reason"]) ?? "Professor Mari updated a Personal Extension draft",
+            reason: firstString(args, ["reason"]) ?? "Professor YunYun updated a Personal Extension draft",
             cwd: context.cwd,
           },
           context.command,
@@ -3339,7 +3339,7 @@ export class MariDbService {
       ok: false,
       mode: "read",
       command: context.command,
-      error: "Durable workspace run resume is planned but not implemented yet. Reopen Professor Mari and paste the run context or continue manually.",
+      error: "Durable workspace run resume is planned but not implemented yet. Reopen Professor YunYun and paste the run context or continue manually.",
     };
   }
 
@@ -4410,7 +4410,7 @@ export class MariDbService {
         level: "error",
         table: "installed_extensions",
         message:
-          "Professor Mari cannot mutate Personal Extensions through raw DB actions. Use personal_extension.create or personal_extension.update; only the user can approve execution in Settings > Addons.",
+          "Professor YunYun cannot mutate Personal Extensions through raw DB actions. Use personal_extension.create or personal_extension.update; only the user can approve execution in Settings > Addons.",
       });
     }
     if (request.personalExtensionDraftMutation) {
@@ -4425,7 +4425,7 @@ export class MariDbService {
             level: "error",
             table: "installed_extensions",
             id: change.id,
-            message: "Professor Mari can save Personal Extension drafts but cannot approve or enable them.",
+            message: "Professor YunYun can save Personal Extension drafts but cannot approve or enable them.",
           });
         }
       }
@@ -4827,7 +4827,7 @@ export class MariDbService {
     }
 
     const fullValidation = await this.validate();
-    // Keep current unrelated optional notices visible to Mari, but only let touched-scope errors block.
+    // Keep current unrelated optional notices visible to YunYun, but only let touched-scope errors block.
     // Existing errors on rows being repaired/deleted must not make the repair impossible.
     const touched = new Set(tables);
     const touchedRows = new Set(changes.map((change) => `${change.table}:${change.id}`));
@@ -4851,7 +4851,7 @@ export class MariDbService {
         if ((change.action === "update" || change.action === "replace") && change.table === "characters") {
           await characterStorage.createVersionSnapshot(change.id, {
             source: "professor-mari-workspace",
-            reason: plan.reason ?? "Professor Mari database change",
+            reason: plan.reason ?? "Professor YunYun database change",
           });
         }
         if (change.action === "insert") {
