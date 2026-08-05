@@ -60,7 +60,7 @@ const DEMO_PROFILE: NoodlerStageProfile = {
   handle: "professor_mari",
   displayName: "Professor YunYun",
   bio: "",
-  avatarUrl: "/sprites/mari/chibi-professor-mari.png",
+  avatarUrl: "/sprites/yunyun/chibi-yunyun.png",
   avatarCrop: null,
   disclosureMode: "open",
   stagePersonality: "",
@@ -138,7 +138,7 @@ export function NoodlerOnboardingWizard({ open, selectionOnly = false, onClose, 
         : disclosure === "hinted"
           ? t("ui.noodle.noodlerwizard.identityPreview.hintedHandle")
           : t("ui.noodle.noodlerwizard.identityPreview.secretHandle"),
-    avatarUrl: disclosure === "secret" ? null : "/sprites/mari/chibi-professor-mari.png",
+    avatarUrl: disclosure === "secret" ? null : "/sprites/yunyun/chibi-yunyun.png",
     disclosureMode: disclosure,
   };
 

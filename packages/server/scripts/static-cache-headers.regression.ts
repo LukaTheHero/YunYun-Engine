@@ -12,7 +12,7 @@ writeFileSync(join(clientDist, "index.html"), "<!doctype html><script src=\"/ass
 writeFileSync(join(clientDist, "manifest.json"), "{}");
 writeFileSync(join(clientDist, "sw.js"), "// service worker");
 writeFileSync(join(clientDist, "registerSW.js"), "// registration helper");
-writeFileSync(join(clientDist, "favicon.png"), "not fingerprinted");
+writeFileSync(join(clientDist, "yunyun-favicon.png"), "not fingerprinted");
 writeFileSync(join(clientDist, "assets", "index-AbCdEf12.js"), "export {};");
 
 const app = Fastify({ logger: false });
@@ -37,9 +37,11 @@ try {
   assert.equal(fingerprintedAsset.statusCode, 200);
   assert.equal(fingerprintedAsset.headers["cache-control"], "public, max-age=31536000, immutable");
 
-  const unfingerprintedAsset = await app.inject({ method: "GET", url: "/favicon.png" });
+  const unfingerprintedAsset = await app.inject({ method: "GET", url: "/yunyun-favicon.png" });
   assert.equal(unfingerprintedAsset.statusCode, 200);
-  assert.equal(unfingerprintedAsset.headers["cache-control"], undefined);
+  // Fork behaviour: unfingerprinted files change in place between builds, so
+  // they must revalidate instead of falling back to heuristic caching.
+  assert.equal(unfingerprintedAsset.headers["cache-control"], "no-cache, must-revalidate");
 
   console.info("Static client cache-header regression passed.");
 } finally {

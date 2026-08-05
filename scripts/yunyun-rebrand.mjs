@@ -38,6 +38,19 @@ const RULES = [
   // .mari-workspace, Mari_profile.png (underscore is a word char),
   // PROFESSOR_MARI_ID, or the ProfessorMari* component identifiers.
   [new RegExp(`\\b${OLD_ASSISTANT}\\b`, "g"), "YunYun"],
+  // Branding assets were renamed to fresh URLs (see commit 4d0751f) so no cache
+  // could serve the pre-rebrand art. Upstream keeps adding files that reference
+  // the OLD paths — NoodlerBulkCreatePanel.tsx arrived in v2.4.1 doing exactly
+  // that, pointing at an asset we had deleted. Remap them here so every future
+  // merge self-heals instead of silently shipping a 404'd image.
+  [/\/sprites\/mari\/chibi-professor-mari\.png/g, "/sprites/yunyun/chibi-yunyun.png"],
+  [/\/sprites\/mari\/Mari_profile\.png/g, "/sprites/yunyun/yunyun-profile.png"],
+  [/\/illustrations\/professor-mari-whats-new\.webp/g, "/illustrations/yunyun-whats-new.webp"],
+  [/"\/logo\.png"/g, '"/yunyun-logo.png"'],
+  [/"\/logo-splash\.gif"/g, '"/yunyun-logo-splash.gif"'],
+  [/"\/favicon\.png"/g, '"/yunyun-favicon.png"'],
+  [/"\/icon-192\.png"/g, '"/yunyun-icon-192.png"'],
+  [/"\/icon-512\.png"/g, '"/yunyun-icon-512.png"'],
 ];
 
 // Phrases that must survive verbatim even though they contain the old name.
