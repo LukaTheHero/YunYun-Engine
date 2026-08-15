@@ -1,4 +1,4 @@
-// Field-level diffing for the Professor Mari "Easy Viewer". Turns a raw MariDbRowChange
+// Field-level diffing for the Professor YunYun "Easy Viewer". Turns a raw MariDbRowChange
 // (full before/after row snapshots from approval.diffPreview) into a readable list of changed
 // fields, recursing into the nested JSON columns (character `data`, lorebook arrays, preset order
 // arrays) so the reviewer sees "Personality changed", not "data changed".
@@ -16,7 +16,7 @@ export interface FieldChange {
 
 export type LorebookVectorStatus = "excluded" | "vectorized" | "notVectorized";
 
-/** Resolve the vector state shown in Professor Mari's lorebook-entry review. */
+/** Resolve the vector state shown in Professor YunYun's lorebook-entry review. */
 export function resolveLorebookVectorStatus(row: Record<string, unknown> | null | undefined): LorebookVectorStatus {
   const excluded =
     row?.excludeFromVectorization === true ||

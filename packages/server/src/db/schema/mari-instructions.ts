@@ -1,8 +1,8 @@
 // ──────────────────────────────────────────────
-// Schema: Mari Instructions (#4851)
+// Schema: YunYun Instructions (#4851)
 //
 // Persistent, user-scoped "standing instructions / memories" for Professor
-// Mari, how the user likes their lorebooks/characters formatted, workflow
+// YunYun, how the user likes their lorebooks/characters formatted, workflow
 // conventions, and behavior directives. Retrieved index-and-fetch (only the
 // title + description index is always injected; full `content` is pulled on
 // relevance) so the store stays token-cheap regardless of size. A `persistent`

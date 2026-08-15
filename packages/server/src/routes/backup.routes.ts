@@ -468,7 +468,7 @@ function buildCompatibleLorebookExport(lb: Record<string, any>) {
     extensions: {
       marinara: {
         exportedAt: new Date().toISOString(),
-        source: "Marinara Engine compatibility export",
+        source: "YunYun Engine compatibility export",
       },
     },
     entries,
@@ -1021,7 +1021,7 @@ function addProfileImportSecurityWarnings(warnings: ProfileImportWarning[], summ
   if (summary.mariInstructionsQuarantined > 0) {
     addProfileImportWarning(warnings, {
       type: "mari_instructions_quarantined",
-      message: `${profileImportCountLabel(summary.mariInstructionsQuarantined, "active Professor Mari memory", "active Professor Mari memories")} will be imported disabled and non-persistent until reviewed.`,
+      message: `${profileImportCountLabel(summary.mariInstructionsQuarantined, "active Professor YunYun memory", "active Professor YunYun memories")} will be imported disabled and non-persistent until reviewed.`,
     });
   }
   if (summary.personalExtensionsQuarantined > 0) {
@@ -2778,7 +2778,7 @@ async function readProfileEnvelopeFromArchive(zip: ProfileZipArchive) {
     throw new ProfileImportRequestError(
       [
         "Profile archive is missing marinara-profile.json.",
-        "Select a Marinara profile export or a full backup ZIP downloaded from Settings -> Advanced -> Backups.",
+        "Select a YunYun profile export or a full backup ZIP downloaded from Settings -> Advanced -> Backups.",
         sampleEntries ? `This ZIP starts with: ${sampleEntries}` : "This ZIP did not contain any readable files.",
       ].join(" "),
     );
@@ -2984,14 +2984,14 @@ export async function readStoredBackupImportForRegression(filePath: string, safe
 
 export function buildBackupRestoreNotes(omittedEntries: readonly string[] = []) {
   const lines = [
-    "Marinara Engine backup",
+    "YunYun Engine backup",
     "",
     "This archive contains a raw filesystem backup for manual recovery.",
     "Treat it as sensitive: full backups include local secret material such as .encryption-key when that file exists.",
     "Restore .encryption-key together with the storage files to keep saved API keys decryptable.",
     "If this install used an ENCRYPTION_KEY environment variable instead of a persisted key file, restore that environment variable separately.",
     "",
-    "For one-click import inside Marinara:",
+    "For one-click import inside YunYun:",
     "1. Open Settings -> Import.",
     "2. Use Import Profile and select the downloaded backup zip archive.",
     "3. Keep the ZIP intact so its streamed table shards and assets remain available to the importer.",

@@ -627,7 +627,7 @@ async function fetchProfessorMariContext(
 
     // Both a resolved item and a disambiguation list ride the durable mariContext
     // slot — which #4768 relocated into the volatile tail, so neither churns the
-    // cached system prefix — and both trigger the fetch follow-up so Mari speaks
+    // cached system prefix — and both trigger the fetch follow-up so YunYun speaks
     // to what she just pulled (a single card, or "which of these did you mean?").
     if (resolution.kind === "single") {
       // Key by name AND id so two same-named entities (the Case-C flow) can both

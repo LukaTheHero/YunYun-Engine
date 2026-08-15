@@ -1,4 +1,4 @@
-// Guards the Home Professor Mari prompt split introduced for #4768.
+// Guards the Home Professor YunYun prompt split introduced for #4768.
 //
 // The name lists and fetched data used to live inside the system message, so any
 // library change or [fetch:] rewrote the static system prefix — token noise on
@@ -61,7 +61,7 @@ function makeStores(opts: {
   });
 
   // The instruction prompt legitimately *names* the <available_names> tag to
-  // teach Mari the idiom, so we pin on the runtime DATA (a character name, a
+  // teach YunYun the idiom, so we pin on the runtime DATA (a character name, a
   // fetched body) never leaking into the stable half — that is the separation
   // that actually matters for cache stability.
   assert.equal(stablePrompt, MARI_ASSISTANT_PROMPT, "stablePrompt must be exactly MARI_ASSISTANT_PROMPT");
@@ -147,14 +147,14 @@ function makeStores(opts: {
   assert.deepEqual(first, second, "identical inputs must yield identical output");
 }
 
-// ── 6. Preserved behavior: Mari filters herself out; a throwing store degrades to
+// ── 6. Preserved behavior: YunYun filters herself out; a throwing store degrades to
 //       a usable stablePrompt with no lists; an empty library yields no volatile block.
 {
   const withMari = await resolveProfessorMariPromptContext({
     chatMeta: {},
-    ...makeStores({ chars: [charRow("Professor Mari", PROFESSOR_MARI_ID), charRow("Luna")] }),
+    ...makeStores({ chars: [charRow("Professor YunYun", PROFESSOR_MARI_ID), charRow("Luna")] }),
   });
-  assert.ok(!withMari.volatileContext.includes("Professor Mari"), "Mari must be filtered from her own name list");
+  assert.ok(!withMari.volatileContext.includes("Professor YunYun"), "YunYun must be filtered from her own name list");
   assert.match(withMari.volatileContext, /Luna/);
 
   const thrown = await resolveProfessorMariPromptContext({
@@ -200,7 +200,7 @@ function makeStores(opts: {
   assert.match(
     src,
     /content:\s*professorMariVolatileContext\s*,[^}]*contextKind:\s*"injection"/,
-    'the tail Mari block must be tagged contextKind "injection"',
+    'the tail YunYun block must be tagged contextKind "injection"',
   );
 
   // The whole point of #4768: the volatile half must NEVER be concatenated onto
@@ -211,4 +211,4 @@ function makeStores(opts: {
   );
 }
 
-process.stdout.write("Professor Mari prompt-context regression passed.\n");
+process.stdout.write("Professor YunYun prompt-context regression passed.\n");

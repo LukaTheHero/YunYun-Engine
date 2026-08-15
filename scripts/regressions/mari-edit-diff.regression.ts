@@ -1,4 +1,4 @@
-// #4919 Professor Mari "Easy Viewer" diff-logic regression. Guards the two pure client utilities
+// #4919 Professor YunYun "Easy Viewer" diff-logic regression. Guards the two pure client utilities
 // that power the readable before/after view: the word-level diff must reconstruct both sides
 // exactly (so nothing is dropped or duplicated when highlighting), and field-change extraction must
 // find real edits (recursing into the nested `data` column) while skipping noise/unchanged keys.
@@ -138,4 +138,4 @@ assert.deepEqual(
   "opting back in without an embedding transitions from excluded to not vectorized",
 );
 
-console.log("Mari Easy Viewer diff regressions passed.");
+console.log("YunYun Easy Viewer diff regressions passed.");

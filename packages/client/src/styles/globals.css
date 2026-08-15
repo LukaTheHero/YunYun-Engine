@@ -3360,7 +3360,7 @@ html[data-marinara-reduced-effects="true"] .mari-home-professor-popup__arrival-f
   background-position: 100% 0;
 }
 
-/* Preserve the current Mari frame while the browser tab/window is inactive.
+/* Preserve the current YunYun frame while the browser tab/window is inactive.
    App.tsx owns the single visibility/focus listener; Home only consumes it. */
 html[data-marinara-effects-paused="true"] .mari-home-professor-popup__sprite,
 html[data-marinara-effects-paused="true"] .mari-home-professor-popup__bubble,

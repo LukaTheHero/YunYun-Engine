@@ -242,7 +242,7 @@ function hasUnsafeSvgHref(source: string): boolean {
   return false;
 }
 
-/** Resolve symlinks and permit reads only from Marinara's configured media roots. */
+/** Resolve symlinks and permit reads only from YunYun's configured media roots. */
 async function resolveAllowedMediaPath(filePath: string, additionalRoot?: string): Promise<string | null> {
   let canonicalPath: string;
   try {

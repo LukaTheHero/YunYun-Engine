@@ -33,5 +33,5 @@ export function useMutationTypeContract() {
   // @ts-expect-error generic endpoint excludes tracker fields
   generic.mutate({ id: "persona", trackerCardPaint: paint });
   // @ts-expect-error tracker endpoint excludes generic fields
-  tracker.mutate({ id: "persona", name: "Mari", trackerCardPaint: paint });
+  tracker.mutate({ id: "persona", name: "YunYun", trackerCardPaint: paint });
 }

@@ -120,8 +120,8 @@ export async function showLocalMessageNotification({
   if (typeof window === "undefined" || !("Notification" in window)) return false;
 
   const notification = new window.Notification(resolveMessageNotificationTitle(title, characterName), {
-    body: "Open Marinara to read it.",
-    icon: "/icon-192.png",
+    body: "Open YunYun to read it.",
+    icon: "/yunyun-icon-192.png",
     tag,
   });
 
@@ -147,7 +147,7 @@ export function showNativeMessageNotification({
   const notificationTitle = resolveMessageNotificationTitle(title, characterName);
   const notificationTag = tag ?? "message";
   const token = getAndroidBridgeToken();
-  if (token) bridge.showNotification(token, notificationTitle, "Open Marinara to read it.", notificationTag);
-  else bridge.showNotification(notificationTitle, "Open Marinara to read it.", notificationTag);
+  if (token) bridge.showNotification(token, notificationTitle, "Open YunYun to read it.", notificationTag);
+  else bridge.showNotification(notificationTitle, "Open YunYun to read it.", notificationTag);
   return true;
 }

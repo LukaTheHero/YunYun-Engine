@@ -905,7 +905,7 @@ export class StorageFormatTooNewError extends Error {
   constructor(onDiskVersion: number, supportedVersion: number) {
     super(
       `This data directory was written by storage format ${onDiskVersion}, but this build supports up to ` +
-        `format ${supportedVersion}. Update Marinara Engine (or restore a matching backup) instead of ` +
+        `format ${supportedVersion}. Update YunYun Engine (or restore a matching backup) instead of ` +
         `running an older build against newer data.`,
     );
     this.name = "StorageFormatTooNewError";

@@ -252,7 +252,7 @@ export interface MariWorkspaceSkillsResponse {
   diagnostics: string[];
 }
 
-// #4851: Professor Mari's saved memories (the mari_instructions store). The list
+// #4851: Professor YunYun's saved memories (the mari_instructions store). The list
 // surfaces full detail (content included) so the Memories management panel can edit
 // in place, mirroring the Skills panel.
 export interface MariInstructionSummary {

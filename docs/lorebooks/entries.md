@@ -359,7 +359,7 @@ Use the **comment macro** to leave a note that never reaches the AI:
 
 - `{{// draft wording, revisit later}}` — everything inside `{{// ... }}` is stripped from the output.
 
-**A note on recursion.** When **Recursive** scanning is turned on for the lorebook (see [Token Budgets and Recursion](token-budgets.md)), Marinara re-scans the *expanded* content of activated entries for more keywords. Because macros resolve first, the text a macro produces can trigger further entries — for instance, content that expands to a name can activate an entry keyed on that name. A `{{// comment}}` is the exception: it is stripped to nothing before the re-scan, so its text can never trigger anything. Comments are for notes only; if you want text to feed recursion, write it plainly.
+**A note on recursion.** When **Recursive** scanning is turned on for the lorebook (see [Token Budgets and Recursion](token-budgets.md)), YunYun re-scans the *expanded* content of activated entries for more keywords. Because macros resolve first, the text a macro produces can trigger further entries — for instance, content that expands to a name can activate an entry keyed on that name. A `{{// comment}}` is the exception: it is stripped to nothing before the re-scan, so its text can never trigger anything. Comments are for notes only; if you want text to feed recursion, write it plainly.
 
 ## Common pitfalls
 

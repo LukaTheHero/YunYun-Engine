@@ -2179,7 +2179,7 @@ export function HomeBrowserHub({
               data-component="HomeBrowserHub.Brand"
             >
               <img
-                src="/logo-splash.gif"
+                src="/yunyun-logo-splash.gif"
                 alt=""
                 data-component="HomeBrowserHub.AnimatedLogo"
                 className="h-8 w-8 shrink-0 object-contain drop-shadow-[0_0_10px_oklch(0.73_0.21_345/0.28)]"
@@ -2228,7 +2228,7 @@ export function HomeBrowserHub({
                     : "border-transparent text-[var(--muted-foreground)] hover:bg-[var(--accent)]",
                 )}
               >
-                <img src="/sprites/mari/Mari_profile.png" alt="" className="h-4 w-4 rounded-sm object-cover" />
+                <img src="/sprites/yunyun/yunyun-profile.png" alt="" className="h-4 w-4 rounded-sm object-cover" />
                 <span className="min-w-0 truncate">{t("home.browser.professorTab")}</span>
               </button>
               {localizedBrowserPackages.map(({ item, display }) => {
@@ -2308,7 +2308,7 @@ export function HomeBrowserHub({
               data-component="HomeBrowserHub.Address"
             >
               <img
-                src="/favicon.png"
+                src="/yunyun-favicon.png"
                 alt=""
                 className="h-[0.9rem] w-[0.9rem] shrink-0 object-contain sm:h-[1.05rem] sm:w-[1.05rem]"
               />
@@ -2579,7 +2579,7 @@ export function HomeBrowserHub({
                   <div className="min-w-0 max-w-5xl">
                     <div className="flex min-w-0 flex-col items-center">
                       <img
-                        src="/logo.png"
+                        src="/yunyun-logo.png"
                         alt=""
                         aria-hidden="true"
                         className="mb-1 h-[clamp(1.8rem,2.4vw,2.35rem)] w-auto object-contain"

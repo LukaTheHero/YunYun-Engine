@@ -1,4 +1,4 @@
-// #4813 (durable review): Professor Mari's Keep/Restore undo card used to live only in an
+// #4813 (durable review): Professor YunYun's Keep/Restore undo card used to live only in an
 // in-memory Map that was dropped after a 10-minute timer or on restart, so an applied change
 // could quietly become permanent. These regressions drive the REAL MariDbService against a
 // file-native store and assert that:
@@ -507,4 +507,4 @@ try {
   else process.env.FILE_STORAGE_DIR = previousFileStorageDir;
 }
 
-console.log("Mari review durability regressions passed.");
+console.log("YunYun review durability regressions passed.");

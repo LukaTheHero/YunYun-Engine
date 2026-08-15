@@ -58,7 +58,7 @@ assert.equal(
     376_363_985,
   ),
   true,
-  "a large stored background from Marinara's own streaming backup must remain importable",
+  "a large stored background from YunYun's own streaming backup must remain importable",
 );
 assert.equal(
   isPermittedLargeStoredBackupEntry(

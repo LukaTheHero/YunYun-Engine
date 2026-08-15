@@ -1,7 +1,7 @@
 // Guards the persisted-embedding backing store for #4768 phase 2: content-hash
 // staleness (an edit to an embed-relevant field invalidates the stored vector
 // with no explicit hook), a narrow setter that never bumps updatedAt, and the
-// Professor-Mari self-exclusion.
+// Professor-YunYun self-exclusion.
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,17 +31,17 @@ async function insertCharacter(id: string, data: Record<string, unknown>) {
 
 await insertCharacter("c1", { name: "Dracula", description: "a brooding immortal vampire", tags: ["undead"] });
 await insertCharacter("c2", { name: "Bob", description: "a cheerful baker" });
-// Professor Mari must never appear as a fetch candidate.
-await insertCharacter(PROFESSOR_MARI_ID, { name: "Professor Mari", description: "the built-in assistant" });
+// Professor YunYun must never appear as a fetch candidate.
+await insertCharacter(PROFESSOR_MARI_ID, { name: "Professor YunYun", description: "the built-in assistant" });
 // A record whose data is the JSON literal "null" must be skipped, not crash the
 // whole projection (JSON.parse("null") === null).
 await db.insert(characters).values({ id: "c-null", data: "null", comment: "", createdAt: STAMP, updatedAt: STAMP });
 
-// ── Candidates project correctly; Mari + malformed rows excluded; embeddings null ──
+// ── Candidates project correctly; YunYun + malformed rows excluded; embeddings null ──
 {
   const candidates = await store.listCandidates("character");
   const ids = candidates.map((c) => c.id).sort();
-  assert.deepEqual(ids, ["c1", "c2"], "Professor Mari and a null-data row must be excluded, without throwing");
+  assert.deepEqual(ids, ["c1", "c2"], "Professor YunYun and a null-data row must be excluded, without throwing");
   const dracula = candidates.find((c) => c.id === "c1")!;
   assert.equal(dracula.name, "Dracula");
   assert.match(dracula.embedText, /brooding immortal vampire/, "embed text must include the description");

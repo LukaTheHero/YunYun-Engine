@@ -151,7 +151,7 @@ try {
     assert.equal(
       encryptedWebhookIssues.some((issue) => issue.message.includes("webhookUrl")),
       false,
-      "Mari DB treats encrypted webhook URLs as opaque stored values",
+      "YunYun DB treats encrypted webhook URLs as opaque stored values",
     );
     const plaintextWebhookIssues: typeof encryptedWebhookIssues = [];
     customToolValidator.validateCustomToolRow(
@@ -162,7 +162,7 @@ try {
     assert.equal(
       plaintextWebhookIssues.some((issue) => issue.message === "Tool webhookUrl must be a valid URL"),
       true,
-      "Mari DB continues to URL-validate plaintext webhook values",
+      "YunYun DB continues to URL-validate plaintext webhook values",
     );
     const created = await mari.executeAction({
       action: "character.create",
@@ -281,7 +281,7 @@ try {
     assert.equal(
       insertedTool.ok,
       true,
-      `Professor Mari can still author executable tool drafts: ${JSON.stringify(insertedTool)}`,
+      `Professor YunYun can still author executable tool drafts: ${JSON.stringify(insertedTool)}`,
     );
     const storedTools = await db.select().from(customTools);
     const storedTool = storedTools.find((entry) => entry.name === "reviewed_webhook");
@@ -363,7 +363,7 @@ try {
 const status = getWorkspaceShellSandboxStatus();
 if (!status.available) {
   assert.ok(status.reason.length > 0);
-  console.log(`Mari DB transform runtime proof skipped: ${status.reason}`);
+  console.log(`YunYun DB transform runtime proof skipped: ${status.reason}`);
 } else {
   const workspace = mkdtempSync(join(tmpdir(), "marinara-mari-transform-workspace-"));
   const outside = mkdtempSync(join(tmpdir(), "marinara-mari-transform-outside-"));
@@ -555,7 +555,7 @@ if (!status.available) {
       await assert.rejects(runMariTransformSandbox(secretReadInput), /Transform sandbox exited/u);
     }
 
-    console.log(`Mari DB execution security regression passed with ${status.backend}.`);
+    console.log(`YunYun DB execution security regression passed with ${status.backend}.`);
   } finally {
     rmSync(workspace, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });

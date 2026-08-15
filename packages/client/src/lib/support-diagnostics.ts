@@ -46,7 +46,7 @@ function available(value: string | null | undefined): string {
 
 export function formatSupportDiagnostics(diagnostics: SupportDiagnostics): string {
   return [
-    "Marinara Engine diagnostics",
+    "YunYun Engine diagnostics",
     `Version: ${available(diagnostics.version)}`,
     `Build: ${available(diagnostics.build)}`,
     `Commit: ${available(diagnostics.commit)}`,

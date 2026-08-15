@@ -1,4 +1,4 @@
-// #4812: Prof Mari can now SEE and EDIT specific parts of a preset — sections, groups, and
+// #4812: Prof YunYun can now SEE and EDIT specific parts of a preset — sections, groups, and
 // choice-blocks — through granular actions modeled on the lorebook entry actions, instead of only
 // creating/replacing a whole preset. This drives the REAL MariDbService against a file-native store
 // and asserts the read/update/add/delete surface plus the folded #4813 child-clobber guard.
@@ -379,4 +379,4 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log("Mari preset granular-edit regressions passed.");
+console.log("YunYun preset granular-edit regressions passed.");

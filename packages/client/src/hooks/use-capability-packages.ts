@@ -216,7 +216,7 @@ export function useCapabilityClientModules() {
       if (!item.manifest.entrypoints.client) continue;
       if (isCapabilityPackageAvailableUntilRestart(item)) {
         // The old client module is still loaded and paired with the old server
-        // runtime until Marinara restarts. Keep its state mounted while the new
+        // runtime until YunYun restarts. Keep its state mounted while the new
         // package version waits on disk.
         eligiblePackageIds.add(item.id);
         continue;

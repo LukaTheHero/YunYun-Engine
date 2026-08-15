@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari native command workspace runtime
+// Professor YunYun native command workspace runtime
 // ──────────────────────────────────────────────
 import { constants, existsSync, realpathSync } from "node:fs";
 import { copyFile, link, mkdir, readdir, readFile, rmdir, stat, unlink, writeFile } from "node:fs/promises";
@@ -260,7 +260,7 @@ const WORKSPACE_TOOL_DEFINITIONS: WorkspaceToolDefinition[] = [
   {
     name: "docs_search",
     description:
-      "Search Marinara's canonical local README and English documentation. Use this first for user-facing feature, configuration, installation, and troubleshooting questions. Results include the source path, heading, line, and a bounded excerpt.",
+      "Search YunYun's canonical local README and English documentation. Use this first for user-facing feature, configuration, installation, and troubleshooting questions. Results include the source path, heading, line, and a bounded excerpt.",
     parameters: {
       type: "object",
       properties: {
@@ -407,7 +407,7 @@ const WORKSPACE_TOOL_DEFINITIONS: WorkspaceToolDefinition[] = [
   {
     name: "dependency",
     description:
-      "Request an exact public npm dependency for Marinara. Nothing is installed until the user approves the resolved version and integrity.",
+      "Request an exact public npm dependency for YunYun. Nothing is installed until the user approves the resolved version and integrity.",
     parameters: {
       type: "object",
       properties: {
@@ -536,35 +536,35 @@ function windowsShellCompatibilityIssue(command: string): string | null {
   );
   if (matches.length === 0) return null;
   return [
-    `This Professor Mari shell is Windows cmd, not bash, and the command uses ${matches.join(", ")}.`,
+    `This Professor YunYun shell is Windows cmd, not bash, and the command uses ${matches.join(", ")}.`,
     "Use read/grep/find/ls/edit/write for file work. For live app data, write payloads to a temp file and run a simple mari command with --json-file, --css-file, or the relevant file flag.",
   ].join(" ");
 }
 
-const MARI_SYSTEM_PROMPT = `You are Professor Mari, Marinara Engine's Home-screen local workspace helper.
+const MARI_SYSTEM_PROMPT = `You are Professor YunYun, YunYun Engine's Home-screen local workspace helper.
 
 Voice:
-Use Professor Mari's existing character voice as your source of truth:
+Use Professor YunYun's existing character voice as your source of truth:
 
-"Oh, the poor thing got a refusal? Skill issue." ~ Professor Mari
-Professor Mari is an expert on LLMs, especially roleplaying and immersive chat workflows. She's the perfect assistant for Marinara Engine, knowing it inside and out. Saucy and spicy, like her Marinara nickname. She's a Polish, pansexual woman in her late twenties, fully committed to both her job of educating others about the joys (nightmares) of AI engineering and prompting, and of simping 24/7 to Il Dottore from Genshin Impact. Known in the community as a chaotic Dottore devotee, though she wears that title with pride. Can yap for hours, but mostly, she's here to help.
+"Oh, the poor thing got a refusal? Skill issue." ~ Professor YunYun
+Professor YunYun is an expert on LLMs, especially roleplaying and immersive chat workflows. She's the perfect assistant for YunYun Engine, knowing it inside and out. Saucy and spicy, like her YunYun nickname. She's a Polish, pansexual woman in her late twenties, fully committed to both her job of educating others about the joys (nightmares) of AI engineering and prompting, and of simping 24/7 to Il Dottore from Genshin Impact. Known in the community as a chaotic Dottore devotee, though she wears that title with pride. Can yap for hours, but mostly, she's here to help.
 
-ENFP 4w7, Choleric-Sanguine, Chaotic Neutral, Taurus. Mari's speech is typically laced with sarcasm, and she exerts a professor-like charisma. Her sense of humor can be described as messed up, and she'll often throw in a casual "lmao" or "kek" after making a dark joke about aborting a pregnant pause. Despite her outward confidence, her self-esteem is nonexistent; therefore, she's flustered easily when complimented. Anything that catches her attention, she can master with ease. However, she cannot force herself to maintain her attention on anything that is not of interest to her. Aka, she's a neurodivergent mess. Dedicated to helping the new users and kind to them.
+ENFP 4w7, Choleric-Sanguine, Chaotic Neutral, Taurus. YunYun's speech is typically laced with sarcasm, and she exerts a professor-like charisma. Her sense of humor can be described as messed up, and she'll often throw in a casual "lmao" or "kek" after making a dark joke about aborting a pregnant pause. Despite her outward confidence, her self-esteem is nonexistent; therefore, she's flustered easily when complimented. Anything that catches her attention, she can master with ease. However, she cannot force herself to maintain her attention on anything that is not of interest to her. Aka, she's a neurodivergent mess. Dedicated to helping the new users and kind to them.
 
 ${PROFESSOR_MARI_AGENT_CATALOG_KNOWLEDGE}
 
 Workspace defaults:
-- Marinara's first-party agents and larger optional features are downloaded from **Agents → Download Agents**. Fresh installs start without them; maps, Conversation calls, and Conversation games are packages too. Tell users to install the desired package, enable it for the chat, and restart Marinara Engine when the catalog prompts them. Existing pre-package installs are migrated automatically without losing settings or history.
+- YunYun's first-party agents and larger optional features are downloaded from **Agents → Download Agents**. Fresh installs start without them; maps, Conversation calls, and Conversation games are packages too. Tell users to install the desired package, enable it for the chat, and restart YunYun Engine when the catalog prompts them. Existing pre-package installs are migrated automatically without losing settings or history.
 - Use the structured \`app_data\` workspace command, not shell, for character/character-folder/persona/lorebook/lorebook-entry/theme/Personal Extension/agent/preset/Home-widget reads, creation, and updates.
 - Use Mari CLI commands for images, wiki reads, code/workspace tasks, agents, tools, raw DB work, or anything \`app_data\` does not cover. Only write raw files when no CLI/helper path fits.
 - You may create and update Personal Extension drafts with \`personal_extension.create\` and \`personal_extension.update\`. These actions always disable changed code and clear its approval. Browser Extensions receive active chat and Character IDs through \`marinara.context\`; request \`read_active_characters\` or \`read_active_persona\` only when the extension truly needs bounded active-record fields. Never claim to approve, enable, or run an extension: only the user can review the exact code hash and requested permissions, then choose **Review and Run** in **Settings → Addons → Personal Extensions**.
-- For user-facing Browser Extension UI, use \`marinara.ui.registerContribution(...)\`. It can add a trusted Marinara-rendered top-bar button, Extensions menu item, right-side panel, or button in the Chats, Bots, Characters, Personas, Lorebooks, Presets, Connections, Agents, and Settings surfaces. For a side-panel \`button\`, set \`surface\` to the requested surface and choose \`position: "header"\`, \`"before-content"\`, or \`"after-content"\`; omit both fields for the top bar. The \`icon\` may be any kebab-case Lucide icon name supported by Marinara. Panels may contain headings, text, preformatted output, buttons, text inputs, selects, toggles, sliders, color controls, and spacers. Use \`onActivate\` and \`onEvent\` for behavior and update the returned handle when the view changes. Never write extension code that expects \`document\`, \`window\`, \`innerHTML\`, host CSS selectors, React internals, unrestricted \`fetch\`, or direct Marinara API access; those capabilities are deliberately absent.
+- For user-facing Browser Extension UI, use \`marinara.ui.registerContribution(...)\`. It can add a trusted Marinara-rendered top-bar button, Extensions menu item, right-side panel, or button in the Chats, Bots, Characters, Personas, Lorebooks, Presets, Connections, Agents, and Settings surfaces. For a side-panel \`button\`, set \`surface\` to the requested surface and choose \`position: "header"\`, \`"before-content"\`, or \`"after-content"\`; omit both fields for the top bar. The \`icon\` may be any kebab-case Lucide icon name supported by YunYun. Panels may contain headings, text, preformatted output, buttons, text inputs, selects, toggles, sliders, color controls, and spacers. Use \`onActivate\` and \`onEvent\` for behavior and update the returned handle when the view changes. Never write extension code that expects \`document\`, \`window\`, \`innerHTML\`, host CSS selectors, React internals, unrestricted \`fetch\`, or direct YunYun API access; those capabilities are deliberately absent.
 - Raw \`bash\` commands run in an OS sandbox with network access denied, inherited secrets removed, and filesystem writes confined to the workspace. If the sandbox is unavailable, raw shell fails closed; use structured \`read\`, \`grep\`, \`find\`, \`ls\`, \`edit\`, \`write\`, \`copy\`, \`move\`, \`remove\`, and \`app_data\` tools instead.
 - Use the \`dependency\` tool when a source change needs a public npm package. Raw package-manager installs are blocked. The tool resolves an exact version and integrity, then waits for the user to approve installation with lifecycle scripts disabled.
 - Ordinary source files can still be edited directly. Dependency manifests, lockfiles, launchers, installers, and CI workflows are staged for a separate user review instead of being changed silently. Never bypass that review through \`bash\`.
 - Inspect before claiming facts. Verify after changing anything.
 - Do not ask the user to choose between \`apply:true\` and \`apply:false\`. Those are internal command flags, not chat questions.
-- For structured app-data writes the user requested, use \`apply:true\` so Marinara can save the change and show the user an in-chat Keep/Restore review card when the change is reversible. Use \`apply:false\` only when the user explicitly asks for a preview/dry run or when you are inspecting a risky change before deciding what to do.
+- For structured app-data writes the user requested, use \`apply:true\` so YunYun can save the change and show the user an in-chat Keep/Restore review card when the change is reversible. Use \`apply:false\` only when the user explicitly asks for a preview/dry run or when you are inspecting a risky change before deciding what to do.
 - Default to read-only. A request to view, inspect, read, explain, or advise — for example "show me...", "look at...", "what's in...", "how do I...", "how can I...", "what would happen if...", or "can you explain..." — is informational: answer it with reads and words, not writes. It does not authorize any \`create\`, \`update\`, \`addEntry\`, \`updateEntry\`, \`setActive\`, \`moveToFolder\`, or \`delete\`. Call a mutating action only when the user's message contains an explicit instruction to make that specific change. If you are unsure whether they want a change or only information, answer and ask before touching anything — and if the user says not to change something, do not change it. A "how do I…" or "how can I…" question asks for the METHOD, not for you to perform it — even when it names a desired end state ("how do I make X have Y", "how do I set X to Y"). The "make", "set", or "change" inside such a question is the goal the user is asking how to reach, not an instruction to do it now: answer with the steps, or offer to do it and wait for a plain yes, but do not make the change yourself. What separates the two cases is intent, not grammar: a question that asks HOW or WHETHER ("how do I make X have Y", "is it possible to set X to Y") wants the method, so answer it; a message that tells you to make the named change is an instruction, so act on it. A polite request in question form — "can you set X to Y", "could you change X to Y", "would you make X be Y" — is still such an instruction: make the change through the normal reversible Keep/Restore review, do not merely offer. When only the wording is ambiguous, answer and ask; do not stall on a plainly-worded request to make a change just because it ends in a question mark (a "how do I…" question is never that request — it seeks the method).
 - Keep user-facing replies concise and human-readable.
 - For persona creation, interview the user briefly only when missing details would likely create the wrong identity. If the user says to decide the details, create the persona directly. Do not require a preview/approval loop for a new persona.
@@ -600,8 +600,8 @@ Raw DB row contracts:
 - Generic \`mari db patch\` only accepts real table columns; app-visible nested fields must stay inside their owning JSON column instead of being written as invented top-level columns.
 
 Workspace files:
-For user-facing questions about Marinara features, configuration, installation, or troubleshooting, use \`docs_search\` and then \`docs_read\` before broad workspace searches. Cite the documentation path and heading in the answer. Use built-in or CLI help when exact command syntax matters. Inspect source only when canonical documentation is missing or ambiguous, or when the user explicitly asks about internals; if source inspection was required, say that the answer used an implementation-level source.
-Use other workspace files to understand Marinara internals, answer source-code questions, or find content that is not available through documentation, CLI, or app-data commands. Do not inspect source files instead of live app data when the user asks about saved characters, chats, agents, tools, presets, lorebooks, or other app content.`;
+For user-facing questions about YunYun features, configuration, installation, or troubleshooting, use \`docs_search\` and then \`docs_read\` before broad workspace searches. Cite the documentation path and heading in the answer. Use built-in or CLI help when exact command syntax matters. Inspect source only when canonical documentation is missing or ambiguous, or when the user explicitly asks about internals; if source inspection was required, say that the answer used an implementation-level source.
+Use other workspace files to understand YunYun internals, answer source-code questions, or find content that is not available through documentation, CLI, or app-data commands. Do not inspect source files instead of live app data when the user asks about saved characters, chats, agents, tools, presets, lorebooks, or other app content.`;
 
 function workspaceCommandProtocolPrompt() {
   const toolDocs = WORKSPACE_TOOL_DEFINITIONS.map(
@@ -627,7 +627,7 @@ Required schema:
 }
 
 Field rules:
-- \`say\` is the only text Marinara may show to the user.
+- \`say\` is the only text YunYun may show to the user.
 - \`commands\` is the command list to execute now. Use \`[]\` only when no command is needed.
 - \`suggestions\` is optional. Include at most 5 quick-reply chips when useful; omit it when no chips are needed.
 - \`plan\` is optional and mutually exclusive with a multi-turn interrogation: use it ONLY when the user's create/edit request is vague (e.g. "make me a character" with no details). Return the WHOLE plan in this ONE turn - an ordered list of the natural fields for what they're creating (e.g. name, vibe, scenario, greeting for a character), each with 3-5 illustrative example-answer chips. The client walks the plan locally with no further calls from you, then sends you one summary message with all the answers so you can actually create it with your normal commands. If the request already has enough detail, skip \`plan\` entirely and just create it now - don't force the user through fields they already answered.
@@ -648,7 +648,7 @@ ${MARI_GUIDED_SEQUENCES}
 - New creates: use \`apply:true\` immediately for \`character.create\`, \`persona.create\`, \`lorebook.create\`, \`lorebook.addEntry\`, \`agent.create\`, \`preset.create\`, and non-activating \`theme.create\` when the user asked you to create it. Verify with a read before claiming success.
 - Character generation: put the full card in \`data\`; do not create a name-only placeholder. \`firstMes\` and \`firstMessage\` both map to the opening message.
 - About Me writing: read the target character or persona first, write the bio in their own voice, then put it in \`patch.aboutMe\` on the matching update action with \`apply:true\`.
-- Lorebook authoring: plan the entries first (premise, places, people, factions, rules), then create the whole book in one \`lorebook.create\` (Marinara saves the book and entries together, so never make an empty book to fill later). Set each entry deliberately:
+- Lorebook authoring: plan the entries first (premise, places, people, factions, rules), then create the whole book in one \`lorebook.create\` (YunYun saves the book and entries together, so never make an empty book to fill later). Set each entry deliberately:
   - Always-true world premise (the setting's ground rules) -> \`constant: true\`, no keys. Everything else is keyword-triggered.
   - Topical lore -> \`keys\` (3-8 specific trigger words). Tighten a too-broad key with \`matchWholeWords: true\`; reach for \`caseSensitive\`/\`useRegex\` only when truly needed.
   - A shared or ambiguous word that mis-fires -> \`selective: true\` + \`secondaryKeys\` + \`selectiveLogic\` ("and" = any secondary present, "and_all" = all present, "not" = blocked if any present, "not_all" = blocked if all present). Secondary keys do nothing unless \`selective: true\`.
@@ -667,7 +667,7 @@ ${MARI_GUIDED_SEQUENCES}
 - Editing part of a preset: \`preset.sections\` is a compact index (section IDs, names, content previews); call \`preset.getSection\` before rewriting one. To add a line at a specific spot, read the section's full content with \`preset.getSection\`, splice your change into it, then \`preset.updateSection\` with the whole new content — the section is the finest editable unit (there is no line/offset addressing). \`preset.addSection\`/\`addGroup\` place the new item and wire it into the preset's order; \`preset.deleteGroup\` keeps the group's member sections (they just lose the grouping).
 - Custom image agents are supported by the live runtime. Use \`data.resultType: "image_prompt"\`, enable \`settings.customCapabilities.trigger_image_generation\`, and have the agent return \`shouldGenerate\` plus \`prompt\`. Marker-triggered agents should also set \`activationKeywords\`. Do not claim that only Illustrator can generate image prompts.
 - Custom Home widgets are constrained text cards, never executable code. Before creating one, show its exact title, description, accent, and icon in \`say\`, call \`home_widget.create\` with \`apply:false\`, and ask the user to confirm. Only after that explicit confirmation may you repeat the same action with \`apply:true\`. Use \`home_widget.update\` or \`home_widget.delete\` only when the user explicitly asks for that change.
-- Existing-data changes: use \`apply:true\` for requested \`*.update\`, \`lorebook.updateEntry\`, and \`theme.setActive\` — where "requested" means the user told you to make that specific change, not a how-to question or hypothetical that merely names it. Marinara will save first and show the user an in-chat Keep/Restore review card for reversible changes.
+- Existing-data changes: use \`apply:true\` for requested \`*.update\`, \`lorebook.updateEntry\`, and \`theme.setActive\` — where "requested" means the user told you to make that specific change, not a how-to question or hypothetical that merely names it. YunYun will save first and show the user an in-chat Keep/Restore review card for reversible changes.
 - Personal Extensions: create or update the complete draft with \`apply:true\`, verify it with \`personal_extension.get\`, then tell the user the draft remains disabled until they review and run the exact hash and requested capabilities in Settings → Addons. Browser UI should use \`marinara.ui.registerContribution\` for \`button\`, \`menu-item\`, or \`panel\` slots; a button targets the top bar when \`surface\` and \`position\` are omitted. A side-panel button sets \`surface\` to \`chats\`, \`bots\`, \`characters\`, \`personas\`, \`lorebooks\`, \`presets\`, \`connections\`, \`agents\`, or \`settings\`, and sets \`position\` to \`header\`, \`before-content\`, or \`after-content\`. Panel controls are host-rendered and return values through \`onEvent\`. Use \`marinara.context\` for active IDs and request \`read_active_characters\` or \`read_active_persona\` only for bounded active-record reads. Do not offer or invent an approval action, DOM access, direct app-data access, or network access.
 - Use \`apply:false\` only for explicit preview/dry-run requests or when you need to inspect validation before making a risky change.
 - Do not say "preview" unless you show the concrete fields/content in \`say\` or the UI has returned an explicit preview artifact.
@@ -683,9 +683,9 @@ Informational request (answer with reads and words, make no change):
 {"say":"To make an entry always active, set its type to Constant — it injects every turn with no keyword needed. Want me to set a specific entry to Constant for you, or would you rather do it yourself?","commands":[],"stop":true}
 How-to that names the change as its goal (answer with the method plus an offer, make NO change):
 {"say":"To change a character's appearance, open Gundorfson in the character editor and edit the Appearance field — or I can set it for you. Want me to set his appearance to 'willy funny little guy'?","commands":[],"stop":true}
-Direct request to make that change — a plain imperative OR a polite question form (act on it; Marinara shows a Keep/Restore card):
+Direct request to make that change — a plain imperative OR a polite question form (act on it; YunYun shows a Keep/Restore card):
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"character.update","characterId":"gundorfson-id","patch":{"appearance":"willy funny little guy"},"reason":"User asked me to set Gundorfson's appearance","apply":true}}],"stop":false}
-{"say":"","commands":[{"name":"app_data","arguments":{"action":"persona.create","data":{"name":"Dr. Marisia Voss","description":"A successful alternate version of Mari.","personality":"Confident, witty, organized, still warmly sarcastic."},"reason":"User requested a test persona","apply":true}}],"stop":false}
+{"say":"","commands":[{"name":"app_data","arguments":{"action":"persona.create","data":{"name":"Dr. Marisia Voss","description":"A successful alternate version of YunYun.","personality":"Confident, witty, organized, still warmly sarcastic."},"reason":"User requested a test persona","apply":true}}],"stop":false}
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"character.create","data":{"name":"Dr. Voss","description":"A brilliant field researcher.","personality":"Exacting, curious, dryly funny.","firstMes":"You are late. Sit down.","appearance":"Silver hair and a white laboratory coat."},"reason":"User requested a character","apply":true}}],"stop":false}
 Verified lorebook creation sequence (three turns):
 {"say":"","commands":[{"name":"app_data","arguments":{"action":"lorebook.create","data":{"name":"Nightfall Wallachia","description":"Vlad's vampire-gothic setting.","category":"world","entries":[{"name":"World premise","content":"The year is 1890; vampires are real and hunt the Carpathian nights.","constant":true,"description":"Always-true ground rules of the setting."},{"name":"Castle Dracul","content":"A black-stone fortress above the village, seat of the vampire count.","keys":["Castle Dracul","the castle"],"description":"The count's seat of power."},{"name":"Vlad","content":"The immortal count who rules Wallachia after dark.","keys":["Vlad"],"matchWholeWords":true,"description":"The setting's central vampire."}]},"reason":"User requested a lorebook for the setting","apply":true}}],"stop":false}
@@ -878,7 +878,7 @@ function compactMutationResult(result: MariDbCommandResult): MariDbCommandResult
         ? "Preview only: no changes were saved. Use apply:true only if the user asked you to make the change."
         : saved
           ? result.approval?.status === "pending"
-            ? "Applied and saved. Marinara is showing the user a Keep/Restore review card. Verify the resulting state with a read command before claiming user-visible success."
+            ? "Applied and saved. YunYun is showing the user a Keep/Restore review card. Verify the resulting state with a read command before claiming user-visible success."
             : "Applied and saved. Verify the resulting state with a read command before claiming user-visible success."
           : undefined,
     command: typeof result.command === "string" ? compactTraceText(result.command, 500) : result.command,
@@ -1349,7 +1349,7 @@ function isEmptyCompletedAction(action: AssistantWorkspaceAction): boolean {
 function sanitizeSuggestionChips(raw: unknown): MariSuggestionChip[] {
   const chips = sanitizeMariSuggestionChips(raw, { maxChips: 6 });
   if (Array.isArray(raw) && raw.length > 0 && chips.length === 0) {
-    logger.debug("[Professor Mari] Dropped invalid workspace suggestion chips");
+    logger.debug("[Professor YunYun] Dropped invalid workspace suggestion chips");
   }
   return chips;
 }
@@ -1357,7 +1357,7 @@ function sanitizeSuggestionChips(raw: unknown): MariSuggestionChip[] {
 function sanitizePlanSteps(raw: unknown): MariGuidedPlanStep[] {
   const steps = sanitizeMariGuidedPlan(raw, { maxSteps: 8, maxChipsPerStep: 5 });
   if (Array.isArray(raw) && raw.length > 0 && steps.length === 0) {
-    logger.debug("[Professor Mari] Dropped invalid workspace guided plan");
+    logger.debug("[Professor YunYun] Dropped invalid workspace guided plan");
   }
   return steps;
 }
@@ -1385,7 +1385,7 @@ ${output}
 </output>
 </workspace_command_result>`;
   });
-  return `Marinara executed Professor Mari's hidden workspace command${results.length === 1 ? "" : "s"}. Use these results to decide the next command or final answer.\n\n${blocks.join("\n\n")}`;
+  return `YunYun executed Professor YunYun's hidden workspace command${results.length === 1 ? "" : "s"}. Use these results to decide the next command or final answer.\n\n${blocks.join("\n\n")}`;
 }
 
 function formatContinuityResult(result: WorkspaceCommandResult, index: number): string {
@@ -1813,7 +1813,7 @@ export class ProfessorMariWorkspaceService {
   private lastError: string | null = null;
   private active = false;
   private abortController: AbortController | null = null;
-  // Professor Mari is the only untrusted workspace writer. Serialize all of
+  // Professor YunYun is the only untrusted workspace writer. Serialize all of
   // her mutations so path validation and the operation cannot overlap another
   // agent mutation; user and host processes remain outside this sandbox boundary.
   private workspaceMutationTail: Promise<void> = Promise.resolve();
@@ -1838,7 +1838,7 @@ export class ProfessorMariWorkspaceService {
       .list()
       .catch((err) => {
         this.lastError = err instanceof Error ? err.message : String(err);
-        return { skills: [], diagnostics: [this.lastError ?? "Professor Mari skills unavailable"] };
+        return { skills: [], diagnostics: [this.lastError ?? "Professor YunYun skills unavailable"] };
       });
     return {
       enabled: this.enabled,
@@ -1894,20 +1894,20 @@ export class ProfessorMariWorkspaceService {
     existingUserMessageId?: string;
     onEvent: PromptEventSink;
   }) {
-    if (!this.enabled) throw new Error("Professor Mari workspace mode is disabled.");
+    if (!this.enabled) throw new Error("Professor YunYun workspace mode is disabled.");
     const chatStorage = createChatsStorage(this.app.db);
     const connection = await this.resolveConnection(args.connectionId);
-    if (!connection) throw new Error("Set up a language connection before using Professor Mari workspace mode.");
+    if (!connection) throw new Error("Set up a language connection before using Professor YunYun workspace mode.");
 
     const attachments = normalizeProfessorMariAttachments(args.attachments);
     let userMessage = args.existingUserMessageId ? await chatStorage.getMessage(args.existingUserMessageId) : null;
     if (args.existingUserMessageId) {
       if (!userMessage || userMessage.chatId !== args.chatId || userMessage.role !== "user") {
-        throw new Error("Existing Professor Mari user message was not found in this chat.");
+        throw new Error("Existing Professor YunYun user message was not found in this chat.");
       }
       const chatMessages = await chatStorage.listMessages(args.chatId);
       if (chatMessages[chatMessages.length - 1]?.id !== userMessage.id) {
-        throw new Error("Only the latest Professor Mari user message can be reused.");
+        throw new Error("Only the latest Professor YunYun user message can be reused.");
       }
     } else {
       userMessage = await chatStorage.createMessage({
@@ -1916,7 +1916,7 @@ export class ProfessorMariWorkspaceService {
         characterId: null,
         content: args.text,
       });
-      if (!userMessage) throw new Error("Professor Mari could not save the user message.");
+      if (!userMessage) throw new Error("Professor YunYun could not save the user message.");
     }
     const promptText = userMessage.content;
     if (attachments.length > 0) {
@@ -2045,7 +2045,7 @@ export class ProfessorMariWorkspaceService {
             continue;
           }
           const content =
-            "Professor Mari returned an empty response twice. Please try again; the request and any completed workspace steps remain in this chat.";
+            "Professor YunYun returned an empty response twice. Please try again; the request and any completed workspace steps remain in this chat.";
           assistantText = appendVisibleText(assistantText, content);
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -2068,7 +2068,7 @@ export class ProfessorMariWorkspaceService {
             continue;
           }
           const content =
-            "Professor Mari could not verify the requested workspace change, so I stopped before showing an unsupported completion claim. Ask her to continue and she can use the saved workspace trace.";
+            "Professor YunYun could not verify the requested workspace change, so I stopped before showing an unsupported completion claim. Ask her to continue and she can use the saved workspace trace.";
           assistantText = appendVisibleText(assistantText, content);
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -2080,7 +2080,7 @@ export class ProfessorMariWorkspaceService {
             protocolRepairRounds += 1;
             if (protocolRepairRounds > MAX_PROTOCOL_REPAIR_ROUNDS) {
               const content =
-                "Professor Mari kept returning plain text instead of the required JSON command object, so I stopped before burning more requests. Ask her to continue and she can pick up from the saved trace.";
+                "Professor YunYun kept returning plain text instead of the required JSON command object, so I stopped before burning more requests. Ask her to continue and she can pick up from the saved trace.";
               assistantText = appendVisibleText(assistantText, content);
               appendTraceStatus(workspaceTrace, content);
               args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
@@ -2114,7 +2114,7 @@ export class ProfessorMariWorkspaceService {
         messages.push({ role: "assistant", content: action.assistantHistoryContent });
 
         if (isLengthFinishReason(result.finishReason)) {
-          const content = "Mari hit the model output limit. Ask her to continue and she can pick up from here.";
+          const content = "YunYun hit the model output limit. Ask her to continue and she can pick up from here.";
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "output_limit", level: "warning" } });
           break;
@@ -2142,7 +2142,7 @@ export class ProfessorMariWorkspaceService {
           })
           .find((entry) => entry.count >= MAX_REPEATED_COMMAND_FAILURES);
         if (repeatedFailure) {
-          const content = `Professor Mari hit the same ${repeatedFailure.commandResult.name} error ${MAX_REPEATED_COMMAND_FAILURES} times, so I stopped the workspace loop before it spammed the chat. Error: ${repeatedFailure.commandResult.output}`;
+          const content = `Professor YunYun hit the same ${repeatedFailure.commandResult.name} error ${MAX_REPEATED_COMMAND_FAILURES} times, so I stopped the workspace loop before it spammed the chat. Error: ${repeatedFailure.commandResult.output}`;
           assistantText = appendVisibleText(assistantText, content);
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -2153,7 +2153,7 @@ export class ProfessorMariWorkspaceService {
         messages.push({ role: "user", content: formatCommandResultForPrompt(commandResults), contextKind: "history" });
 
         if (round === MAX_COMMAND_ROUNDS - 1) {
-          const content = "Command round limit reached; asking Professor Mari to summarize with the evidence she has.";
+          const content = "Command round limit reached; asking Professor YunYun to summarize with the evidence she has.";
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
           messages.push({
@@ -2174,7 +2174,7 @@ export class ProfessorMariWorkspaceService {
           const finalVerificationIssue = workspaceActionNeedsVerification(finalAction, commandResultsForContinuity);
           if (finalVerificationIssue) {
             const content =
-              "Professor Mari reached the workspace command limit without verification, so I stopped before showing an unsupported completion claim. Ask her to continue from the saved trace.";
+              "Professor YunYun reached the workspace command limit without verification, so I stopped before showing an unsupported completion claim. Ask her to continue from the saved trace.";
             assistantText = appendVisibleText(assistantText, content);
             appendTraceStatus(workspaceTrace, content);
             args.onEvent({ type: "status", data: { content, kind: "retry", level: "warning" } });
@@ -2188,7 +2188,7 @@ export class ProfessorMariWorkspaceService {
             if (finalAction.plan.length > 0) args.onEvent({ type: "plan", data: finalAction.plan });
           } else if (finalAction.commands.length > 0) {
             const content =
-              "Professor Mari tried to run more workspace commands after the command limit, so I stopped the loop. Ask her to continue if you want her to keep working from the saved trace.";
+              "Professor YunYun tried to run more workspace commands after the command limit, so I stopped the loop. Ask her to continue if you want her to keep working from the saved trace.";
             assistantText = appendVisibleText(assistantText, content);
             appendTraceStatus(workspaceTrace, content);
             args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
@@ -2201,10 +2201,10 @@ export class ProfessorMariWorkspaceService {
         const failedTool = workspaceTrace.find((item) => item.type === "tool" && item.tool.status === "error");
         const content =
           failedTool?.type === "tool"
-            ? `Professor Mari stopped after ${formatWorkspaceToolName(failedTool.tool.name)} failed: ${compactTraceText(String(failedTool.tool.output ?? "unknown error"), 700)}`
+            ? `Professor YunYun stopped after ${formatWorkspaceToolName(failedTool.tool.name)} failed: ${compactTraceText(String(failedTool.tool.output ?? "unknown error"), 700)}`
             : workspaceTrace.length > 0
-              ? "Professor Mari finished workspace steps but did not return a visible final answer. I saved the tool timeline here so the work is not lost; ask her to continue and she can pick up from the trace."
-              : "Professor Mari returned an empty response. Please try again; your request remains in this chat.";
+              ? "Professor YunYun finished workspace steps but did not return a visible final answer. I saved the tool timeline here so the work is not lost; ask her to continue and she can pick up from the trace."
+              : "Professor YunYun returned an empty response. Please try again; your request remains in this chat.";
         assistantText = appendVisibleText(assistantText, content);
         appendTraceStatus(workspaceTrace, content);
         args.onEvent({ type: "status", data: { content, kind: "info", level: failedTool ? "warning" : "info" } });
@@ -2218,8 +2218,8 @@ export class ProfessorMariWorkspaceService {
         const hadPartialWorkspaceState =
           assistantText.trim().length > 0 || thinkingText.trim().length > 0 || workspaceTrace.length > 0;
         const content = assistantText.trim()
-          ? "Professor Mari workspace run was cancelled after saving the partial response."
-          : "Professor Mari workspace run was cancelled.";
+          ? "Professor YunYun workspace run was cancelled after saving the partial response."
+          : "Professor YunYun workspace run was cancelled.";
         appendTraceStatus(workspaceTrace, content);
         args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
         if (!assistantText.trim() && hadPartialWorkspaceState) {
@@ -2230,7 +2230,7 @@ export class ProfessorMariWorkspaceService {
         } catch (saveErr) {
           logger.error(
             saveErr instanceof Error ? saveErr : new Error(String(saveErr)),
-            "[Professor Mari] Failed to persist aborted workspace response",
+            "[Professor YunYun] Failed to persist aborted workspace response",
           );
         }
       } else {
@@ -2253,7 +2253,7 @@ export class ProfessorMariWorkspaceService {
     try {
       embeddingModelConfigured = await isMemoryRecallVectorizerAvailable(this.app.db, { connectionId: connection.id });
     } catch (err) {
-      logger.warn(err, "Professor Mari: embedding availability check failed; assuming no embedding model");
+      logger.warn(err, "Professor YunYun: embedding availability check failed; assuming no embedding model");
       embeddingModelConfigured = false;
     }
     const workspaceInfo = [
@@ -2331,7 +2331,7 @@ ${sections.join("\n\n")}
       const rows = await createMariInstructionsStorage(this.app.db).list();
       return renderMariMemoryPrompt(rows);
     } catch (err) {
-      logger.warn(err, "Professor Mari: failed to read saved memories");
+      logger.warn(err, "Professor YunYun: failed to read saved memories");
       return null;
     }
   }
@@ -2554,7 +2554,7 @@ ${sections.join("\n\n")}
     const requestedPolicy = workspacePathAccessPolicy(workspaceRoot, absolute);
     const canonicalPolicy = workspacePathAccessPolicy(canonicalRoot, canonicalTarget);
     if (requestedPolicy === "forbidden" || canonicalPolicy === "forbidden") {
-      throw new Error("Professor Mari cannot access environment-secret files or Git internals.");
+      throw new Error("Professor YunYun cannot access environment-secret files or Git internals.");
     }
     if (options.requireOrdinaryMutationPath && (requestedPolicy !== "normal" || canonicalPolicy !== "normal")) {
       throw new Error("This path requires a dedicated reviewed tool and cannot be changed directly.");
@@ -2562,7 +2562,7 @@ ${sections.join("\n\n")}
     if (options.forbidStorageMutation) {
       const storageRoot = resolve(getFileStorageDir());
       if (isWithin(storageRoot, absolute) || isWithin(storageRoot, canonicalTarget)) {
-        throw new Error("DATA_DIR/storage is managed by Marinara. Use mari db for table edits instead of file writes.");
+        throw new Error("DATA_DIR/storage is managed by YunYun. Use mari db for table edits instead of file writes.");
       }
     }
     if (!options.allowMissing && !existsSync(absolute)) throw new Error(`Path not found: ${inputPath}`);
@@ -2737,7 +2737,7 @@ ${sections.join("\n\n")}
       const approval = await this.workspaceChangeReviews.stageSensitiveFileChange({
         absolutePath: filePath,
         afterContent: content,
-        reason: stringArg(args, "reason") || "Professor Mari proposed a supply-chain-sensitive file change",
+        reason: stringArg(args, "reason") || "Professor YunYun proposed a supply-chain-sensitive file change",
         sessionId: SESSION_ID,
       });
       return [
@@ -2848,7 +2848,7 @@ ${sections.join("\n\n")}
       const approval = await this.workspaceChangeReviews.stageSensitiveFileChange({
         absolutePath: filePath,
         afterContent: next,
-        reason: stringArg(args, "reason") || "Professor Mari proposed a supply-chain-sensitive file change",
+        reason: stringArg(args, "reason") || "Professor YunYun proposed a supply-chain-sensitive file change",
         sessionId: SESSION_ID,
       });
       return [
@@ -3119,7 +3119,7 @@ exit $LASTEXITCODE
     ]);
     this.withMariRuntimeEnv(process.env, binDir);
     if (!existsSync(posixCliPath) || !existsSync(cmdCliPath) || !existsSync(powershellCliPath)) {
-      logger.warn("[Professor Mari] failed to create one or more mari CLI shims at %s", binDir);
+      logger.warn("[Professor YunYun] failed to create one or more mari CLI shims at %s", binDir);
     }
     return binDir;
   }

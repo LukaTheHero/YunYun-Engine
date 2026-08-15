@@ -145,23 +145,23 @@ assert.equal(
 assert.equal(stripMacroComments("Before{{//".repeat(20_000) + "comment}}After"), "BeforeAfter");
 assert.equal(stripMacroComments("Before{{// comment with } a lone brace }}After"), "BeforeAfter");
 const groupMacroContext = {
-  user: "Mari",
+  user: "YunYun",
   char: "Miko",
   characters: ["Miko", "Dottore"],
   characterProfiles: [{ name: "Miko" }, { name: "Dottore" }],
   variables: {},
 };
 assert.equal(
-  resolveMacros("[\n{{char}} greets Mari.\n]", groupMacroContext),
-  "[\nMiko greets Mari.\n]\n[\nDottore greets Mari.\n]",
+  resolveMacros("[\n{{char}} greets YunYun.\n]", groupMacroContext),
+  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
 );
 assert.equal(
-  resolveMacros('[\n{{#if char == "Miko"}}Miko{{else}}Dottore{{/if}} greets Mari.\n]', groupMacroContext),
-  "[\nMiko greets Mari.\n]\n[\nDottore greets Mari.\n]",
+  resolveMacros('[\n{{#if char == "Miko"}}Miko{{else}}Dottore{{/if}} greets YunYun.\n]', groupMacroContext),
+  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
 );
 assert.equal(
-  resolveMacros('[\n{{#if {{char}} == "Miko"}}Miko{{else}}Dottore{{/if}} greets Mari.\n]', groupMacroContext),
-  "[\nMiko greets Mari.\n]\n[\nDottore greets Mari.\n]",
+  resolveMacros('[\n{{#if {{char}} == "Miko"}}Miko{{else}}Dottore{{/if}} greets YunYun.\n]', groupMacroContext),
+  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
 );
 assert.equal(
   resolveMacros("[\n{{group}}\n]", groupMacroContext),
@@ -170,10 +170,10 @@ assert.equal(
 assert.equal(resolveMacros("[\n{{ char }}\n]", groupMacroContext), "[\nMiko\n]\n[\nDottore\n]");
 assert.equal(
   resolveMacros(
-    '[\n{{#if user == "Other"}}Other{{else if char == "Miko"}}Miko{{else}}Dottore{{/if}} greets Mari.\n]',
+    '[\n{{#if user == "Other"}}Other{{else if char == "Miko"}}Miko{{else}}Dottore{{/if}} greets YunYun.\n]',
     groupMacroContext,
   ),
-  "[\nMiko greets Mari.\n]\n[\nDottore greets Mari.\n]",
+  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
 );
 const nestedParenthesesConditional = `[\n{{#if ${"(".repeat(10_000)}unknown${")".repeat(10_000)}}}text\n]`;
 const nestedParenthesesStartedAt = performance.now();

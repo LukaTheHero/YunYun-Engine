@@ -206,7 +206,7 @@ async function readShardRowsOrThrow(dir, name) {
 }
 
 /**
- * Best-effort running-server detection: a Marinara that is still up would
+ * Best-effort running-server detection: a YunYun that is still up would
  * re-shard the data on its next save, silently undoing the conversion (and
  * holding Windows file handles that break the directory renames).
  */
@@ -221,7 +221,7 @@ async function assertNoRunningServer(pick) {
   }
   if (responded) {
     throw new Error(
-      `Something is answering on http://127.0.0.1:${port} — a running Marinara re-shards the data on its ` +
+      `Something is answering on http://127.0.0.1:${port} — a running YunYun re-shards the data on its ` +
         `next save, undoing this conversion. Stop the server, then re-run unshard. Nothing has been changed.`,
     );
   }

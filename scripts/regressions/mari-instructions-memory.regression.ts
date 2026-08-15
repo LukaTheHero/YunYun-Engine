@@ -1,4 +1,4 @@
-// #4851: Professor Mari now has a persistent, retrievable memory (the user's "saved
+// #4851: Professor YunYun now has a persistent, retrievable memory (the user's "saved
 // instructions"). This drives the REAL MariDbService against a file-native store and
 // asserts (a) the instruction.* action surface (remember/list/get/update/forget) routed
 // through the Keep/Restore mutation pipeline, disabled-by-default,
@@ -48,7 +48,7 @@ const drainKeep = async (mari: MariDbService) => {
   assert.match(nonPersistent, /key on name \+ nickname/, "the index shows the one-line description");
   assert.match(nonPersistent, /\[m1\]/, "the index shows the id to fetch");
   assert.doesNotMatch(nonPersistent, /SECRET-BODY-XYZ/, "a NON-persistent body is never injected (token-bloat guard)");
-  assert.match(nonPersistent, /instruction\.get/, "the block tells Mari to fetch relevant memories");
+  assert.match(nonPersistent, /instruction\.get/, "the block tells YunYun to fetch relevant memories");
   assert.match(nonPersistent, /precedence|authoritative|follow the memory/i, "the block frames memory as taking precedence");
 
   const persistent = renderMariMemoryPrompt([mk({ id: "p1", name: "How-to handling", content: "PERSIST-BODY-ABC", persistent: true })]);
@@ -132,7 +132,7 @@ try {
         }>;
       }).items;
 
-    // (1) REMEMBER: a Mari-authored memory routes through the Keep/Restore review AND
+    // (1) REMEMBER: a YunYun-authored memory routes through the Keep/Restore review AND
     // lands DISABLED by default (inert until the user enables it).
     const remembered = await mari.executeAction({
       action: "instruction.remember",
@@ -154,10 +154,10 @@ try {
     assert.equal(mem.name, "Lorebook formatting");
     assert.equal(mem.description, "Key entries on name + nickname");
     assert.equal(mem.persistent, false, "a memory defaults to not-persistent");
-    assert.equal(mem.enabled, false, "a Mari-authored memory is DISABLED by default");
+    assert.equal(mem.enabled, false, "a YunYun-authored memory is DISABLED by default");
     assert.equal(mem.content, undefined, "instruction.list is a lean index; it does NOT return the body");
 
-    // Injection guard: Mari CANNOT self-enable. A remember that tries enabled:true still lands disabled.
+    // Injection guard: YunYun CANNOT self-enable. A remember that tries enabled:true still lands disabled.
     const beforeInject = new Set(mari.getPendingApprovals().map((a) => a.id));
     await mari.executeAction({
       action: "instruction.remember",
@@ -169,7 +169,7 @@ try {
     await mari.keepAppliedReview(injReview.id);
     const injected = (await listMemories()).find((m) => m.name === "Injection attempt");
     assert.ok(injected, "the remember created a memory");
-    assert.equal(injected.enabled, false, "Mari cannot self-enable a memory via remember enabled:true (injection guard)");
+    assert.equal(injected.enabled, false, "YunYun cannot self-enable a memory via remember enabled:true (injection guard)");
 
     // (3) GET: the full body is fetched on demand.
     const full = (await mari.executeAction({ action: "instruction.get", id: mem.id })).output as { content?: string } | null;
@@ -194,7 +194,7 @@ try {
     assert.equal(
       ((await mari.executeAction({ action: "instruction.list" })).output as { items: Array<{ id: string; enabled: boolean }> }).items.find((m) => m.id === mem.id)?.enabled,
       false,
-      "instruction.update cannot enable a memory (Mari never self-enables, even via update)",
+      "instruction.update cannot enable a memory (YunYun never self-enables, even via update)",
     );
     await mari.restoreAppliedReview(updateReview.id);
     assert.match(
@@ -402,4 +402,4 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log("Mari instructions-memory regressions passed.");
+console.log("YunYun instructions-memory regressions passed.");

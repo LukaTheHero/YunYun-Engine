@@ -1,6 +1,6 @@
 # Downloadable Agents Reference
 
-This guide lists all 32 official first-party packages available through **Agents → Download Agents**, grouped by category. Agents do not ship inside a fresh Marinara Engine installation. Their package sources, manifests, artifacts, and machine-readable catalog are published in [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents). For each one, this guide explains what the agent does, when it runs or integrates, which chat modes allow it, and the main settings. For installation and activation, read the [Agents overview](agents-overview.md) first.
+This guide lists all 32 official first-party packages available through **Agents → Download Agents**, grouped by category. Agents do not ship inside a fresh YunYun Engine installation. Their package sources, manifests, artifacts, and machine-readable catalog are published in [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents). For each one, this guide explains what the agent does, when it runs or integrates, which chat modes allow it, and the main settings. For installation and activation, read the [Agents overview](agents-overview.md) first.
 
 ## How to read this reference
 
@@ -12,7 +12,7 @@ Each agent below shows three quick facts.
 - **Where it works**: the chat modes that let you add the agent. Most agents work in **Roleplay** chats. A few work in other modes, and each entry says which.
 - **Key settings**: the settings you are most likely to change. You set these when you add the agent, or later in the agent's setup card in **Chat Settings**.
 
-Marinara groups its agents into three categories in the **Agents** panel: **Writer Agents**, **Tracker Agents**, and **Misc Agents**. This reference uses the same grouping.
+YunYun groups its agents into three categories in the **Agents** panel: **Writer Agents**, **Tracker Agents**, and **Misc Agents**. This reference uses the same grouping.
 
 A run interval means the agent runs once every few user and assistant messages instead of after every message. You can change a run interval in the agent's setup, up to 100.
 
@@ -136,7 +136,7 @@ Adds persistent nested locations and spatial relationships to a story. You can a
 
 - **Integration**: Feature package; it contributes map UI and chat runtime context instead of running as a normal generation-phase agent.
 - **Where it works**: Roleplay and Game.
-- **Key settings**: enable it for the Roleplay chat from **Chat Settings → Agents**, or select it during Game creation and manage it later from that game's settings. Installing or removing it requires a Marinara restart.
+- **Key settings**: enable it for the Roleplay chat from **Chat Settings → Agents**, or select it during Game creation and manage it later from that game's settings. Installing or removing it requires a YunYun restart.
 - **Full guide**: [World Maps: Setup, Authoring, and Travel](hierarchical-maps.md).
 
 ## Misc agents
@@ -157,7 +157,7 @@ Adds an optional local social world with the Noodle public timeline and the Nood
 
 - **Integration**: Feature package; it contributes the Home tab, local routes, generation and media flows, and background schedulers.
 - **Where it works**: Home, with optional context carried in from Conversation, Roleplay, and Game chats.
-- **Key settings**: install it from **Agents → Download Agents** and restart Marinara Engine when prompted. Inside Noodle, you can configure invited accounts, text and image connections, timeline refreshes, NoodleR Creator profiles, simulated post access, and audience activity.
+- **Key settings**: install it from **Agents → Download Agents** and restart YunYun Engine when prompted. Inside Noodle, you can configure invited accounts, text and image connections, timeline refreshes, NoodleR Creator profiles, simulated post access, and audience activity.
 - **Data lifecycle**: uninstalling removes the Home tab and stops package routes and schedulers after restart while preserving existing Noodle and NoodleR data for a later reinstall.
 - **Full guide**: [Noodle: The In-App Social Timeline](../noodle/overview.md).
 
@@ -168,7 +168,7 @@ Extracts durable memories from chat summaries, character records, and lorebooks 
 - **Integration**: Feature package; it contributes pre-generation context and memory management UI instead of running as a normal post-processing tracker.
 - **Where it works**: Conversation, Roleplay, and Game.
 - **Key settings**: enablement, recall token budget (128-16,384), maximum recalled chunks (1-100), score threshold, recent-message context (1-20), recall style and semantic, lexical, graph, and keyword weights, resolved-memory inclusion, recall preamble, extraction reasoning and verbosity, generation limits, source limits, prompt templates, AI keyword extraction, and Game-mode extraction.
-- **Data lifecycle**: use the Memory Settings backup controls to export or replace the vault, drafts, and settings. Delete all data permanently removes memories, drafts, activity, and derived indexes while retaining settings. Uninstalling the package preserves the Long-Term Memory vault for a later reinstall. Installing, updating, or removing it requires a Marinara restart.
+- **Data lifecycle**: use the Memory Settings backup controls to export or replace the vault, drafts, and settings. Delete all data permanently removes memories, drafts, activity, and derived indexes while retaining settings. Uninstalling the package preserves the Long-Term Memory vault for a later reinstall. Installing, updating, or removing it requires a YunYun restart.
 - **Compatibility**: Engine `2.3.5` through before `4.0.0`. The package uses `agent-runtime`, `chat-read`, `chat-write`, `routes`, `storage`, and `ui` permissions.
 
 ### Illustrator
@@ -243,7 +243,7 @@ Adds live audio and video calls with Conversation characters, including user-sta
 
 - **Integration**: Conversation feature package; it adds toolbar, chat-surface, and Chat Settings controls instead of running as a normal generation-phase agent.
 - **Where it works**: Conversation.
-- **Key settings**: open **Chat Settings → Agents → Calls** to enable calls and choose speech, microphone, ringing, and video behavior. See [Conversation Audio and Video Calls](../conversation/calls.md). Installing or removing it requires a Marinara restart.
+- **Key settings**: open **Chat Settings → Agents → Calls** to enable calls and choose speech, microphone, ringing, and video behavior. See [Conversation Audio and Video Calls](../conversation/calls.md). Installing or removing it requires a YunYun restart.
 
 ### UNO
 
@@ -251,7 +251,7 @@ Adds a rules-enforced UNO table for you and Conversation characters, with config
 
 - **Integration**: Conversation game package.
 - **Where it works**: Conversation.
-- **Key settings**: start it from the games picker or with `/uno`; the setup chooses players and house rules. Installing or removing it requires a Marinara restart.
+- **Key settings**: start it from the games picker or with `/uno`; the setup chooses players and house rules. Installing or removing it requires a YunYun restart.
 
 ### Chess
 
@@ -259,7 +259,7 @@ Adds a one-on-one Chess board with legal move enforcement, check and checkmate d
 
 - **Integration**: Conversation game package.
 - **Where it works**: Conversation.
-- **Key settings**: start it from the games picker or with `/chess`, then choose the opponent and which side you play. Installing or removing it requires a Marinara restart.
+- **Key settings**: start it from the games picker or with `/chess`, then choose the opponent and which side you play. Installing or removing it requires a YunYun restart.
 
 ### Poker
 
@@ -267,7 +267,7 @@ Adds a Texas Hold'em table for two to eight total players, with blinds, betting 
 
 - **Integration**: Conversation game package.
 - **Where it works**: Conversation.
-- **Key settings**: start it from the games picker or with `/poker`, then choose the players, starting chips, and blind values. Installing or removing it requires a Marinara restart.
+- **Key settings**: start it from the games picker or with `/poker`, then choose the players, starting chips, and blind values. Installing or removing it requires a YunYun restart.
 
 ### 8-Ball Pool
 
@@ -275,7 +275,7 @@ Adds a one-on-one pool table with solids and stripes, aiming and shot strength, 
 
 - **Integration**: Conversation game package.
 - **Where it works**: Conversation.
-- **Key settings**: start it from the games picker or with `/8ball`, then choose the opponent. Installing or removing it requires a Marinara restart.
+- **Key settings**: start it from the games picker or with `/8ball`, then choose the opponent. Installing or removing it requires a YunYun restart.
 
 ### Tic-Tac-Toe
 
@@ -283,7 +283,7 @@ Adds a one-on-one Tic-Tac-Toe board with selectable or random marks, legal turn 
 
 - **Integration**: Conversation game package.
 - **Where it works**: Conversation.
-- **Key settings**: start it from the games picker or with `/tictactoe` (alias `/ttt`), then choose the opponent and mark. Installing or removing it requires a Marinara restart.
+- **Key settings**: start it from the games picker or with `/tictactoe` (alias `/ttt`), then choose the opponent and mark. Installing or removing it requires a YunYun restart.
 
 ### Rock-Paper-Scissors
 
@@ -291,7 +291,7 @@ Adds a one-on-one Rock-Paper-Scissors match where both choices stay hidden until
 
 - **Integration**: Conversation game package.
 - **Where it works**: Conversation.
-- **Key settings**: start it from the games picker or with `/rps`, then choose the opponent and a best-of-three, five, or seven match. Installing or removing it requires a Marinara restart.
+- **Key settings**: start it from the games picker or with `/rps`, then choose the opponent and a best-of-three, five, or seven match. Installing or removing it requires a YunYun restart.
 
 ## Related guides
 

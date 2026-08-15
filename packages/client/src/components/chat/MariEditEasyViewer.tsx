@@ -1,4 +1,4 @@
-// #4919 Easy Viewer: a human-readable rendering of Professor Mari's edits for the Keep/Restore
+// #4919 Easy Viewer: a human-readable rendering of Professor YunYun's edits for the Keep/Restore
 // review card. Instead of the raw `app_data … {JSON}` command, it shows each affected row as a
 // before/after diff (removed text red, added text green), with a lorebook-entry layout that
 // resembles the editor users know. All data comes from approval.diffPreview (full before/after row
@@ -133,7 +133,7 @@ const LOREBOOK_TOGGLES: Array<{ key: string; labelKey: string }> = [
   { key: "locked", labelKey: "ui.chat.mariediteasyviewer.toggleLocked" },
 ];
 
-// Fields the lorebook layout renders itself; anything else Mari changes (probability, timing,
+// Fields the lorebook layout renders itself; anything else YunYun changes (probability, timing,
 // recursion, group weight, scan depth, folder, filters, selective logic) falls through to a generic
 // field diff so no editable setting is silently missing from the view. `constant` is always shown by
 // the activation pill (flipping it always moves the activation type) and `excludeFromVectorization`
@@ -160,7 +160,7 @@ const LOREBOOK_HANDLED_PATHS = new Set([
 // 3-way constant/selective/normal enum shown as a colored dot, "disabled" is the orthogonal `enabled`
 // flag, and vectorization distinguishes excluded, embedded, and not-yet-embedded entries. Render
 // them as always-visible status pills so a reviewer can tell an entry's kind at a glance, not only
-// when Mari's edit happens to change one. Dots reuse the engine's colors (constant = yellow, selective = red, normal =
+// when YunYun's edit happens to change one. Dots reuse the engine's colors (constant = yellow, selective = red, normal =
 // emerald, vector = cyan); the pill background stays neutral so those colors are never confused with
 // the diff's added-green / removed-red text.
 type ActivationType = "constant" | "selective" | "normal";
@@ -204,7 +204,7 @@ function StatusPill({ dot, label, title, faded }: { dot?: string; label: string;
   );
 }
 
-// Render one status as a single pill, or `from → to` when Mari's edit changes it. `before`/`after`
+// Render one status as a single pill, or `from → to` when YunYun's edit changes it. `before`/`after`
 // are null on the missing side of an insert/delete, so those collapse to a single pill. The `before`
 // pill's strikethrough + the arrow are visual-only, so `srChangedTo` gives assistive tech the
 // direction ("changed to") between the two labels.
@@ -261,7 +261,7 @@ function LorebookEntryDiff({ change, collapsed }: { change: MariDbRowChange; col
       : [];
 
   // Activation (constant / selective / normal) and vectorization are shown as always-visible status
-  // pills so an entry's kind is obvious even when Mari's edit didn't touch them; a change renders as
+  // pills so an entry's kind is obvious even when YunYun's edit didn't touch them; a change renders as
   // `from → to`.
   const beforeAct = before ? activationType(before) : null;
   const afterAct = after ? activationType(after) : null;
@@ -455,7 +455,7 @@ function actionMeta(action: MariDbRowChange["action"], localizeUi: (key: string)
 // A character or preset edit can be previewed as an assembled prompt. Deletes are NOT offered: the
 // field diff already shows the removed content, and a synthetic re-assembly of a deleted row is
 // either impossible (a character delete has no live row for the proxy to substitute) or misleading
-// (Mari's section delete also prunes the id from the preset's sectionOrder, so the assembler skips
+// (YunYun's section delete also prunes the id from the preset's sectionOrder, so the assembler skips
 // the re-spliced section and the before/after come out identical).
 const PROMPT_RENDER_TABLES = new Set(["prompt_presets", "prompt_sections", "prompt_groups", "choice_blocks"]);
 function canRenderPrompt(change: MariDbRowChange): boolean {
@@ -483,7 +483,7 @@ function RowCard({
   const { t: localizeUi } = useUiTranslation();
   const meta = actionMeta(change.action, localizeUi);
   const MetaIcon = meta.icon;
-  // A delete is Mari's most destructive action — make the whole row unmistakably red.
+  // A delete is YunYun's most destructive action — make the whole row unmistakably red.
   const isDelete = change.action === "delete";
   // Reject reverts the row on the server (a real undo). Only top-level lorebook entries are
   // individually rejectable — the server refuses anything else — so the control is offered only there.

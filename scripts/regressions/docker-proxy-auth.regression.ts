@@ -312,7 +312,7 @@ try {
   const professorStyleReply = replyRecorder();
   assert.equal(
     requirePrivilegedAccess(request(), professorStyleReply.reply, {
-      feature: "Professor Mari workspace",
+      feature: "Professor YunYun workspace",
     }),
     false,
     "non-loopback workspace access must require ADMIN_SECRET even from an allowlisted client",

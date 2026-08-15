@@ -77,12 +77,12 @@ export function getWorkspaceShellSandboxStatus(): WorkspaceShellSandboxStatus {
   if (process.platform === "linux") {
     const status = getBubblewrapRuntimeStatus();
     if (status.available) return { available: true, backend: "linux-bubblewrap" };
-    return { available: false, backend: null, reason: `Professor Mari shell commands are disabled. ${status.reason}` };
+    return { available: false, backend: null, reason: `Professor YunYun shell commands are disabled. ${status.reason}` };
   }
   return {
     available: false,
     backend: null,
-    reason: `Professor Mari shell commands are disabled because no supported OS sandbox is available on ${process.platform}.`,
+    reason: `Professor YunYun shell commands are disabled because no supported OS sandbox is available on ${process.platform}.`,
   };
 }
 
@@ -345,7 +345,7 @@ export async function spawnWorkspaceSandboxedShell(input: SpawnWorkspaceShellInp
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `${message} Use Professor Mari's structured read, grep, find, ls, edit, write, copy, move, remove, and app_data tools instead.`,
+      `${message} Use Professor YunYun's structured read, grep, find, ls, edit, write, copy, move, remove, and app_data tools instead.`,
     );
   }
 }

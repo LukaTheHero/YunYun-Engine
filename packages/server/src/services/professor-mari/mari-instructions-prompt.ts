@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari: saved-memory prompt injection (#4851)
+// Professor YunYun: saved-memory prompt injection (#4851)
 //
 // Pure renderer for the `<professor_mari_memory>` block. Kept separate from the
 // workspace agent so the token-critical invariants (never inline a non-persistent

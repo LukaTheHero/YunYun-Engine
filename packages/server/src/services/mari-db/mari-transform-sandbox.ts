@@ -36,7 +36,7 @@ const MAX_TRANSFORM_ERROR_BYTES = 32_000;
 const UNSAFE_TRANSFORM_FALLBACK_ENV = "MARI_DB_ALLOW_UNSAFE_TRANSFORMS";
 
 // This source is deliberately self-contained. It executes in a separate Node process behind
-// Seatbelt/bubblewrap, not in Marinara's server process. The transform keeps the established
+// Seatbelt/bubblewrap, not in YunYun's server process. The transform keeps the established
 // row/context API while network, secret files, and workspace writes remain unavailable.
 const TRANSFORM_RUNNER_SOURCE = String.raw`
 import { randomBytes } from "node:crypto";
@@ -163,7 +163,7 @@ async function spawnTransformProcess(workspaceRoot: string, args: string[]): Pro
   if (!unsafeFallbackEnabled()) {
     throw new Error(
       `${status.reason} mari db transform requires Seatbelt/bubblewrap for untrusted scripts. ` +
-        `To run a personally reviewed local transform anyway, set ${UNSAFE_TRANSFORM_FALLBACK_ENV}=true and restart Marinara.`,
+        `To run a personally reviewed local transform anyway, set ${UNSAFE_TRANSFORM_FALLBACK_ENV}=true and restart YunYun.`,
     );
   }
   logger.warn(

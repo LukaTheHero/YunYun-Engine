@@ -1,11 +1,11 @@
 // ──────────────────────────────────────────────
-// Storage: Mari Instructions (#4851)
+// Storage: YunYun Instructions (#4851)
 //
-// Read/write surface for Professor Mari's persistent standing instructions.
+// Read/write surface for Professor YunYun's persistent standing instructions.
 // Reads (list/get) back the index-and-fetch prompt injection and the
 // instruction.list/get actions. Writes (create/update/remove) back the user-driven
 // Memories management panel, which edits directly (like the Skills panel) because
-// the user IS the reviewer of their own memory. This is distinct from Mari's OWN
+// the user IS the reviewer of their own memory. This is distinct from YunYun's OWN
 // autonomous remember/update/forget, which run through the mutation/Keep-Restore
 // pipeline in mari-db.service.ts so she gets a review card. Do NOT route panel
 // writes through that pipeline (it would raise a Keep/Restore card for the user's

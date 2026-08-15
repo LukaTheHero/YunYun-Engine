@@ -1,4 +1,4 @@
-// #4931: synthetic "Peek Prompt" preview of a Professor Mari character/preset edit. Shows the
+// #4931: synthetic "Peek Prompt" preview of a Professor YunYun character/preset edit. Shows the
 // assembled prompt before vs after with the change highlighted (added green, removed red). It is
 // assembled on its own (default preset, no persona, no chat history), so it is a labeled preview,
 // not a real chat prompt.

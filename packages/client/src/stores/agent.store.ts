@@ -71,7 +71,7 @@ export interface AgentDebugEntry {
 function logAgentDebugToBrowserConsole(entry: AgentDebugEntry) {
   const call = entry.agentCall;
   if (!call) {
-    console.debug("[Marinara Agent Debug]", entry);
+    console.debug("[YunYun Agent Debug]", entry);
     return;
   }
 
@@ -85,7 +85,7 @@ function logAgentDebugToBrowserConsole(entry: AgentDebugEntry) {
   const usage = usageParts.length > 0 ? ` | ${usageParts.join(", ")} tokens` : "";
   const duration = call.durationMs != null ? ` | ${call.durationMs}ms` : "";
   const elapsed = call.elapsedMs != null ? ` | ${call.elapsedMs}ms total` : "";
-  const label = `[Marinara Agent Debug] ${call.stage}${round}: ${call.agentName} (${call.agentType}) | ${call.model}${usage}${duration}${elapsed}`;
+  const label = `[YunYun Agent Debug] ${call.stage}${round}: ${call.agentName} (${call.agentType}) | ${call.model}${usage}${duration}${elapsed}`;
 
   console.groupCollapsed(label);
   console.debug("Event", call);
@@ -138,7 +138,7 @@ interface AgentState {
   mariChips: MariSuggestionChip[];
   mariChipsChatId: string | null;
   /**
-   * A guided-creation plan Mari returned in one call: an ordered list of question+chip
+   * A guided-creation plan YunYun returned in one call: an ordered list of question+chip
    * steps. The client walks these locally (see recordMariPlanAnswer) with zero further
    * LLM calls until the plan is exhausted and a summary message is sent back to her.
    */
@@ -196,7 +196,7 @@ interface AgentState {
   enqueuePendingAgentWriteApproval: (entry: PendingAgentWriteApproval) => void;
   dismissPendingAgentWriteApproval: (id: string) => void;
   clearPendingAgentWriteApprovals: () => void;
-  /** Clear chat-runtime Agent state while retaining Professor Mari's chat-scoped continuation UI. */
+  /** Clear chat-runtime Agent state while retaining Professor YunYun's chat-scoped continuation UI. */
   resetForChatChange: () => void;
   reset: () => void;
 }

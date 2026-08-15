@@ -15,7 +15,7 @@ import {
 import { BOW_STUB_DIM as DIM, createBowStubEmbedder } from "./helpers/bow-stub-embedder.js";
 
 // Deterministic, collision-free bag-of-words embedder (token overlap → exact
-// cosine separation); shared with the other Mari fetch regressions.
+// cosine separation); shared with the other YunYun fetch regressions.
 const stubEmbedder = createBowStubEmbedder(undefined, "fetch-tiers regression");
 
 function candidate(id: string, name: string, embedText: string): EntityCandidate {
@@ -70,7 +70,7 @@ const library = () => [
 // ── 4. Ambiguous match returns a candidate LIST, not a wrong auto-open ──
 {
   // "vampire" is a substring of two candidates (Dracula, Alucard); neither wins
-  // by the required margin, so Mari must be given both to disambiguate.
+  // by the required margin, so YunYun must be given both to disambiguate.
   const r = await tieredResolveEntity(makeDescriptor(library()), "vampire", OPTS);
   assert.equal(r.kind, "candidates", "an ambiguous match must disambiguate, not guess");
   const ids = r.kind === "candidates" ? r.candidates.map((c) => c.id).sort() : [];
@@ -118,4 +118,4 @@ const library = () => [
   assert.ok(onTheFlyPool.every((c) => c.embedding && c.embedding.length === DIM), "in-memory embeddings populate the pool");
 }
 
-process.stdout.write("Professor Mari fetch-tiers regression passed.\n");
+process.stdout.write("Professor YunYun fetch-tiers regression passed.\n");

@@ -220,7 +220,7 @@ test("Playwright color parsing preserves supported force values only", () => {
   }
 });
 
-test("What's New opens once for each Marinara Engine version", async ({ page }) => {
+test("What's New opens once for each YunYun Engine version", async ({ page }) => {
   await page.goto("/api/health");
   await page.evaluate(
     ({ bypassKey, seenKey }) => {
@@ -237,17 +237,17 @@ test("What's New opens once for each Marinara Engine version", async ({ page }) 
   await expect(announcement.getByRole("heading", { name: "Hello and welcome to the new version!" })).toBeVisible();
   await expect(
     announcement.getByText(
-      "Aside from the usual portion of bug fixes and minor QoL improvements, we also tightened the security again, improved Professor Mari's capabilities, updated our agents, and worked on the newly enhanced home page!",
+      "Aside from the usual portion of bug fixes and minor QoL improvements, we also tightened the security again, improved Professor YunYun's capabilities, updated our agents, and worked on the newly enhanced home page!",
       { exact: true },
     ),
   ).toBeVisible();
   const exactReleaseCopy = [
     "Hello and welcome to the new version!",
-    "Aside from the usual portion of bug fixes and minor QoL improvements, we also tightened the security again, improved Professor Mari's capabilities, updated our agents, and worked on the newly enhanced home page!",
-    "Your home page is now a fully customizable hub with widgets. You can add, remove, and rearrange them however you want. These include widgets with recent chats, useful help centers, Professor Mari, clock and calendar, and many others. You can also ask Professor Mari to create new, custom ones for you.",
-    "You probably also noticed that there's a small new Professor Mari on the home page. She is your new personal navigator, that will take you to different parts of Marinara Engine, including your lorebooks, chats, characters, and even agents. Hopefully, no more trouble with finding the Chats tab anymore.",
+    "Aside from the usual portion of bug fixes and minor QoL improvements, we also tightened the security again, improved Professor YunYun's capabilities, updated our agents, and worked on the newly enhanced home page!",
+    "Your home page is now a fully customizable hub with widgets. You can add, remove, and rearrange them however you want. These include widgets with recent chats, useful help centers, Professor YunYun, clock and calendar, and many others. You can also ask Professor YunYun to create new, custom ones for you.",
+    "You probably also noticed that there's a small new Professor YunYun on the home page. She is your new personal navigator, that will take you to different parts of YunYun Engine, including your lorebooks, chats, characters, and even agents. Hopefully, no more trouble with finding the Chats tab anymore.",
     "Be gentle when moving her around, though…",
-    "Additionally, Professor Mari (the assistant version) now has Memories that you can access on her tab (right, forgot to mention, she has her tab now accessible from Home; check at the top of the screen). She will remember your instructions and important details between the chats.",
+    "Additionally, Professor YunYun (the assistant version) now has Memories that you can access on her tab (right, forgot to mention, she has her tab now accessible from Home; check at the top of the screen). She will remember your instructions and important details between the chats.",
     "One significant change is that Noodle is now moved to be an Agent (don't worry, it will be there i you already had it installed). You can access it as a separate tab from the Home page menu. This should declutter the main top bar a little, plus allow you to uninstall it if you would rather not use it.",
     "You may have noticed that the Browser tab was removed: don't worry, the option to download characters was merged into the Characters and Personas tabs.",
     "These are the most significant changes in this version and we hope you will enjoy them. Read the entire list of changes here:",
@@ -2893,7 +2893,7 @@ test("Character and Persona avatar actions stay separated and visually balanced"
   const connection = (await connectionResponse.json()) as { id: string };
 
   const characterName = `Avatar Character ${suffix}`;
-  const characterCreator = "Professor Mari and the Fatui Research Collective";
+  const characterCreator = "Professor YunYun and the Fatui Research Collective";
   const characterVersion = "12.34";
   const characterResponse = await page.request.post("/api/characters", {
     data: {
@@ -2915,7 +2915,7 @@ test("Character and Persona avatar actions stay separated and visually balanced"
   expect(characterAvatarResponse.ok()).toBeTruthy();
 
   const personaName = `Avatar Persona ${suffix}`;
-  const personaCreator = "Professor Mari and the Snezhnayan Institute";
+  const personaCreator = "Professor YunYun and the Snezhnayan Institute";
   const personaVersion = "56.78";
   const personaResponse = await page.request.post("/api/characters/personas", {
     data: {
@@ -4909,7 +4909,7 @@ test("generation fallbacks identify the replacement connection in a toast", asyn
     await page.locator("button.mari-chat-send-btn").click();
     await expect(page.getByText("Main switched to Backup API (fallback-model).")).toBeVisible();
     await expect(
-      page.getByText("The primary generation failed, so Marinara retried with your configured fallback."),
+      page.getByText("The primary generation failed, so YunYun retried with your configured fallback."),
     ).toBeVisible();
   } finally {
     await page.request.delete(`/api/chats/${chat.id}`);
@@ -5688,7 +5688,7 @@ test("legacy browser records are cleaned while extension imports stay locked", a
   await expect(
     page
       .getByText(
-        "Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
+        "Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
         { exact: true },
       )
       .first(),
@@ -5705,7 +5705,7 @@ test("legacy browser records are cleaned while extension imports stay locked", a
   await expect(page.getByRole("button", { name: /Export extension/i })).toHaveCount(0);
 });
 
-test("Personal Extensions default to the Professor Mari-only locked workflow", async ({ page }) => {
+test("Personal Extensions default to the Professor YunYun-only locked workflow", async ({ page }) => {
   await page.goto("/");
   await page.locator('[data-tour="panel-settings"]').click();
   await page.getByRole("tab", { name: "Addons" }).click();
@@ -5714,7 +5714,7 @@ test("Personal Extensions default to the Professor Mari-only locked workflow", a
   await expect(
     page
       .getByText(
-        "Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
+        "Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
         { exact: true },
       )
       .first(),
@@ -7810,14 +7810,14 @@ test("PocketTTS discovers server voices and uses its speech endpoint", async ({ 
     });
 
     const speechResponse = await request.post("/api/tts/speak", {
-      data: { text: "Hello from Marinara." },
+      data: { text: "Hello from YunYun." },
     });
     expect(speechResponse.ok()).toBeTruthy();
     expect(receivedPath).toBe("/v1/audio/speech");
     expect(receivedContentType).toContain("application/json");
     expect(JSON.parse(receivedBody)).toMatchObject({
       model: "pocket-tts",
-      input: "Hello from Marinara.",
+      input: "Hello from YunYun.",
       voice: "alba",
       response_format: "mp3",
       speed: 1,
@@ -8296,9 +8296,9 @@ test("home shell and primary topbar panels open without client errors", async ({
   await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("tab", { name: "Home", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/home");
-  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/favicon.png");
-  await expect(page.locator('.mari-home-browser-chrome img[src="/logo-splash.gif"]')).toBeVisible();
-  await expect(page.locator('.mari-home-hero img[src="/logo-splash.gif"]')).toHaveCount(0);
+  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
+  await expect(page.locator('.mari-home-browser-chrome img[src="/yunyun-logo-splash.gif"]')).toBeVisible();
+  await expect(page.locator('.mari-home-hero img[src="/yunyun-logo-splash.gif"]')).toHaveCount(0);
   await expect(page.locator('[data-tour="noodle-tab"]')).toHaveCount(0);
   const guideGeometry = await page.locator('[data-home-widget-id="professor"]').evaluate((guide) => {
     const panel = guide.querySelector<HTMLElement>('[data-component="HomeBrowserHub.ProfessorWidget"]')!;
@@ -8568,7 +8568,7 @@ test("installed Home destinations appear as browser tabs without returning to th
   await expect(page.getByRole("region", { name: "Noodle package surface" })).toHaveText("Familiar Noodle interface");
   await expect(noodleTab).toHaveAttribute("aria-selected", "true");
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/noodle");
-  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/favicon.png");
+  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
   await page.getByRole("tab", { name: "Home", exact: true }).click();
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/home");
   await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible();
@@ -8831,10 +8831,10 @@ test("Home feed prioritizes read-only visits and exposes current Game presentati
   }
 });
 
-test("new Professor Mari Home widgets receive a movable layout slot immediately", async ({ page }) => {
+test("new Professor YunYun Home widgets receive a movable layout slot immediately", async ({ page }) => {
   const widget = {
     id: `mari-widget-${Date.now()}`,
-    title: "Mari's Field Formula",
+    title: "YunYun's Field Formula",
     description: "A safe custom note created for the Home layout regression.",
     accent: "cyan",
     icon: "sparkles",
@@ -8884,11 +8884,11 @@ test("new Professor Mari Home widgets receive a movable layout slot immediately"
   }
 });
 
-test("Professor Mari visibly arrives on Home and navigates without AI", async ({ page }, testInfo) => {
+test("Professor YunYun visibly arrives on Home and navigates without AI", async ({ page }, testInfo) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({ timeout: 30_000 });
 
-  const assistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+  const assistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
   await expect(assistant).toBeVisible({ timeout: 6_000 });
   await expect(
     assistant.getByText("Hey, having trouble finding something? Looking for a Chats tab? Let me help!", {
@@ -8903,7 +8903,7 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
     "src",
     "/sprites/mari/generated/professor-mari-assistant-blink-v3.png",
   );
-  await assistant.getByRole("button", { name: "Minimize Professor Mari navigation", exact: true }).click();
+  await assistant.getByRole("button", { name: "Minimize Professor YunYun navigation", exact: true }).click();
   await expect(assistant).toBeHidden();
   const recallButton = page.getByRole("button", { name: "Help Me Navigate", exact: true });
   await expect(recallButton).toBeVisible();
@@ -8932,7 +8932,7 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
   await expect(assistant.locator(".mari-home-professor-popup__idle-stage")).toHaveCSS("opacity", "0");
   await assistant.getByRole("button", { name: "Back to search", exact: true }).click();
   await expect(navigationInput).toBeFocused();
-  await navigationInput.fill("Could I talk to Professor Mari?");
+  await navigationInput.fill("Could I talk to Professor YunYun?");
   await navigationInput.press("Enter");
   await expect(assistant.getByText("Here, found it!", { exact: true })).toBeVisible();
   await expect(assistant.locator(".mari-home-professor-popup__state-image--map")).toHaveAttribute(
@@ -8945,7 +8945,7 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
     page.locator('[data-component="HomeProfessorMariChat.Window"]').getByRole("button", { name: "Close", exact: true }),
   ).toHaveCount(0);
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/professor");
-  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/favicon.png");
+  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
   await expect(page.locator(".mari-home-browser-chrome")).toBeVisible();
 
   await page.getByRole("tab", { name: "Home", exact: true }).click();
@@ -8971,13 +8971,13 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({
       timeout: 30_000,
     });
-    await expect(page.locator('aside[aria-label="Professor Mari assistant"]')).toBeVisible({ timeout: 6_000 });
+    await expect(page.locator('aside[aria-label="Professor YunYun assistant"]')).toBeVisible({ timeout: 6_000 });
   } finally {
     await page.request.delete(`/api/chats/${chat.id}?force=true`).catch(() => undefined);
   }
 });
 
-test("Professor Mari opens a named character directly in its editor", async ({ page }) => {
+test("Professor YunYun opens a named character directly in its editor", async ({ page }) => {
   const resourceName = `Maukie Navigator ${Date.now()}`;
   const characterResponse = await page.request.post("/api/characters", {
     data: { data: { name: resourceName } },
@@ -8995,7 +8995,7 @@ test("Professor Mari opens a named character directly in its editor", async ({ p
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({
       timeout: 30_000,
     });
-    const assistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+    const assistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
     await expect(assistant).toBeVisible({ timeout: 6_000 });
     await assistant.getByRole("button", { name: "Help Me Navigate", exact: true }).click();
     const navigationInput = assistant.getByPlaceholder("What are you looking for?");
@@ -9010,10 +9010,10 @@ test("Professor Mari opens a named character directly in its editor", async ({ p
   }
 });
 
-test("Professor Mari introduces Characters and Personas in topbar order without a Browser step", async ({ page }) => {
+test("Professor YunYun introduces Characters and Personas in topbar order without a Browser step", async ({ page }) => {
   await prepareOnboardingReplay(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Welcome to Marinara Engine!", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to YunYun Engine!", exact: true })).toBeVisible();
 
   const next = page.getByRole("button", { name: "Next", exact: true });
   await next.click();
@@ -9023,12 +9023,12 @@ test("Professor Mari introduces Characters and Personas in topbar order without 
   await expect(page.locator("h3").filter({ hasText: /^Personas$/ })).toBeVisible();
 });
 
-test("Professor Mari replaces the Noodle tour with highlighted Home guidance", async ({ page }, testInfo) => {
+test("Professor YunYun replaces the Noodle tour with highlighted Home guidance", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.includes("mobile"), "Desktop verifies the individual Home spotlight anchors.");
 
   await prepareOnboardingReplay(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Welcome to Marinara Engine!", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to YunYun Engine!", exact: true })).toBeVisible();
 
   const next = page.getByRole("button", { name: "Next", exact: true });
   const stepsBeforeHome = [
@@ -9810,7 +9810,7 @@ test("Character and Persona panels launch card downloads and their local librari
   expect(errors.filter((error) => !error.includes("status of 503 (Service Unavailable)"))).toEqual([]);
 });
 
-test("Downloaded cards use Marinara destination and lorebook choices", async ({ page }, testInfo) => {
+test("Downloaded cards use YunYun destination and lorebook choices", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.includes("mobile"), "The import contract is covered once on desktop.");
 
   const cardName = `Native Import ${Date.now().toString(36)}`;
@@ -9827,7 +9827,7 @@ test("Downloaded cards use Marinara destination and lorebook choices", async ({ 
           {
             id: "native-import-card",
             name: cardName,
-            creator: { displayName: "Marinara Tester" },
+            creator: { displayName: "YunYun Tester" },
             tagline: "A card with an attached lorebook",
             tags: ["testing", "native"],
             rating: "none",
@@ -9842,8 +9842,8 @@ test("Downloaded cards use Marinara destination and lorebook choices", async ({ 
         name: cardName,
         description: "A detailed imported persona.",
         personality: "Curious and precise.",
-        scenario: "Inside the Marinara test kitchen.",
-        creator: "Marinara Tester",
+        scenario: "Inside the YunYun test kitchen.",
+        creator: "YunYun Tester",
         character_book: {
           name: `${cardName} Lore`,
           entries: [
@@ -9894,8 +9894,8 @@ test("Downloaded cards use Marinara destination and lorebook choices", async ({ 
     name: cardName,
     description: "A detailed imported persona.",
     personality: "Curious and precise.",
-    scenario: "Inside the Marinara test kitchen.",
-    creator: "Marinara Tester",
+    scenario: "Inside the YunYun test kitchen.",
+    creator: "YunYun Tester",
   });
   expect(importedLorebook).toMatchObject({
     name: `${cardName} Lore`,
@@ -10253,7 +10253,7 @@ test("downloadable agent catalog is usable on desktop and mobile", async ({ page
   } else {
     await expect(allAgentsButton).toBeHidden();
   }
-  await expect(catalogView.getByText("Marinara Engine v2.3.0+")).toBeVisible();
+  await expect(catalogView.getByText("YunYun Engine v2.3.0+")).toBeVisible();
   const documentationLink = catalogView.getByRole("link", { name: "Read how this agent works" });
   await expect(documentationLink).toHaveAttribute("href", "https://github.com/Pasta-Devs/Marinara-Agents#uno");
   const installButton = catalogView.getByRole("button", { name: "Install", exact: true });
@@ -10452,7 +10452,7 @@ test("agent catalog reports API failures without diagnosing an internet outage",
 
   const catalogView = page.locator('[data-component="AgentCatalogView"]');
   await expect(catalogView.getByText("The agent catalog is unavailable.")).toBeVisible();
-  await expect(catalogView.getByText(/Marinara Engine returned HTTP 400: Validation Error\./)).toBeVisible();
+  await expect(catalogView.getByText(/YunYun Engine returned HTTP 400: Validation Error\./)).toBeVisible();
   await expect(catalogView.getByText(/Check the server internet connection/)).toHaveCount(0);
 });
 
@@ -12752,20 +12752,20 @@ test("desktop Connections and Lorebooks folders expand without a React hook erro
   }
 });
 
-test("Professor Mari chat fills the mobile home viewport and keeps its composer visible", async ({
+test("Professor YunYun chat fills the mobile home viewport and keeps its composer visible", async ({
   page,
 }, testInfo) => {
-  test.skip(!testInfo.project.name.includes("mobile"), "Professor Mari mobile viewport regression.");
+  test.skip(!testInfo.project.name.includes("mobile"), "Professor YunYun mobile viewport regression.");
   await page.goto("/");
 
   await page
     .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-    .getByRole("button", { name: "Ask Professor Mari" })
+    .getByRole("button", { name: "Ask Professor YunYun" })
     .click();
 
   const topBar = page.locator('[data-component="TopBar"]');
   const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
-  const composer = window.getByPlaceholder("Ask Professor Mari");
+  const composer = window.getByPlaceholder("Ask Professor YunYun");
   await expect(window).toBeVisible();
   await expect(composer).toBeVisible();
   await expect
@@ -12787,11 +12787,11 @@ test("Professor Mari chat fills the mobile home viewport and keeps its composer 
     .toBe(true);
 });
 
-test("Professor Mari suggestions stay visible after chat history loads", async ({ page }) => {
+test("Professor YunYun suggestions stay visible after chat history loads", async ({ page }) => {
   const chatResponse = await page.request.get("/api/chats/internal/professor-mari");
   expect(chatResponse.ok()).toBeTruthy();
   const chat = (await chatResponse.json()) as { id: string };
-  const messageContent = `Professor Mari suggestion stability ${Date.now()}`;
+  const messageContent = `Professor YunYun suggestion stability ${Date.now()}`;
   const messageResponse = await page.request.post(`/api/chats/${chat.id}/messages`, {
     data: {
       role: "assistant",
@@ -12826,7 +12826,7 @@ test("Professor Mari suggestions stay visible after chat history loads", async (
   }
 });
 
-test("Professor Mari shows the latest context budget when token usage is enabled", async ({ page }) => {
+test("Professor YunYun shows the latest context budget when token usage is enabled", async ({ page }) => {
   const chatResponse = await page.request.get("/api/chats/internal/professor-mari");
   expect(chatResponse.ok()).toBeTruthy();
   const chat = (await chatResponse.json()) as { id: string };
@@ -12892,7 +12892,7 @@ test("Professor Mari shows the latest context budget when token usage is enabled
     });
     await page
       .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-      .getByRole("button", { name: "Ask Professor Mari" })
+      .getByRole("button", { name: "Ask Professor YunYun" })
       .click();
 
     const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
@@ -12906,7 +12906,7 @@ test("Professor Mari shows the latest context budget when token usage is enabled
   }
 });
 
-test("Professor Mari history opens a loaded chat at its newest message", async ({ page }) => {
+test("Professor YunYun history opens a loaded chat at its newest message", async ({ page }) => {
   const createdChatIds: string[] = [];
 
   try {
@@ -12918,7 +12918,7 @@ test("Professor Mari history opens a loaded chat at its newest message", async (
       const messageResponse = await page.request.post(`/api/chats/${firstChat.id}/messages`, {
         data: {
           role: index % 2 === 0 ? "user" : "assistant",
-          content: `Professor Mari history message ${index + 1}. ${"A long transcript line makes the pane overflow. ".repeat(8)}`,
+          content: `Professor YunYun history message ${index + 1}. ${"A long transcript line makes the pane overflow. ".repeat(8)}`,
         },
       });
       expect(messageResponse.ok()).toBeTruthy();
@@ -12931,7 +12931,7 @@ test("Professor Mari history opens a loaded chat at its newest message", async (
     await page.goto("/");
     await page
       .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-      .getByRole("button", { name: "Ask Professor Mari" })
+      .getByRole("button", { name: "Ask Professor YunYun" })
       .click();
 
     const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
@@ -12957,7 +12957,7 @@ test("Professor Mari history opens a loaded chat at its newest message", async (
   }
 });
 
-test("Professor Mari bulk chat deletion follows the active accent", async ({ page }) => {
+test("Professor YunYun bulk chat deletion follows the active accent", async ({ page }) => {
   const firstResponse = await page.request.get("/api/chats/internal/professor-mari");
   expect(firstResponse.ok()).toBeTruthy();
   const firstChat = (await firstResponse.json()) as { id: string };
@@ -12971,7 +12971,7 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
     const activeAccentColor = await readCssVariableColor(page, "--marinara-chat-chrome-button-text-active");
     await page
       .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-      .getByRole("button", { name: "Ask Professor Mari" })
+      .getByRole("button", { name: "Ask Professor YunYun" })
       .click();
 
     const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
@@ -12979,7 +12979,7 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
     await window.getByRole("button", { name: "Select", exact: true }).click();
     await window
       .locator(`[data-professor-mari-chat-id="${firstChat.id}"]`)
-      .getByRole("button", { name: /Professor Mari/u })
+      .getByRole("button", { name: /Professor YunYun/u })
       .click();
 
     const deleteSelected = window.getByRole("button", { name: "Delete selected" });
@@ -12996,7 +12996,7 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
   }
 });
 
-test("Professor Mari dependency and sensitive-file reviews stay explicit across viewports", async ({ page }) => {
+test("Professor YunYun dependency and sensitive-file reviews stay explicit across viewports", async ({ page }) => {
   await page.route("**/api/professor-mari/workspace/status*", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -13052,7 +13052,7 @@ test("Professor Mari dependency and sensitive-file reviews stay explicit across 
   await page.goto("/");
   await page
     .locator('[data-component="HomeProfessorMariChat.MariPanel"]')
-    .getByRole("button", { name: "Ask Professor Mari" })
+    .getByRole("button", { name: "Ask Professor YunYun" })
     .click();
 
   const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
@@ -13794,7 +13794,7 @@ test("Home Community and clock widgets are useful, timezone-aware, and optional"
   await expect(
     page
       .locator('[data-home-widget-id="learn"]')
-      .getByText("Search official documentation and guides without leaving Marinara.", { exact: true }),
+      .getByText("Search official documentation and guides without leaving YunYun.", { exact: true }),
   ).toBeVisible();
 
   const timeZone = "America/Los_Angeles";
@@ -13841,7 +13841,7 @@ test("Home Community and clock widgets are useful, timezone-aware, and optional"
   const widgetManager = page.getByRole("dialog", { name: "Home Widgets" });
   await expect(widgetManager.getByRole("switch")).toHaveCount(9);
   for (const label of [
-    "Your guide — Professor Mari",
+    "Your guide — Professor YunYun",
     "Continue chatting — Recent chats",
     "From the kitchen — What's New",
     "Discovery desk — Something new for your engine",
@@ -13908,7 +13908,7 @@ test("mobile Home collects its bookmarks into a Marinara-colored menu", async ({
   }
 
   await menu.getByRole("button", { name: "FAQ", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Professor Mari's FAQ" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Professor YunYun's FAQ" })).toBeVisible();
   await expect(menu).toBeAttached();
   await page.waitForTimeout(50);
   await expect(menu).toBeAttached();
@@ -14031,7 +14031,7 @@ test("Home achievements preview the latest unlock and nearest measurable goal", 
           {
             id: "diligent_student",
             title: "Diligent Student",
-            description: "Completed Professor Mari's tutorial.",
+            description: "Completed Professor YunYun's tutorial.",
             category: "milestone",
             icon: "graduation",
           },
@@ -14312,7 +14312,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   ).toBeVisible();
   await expect(page.locator('[data-component="HomeBrowserHub.AnimatedLogo"]')).toHaveAttribute(
     "src",
-    "/logo-splash.gif",
+    "/yunyun-logo-splash.gif",
   );
   await expect(page.locator('[data-component="HomeBrowserHub.AnimatedLogo"]')).toBeVisible();
   expect(
@@ -14321,7 +14321,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
       return element.complete && element.naturalWidth > 0 && element.naturalHeight > 0;
     }),
   ).toBe(true);
-  await expect(page.locator(".mari-home-hero img")).toHaveAttribute("src", "/logo.png");
+  await expect(page.locator(".mari-home-hero img")).toHaveAttribute("src", "/yunyun-logo.png");
   await expect(page.locator('.mari-home-hero [data-chat-mode-icon="conversation"]')).toHaveClass(
     /lucide-message-square/,
   );
@@ -14332,7 +14332,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   await expect(page.locator('[data-component="HomeFaq.MobileLauncher"]')).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "FAQ", exact: true })).toHaveCount(0);
   await openHomeBookmark(page, "FAQ");
-  const faqWindow = page.getByRole("dialog", { name: "Professor Mari's FAQ" });
+  const faqWindow = page.getByRole("dialog", { name: "Professor YunYun's FAQ" });
   await expect(faqWindow).toBeVisible();
   await expect(faqWindow.getByRole("searchbox", { name: "Search FAQ" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -14393,7 +14393,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   await expect(page.locator("[data-home-widget-id]")).toHaveCount(5);
   await expectHomeWidgetHeightsMatch(page, baselineCompactHeight);
 
-  await widgetManager.getByRole("switch", { name: "Hide Your guide — Professor Mari" }).click();
+  await widgetManager.getByRole("switch", { name: "Hide Your guide — Professor YunYun" }).click();
   await expect(page.locator("[data-home-widget-id]")).toHaveCount(4);
   await expectHomeWidgetHeightsMatch(page, baselineCompactHeight);
 
@@ -14414,7 +14414,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
     "From the kitchen — What's New",
     "Discovery desk — Something new for your engine",
     "Your shelf — Achievements",
-    "Your guide — Professor Mari",
+    "Your guide — Professor YunYun",
     "Daily encounter — Character of the Day",
     "Community — Around the table",
     "Clock & calendar — Right now",
@@ -14480,17 +14480,17 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
       const module = await import("/src/stores/ui.store.ts");
       module.useUIStore.getState().setProfessorMariNavigationEnabled(false);
     });
-    await expect(page.locator('aside[aria-label="Professor Mari assistant"]')).toBeHidden();
+    await expect(page.locator('aside[aria-label="Professor YunYun assistant"]')).toBeHidden();
     await page.reload();
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible();
     await page.waitForTimeout(1_300);
-    await expect(page.locator('aside[aria-label="Professor Mari assistant"]')).toBeHidden();
+    await expect(page.locator('aside[aria-label="Professor YunYun assistant"]')).toBeHidden();
     await page.evaluate(async () => {
       const module = await import("/src/stores/ui.store.ts");
       module.useUIStore.getState().setReduceAmbientEffects(true);
       module.useUIStore.getState().setProfessorMariNavigationEnabled(true);
     });
-    const restoredAssistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+    const restoredAssistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
     await expect(restoredAssistant).toBeVisible({ timeout: 1_000 });
     await expect(restoredAssistant.locator(".mari-home-professor-popup__idle-stage--active")).toBeVisible();
     await expect(restoredAssistant.locator(".mari-home-professor-popup__arrival-frame")).toHaveCSS("opacity", "0");
@@ -14499,8 +14499,8 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
       module.useUIStore.getState().setReduceAmbientEffects(false);
     });
     await page.locator('[data-tour="panel-settings"]').click();
-    const suggestionsToggle = page.getByRole("checkbox", { name: "Professor Mari suggestions" });
-    const navigationToggle = page.getByRole("checkbox", { name: "Professor Mari navigation" });
+    const suggestionsToggle = page.getByRole("checkbox", { name: "Professor YunYun suggestions" });
+    const navigationToggle = page.getByRole("checkbox", { name: "Professor YunYun navigation" });
     await expect(suggestionsToggle).toBeVisible();
     await expect(navigationToggle).toBeChecked();
     const [suggestionsBounds, navigationBounds, settingsSearchBounds, addressRowBounds] = await Promise.all([
@@ -14602,7 +14602,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   expect(errors).toEqual([]);
 });
 
-test("Professor Mari navigation can be repositioned within Home on desktop", async ({ page }, testInfo) => {
+test("Professor YunYun navigation can be repositioned within Home on desktop", async ({ page }, testInfo) => {
   const mobile = testInfo.project.name.includes("mobile");
   await page.addInitScript(() => {
     if (sessionStorage.getItem("marinara:e2e:professor-position-cleared") === "true") return;
@@ -14623,7 +14623,7 @@ test("Professor Mari navigation can be repositioned within Home on desktop", asy
     return;
   }
 
-  const assistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+  const assistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
   const content = page.locator('[data-component="HomeBrowserHub.Content"]');
   const sprite = page.locator('[data-component="HomeBrowserHub.ProfessorAssistantSprite"]');
   const bubble = page.locator('[data-component="HomeBrowserHub.ProfessorAssistantBubble"]');

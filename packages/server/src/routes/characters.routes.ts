@@ -718,7 +718,7 @@ function buildCompatiblePersonaExport(persona: Record<string, unknown>) {
     extensions: {
       marinara: {
         exportedAt: new Date().toISOString(),
-        source: "Marinara Engine compatibility export",
+        source: "YunYun Engine compatibility export",
       },
     },
   };
@@ -1146,7 +1146,7 @@ export async function charactersRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Invalid character ID" });
     }
     if (id === PROFESSOR_MARI_ID) {
-      return reply.status(403).send({ error: "Professor Mari is a built-in character and cannot be deleted" });
+      return reply.status(403).send({ error: "Professor YunYun is a built-in character and cannot be deleted" });
     }
     const galleryImages = await characterGallery.listByCharacterId(id);
     await mutateAvatarReferencesAndCleanup({

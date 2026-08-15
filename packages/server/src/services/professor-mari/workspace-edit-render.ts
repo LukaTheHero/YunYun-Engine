@@ -1,12 +1,12 @@
-// #4931: synthetic "Peek Prompt" render of a Professor Mari workspace edit. A workspace edit is not
+// #4931: synthetic "Peek Prompt" render of a Professor YunYun workspace edit. A workspace edit is not
 // attached to a chat, so there is no persona / history / chosen-character context to assemble in.
 // Instead we assemble the affected entity ON ITS OWN — the default preset for a character edit (or
 // the edited preset itself), no persona, no chat history, previewOnly — and return the before/after
 // assembled messages so the client can diff them. It is a labeled preview, not a real chat prompt.
 //
-// Mari has ALREADY applied the change by the time it is reviewed, so the live row is the AFTER state.
+// YunYun has ALREADY applied the change by the time it is reviewed, so the live row is the AFTER state.
 // We therefore render BOTH sides from the change's raw snapshots (beforeRaw / afterRaw) rather than
-// trusting the live row, so the preview shows exactly what Mari proposed regardless of later drift.
+// trusting the live row, so the preview shows exactly what YunYun proposed regardless of later drift.
 import type { DB } from "../../db/connection.js";
 import { characters } from "../../db/schema/index.js";
 import { assemblePrompt, type AssemblerInput } from "../prompt/assembler.js";

@@ -191,7 +191,7 @@ try {
   await db.insert(characters).values([
     {
       id: PROFESSOR_MARI_ID,
-      data: characterData("Professor Mari"),
+      data: characterData("Professor YunYun"),
       comment: "",
       avatarPath: localAvatar("professor-mari.png"),
       spriteFolderPath: null,
@@ -219,7 +219,7 @@ try {
   await db.delete(characters).where(ne(characters.id, PROFESSOR_MARI_ID));
   assert.equal(await unlinkAvatarFilesIfUnreferenced({ db, avatarPaths: dangerZonePaths, avatarRoot }), 1);
   assert.equal(existsSync(dangerZoneFile), false, "Danger Zone character deletion must remove owned avatars");
-  assert.equal(existsSync(mariFile), true, "Danger Zone character deletion must preserve Professor Mari's avatar");
+  assert.equal(existsSync(mariFile), true, "Danger Zone character deletion must preserve Professor YunYun's avatar");
   assert.equal((await db.select().from(characters)).length, 1);
 
   writeFileSync(outsideFile, "outside");

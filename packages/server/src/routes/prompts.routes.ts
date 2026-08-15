@@ -34,7 +34,7 @@ import { logger } from "../lib/logger.js";
 const PROMPT_IMAGES_DIR = join(DATA_DIR, "prompts", "images");
 const PROMPT_IMAGE_URL_PREFIX = "/api/prompts/images/file/";
 const STOCK_PRESET_READ_ONLY_ERROR =
-  "The stock Marinara Universal preset is read-only. Open it to create an editable copy.";
+  "The stock YunYun Universal preset is read-only. Open it to create an editable copy.";
 
 async function rejectStockPresetMutation(
   storage: ReturnType<typeof createPromptsStorage>,

@@ -113,7 +113,7 @@ try {
   assert.equal(
     await validateImageAssetFile(outsideFile, "outside.png"),
     null,
-    "media validation must not read a file outside Marinara's configured media roots",
+    "media validation must not read a file outside YunYun's configured media roots",
   );
   const oversizedSvgPath = join(dataDir, "oversized.svg");
   writeFileSync(oversizedSvgPath, "<svg>");

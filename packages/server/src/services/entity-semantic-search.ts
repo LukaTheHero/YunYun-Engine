@@ -1,6 +1,6 @@
-// Tiered entity resolution for Professor Mari's [fetch:] (#4768 phase 2).
+// Tiered entity resolution for Professor YunYun's [fetch:] (#4768 phase 2).
 //
-// Conversation Mari used to resolve a fetch by EXACT normalized name only, so a
+// Conversation YunYun used to resolve a fetch by EXACT normalized name only, so a
 // buried "Zander" (past the injected name-list cap) or a fuzzy reference ("the
 // vampire guy") went silent. This module resolves a query in tiers — exact name
 // → substring over name/description/tags → semantic embedding shortlist — for any
@@ -8,8 +8,8 @@
 // pipeline (embedMemoryRecallTexts + the lorebook calibration helpers) rather
 // than inventing a new one.
 //
-// On a single confident hit it resolves to one entity (Mari auto-opens it). On a
-// weak or ambiguous match it returns a ranked candidate LIST so Mari can ask the
+// On a single confident hit it resolves to one entity (YunYun auto-opens it). On a
+// weak or ambiguous match it returns a ranked candidate LIST so YunYun can ask the
 // user which one — never a silent wrong guess.
 import { normalizeTextForMatch } from "@marinara-engine/shared";
 import { logger } from "../lib/logger.js";
@@ -230,7 +230,7 @@ export async function tieredResolveEntity(
 
   // Tier 1 — exact normalized name. One match auto-opens. Several entities
   // sharing a name disambiguate: the candidate list carries each id, and the
-  // caller instructs Mari to pick one by its id, which Tier 0 above resolves —
+  // caller instructs YunYun to pick one by its id, which Tier 0 above resolves —
   // so name-collisions resolve to a specific entity instead of silently opening
   // the first or looping.
   const exactMatches = candidates.filter((c) => normalizeTextForMatch(c.name) === normalizedQuery);

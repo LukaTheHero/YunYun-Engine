@@ -61,4 +61,4 @@ assert.throws(
   /crossed to a different host/u,
 );
 
-process.stdout.write("Professor Mari wiki regression passed.\n");
+process.stdout.write("Professor YunYun wiki regression passed.\n");

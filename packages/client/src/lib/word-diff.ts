@@ -1,4 +1,4 @@
-// Self-contained word-level diff for the Professor Mari "Easy Viewer" (no external diff dependency).
+// Self-contained word-level diff for the Professor YunYun "Easy Viewer" (no external diff dependency).
 // Produces ordered segments describing how to turn `before` into `after`, so the UI can highlight
 // removed text in red and added text in green inline.
 

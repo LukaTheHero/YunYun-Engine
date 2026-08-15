@@ -9,7 +9,7 @@ export function isProfessorMariTranscriptNearBottom(container: ProfessorMariTran
   return container.scrollHeight - container.clientHeight - container.scrollTop <= threshold;
 }
 
-/** Align a mounted Professor Mari transcript with its newest message. */
+/** Align a mounted Professor YunYun transcript with its newest message. */
 export function scrollProfessorMariTranscriptToBottom(container: ProfessorMariTranscriptScrollContainer) {
   container.scrollTop = container.scrollHeight;
 }

@@ -26,7 +26,7 @@ if [ -f "$MARINARA_ANDROID_SECRET_FILE" ]; then
 fi
 if [ -n "${MARINARA_ANDROID_SECRET:-}" ]; then
     if [ "${#MARINARA_ANDROID_SECRET}" -ne 64 ] || [[ "$MARINARA_ANDROID_SECRET" == *[!0-9a-fA-F]* ]]; then
-        echo "  [ERROR] The Android local-auth secret is invalid. Re-run setup from the Marinara Android app."
+        echo "  [ERROR] The Android local-auth secret is invalid. Re-run setup from the YunYun Android app."
         if [ "$MARINARA_ANDROID_SECRET_REQUIRED" = "1" ]; then
             exit 1
         fi
@@ -36,7 +36,7 @@ if [ -n "${MARINARA_ANDROID_SECRET:-}" ]; then
         export MARINARA_ANDROID_SECRET
     fi
 elif [ "$MARINARA_ANDROID_SECRET_REQUIRED" = "1" ]; then
-    echo "  [ERROR] The Android local-auth secret is empty. Re-run setup from the Marinara Android app."
+    echo "  [ERROR] The Android local-auth secret is empty. Re-run setup from the YunYun Android app."
     exit 1
 fi
 

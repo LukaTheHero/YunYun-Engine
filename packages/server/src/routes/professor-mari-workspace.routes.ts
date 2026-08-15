@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Routes: Professor Mari Workspace Agent
+// Routes: Professor YunYun Workspace Agent
 // ──────────────────────────────────────────────
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -65,7 +65,7 @@ const skillUpdateSchema = z.object({
 
 // #4851: memories are edited directly by the user in the Memories panel (the user is
 // the reviewer of their own memory), so these routes deliberately do NOT call
-// workspaceService.reset(); a reset aborts Mari's in-flight turn, and the memory
+// workspaceService.reset(); a reset aborts YunYun's in-flight turn, and the memory
 // injection is re-read live per turn, so no agent rebuild is needed.
 const instructionCreateSchema = z.object({
   name: z.string().min(1).max(MAX_INSTRUCTION_NAME_LENGTH),
@@ -106,7 +106,7 @@ const renderPromptSchema = rejectRowRowSchema;
 function privileged(request: FastifyRequest, reply: FastifyReply, loopbackOnly = false) {
   return requirePrivilegedAccess(request, reply, {
     loopbackOnly,
-    feature: "Professor Mari workspace",
+    feature: "Professor YunYun workspace",
   });
 }
 
@@ -264,7 +264,7 @@ export async function professorMariWorkspaceRoutes(app: FastifyInstance) {
     const result = await getMariDbService(app.db).restoreAppliedReview(req.params.id);
     if (!result) return reply.status(404).send({ error: "Applied change review not found" });
     if ("outcome" in result && result.outcome === "state_changed") {
-      // #4852 F2: the row changed after Mari staged this review, so the restore was a no-op that
+      // #4852 F2: the row changed after YunYun staged this review, so the restore was a no-op that
       // left the newer data intact. Return 200 with ok:false (a non-2xx would land in the client's
       // generic "could not restore" catch instead of rendering the state_changed notice), and skip
       // the extension reload below since nothing was reverted.

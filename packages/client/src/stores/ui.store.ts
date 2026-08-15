@@ -761,7 +761,7 @@ interface UIState {
   chibiProfessorMariEnabled: boolean;
   /** When true, Professor YunYun shows generated suggestion chips and guided-plan options. */
   professorMariSuggestionsEnabled: boolean;
-  /** When true, Professor Mari's deterministic Home navigator is available. */
+  /** When true, Professor YunYun's deterministic Home navigator is available. */
   professorMariNavigationEnabled: boolean;
   /** When true, achievements appear on Home and announce unlocks. Backend tracking stays silent either way. */
   achievementsEnabled: boolean;

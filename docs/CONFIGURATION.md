@@ -1,10 +1,10 @@
 # Server Configuration Reference
 
-This guide explains how to change server-level settings for Marinara Engine using environment variables. An environment variable is a setting you write in a plain text file that the server reads. Most users never need this page. The full variable list is near the bottom.
+This guide explains how to change server-level settings for YunYun Engine using environment variables. An environment variable is a setting you write in a plain text file that the server reads. Most users never need this page. The full variable list is near the bottom.
 
-## When would you configure Marinara?
+## When would you configure YunYun?
 
-Marinara Engine works out of the box with no configuration. You only need this page for a small number of tasks. Most of them involve running the server for more than one device.
+YunYun Engine works out of the box with no configuration. You only need this page for a small number of tasks. Most of them involve running the server for more than one device.
 
 You might edit configuration when you want to:
 
@@ -17,12 +17,12 @@ You might edit configuration when you want to:
 
 Almost everything else, like your AI provider keys, characters, and chat options, is set inside the app, not here. To add an AI provider, see [Connecting to an AI Provider](connections/connecting-to-a-provider.md).
 
-Optional first-party agents are also managed inside the app. Open **Agents → Download Agents** to install or uninstall them. Marinara automatically selects the [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents) catalog lane matching its Engine major version.
+Optional first-party agents are also managed inside the app. Open **Agents → Download Agents** to install or uninstall them. YunYun automatically selects the [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents) catalog lane matching its Engine major version.
 
 Package lifecycle and storage:
 
-- **Updates:** Marinara checks already-installed official packages for compatible updates and asks before downloading each new version. Choosing **No** keeps the current version and leaves the manual **Update** action available in Download Agents. A fresh install remains empty until you choose packages.
-- **Platforms:** The same behavior applies to desktop, Docker, and Termux-hosted Android installations. iOS and other browser clients use the packages installed on their Marinara host server.
+- **Updates:** YunYun checks already-installed official packages for compatible updates and asks before downloading each new version. Choosing **No** keeps the current version and leaves the manual **Update** action available in Download Agents. A fresh install remains empty until you choose packages.
+- **Platforms:** The same behavior applies to desktop, Docker, and Termux-hosted Android installations. iOS and other browser clients use the packages installed on their YunYun host server.
 - **Persistence:** Packages live under `DATA_DIR/capability-packages`. Docker volumes, custom data directories, backups, and normal upgrades preserve them.
 - **Offline resilience:** Existing packages continue working at their installed version when outbound GitHub HTTPS is unavailable, an update is declined, or an update fails verification.
 
@@ -30,11 +30,11 @@ Package lifecycle and storage:
 
 External Agent files, folders, and custom repositories are locked by default. To allow them, open **Settings → Advanced → Danger Zone** and enable **Allow custom Agent imports**. Unlike External Extensions, this user-controlled gate does not require an environment variable. The import controls remain greyed out until it is enabled.
 
-Every import shows the Agent's requested capabilities before it is stored. Permissions must be approved explicitly, bundled functions and tool selections are not imported, generated CSS is sanitized, and result actions are checked against the approved capability set. Turning the gate off stops externally imported Agents from running. Custom Agents created in Marinara and official packages installed through **Download Agents** remain runnable and do not use this gate.
+Every import shows the Agent's requested capabilities before it is stored. Permissions must be approved explicitly, bundled functions and tool selections are not imported, generated CSS is sanitized, and result actions are checked against the approved capability set. Turning the gate off stops externally imported Agents from running. Custom Agents created in YunYun and official packages installed through **Download Agents** remain runnable and do not use this gate.
 
 ### Custom agent repositories
 
-Custom repositories are disabled by default because their prompts and tool selections are unvetted third-party content. Set `ENABLE_CUSTOM_AGENT_REPOS=true`, enable **Allow custom Agent imports** in the Danger Zone, then open **Agents → Download Agents → Custom Sources** to preview a public GitHub repository. Adding a source and applying any later content change both require explicit confirmation. Synchronization is manual; Marinara does not clone repositories or poll them in the background.
+Custom repositories are disabled by default because their prompts and tool selections are unvetted third-party content. Set `ENABLE_CUSTOM_AGENT_REPOS=true`, enable **Allow custom Agent imports** in the Danger Zone, then open **Agents → Download Agents → Custom Sources** to preview a public GitHub repository. Adding a source and applying any later content change both require explicit confirmation. Synchronization is manual; YunYun does not clone repositories or poll them in the background.
 
 The repository root must contain an `agents.json` array using the same agent-definition format as downloadable agent packages. A minimal file looks like this:
 
@@ -52,7 +52,7 @@ The repository root must contain an `agents.json` array using the same agent-def
 ]
 ```
 
-Marinara accepts GitHub repository-root URLs only and validates the bounded archive plus every agent definition before showing the preview. During synchronization, remote prompt, settings, and tool values replace the repository-managed values shown in that preview. Connection and artwork choices remain local. If an agent disappears upstream, Marinara keeps it as a normal local custom agent and removes only its repository link. Removing a source follows the same keep-local policy.
+YunYun accepts GitHub repository-root URLs only and validates the bounded archive plus every agent definition before showing the preview. During synchronization, remote prompt, settings, and tool values replace the repository-managed values shown in that preview. Connection and artwork choices remain local. If an agent disappears upstream, YunYun keeps it as a normal local custom agent and removes only its repository link. Removing a source follows the same keep-local policy.
 
 ### External Extensions
 
@@ -60,17 +60,17 @@ External Extension imports require two independent opt-ins. Set `ENABLE_EXTERNAL
 
 The environment variable is the host-operator permission; the Danger Zone toggle is the user's explicit acceptance. The section, import routes, approval routes, and both runtime loaders all enforce the combined policy. Closing either gate disables external records and stops running external code. Manually stored, legacy, profile-imported, and unknown-source extension records are treated as external, so dropping files into an extension-related folder cannot bypass the gates.
 
-Professor Mari drafts remain available without this flag. They are created disabled and still require approval of their exact code hash.
+Professor YunYun drafts remain available without this flag. They are created disabled and still require approval of their exact code hash.
 
-Sandboxed Browser Extensions remain the default. Some older third-party packages are marked **Full page access** because they depend on Marinara's DOM. That mode runs the exact approved code inside Marinara's page and can access page content, browser storage, network APIs, and the current same-origin session. It is available only to External Extensions after both gates are open and requires a separate warning acknowledgement. Disable it and reload the page if the extension leaves visual or behavioral changes behind.
+Sandboxed Browser Extensions remain the default. Some older third-party packages are marked **Full page access** because they depend on YunYun's DOM. That mode runs the exact approved code inside YunYun's page and can access page content, browser storage, network APIs, and the current same-origin session. It is available only to External Extensions after both gates are open and requires a separate warning acknowledgement. Disable it and reload the page if the extension leaves visual or behavioral changes behind.
 
 ## Where the .env file is
 
 Configuration lives in a file named `.env`. This is a plain text file with one setting per line, in the form `KEY=value`. Lines that start with `#` are comments and the server ignores them.
 
-The `.env` file is data, not a shell script. Marinara does not execute `$`, command substitutions such as `$(...)`, or other shell syntax found in a value. The macOS/Linux and Termux launchers use the same non-evaluating rule for the small set of settings they need before server startup. A value already supplied in the launcher's environment takes precedence over the matching `.env` entry.
+The `.env` file is data, not a shell script. YunYun does not execute `$`, command substitutions such as `$(...)`, or other shell syntax found in a value. The macOS/Linux and Termux launchers use the same non-evaluating rule for the small set of settings they need before server startup. A value already supplied in the launcher's environment takes precedence over the matching `.env` entry.
 
-Marinara creates an empty `.env` for you the first time it starts, so you do not have to make one by hand.
+YunYun creates an empty `.env` for you the first time it starts, so you do not have to make one by hand.
 
 - On normal installs, the `.env` file sits in the project root folder.
 - On official Docker or Podman images, it sits at `/app/data/.env`, inside the same storage volume as your data.
@@ -89,7 +89,7 @@ The server reads `.env` by itself, no matter how you start it. This includes run
 
 ## Restart or hot reload
 
-Marinara watches the `.env` file while it runs. When you save a change, most settings take effect almost immediately, with no restart. The server writes a log line starting with `[env-watcher]` each time it applies a change. If the file watch cannot be set up on your filesystem, the server falls back to checking the file every 30 seconds and says so in the log.
+YunYun watches the `.env` file while it runs. When you save a change, most settings take effect almost immediately, with no restart. The server writes a log line starting with `[env-watcher]` each time it applies a change. If the file watch cannot be set up on your filesystem, the server falls back to checking the file every 30 seconds and says so in the log.
 
 One caveat: on some setups the watch starts fine but change events never arrive — typically when the file is edited from *another machine or context*, such as across a network share or from the host into a container bind mount. If your `.env` edits are not being picked up, set `MARINARA_ENV_WATCH=poll` to make the server check the file every 30 seconds instead; that sees every write. To turn the watcher off entirely, set `MARINARA_ENV_WATCH=0` (in the shell environment, or in `.env` itself before starting) — changes then require a restart. Both are advanced options; the hot-reload path is how access-control changes take effect without downtime, so leave the default unless you have a specific reason.
 
@@ -125,7 +125,7 @@ The main access-control settings are:
 | --------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `BASIC_AUTH_USER`                       | empty             | Username for a password prompt. Set with `BASIC_AUTH_PASS` to require a login.                                                                            |
 | `BASIC_AUTH_PASS`                       | empty             | Password for the login prompt. Leave either field empty to turn login off.                                                                                |
-| `BASIC_AUTH_REALM`                      | `Marinara Engine` | Text shown in the browser's password box.                                                                                                                 |
+| `BASIC_AUTH_REALM`                      | `YunYun Engine` | Text shown in the browser's password box.                                                                                                                 |
 | `IP_ALLOWLIST`                          | empty             | Comma-separated IPs or CIDR ranges that are always allowed. Loopback is always allowed.                                                                   |
 | `IP_ALLOWLIST_ENABLED`                  | `true`            | Set to `false` to keep the list but pause enforcement.                                                                                                    |
 | `ALLOW_UNAUTHENTICATED_PRIVATE_NETWORK` | `false`           | Restores passwordless access from private networks when no login is set.                                                                                  |
@@ -134,16 +134,16 @@ The main access-control settings are:
 | `BYPASS_AUTH_TAILSCALE`                 | automatic         | Empty trusts direct Tailscale sockets only when both endpoints use Tailnet addresses. Set `true` for the legacy whole-`100.64.0.0/10` bypass or `false` to require normal access control. |
 | `BYPASS_AUTH_DOCKER`                    | automatic         | Empty trusts only a detected container interface and its exact gateway. Set `true` for legacy/custom-network compatibility or `false` to require normal access control. |
 | `REQUIRE_AUTH_FOR_DOCKER_PROXY`         | `true`            | Requires normal login/allowlist checks for proxy-forwarded Docker traffic. Set to `false` only when every upstream client is trusted.                     |
-| `TRUSTED_HOSTS`                         | empty             | Extra public or reverse-proxy hostnames Marinara may answer. Direct IP, localhost, `.local`, `.home.arpa`, and single-label LAN names work automatically. |
+| `TRUSTED_HOSTS`                         | empty             | Extra public or reverse-proxy hostnames YunYun may answer. Direct IP, localhost, `.local`, `.home.arpa`, and single-label LAN names work automatically. |
 | `SSL_CERT`                              | empty             | Path to a TLS certificate file. Set with `SSL_KEY` to serve HTTPS directly.                                                                               |
 | `SSL_KEY`                               | empty             | Path to the TLS private key file.                                                                                                                         |
 | `CSRF_TRUSTED_ORIGINS`                  | empty             | Extra browser origins allowed to save changes. Use for a public domain or an unusual port.                                                                |
 
-Basic Auth is short for HTTP Basic Authentication, a simple username and password prompt. Its credentials are only encoded, not encrypted, so always pair it with HTTPS when your server faces the public internet. HTTPS is the secure, encrypted version of HTTP. To turn it on directly, set both `SSL_CERT` and `SSL_KEY`, or put a reverse proxy in front of Marinara.
+Basic Auth is short for HTTP Basic Authentication, a simple username and password prompt. Its credentials are only encoded, not encrypted, so always pair it with HTTPS when your server faces the public internet. HTTPS is the secure, encrypted version of HTTP. To turn it on directly, set both `SSL_CERT` and `SSL_KEY`, or put a reverse proxy in front of YunYun.
 
 To let other devices reach the server at all, the server must bind to a reachable interface. Set `HOST=0.0.0.0`. The shell launchers do this for you, but `pnpm start` binds to loopback only.
 
-Phones, tablets, Tailscale peers, and other computers can continue to connect by the server's IP address without adding it to `TRUSTED_HOSTS`. If you publish Marinara at a public or reverse-proxy hostname, add that exact name, for example `TRUSTED_HOSTS=chat.example.com`. Names already present in `CSRF_TRUSTED_ORIGINS` or `CORS_ORIGINS` are also accepted for compatibility. This Host check prevents a public website's DNS name from being rebound to Marinara's loopback address.
+Phones, tablets, Tailscale peers, and other computers can continue to connect by the server's IP address without adding it to `TRUSTED_HOSTS`. If you publish YunYun at a public or reverse-proxy hostname, add that exact name, for example `TRUSTED_HOSTS=chat.example.com`. Names already present in `CSRF_TRUSTED_ORIGINS` or `CORS_ORIGINS` are also accepted for compatibility. This Host check prevents a public website's DNS name from being rebound to YunYun's loopback address.
 
 ## Storage
 
@@ -155,7 +155,7 @@ Storage settings control where your local data lives. Your data includes chats, 
 | `FILE_STORAGE_DIR` | the `storage` folder inside `DATA_DIR` | Overrides the file-storage folder.                                       |
 | `ENCRYPTION_KEY`   | empty                                  | Key used to encrypt saved API keys. Generate one with the command below. |
 
-Marinara keeps your data as plain JSON files. This makes backups easy to copy and inspect.
+YunYun keeps your data as plain JSON files. This makes backups easy to copy and inspect.
 
 To generate an encryption key, run this command and paste the result into `ENCRYPTION_KEY`:
 
@@ -283,7 +283,7 @@ This section lists the remaining settings, grouped by purpose. The tables above 
 
 `AUTO_CREATE_DEFAULT_CONNECTION` is kept only for older installs. New builds no longer ship a bundled starter connection, so leaving it on does nothing. To start chatting, add a connection under [Connecting to an AI Provider](connections/connecting-to-a-provider.md).
 
-Conversation schedule controls default to the timezone reported by the browser or app device. **Schedule timezone** can be changed during Conversation setup, in Conversation Chat Settings, or in the character schedule editor. The selected IANA timezone is one global preference shared by every Conversation chat and synced to other Marinara clients connected to the same server.
+Conversation schedule controls default to the timezone reported by the browser or app device. **Schedule timezone** can be changed during Conversation setup, in Conversation Chat Settings, or in the character schedule editor. The selected IANA timezone is one global preference shared by every Conversation chat and synced to other YunYun clients connected to the same server.
 
 ### Media and sprite tools
 
@@ -317,9 +317,9 @@ Scene video providers are set up as connections inside the app, not as environme
 | `GIPHY_API_KEY`                   | empty                                      | Giphy key for GIF search in Conversation mode. Search is off when unset.          |
 | `INTIFACE_URL`                    | `ws://127.0.0.1:12345`                     | Default address for the Intiface haptic app.                                      |
 | `SPOTIFY_REDIRECT_URI`            | derived from request                       | Override for the Spotify login callback URL. Set it when TLS is handled upstream. |
-| `MARI_WIKI_CONTENT_MAX_BYTES`     | `50000`                                    | Largest wiki page content Professor Mari reads before trimming.                   |
-| `MARI_WIKI_REQUEST_TIMEOUT_MS`    | `30000`                                    | Time allowed for one wiki request by Professor Mari.                              |
-| `MARI_WIKI_CACHE_TTL_MS`          | `300000`                                   | How long Professor Mari caches a wiki read.                                       |
+| `MARI_WIKI_CONTENT_MAX_BYTES`     | `50000`                                    | Largest wiki page content Professor YunYun reads before trimming.                   |
+| `MARI_WIKI_REQUEST_TIMEOUT_MS`    | `30000`                                    | Time allowed for one wiki request by Professor YunYun.                              |
+| `MARI_WIKI_CACHE_TTL_MS`          | `300000`                                   | How long Professor YunYun caches a wiki read.                                       |
 | `SIDECAR_RUNTIME_INSTALL_ENABLED` | `false` (the Windows launcher sets `true`) | Allows installing the local model runtime without an admin header on loopback.    |
 | `SSL_CERT`                        | empty                                      | Path to a TLS certificate. See Access control above.                              |
 | `SSL_KEY`                         | empty                                      | Path to a TLS private key. See Access control above.                              |
@@ -332,4 +332,4 @@ For a Giphy key, note that GIF search stays unavailable until you set `GIPHY_API
 - [Where Your Data Is Stored](data/where-data-is-stored.md)
 - [Connecting to an AI Provider](connections/connecting-to-a-provider.md)
 - [Scene Video](media/scene-video.md)
-- [Troubleshooting Marinara Engine](TROUBLESHOOTING.md)
+- [Troubleshooting YunYun Engine](TROUBLESHOOTING.md)

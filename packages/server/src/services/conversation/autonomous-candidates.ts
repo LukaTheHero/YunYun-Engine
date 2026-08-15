@@ -1,6 +1,6 @@
 /**
  * Background-autonomous candidate filter (#4704): conversation chats with
- * autonomous messaging enabled, excluding the Professor Mari home assistant.
+ * autonomous messaging enabled, excluding the Professor YunYun home assistant.
  * Mirrors the client-side legacy filter in use-background-autonomous.ts (kept
  * there as the old-server fallback) — the two must stay in sync. Kept as a
  * pure predicate so the /chats/autonomous-candidates route and the regression

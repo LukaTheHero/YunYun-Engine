@@ -1,4 +1,4 @@
-// Shared deterministic bag-of-words stub embedder for the Professor Mari fetch/
+// Shared deterministic bag-of-words stub embedder for the Professor YunYun fetch/
 // relevance regressions. A stable vocabulary map gives each distinct token its
 // own fixed dimension, so cosine similarity is exactly token overlap with no
 // hash collisions. It THROWS rather than wrapping once the vocabulary would

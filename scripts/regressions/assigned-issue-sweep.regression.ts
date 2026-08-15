@@ -235,7 +235,7 @@ assert.equal(
 assert.equal(
   isStockMarinaraUniversalPreset({
     name: "Marinara's Universal Preset",
-    author: "Marinara",
+    author: "YunYun",
     systemKey: "",
   }),
   false,
@@ -287,12 +287,12 @@ const professorMariChatSource = readFileSync(
 assert.match(
   professorMariChatSource,
   /inputDrafts\.get\(PROFESSOR_MARI_DRAFT_KEY\)/u,
-  "Home Professor Mari restores her composer from the persisted draft store",
+  "Home Professor YunYun restores her composer from the persisted draft store",
 );
 assert.match(
   professorMariChatSource,
   /setInputDraft\(PROFESSOR_MARI_DRAFT_KEY,/u,
-  "Home Professor Mari saves composer changes through the persisted draft store",
+  "Home Professor YunYun saves composer changes through the persisted draft store",
 );
 
 const continuationChips = [{ id: "continue", label: "Continue", prompt: "Continue with the current lorebook." }];
@@ -317,7 +317,7 @@ useAgentStore.getState().resetForChatChange();
 assert.deepEqual(
   useAgentStore.getState().mariChips,
   continuationChips,
-  "temporary chat/editor navigation retains Professor Mari continuation suggestions",
+  "temporary chat/editor navigation retains Professor YunYun continuation suggestions",
 );
 assert.equal(useAgentStore.getState().mariChipsChatId, "professor-chat");
 assert.deepEqual(useAgentStore.getState().mariPlan, guidedPlan);
@@ -326,7 +326,7 @@ assert.equal(useAgentStore.getState().mariPlanCursor, 1);
 assert.deepEqual(useAgentStore.getState().mariPlanAnswers, { setting: "A candlelit library" });
 assert.deepEqual(useAgentStore.getState().activeAgents, [], "other Agent runtime state still resets between chats");
 useAgentStore.getState().reset();
-assert.equal(useAgentStore.getState().mariPlan, null, "full Agent reset clears Professor Mari's guided plan");
+assert.equal(useAgentStore.getState().mariPlan, null, "full Agent reset clears Professor YunYun's guided plan");
 assert.equal(useAgentStore.getState().mariPlanChatId, null);
 assert.equal(useAgentStore.getState().mariPlanCursor, 0);
 assert.deepEqual(useAgentStore.getState().mariPlanAnswers, {});

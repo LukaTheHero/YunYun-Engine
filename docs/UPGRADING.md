@@ -183,7 +183,7 @@ The button shows **Refreshing…** while it works, then the app reloads.
 
 ## Downgrading to an older version
 
-Upgrades are always safe, but going backwards is not always possible directly. Newer versions of Marinara store chat messages in a newer on-disk format, and a version older than your data's format cannot read it. To protect your chat history, the launcher skips auto-updates that would land on an incompatible version, and the in-app updater refuses to apply one.
+Upgrades are always safe, but going backwards is not always possible directly. Newer versions of YunYun store chat messages in a newer on-disk format, and a version older than your data's format cannot read it. To protect your chat history, the launcher skips auto-updates that would land on an incompatible version, and the in-app updater refuses to apply one.
 
 If you need an older version anyway, a one-command conversion puts your data back in the old format first. See [Chats show no messages after switching to an older version](TROUBLESHOOTING.md#chats-show-no-messages-after-switching-to-an-older-version) for the steps.
 

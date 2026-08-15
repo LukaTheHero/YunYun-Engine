@@ -215,7 +215,7 @@ export function androidLocalAuthHook(request: FastifyRequest, reply: FastifyRepl
   }
   reply.status(401).send({
     error: "Android local authentication required",
-    message: "Open Marinara through its Android app, or authenticate this browser at /android-login.",
+    message: "Open YunYun through its Android app, or authenticate this browser at /android-login.",
   });
 }
 
@@ -281,7 +281,7 @@ export async function androidLocalAuthRoutes(app: FastifyInstance) {
         .status(401)
         .type("text/html")
         .send(
-          '<!doctype html><title>Marinara authentication failed</title><p>That local access secret was not accepted.</p><p><a href="/android-login">Try again</a></p>',
+          '<!doctype html><title>YunYun authentication failed</title><p>That local access secret was not accepted.</p><p><a href="/android-login">Try again</a></p>',
         );
     }
     issueSession(reply);
@@ -305,11 +305,11 @@ export async function androidLocalLoginRoute(app: FastifyInstance) {
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Marinara local authentication</title>
+<title>YunYun local authentication</title>
 <style>body{max-width:38rem;margin:12vh auto;padding:1.5rem;background:#0a0a0f;color:#eee;font:16px system-ui}input,button{box-sizing:border-box;width:100%;margin:.5rem 0;padding:.8rem;border-radius:.5rem}button{cursor:pointer}</style>
 <h1>Authenticate this local browser</h1>
 <p>This APK-managed Termux server rejects other Android apps by default. Paste the local secret shown by <code>cat ~/.marinara-engine/android-secret</code> in Termux.</p>
-<form method="post" action="${action}"><label>Local access secret<input name="secret" type="password" required minlength="64" maxlength="64" autocomplete="off" spellcheck="false"></label><button type="submit">Open Marinara</button></form>
+<form method="post" action="${action}"><label>Local access secret<input name="secret" type="password" required minlength="64" maxlength="64" autocomplete="off" spellcheck="false"></label><button type="submit">Open YunYun</button></form>
 </html>`);
   });
 }

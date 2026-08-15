@@ -111,8 +111,8 @@ import {
 import { MariSuggestionChips } from "./MariSuggestionChips";
 import { useTranslation, useTranslation as useUiTranslation } from "react-i18next";
 
-const MARI_AVATAR_URL = "/sprites/mari/Mari_profile.png";
-const MARI_CHIBI_URL = "/sprites/mari/chibi-professor-mari.png";
+const MARI_AVATAR_URL = "/sprites/yunyun/yunyun-profile.png";
+const MARI_CHIBI_URL = "/sprites/yunyun/chibi-yunyun.png";
 const PROFESSOR_MARI_WELCOME_MESSAGE_ID = "__professor_mari_home_welcome__";
 const PROFESSOR_MARI_DRAFT_KEY = "__home_professor_mari__";
 const MARI_CONNECTION_STORAGE_KEY = "marinara:home-professor-mari-connection-id";
@@ -160,15 +160,15 @@ async function waitForWorkspaceRunToSettle(connectionId: string | null, signal: 
 const PROFESSOR_MARI_NO_CONNECTION_TOAST =
   "You haven't set up a connection yet! Click the link icon beside the paperclip to select one.";
 const MARI_WELCOME =
-  "Howdy, welcome to Marinara Engine!\n\nFeeling a little lost? It is not a skill issue yet, I am here to help! Ask me about the app, your setup, or what to do next.\n\nNeed something made or changed? I can create character cards, personas, lorebooks, chats, and presets, and I can make reversible local workspace changes with a Keep/Restore review. Select a connection via the link icon beside the paperclip first and then ask away!";
-const NEW_SKILL_CONTENT = `# Custom Professor Mari Skill
+  "Howdy, welcome to YunYun Engine!\n\nFeeling a little lost? It is not a skill issue yet, I am here to help! Ask me about the app, your setup, or what to do next.\n\nNeed something made or changed? I can create character cards, personas, lorebooks, chats, and presets, and I can make reversible local workspace changes with a Keep/Restore review. Select a connection via the link icon beside the paperclip first and then ask away!";
+const NEW_SKILL_CONTENT = `# Custom Professor YunYun Skill
 
-Use this skill when the request matches a workflow you want Professor Mari to follow.
+Use this skill when the request matches a workflow you want Professor YunYun to follow.
 
 ## Workflow
 
 - Add the trigger conditions.
-- Add the steps Professor Mari should follow.
+- Add the steps Professor YunYun should follow.
 - Add any checks or evidence she should collect before saying the work is done.
 `;
 
@@ -336,7 +336,7 @@ function describeProfessorMariError(error: unknown) {
   if (message) {
     return `${formatGenerationParameterError(message)} This message will stay visible long enough to screenshot for troubleshooting.`;
   }
-  return "The request failed before Professor Mari could answer. This message will stay visible long enough to screenshot for troubleshooting.";
+  return "The request failed before Professor YunYun could answer. This message will stay visible long enough to screenshot for troubleshooting.";
 }
 
 function isProfessorMariAbortError(error: unknown) {
@@ -1022,8 +1022,8 @@ function getSkillReadPresentation(tool: WorkspaceToolCall): ToolPresentation | n
   const professorMariSkill = normalized.includes("/.mari-workspace/skills/");
   const skillName = skillNameFromPath(path);
   return {
-    eyebrow: professorMariSkill ? "Mari skill" : "Skill",
-    title: professorMariSkill ? "Loading Professor Mari skill" : `Loading ${skillName}`,
+    eyebrow: professorMariSkill ? "YunYun skill" : "Skill",
+    title: professorMariSkill ? "Loading Professor YunYun skill" : `Loading ${skillName}`,
     detail: professorMariSkill ? skillName : null,
     tone: "skill",
   };
@@ -3467,7 +3467,7 @@ export function HomeProfessorMariChat({
     // Invalidation marks every query stale either way; the default 'active'
     // refetch pulls only what is mounted now, and everything else refreshes on
     // its next mount. refetchType:'all' here made every cached chat re-drain
-    // its full message page history on each Mari workspace change (#4703).
+    // its full message page history on each YunYun workspace change (#4703).
     await qc.invalidateQueries();
   }, [qc]);
 
@@ -3491,7 +3491,7 @@ export function HomeProfessorMariChat({
       handledWorkspaceRefreshIdsRef.current.add(entry.id);
     }
     void invalidateWorkspaceData().catch((error) => {
-      console.error("[Professor Mari] Failed to refresh app data after workspace change", error);
+      console.error("[Professor YunYun] Failed to refresh app data after workspace change", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariAppliedAWorkspaceChangeButAppData"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -3520,7 +3520,7 @@ export function HomeProfessorMariChat({
         return loadMessages(chat.id);
       })
       .catch((error) => {
-        console.error("[Professor Mari] Failed to load home assistant", error);
+        console.error("[Professor YunYun] Failed to load home assistant", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotLoad"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -3555,8 +3555,8 @@ export function HomeProfessorMariChat({
 
   useEffect(() => {
     void loadSkills().catch((error) => {
-      console.error("[Professor Mari] Failed to load skills", error);
-      setSkillsDiagnostics(["Professor Mari skills unavailable"]);
+      console.error("[Professor YunYun] Failed to load skills", error);
+      setSkillsDiagnostics(["Professor YunYun skills unavailable"]);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariSkillsAreUnavailable"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -3567,7 +3567,7 @@ export function HomeProfessorMariChat({
   useEffect(() => {
     if (!chatHistoryOpen) return;
     void loadChatHistory().catch((error) => {
-      console.error("[Professor Mari] Failed to load chats", error);
+      console.error("[Professor YunYun] Failed to load chats", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotLoadHerPreviousChats"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -3601,7 +3601,7 @@ export function HomeProfessorMariChat({
 
   useEffect(() => {
     void loadMemories().catch((error) => {
-      console.error("[Professor Mari] Failed to load memories", error);
+      console.error("[Professor YunYun] Failed to load memories", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariMemoriesAreUnavailable"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -3632,7 +3632,7 @@ export function HomeProfessorMariChat({
     [workspaceStatus?.pendingApprovals],
   );
 
-  // Alert the user when Professor Mari finished her work and is now blocked
+  // Alert the user when Professor YunYun finished her work and is now blocked
   // waiting on an approval. The notification helpers no-op while the app is
   // focused, so a present user just sees the in-app review card. Reviews are
   // re-fetched from the workspace service on re-entry, so the card is already waiting too.
@@ -3644,8 +3644,8 @@ export function HomeProfessorMariChat({
     for (const approval of fresh) notifiedApprovalIdsRef.current.add(approval.id);
     const uiState = useUIStore.getState();
     const notification = {
-      characterName: "Professor Mari",
-      title: "Professor Mari needs your approval",
+      characterName: "Professor YunYun",
+      title: "Professor YunYun needs your approval",
       tag: "marinara-mari-approval",
     };
     void showLocalMessageNotification({ ...notification, enabled: uiState.generationBrowserNotifications });
@@ -3715,7 +3715,7 @@ export function HomeProfessorMariChat({
             await ensureProfessorMariChat(id);
           } catch (error) {
             if (!pendingConnectionPersistRef.current && latestConnectionSelectionRef.current === id) {
-              console.error("[Professor Mari] Failed to save selected connection", error);
+              console.error("[Professor YunYun] Failed to save selected connection", error);
               toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRememberThatConnection"), {
                 description: describeProfessorMariError(error),
                 duration: 12_000,
@@ -3954,7 +3954,7 @@ export function HomeProfessorMariChat({
       await handleRestart();
       clearMariPlan();
     } catch (error) {
-      console.error("[Professor Mari] Failed to restart", error);
+      console.error("[Professor YunYun] Failed to restart", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRestartHerNotes"));
     } finally {
       setSending(false);
@@ -3995,7 +3995,7 @@ export function HomeProfessorMariChat({
           );
         }
       } catch (error) {
-        console.error("[Professor Mari] Failed to keep workspace change", error);
+        console.error("[Professor YunYun] Failed to keep workspace change", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotKeepThatWorkspaceChange"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -4014,7 +4014,7 @@ export function HomeProfessorMariChat({
       try {
         const result = await api.post<WorkspaceApprovalResponse>(`/professor-mari/workspace/approvals/${id}/reject`);
         await refreshWorkspaceStatus().catch(() => undefined);
-        // Refresh the Memories panel after a restore: reverting a Mari memory insert deletes the
+        // Refresh the Memories panel after a restore: reverting a YunYun memory insert deletes the
         // row, so the panel would otherwise keep rendering a stale client-side entry.
         await loadMemories().catch(() => undefined);
         if (result.outcome === "discarded") {
@@ -4031,7 +4031,7 @@ export function HomeProfessorMariChat({
           );
         }
       } catch (error) {
-        console.error("[Professor Mari] Failed to restore workspace change", error);
+        console.error("[Professor YunYun] Failed to restore workspace change", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRestoreThatWorkspaceChange"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -4080,7 +4080,7 @@ export function HomeProfessorMariChat({
         }
         return false;
       } catch (error) {
-        console.error("[Professor Mari] Failed to reject workspace rows", error);
+        console.error("[Professor YunYun] Failed to reject workspace rows", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRejectThatEntry"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -4106,7 +4106,7 @@ export function HomeProfessorMariChat({
         if (!result.ok) return null;
         return { before: result.before ?? null, after: result.after ?? null };
       } catch (error) {
-        console.error("[Professor Mari] Failed to render workspace prompt", error);
+        console.error("[Professor YunYun] Failed to render workspace prompt", error);
         return null;
       }
     },
@@ -4118,7 +4118,7 @@ export function HomeProfessorMariChat({
     try {
       await api.post("/professor-mari/workspace/abort");
     } catch (error) {
-      console.error("[Professor Mari] Failed to stop workspace task", error);
+      console.error("[Professor YunYun] Failed to stop workspace task", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotStopTheWorkspaceTask"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -4149,10 +4149,10 @@ export function HomeProfessorMariChat({
   const handleNewSkill = useCallback(() => {
     void createSkillFromContent({
       name: "custom-skill",
-      description: "User-defined Professor Mari skill.",
+      description: "User-defined Professor YunYun skill.",
       content: NEW_SKILL_CONTENT,
     }).catch((error) => {
-      console.error("[Professor Mari] Failed to create skill", error);
+      console.error("[Professor YunYun] Failed to create skill", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotAddThatSkill"));
     });
   }, [createSkillFromContent, localizeUi]);
@@ -4170,7 +4170,7 @@ export function HomeProfessorMariChat({
         .text()
         .then((content) => createSkillFromContent({ content, fileName: file.name }))
         .catch((error) => {
-          console.error("[Professor Mari] Failed to upload skill", error);
+          console.error("[Professor YunYun] Failed to upload skill", error);
           toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUploadThatSkill"));
         });
     },
@@ -4194,7 +4194,7 @@ export function HomeProfessorMariChat({
       await refreshWorkspaceStatus().catch(() => undefined);
       toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariSkillSaved"));
     } catch (error) {
-      console.error("[Professor Mari] Failed to save skill", error);
+      console.error("[Professor YunYun] Failed to save skill", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotSaveThatSkill"));
     } finally {
       setSkillsSaving(false);
@@ -4211,7 +4211,7 @@ export function HomeProfessorMariChat({
         await loadSkills();
         await refreshWorkspaceStatus().catch(() => undefined);
       } catch (error) {
-        console.error("[Professor Mari] Failed to toggle skill", error);
+        console.error("[Professor YunYun] Failed to toggle skill", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUpdateThatSkill"));
       } finally {
         setSkillsSaving(false);
@@ -4233,7 +4233,7 @@ export function HomeProfessorMariChat({
         await refreshWorkspaceStatus().catch(() => undefined);
         toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariSkillDeleted"));
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete skill", error);
+        console.error("[Professor YunYun] Failed to delete skill", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatSkill"));
       } finally {
         setSkillsSaving(false);
@@ -4265,8 +4265,8 @@ export function HomeProfessorMariChat({
   );
 
   const handleNewMemory = useCallback(() => {
-    void createMemory({ name: "New memory", content: "Describe a preference or instruction for Professor Mari." }).catch((error) => {
-      console.error("[Professor Mari] Failed to create memory", error);
+    void createMemory({ name: "New memory", content: "Describe a preference or instruction for Professor YunYun." }).catch((error) => {
+      console.error("[Professor YunYun] Failed to create memory", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotAddThatMemory"));
     });
   }, [createMemory, localizeUi]);
@@ -4299,7 +4299,7 @@ export function HomeProfessorMariChat({
           return createMemory({ content, name: baseName || undefined });
         })
         .catch((error) => {
-          console.error("[Professor Mari] Failed to upload memory", error);
+          console.error("[Professor YunYun] Failed to upload memory", error);
           toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUploadThatMemory"));
         });
     },
@@ -4318,7 +4318,7 @@ export function HomeProfessorMariChat({
       setSelectedMemoryId(result.instruction.id);
       toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariMemorySaved"));
     } catch (error) {
-      console.error("[Professor Mari] Failed to save memory", error);
+      console.error("[Professor YunYun] Failed to save memory", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotSaveThatMemory"));
     } finally {
       setMemoriesSaving(false);
@@ -4332,7 +4332,7 @@ export function HomeProfessorMariChat({
         await api.put<MariInstructionMutationResponse>(`/professor-mari/workspace/instructions/${memory.id}`, patch);
         await loadMemories();
       } catch (error) {
-        console.error("[Professor Mari] Failed to update memory", error);
+        console.error("[Professor YunYun] Failed to update memory", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUpdateThatMemory"));
       } finally {
         setMemoriesSaving(false);
@@ -4363,7 +4363,7 @@ export function HomeProfessorMariChat({
         await loadMemories();
         toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariMemoryDeleted"));
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete memory", error);
+        console.error("[Professor YunYun] Failed to delete memory", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatMemory"));
       } finally {
         setMemoriesSaving(false);
@@ -4391,7 +4391,7 @@ export function HomeProfessorMariChat({
         await loadMessages(chat.id);
         await loadChatHistory();
       } catch (error) {
-        console.error("[Professor Mari] Failed to open previous chat", error);
+        console.error("[Professor YunYun] Failed to open previous chat", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotOpenThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -4416,7 +4416,7 @@ export function HomeProfessorMariChat({
           qc.invalidateQueries({ queryKey: homeFeedKeys.all }),
         ]);
       } catch (error) {
-        console.error("[Professor Mari] Failed to rename chat", error);
+        console.error("[Professor YunYun] Failed to rename chat", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRenameThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -4450,7 +4450,7 @@ export function HomeProfessorMariChat({
         ]);
         toast.success(localizeUi("ui.chat.homeprofessormarichat.titleCommandRenamed", { name }));
       } catch (error) {
-        console.error("[Professor Mari] Failed to rename chat with /title", error);
+        console.error("[Professor YunYun] Failed to rename chat with /title", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRenameThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -4483,7 +4483,7 @@ export function HomeProfessorMariChat({
         }
         await loadChatHistory();
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete chat", error);
+        console.error("[Professor YunYun] Failed to delete chat", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -4540,7 +4540,7 @@ export function HomeProfessorMariChat({
       await loadChatHistory();
       if (failedDeletion?.status === "rejected") throw failedDeletion.reason;
     } catch (error) {
-      console.error("[Professor Mari] Failed to delete selected chats", error);
+      console.error("[Professor YunYun] Failed to delete selected chats", error);
       await loadChatHistory().catch(() => undefined);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteSelectedChats"), {
         description: describeProfessorMariError(error),
@@ -4594,7 +4594,7 @@ export function HomeProfessorMariChat({
         }
 
       } catch (error) {
-        console.error("[Professor Mari] Failed to prepare attachment", error);
+        console.error("[Professor YunYun] Failed to prepare attachment", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotAttachThatFile"), {
           description:
             error instanceof Error ? error.message : localizeUi("ui.chat.homeprofessormarichat.theFileCouldNotBeRead"),
@@ -4768,7 +4768,7 @@ export function HomeProfessorMariChat({
         });
         messagesReloaded = true;
       } catch (error) {
-        console.error("[Professor Mari] Failed to reload messages after completed workspace run", error);
+        console.error("[Professor YunYun] Failed to reload messages after completed workspace run", error);
       }
       if (workspaceRunIdRef.current !== runId || activeChatIdRef.current !== completedChatId) return;
       if (messagesReloaded) {
@@ -4802,7 +4802,7 @@ export function HomeProfessorMariChat({
       try {
         await api.delete(`/chats/${chatId}/messages/${messageId}`);
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete message", error);
+        console.error("[Professor YunYun] Failed to delete message", error);
         await loadMessages(chatId).catch(() => undefined);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatMessage"), {
           description: describeProfessorMariError(error),
@@ -4820,7 +4820,7 @@ export function HomeProfessorMariChat({
       try {
         await api.patch(`/chats/${chatId}/messages/${messageId}`, { content });
       } catch (error) {
-        console.error("[Professor Mari] Failed to edit message", error);
+        console.error("[Professor YunYun] Failed to edit message", error);
         await loadMessages(chatId).catch(() => undefined);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotSaveThatEdit"), {
           description: describeProfessorMariError(error),
@@ -4875,10 +4875,10 @@ export function HomeProfessorMariChat({
           getProfessorMariAttachments(userMessage),
           userMessage.id,
         );
-        if (!received) throw new Error("Professor Mari did not return a regenerated response");
+        if (!received) throw new Error("Professor YunYun did not return a regenerated response");
         void refreshAfterWorkspaceRun(chatId, runId);
       } catch (error) {
-        console.error("[Professor Mari] Failed to regenerate response", error);
+        console.error("[Professor YunYun] Failed to regenerate response", error);
         void loadMessages(chatId).catch(() => undefined);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRegenerateThatResponse"), {
           description: describeProfessorMariError(error),
@@ -4918,7 +4918,7 @@ export function HomeProfessorMariChat({
         );
         await api.patch(`/chats/${chatId}/messages/${messageId}/extra`, { attachments: updated });
       } catch (error) {
-        console.error("[Professor Mari] Failed to remove attachment", error);
+        console.error("[Professor YunYun] Failed to remove attachment", error);
         await loadMessages(chatId).catch(() => undefined);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRemoveThatAttachment"), {
           description: describeProfessorMariError(error),
@@ -4971,7 +4971,7 @@ export function HomeProfessorMariChat({
       if (isProfessorMariAbortError(error)) return;
       setDraft(text);
       setAttachments(submittedAttachments);
-      console.error("[Professor Mari] Failed to send", error);
+      console.error("[Professor YunYun] Failed to send", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotAnswerRightNow"), {
         description: describeProfessorMariError(error),
         duration: PROFESSOR_MARI_ERROR_TOAST_DURATION_MS,

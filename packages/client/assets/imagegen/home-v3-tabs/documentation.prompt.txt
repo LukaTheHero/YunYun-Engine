@@ -1,5 +1,5 @@
 Use case: stylized-concept
-Asset type: 20px browser bookmark favicon for Marinara Engine Documentation
+Asset type: 20px browser bookmark favicon for YunYun Engine Documentation
 Primary request: a modern minimal open book with a single bookmark ribbon, clean contemporary app-icon silhouette, no enclosing badge or frame
 Scene/backdrop: perfectly flat solid #00ff00 chroma-key background for background removal
 Style/medium: crisp flat 2D UI icon with subtle two-tone depth, rounded geometry, high legibility at 20px, aligned with a modern playful AI chat app

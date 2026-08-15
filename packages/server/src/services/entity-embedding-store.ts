@@ -109,7 +109,7 @@ function blurb(name: string, description: string, suffix?: string): string {
 type Projection = { name: string; embedText: string; blurb: string };
 
 function projectCharacter(row: Row): Projection | null {
-  if (row.id === PROFESSOR_MARI_ID) return null; // Mari does not fetch herself
+  if (row.id === PROFESSOR_MARI_ID) return null; // YunYun does not fetch herself
   let data: Partial<CharacterData> = {};
   try {
     // JSON.parse can return null / a non-object (data === "null"); guard so

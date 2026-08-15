@@ -161,7 +161,7 @@ try {
   }
 
   const realLanPeer = await app.inject({ method: "GET", url: "/api/private", remoteAddress: "192.0.2.77" });
-  assert.equal(realLanPeer.statusCode, 200, "LAN peers must remain governed by Marinara's existing auth policy");
+  assert.equal(realLanPeer.statusCode, 200, "LAN peers must remain governed by YunYun's existing auth policy");
 
   process.env.MARINARA_ANDROID_SECRET = "invalid";
   const invalidConfig = await app.inject({ method: "GET", url: "/api/private" });
@@ -226,7 +226,7 @@ try {
   );
   const unverifiableGuardIndex = activitySource.indexOf(String.raw`elif [ \"$guard_status\" -ne 0 ]`);
   const unverifiableMessageIndex = activitySource.indexOf(
-    "Could not verify that this Marinara Android build can safely read your stored data.",
+    "Could not verify that this YunYun Android build can safely read your stored data.",
     unverifiableGuardIndex,
   );
   const unverifiableExitIndex = activitySource.indexOf(String.raw`+ "    exit 1\n"`, unverifiableMessageIndex);

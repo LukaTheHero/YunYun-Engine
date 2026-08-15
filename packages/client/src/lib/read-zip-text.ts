@@ -3,7 +3,7 @@ const ZIP_CENTRAL_DIRECTORY_FILE_HEADER = 0x02014b50;
 const ZIP_LOCAL_FILE_HEADER = 0x04034b50;
 const MAX_ZIP_BYTES = 32 * 1024 * 1024;
 // Engine exports can contain several files per agent/function. Keep the parser
-// bounded without rejecting large archives produced by Marinara itself.
+// bounded without rejecting large archives produced by YunYun itself.
 const MAX_ZIP_ENTRIES = 8_192;
 const MAX_TEXT_ENTRY_BYTES = 2 * 1024 * 1024;
 const MAX_TOTAL_TEXT_BYTES = 16 * 1024 * 1024;

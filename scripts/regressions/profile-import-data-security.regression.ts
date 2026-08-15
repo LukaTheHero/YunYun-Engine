@@ -304,8 +304,8 @@ try {
     assert.ok(await connections.getWithKey("new-connection"), "saving locally must preserve the imported capability");
 
     const [instruction] = await db.select().from(schema.mariInstructions);
-    assert.equal(instruction?.enabled, 0, "imported Professor Mari memories must start disabled");
-    assert.equal(instruction?.persistent, 0, "imported Professor Mari memories must not auto-inject persistently");
+    assert.equal(instruction?.enabled, 0, "imported Professor YunYun memories must start disabled");
+    assert.equal(instruction?.persistent, 0, "imported Professor YunYun memories must not auto-inject persistently");
     const [theme] = await db.select().from(schema.customThemes);
     assert.equal(theme?.isActive, "false", "modern profile themes must not activate imported CSS");
     const [tool] = await db.select().from(schema.customTools);
