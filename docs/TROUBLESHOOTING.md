@@ -406,7 +406,7 @@ Before sharing debug output, remove API keys, access tokens, admin secrets, priv
 Then reach the community:
 
 - Read the open issues at https://github.com/Pasta-Devs/Marinara-Engine/issues
-- Join the Discord for community help at https://discord.com/invite/KdAkTg94ME
+- Join the Discord for community help at https://discord.gg/canalpa
 - File a bug report at https://github.com/Pasta-Devs/Marinara-Engine/issues with your details above.
 
 ## Related guides

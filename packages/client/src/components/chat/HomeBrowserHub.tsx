@@ -86,12 +86,7 @@ import { HomeNewChatLauncher } from "./HomeNewChatLauncher";
 import { HomeProfessorMariChat, ProfessorMariPixelScene } from "./HomeProfessorMariChat";
 import { RecentChats } from "./RecentChats";
 
-const MARI_ASSISTANT_ARRIVAL_SHEET = "/sprites/mari/generated/professor-mari-assistant-sheet.png";
-const MARI_ASSISTANT_IDLE = "/sprites/mari/generated/professor-mari-assistant-idle.png";
-const MARI_ASSISTANT_BLINK = "/sprites/mari/generated/professor-mari-assistant-blink-v3.png";
-const MARI_ASSISTANT_MAP = "/sprites/mari/generated/professor-mari-assistant-map.png";
-const MARI_ASSISTANT_SHRUG = "/sprites/mari/generated/professor-mari-assistant-shrug.png";
-const MARI_ASSISTANT_DRAG_SHEET = "/sprites/mari/generated/professor-mari-assistant-drag-sheet-v3.png";
+const YUNYUN_ASSISTANT_IMAGE = "/sprites/yunyun/chibi-yunyun.png";
 const HOME_BROWSER_PANEL_ID = "marinara-home-browser-panel";
 const MARINARA_EFFECTS_PAUSED_EVENT = "marinara:effects-paused";
 
@@ -865,7 +860,6 @@ function FloatingProfessorMari({
   const overlayRef = useRef<HTMLElement | null>(null);
   const spriteRef = useRef<HTMLDivElement | null>(null);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
-  const dragAnimationRef = useRef<HTMLSpanElement | null>(null);
   const dragMoveFrameRef = useRef<number | null>(null);
   const pendingDragPositionRef = useRef<ProfessorAssistantPosition | null>(null);
   const normalizedPositionRef = useRef<ProfessorAssistantPosition | null>(readProfessorAssistantPosition());
@@ -882,7 +876,6 @@ function FloatingProfessorMari({
   const [desktopDragEnabled, setDesktopDragEnabled] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 640px) and (pointer: fine)").matches,
   );
-  const [dragSpriteReady, setDragSpriteReady] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState<ProfessorAssistantPosition | null>(null);
   const [dragLayout, setDragLayout] = useState<ProfessorAssistantDragLayout | null>(null);
@@ -941,29 +934,6 @@ function FloatingProfessorMari({
     mediaQuery.addEventListener("change", syncDesktopDrag);
     return () => mediaQuery.removeEventListener("change", syncDesktopDrag);
   }, []);
-
-  useEffect(() => {
-    if (!pageActive || !enabled || minimized || !desktopDragEnabled || dragSpriteReady) return;
-    let active = true;
-    let settled = false;
-    const image = new Image();
-    const markReady = () => {
-      if (settled) return;
-      settled = true;
-      if (active) setDragSpriteReady(true);
-    };
-    const decode = () => {
-      if (typeof image.decode === "function") void image.decode().then(markReady, markReady);
-      else markReady();
-    };
-    image.addEventListener("load", decode, { once: true });
-    image.src = MARI_ASSISTANT_DRAG_SHEET;
-    if (image.complete) decode();
-    return () => {
-      active = false;
-      image.removeEventListener("load", decode);
-    };
-  }, [desktopDragEnabled, dragSpriteReady, enabled, minimized, pageActive]);
 
   const syncDragLayout = useCallback(() => {
     if (!desktopDragEnabled || dragRef.current) return;
@@ -1144,7 +1114,7 @@ function FloatingProfessorMari({
   }, []);
 
   const beginProfessorDrag = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!desktopDragEnabled || !dragSpriteReady || !dragLayoutRef.current || !positionRef.current) return;
+    if (!desktopDragEnabled || !dragLayoutRef.current || !positionRef.current) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.target instanceof HTMLElement)
@@ -1163,7 +1133,6 @@ function FloatingProfessorMari({
     if (dragMoveFrameRef.current !== null) window.cancelAnimationFrame(dragMoveFrameRef.current);
     dragMoveFrameRef.current = null;
     pendingDragPositionRef.current = null;
-    for (const animation of dragAnimationRef.current?.getAnimations() ?? []) animation.currentTime = 0;
     document.documentElement.classList.add("mari-home-professor-drag-active");
     flushSync(() => setDragging(true));
   };
@@ -1290,10 +1259,10 @@ function FloatingProfessorMari({
         className="mari-home-professor-recall absolute bottom-[max(0.65rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] z-[30] flex h-14 w-14 items-end justify-center overflow-hidden rounded-full border border-[color-mix(in_srgb,oklch(0.73_0.21_345)_54%,var(--border))] bg-[color-mix(in_srgb,oklch(0.73_0.21_345)_12%,var(--card))] p-0.5 shadow-[0_16px_36px_-18px_oklch(0.73_0.21_345/0.72)] transition-[transform,box-shadow,background-color] hover:-translate-y-0.5 hover:bg-[color-mix(in_srgb,oklch(0.73_0.21_345)_18%,var(--card))] hover:shadow-[0_20px_42px_-16px_oklch(0.73_0.21_345/0.78)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.73_0.21_345)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] active:scale-95 motion-reduce:transition-none sm:bottom-4 sm:right-4"
       >
         <img
-          src={MARI_ASSISTANT_IDLE}
+          src={YUNYUN_ASSISTANT_IMAGE}
           alt=""
           aria-hidden="true"
-          className="h-[92%] w-[92%] object-contain [image-rendering:pixelated]"
+          className="h-[92%] w-[92%] object-contain"
           style={{ objectPosition: "calc(50% + 1.5px) bottom" }}
         />
       </button>
@@ -1362,7 +1331,7 @@ function FloatingProfessorMari({
         onPointerCancel={finishProfessorDrag}
         onLostPointerCapture={finishProfessorDrag}
       >
-        {desktopDragEnabled && dragSpriteReady ? (
+        {desktopDragEnabled ? (
           <span
             role="button"
             tabIndex={0}
@@ -1379,55 +1348,14 @@ function FloatingProfessorMari({
             <GripVertical size="0.9rem" />
           </span>
         ) : null}
-        {desktopDragEnabled && dragSpriteReady ? (
-          <span
-            ref={dragAnimationRef}
-            className="mari-home-professor-popup__drag-frame absolute z-[5] bg-no-repeat [background-size:400%_100%]"
-            style={{ backgroundImage: `url(${MARI_ASSISTANT_DRAG_SHEET})` }}
-            aria-hidden="true"
-            data-component="HomeBrowserHub.ProfessorDragAnimation"
-          />
-        ) : null}
         <div className="mari-home-professor-popup__rest-frame absolute inset-0" aria-hidden="true">
-          <span
-            className={cn(
-              "mari-home-professor-popup__arrival-frame absolute inset-0 z-[2] bg-no-repeat opacity-0 [background-size:400%_100%]",
-              phase === "arriving" && "opacity-100",
-            )}
-            style={{ backgroundImage: `url(${MARI_ASSISTANT_ARRIVAL_SHEET})` }}
+          <img
+            src={YUNYUN_ASSISTANT_IMAGE}
+            alt=""
+            draggable={false}
+            data-component="HomeBrowserHub.ProfessorAssistantImage"
+            className="absolute inset-0 z-[1] h-full w-full object-contain object-bottom"
           />
-          <span
-            className={cn(
-              "mari-home-professor-popup__idle-stage absolute inset-0 z-[1] opacity-0",
-              phase === "idle" && "mari-home-professor-popup__idle-stage--active opacity-100",
-            )}
-          >
-            <img
-              src={MARI_ASSISTANT_IDLE}
-              alt=""
-              draggable={false}
-              className="mari-home-professor-popup__idle absolute inset-0 h-full w-full object-contain object-bottom"
-            />
-            <img
-              src={MARI_ASSISTANT_BLINK}
-              alt=""
-              draggable={false}
-              className="mari-home-professor-popup__blink absolute inset-0 h-full w-full object-contain object-bottom"
-            />
-          </span>
-          {phase === "map" || phase === "shrug" ? (
-            <img
-              src={phase === "map" ? MARI_ASSISTANT_MAP : MARI_ASSISTANT_SHRUG}
-              alt=""
-              draggable={false}
-              className={cn(
-                "mari-home-professor-popup__state-image absolute inset-0 z-[3] h-full w-full object-contain object-bottom",
-                phase === "map"
-                  ? "mari-home-professor-popup__state-image--map"
-                  : "mari-home-professor-popup__state-image--shrug",
-              )}
-            />
-          ) : null}
         </div>
       </div>
       <div
@@ -2147,10 +2075,10 @@ export function HomeBrowserHub({
     if (target.kind === "window") {
       if (target.window === "discord") {
         trackHomeAction("discord_clicked");
-        window.open("https://discord.com/invite/KdAkTg94ME", "_blank", "noopener,noreferrer");
+        window.open("https://discord.gg/canalpa", "_blank", "noopener,noreferrer");
       } else if (target.window === "support") {
         trackHomeAction("kofi_clicked");
-        window.open("https://ko-fi.com/marinara_spaghetti", "_blank", "noopener,noreferrer");
+        window.open("https://ko-fi.com/lukathehero", "_blank", "noopener,noreferrer");
       } else if (target.window === "documentation") ui.openModal("docs-viewer");
       else if (target.window === "faq") setFaqOpen(true);
       else if (target.window === "widgets") setWidgetManagerOpen(true);
@@ -2330,7 +2258,7 @@ export function HomeBrowserHub({
           >
             <div className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto sm:flex">
               <BrowserBookmark
-                href="https://discord.com/invite/KdAkTg94ME"
+                href="https://discord.gg/canalpa"
                 onClick={() => trackHomeAction("discord_clicked")}
                 icon={<img src="/home/tab-icons/discord.svg" alt="" className="h-4 w-4 object-contain" />}
                 tone="#5865F2"
@@ -2338,7 +2266,7 @@ export function HomeBrowserHub({
                 {t("home.browser.bookmarks.discord")}
               </BrowserBookmark>
               <BrowserBookmark
-                href="https://ko-fi.com/marinara_spaghetti"
+                href="https://ko-fi.com/lukathehero"
                 onClick={() => trackHomeAction("kofi_clicked")}
                 icon={<img src="/home/tab-icons/kofi.png" alt="" className="h-4 w-4 object-contain" />}
                 tone="#ff6433"
@@ -2436,7 +2364,7 @@ export function HomeBrowserHub({
                   data-bookmarks-motion="slide"
                 >
                   <MobileBrowserBookmark
-                    href="https://discord.com/invite/KdAkTg94ME"
+                    href="https://discord.gg/canalpa"
                     onClick={() => {
                       setMobileBookmarksOpen(false);
                       trackHomeAction("discord_clicked");
@@ -2447,7 +2375,7 @@ export function HomeBrowserHub({
                     {t("home.browser.bookmarks.discord")}
                   </MobileBrowserBookmark>
                   <MobileBrowserBookmark
-                    href="https://ko-fi.com/marinara_spaghetti"
+                    href="https://ko-fi.com/lukathehero"
                     onClick={() => {
                       setMobileBookmarksOpen(false);
                       trackHomeAction("kofi_clicked");
@@ -2933,14 +2861,14 @@ export function HomeBrowserHub({
                       >
                         <div className="mari-home-widget-shortcut-list grid content-center gap-1">
                           <HomeWidgetShortcut
-                            href="https://discord.com/invite/KdAkTg94ME"
+                            href="https://discord.gg/canalpa"
                             onClick={() => trackHomeAction("discord_clicked")}
                             icon="/home/tab-icons/discord.svg"
                             title={t("home.community.discordTitle")}
                             description={t("home.community.discordDescription")}
                           />
                           <HomeWidgetShortcut
-                            href="https://ko-fi.com/marinara_spaghetti"
+                            href="https://ko-fi.com/lukathehero"
                             onClick={() => trackHomeAction("kofi_clicked")}
                             icon="/home/tab-icons/kofi.png"
                             title={t("home.community.supportTitle")}

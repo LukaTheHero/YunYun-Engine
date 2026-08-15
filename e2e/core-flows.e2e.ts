@@ -8895,20 +8895,16 @@ test("Professor YunYun visibly arrives on Home and navigates without AI", async 
       exact: true,
     }),
   ).toBeVisible();
-  await expect(assistant.locator(".mari-home-professor-popup__idle")).toHaveAttribute(
+  await expect(assistant.locator('[data-component="HomeBrowserHub.ProfessorAssistantImage"]')).toHaveAttribute(
     "src",
-    "/sprites/mari/generated/professor-mari-assistant-idle.png",
-  );
-  await expect(assistant.locator(".mari-home-professor-popup__blink")).toHaveAttribute(
-    "src",
-    "/sprites/mari/generated/professor-mari-assistant-blink-v3.png",
+    "/sprites/yunyun/chibi-yunyun.png",
   );
   await assistant.getByRole("button", { name: "Minimize Professor YunYun navigation", exact: true }).click();
   await expect(assistant).toBeHidden();
   const recallButton = page.getByRole("button", { name: "Help Me Navigate", exact: true });
   await expect(recallButton).toBeVisible();
   const recallSprite = recallButton.locator("img");
-  await expect(recallSprite).toHaveAttribute("src", "/sprites/mari/generated/professor-mari-assistant-idle.png");
+  await expect(recallSprite).toHaveAttribute("src", "/sprites/yunyun/chibi-yunyun.png");
   await expect(recallSprite).toHaveCSS("object-position", "calc(50% + 1.5px) 100%");
   const [recallBounds, viewportWidth] = await Promise.all([
     recallButton.boundingBox(),
@@ -8928,18 +8924,11 @@ test("Professor YunYun visibly arrives on Home and navigates without AI", async 
   await navigationInput.fill("quantum spaghetti cupboard");
   await navigationInput.press("Enter");
   await expect(assistant.getByText("Couldn't find it, sorry!", { exact: true })).toBeVisible();
-  await expect(assistant.locator(".mari-home-professor-popup__state-image--shrug")).toBeVisible();
-  await expect(assistant.locator(".mari-home-professor-popup__idle-stage")).toHaveCSS("opacity", "0");
   await assistant.getByRole("button", { name: "Back to search", exact: true }).click();
   await expect(navigationInput).toBeFocused();
   await navigationInput.fill("Could I talk to Professor YunYun?");
   await navigationInput.press("Enter");
   await expect(assistant.getByText("Here, found it!", { exact: true })).toBeVisible();
-  await expect(assistant.locator(".mari-home-professor-popup__state-image--map")).toHaveAttribute(
-    "src",
-    "/sprites/mari/generated/professor-mari-assistant-map.png",
-  );
-  await expect(assistant.locator(".mari-home-professor-popup__idle-stage")).toHaveCSS("opacity", "0");
   await expect(page.locator('[data-component="HomeProfessorMariChat.Window"]')).toBeVisible();
   await expect(
     page.locator('[data-component="HomeProfessorMariChat.Window"]').getByRole("button", { name: "Close", exact: true }),
@@ -13770,11 +13759,11 @@ test("Home Community and clock widgets are useful, timezone-aware, and optional"
   await expect(community.getByRole("heading", { name: "Around the table" })).toBeVisible();
   await expect(community.getByRole("link", { name: /Discord/ })).toHaveAttribute(
     "href",
-    "https://discord.com/invite/KdAkTg94ME",
+    "https://discord.gg/canalpa",
   );
   await expect(community.getByRole("link", { name: /Support/ })).toHaveAttribute(
     "href",
-    "https://ko-fi.com/marinara_spaghetti",
+    "https://ko-fi.com/lukathehero",
   );
   await community.getByRole("button", { name: /Credits/ }).click();
   const creditsWindow = page.getByRole("dialog", { name: "Credits", exact: true });
@@ -14492,8 +14481,9 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
     });
     const restoredAssistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
     await expect(restoredAssistant).toBeVisible({ timeout: 1_000 });
-    await expect(restoredAssistant.locator(".mari-home-professor-popup__idle-stage--active")).toBeVisible();
-    await expect(restoredAssistant.locator(".mari-home-professor-popup__arrival-frame")).toHaveCSS("opacity", "0");
+    await expect(
+      restoredAssistant.locator('[data-component="HomeBrowserHub.ProfessorAssistantImage"]'),
+    ).toBeVisible();
     await page.evaluate(async () => {
       const module = await import("/src/stores/ui.store.ts");
       module.useUIStore.getState().setReduceAmbientEffects(false);
@@ -14628,7 +14618,6 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   const sprite = page.locator('[data-component="HomeBrowserHub.ProfessorAssistantSprite"]');
   const bubble = page.locator('[data-component="HomeBrowserHub.ProfessorAssistantBubble"]');
   const bubbleTail = page.locator('[data-component="HomeBrowserHub.ProfessorAssistantBubbleTail"]');
-  const dragAnimation = page.locator('[data-component="HomeBrowserHub.ProfessorDragAnimation"]');
   await expect(assistant).toBeVisible({ timeout: 6_000 });
   await expect(sprite).toBeVisible();
   await expect(bubbleTail).toHaveCount(1);
@@ -14641,7 +14630,6 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   await sprite.hover();
   await expect(handle).toBeVisible();
   await expect(handle).toHaveCSS("opacity", "1");
-  await expect(dragAnimation).toBeHidden();
 
   const [handleBounds, initialSpriteBounds, contentBounds] = await Promise.all([
     handle.boundingBox(),
@@ -14654,32 +14642,11 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   await page.mouse.move(handleBounds!.x + handleBounds!.width / 2, handleBounds!.y + handleBounds!.height / 2);
   await page.mouse.down();
   await expect(assistant).toHaveAttribute("data-dragging", "true");
-  await expect(dragAnimation).toBeVisible();
   await expect(bubble).toContainText("W-What are you doing? Put me down! (˶>⩊<˶)");
-  await page.waitForTimeout(80);
-  const firstDragTimeline = await dragAnimation.evaluate((element) => ({
-    currentTime: Number(element.getAnimations()[0]?.currentTime ?? 0),
-    frame: getComputedStyle(element).backgroundPositionX,
-  }));
-  expect(["3.1%", "34.48%", "66.12%", "98.15%"]).toContain(firstDragTimeline.frame);
-  const dragAnimationBounds = await dragAnimation.boundingBox();
-  expect(dragAnimationBounds).not.toBeNull();
-  const dragScaleX = dragAnimationBounds!.width / initialSpriteBounds!.width;
-  const dragScaleY = dragAnimationBounds!.height / initialSpriteBounds!.height;
-  expect(dragScaleX).toBeGreaterThan(1.16);
-  expect(dragScaleY).toBeGreaterThan(1.1);
-  expect(dragScaleX / dragScaleY).toBeGreaterThan(1.03);
-  expect(dragScaleX / dragScaleY).toBeLessThan(1.08);
 
   const rightEdgeGrabX = contentBounds!.x + contentBounds!.width - 16 - initialSpriteBounds!.width * (1 - 0.45);
   await page.mouse.move(rightEdgeGrabX, contentBounds!.y + 220, { steps: 6 });
   await expect(bubble).toHaveAttribute("data-tail-side", "right");
-  const movedDragTimeline = await dragAnimation.evaluate((element) => ({
-    currentTime: Number(element.getAnimations()[0]?.currentTime ?? 0),
-    frame: getComputedStyle(element).backgroundPositionX,
-  }));
-  expect(movedDragTimeline.currentTime).toBeGreaterThan(firstDragTimeline.currentTime);
-  expect(["3.1%", "34.48%", "66.12%", "98.15%"]).toContain(movedDragTimeline.frame);
   const rightTailStyle = await bubbleTail.evaluate((element) => {
     const tail = getComputedStyle(element);
     const outerTail = getComputedStyle(element, "::before");
@@ -14697,7 +14664,6 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   expect(rightTailStyle.transform).toBe("matrix(-1, 0, 0, 1, 0, 0)");
   await page.mouse.up();
   await expect(assistant).toHaveAttribute("data-dragging", "false");
-  await expect(dragAnimation).toBeHidden();
   await expect(bubble).toHaveAttribute("data-tail-side", "right");
 
   await sprite.hover();
@@ -14709,12 +14675,6 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   );
   await page.mouse.down();
   await expect(assistant).toHaveAttribute("data-dragging", "true");
-  await expect(dragAnimation).toBeVisible();
-  expect(
-    await dragAnimation.evaluate((element) =>
-      Number(element.getAnimations()[0]?.currentTime ?? Number.POSITIVE_INFINITY),
-    ),
-  ).toBeLessThan(150);
 
   const dragTarget = {
     x: contentBounds!.x + contentBounds!.width * 0.35,
@@ -14755,7 +14715,6 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   );
   await page.mouse.up();
   await expect(assistant).toHaveAttribute("data-dragging", "false");
-  await expect(dragAnimation).toBeHidden();
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -14771,7 +14730,9 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   const droppedPosition = await sprite.boundingBox();
   await page.reload();
   await expect(sprite).toBeVisible({ timeout: 6_000 });
-  await expect(sprite.locator(".mari-home-professor-popup__idle-stage--active")).toBeVisible({ timeout: 3_000 });
+  await expect(sprite.locator('[data-component="HomeBrowserHub.ProfessorAssistantImage"]')).toBeVisible({
+    timeout: 3_000,
+  });
   const restoredPosition = await sprite.boundingBox();
   expect(droppedPosition).not.toBeNull();
   expect(restoredPosition).not.toBeNull();

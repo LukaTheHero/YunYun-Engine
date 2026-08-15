@@ -44,6 +44,9 @@ const RULES = [
   // that, pointing at an asset we had deleted. Remap them here so every future
   // merge self-heals instead of silently shipping a 404'd image.
   [/\/sprites\/mari\/chibi-professor-mari\.png/g, "/sprites/yunyun/chibi-yunyun.png"],
+  // The home assistant's six pixel-art states were replaced by one static
+  // YunYun image, so any re-added reference must collapse onto it or 404.
+  [/\/sprites\/mari\/generated\/professor-mari-assistant-[a-z0-9-]+\.png/g, "/sprites/yunyun/chibi-yunyun.png"],
   [/\/sprites\/mari\/Mari_profile\.png/g, "/sprites/yunyun/yunyun-profile.png"],
   [/\/illustrations\/professor-mari-whats-new\.webp/g, "/illustrations/yunyun-whats-new.webp"],
   [/"\/logo\.png"/g, '"/yunyun-logo.png"'],
@@ -51,6 +54,10 @@ const RULES = [
   [/"\/favicon\.png"/g, '"/yunyun-favicon.png"'],
   [/"\/icon-192\.png"/g, '"/yunyun-icon-192.png"'],
   [/"\/icon-512\.png"/g, '"/yunyun-icon-512.png"'],
+  // Upstream's community links. These are Marinara's own Discord and donation
+  // page, so every merge that adds a new reference must be repointed at ours.
+  [/https:\/\/discord\.com\/invite\/KdAkTg94ME/g, "https://discord.gg/canalpa"],
+  [/https:\/\/ko-fi\.com\/marinara_spaghetti/g, "https://ko-fi.com/lukathehero"],
 ];
 
 // Phrases that must survive verbatim even though they contain the old name.
