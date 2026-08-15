@@ -1,6 +1,6 @@
 # Custom Tools and Function Calling
 
-This guide explains custom tools, also called Functions, in YunYun Engine. A custom tool teaches the AI to run a small action during a chat. It can return a fixed piece of text, call an outside web address, or run a short script on the server. You will learn how to build one, turn tool use on for a chat, and keep script tools safe.
+This guide explains custom tools, also called Functions, in Marinara Engine. A custom tool teaches the AI to run a small action during a chat. It can return a fixed piece of text, call an outside web address, or run a short script on the server. You will learn how to build one, turn tool use on for a chat, and keep script tools safe.
 
 ## What function calling is
 
@@ -179,7 +179,7 @@ You can move tools between installs.
 - To export every tool, click **Export functions to ZIP** in the **Functions** section.
 - To import, click **Import functions from ZIP or JSON** and pick a `.json` or `.zip` file. A message reports how many tools imported.
 
-Imported webhook tools are always saved with the tool disabled and **Include hidden chat context** off, even if the file asks for either permission. After the import, YunYun shows the webhook's destination origin and the permissions the file requested. Open each imported webhook, inspect its complete URL and hidden-context setting, then turn it on only if you trust the destination. Static and Script tools keep their imported enabled state.
+Imported webhook and Script tools are always saved with the tool disabled and **Include hidden chat context** off, even if the file asks for either permission. After the import, Marinara shows the executable type, webhook destination when applicable, and the permissions the file requested. Open each imported executable tool, inspect it, then turn it on only if you trust it. Static tools keep their imported enabled state.
 
 An import skips any tool whose name clashes with an existing tool or a built-in tool name. Agent packages do not bundle or import custom tools: export trusted functions separately, review them in **Function Calls**, and explicitly attach them after importing the agent.
 

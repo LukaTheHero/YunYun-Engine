@@ -66,6 +66,10 @@ const PROTECT = [
   `${OLD_NAME} Conversation prompt`,
   `PRESET_AUTHOR = "${OLD_NAME}"`,
   `MARINARA_UNIVERSAL_PRESET_AUTHOR = "${OLD_NAME}"`,
+  // v2.4.2 moved the preset credit into shared constants. The seeder matches
+  // stock presets on name+author, so renaming either orphans users' presets
+  // and seeds a duplicate.
+  `MARINARA_UNIVERSAL_PRESET_NAME = "${OLD_NAME}'s Universal Preset"`,
   // The workspace CLI binary is literally `mari`; describing it as anything
   // else in an agent prompt makes the model invoke a command that does not exist.
   `${OLD_ASSISTANT} CLI`,

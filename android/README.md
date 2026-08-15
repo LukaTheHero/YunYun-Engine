@@ -1,23 +1,26 @@
-# YunYun Engine - Android APK
+# Marinara Engine - Android APK
 
-The Android app is a Termux bootstrap + WebView shell for YunYun Engine. It is not a native Android server build, but it can help launch the Termux setup flow and then opens the local YunYun server in a fullscreen WebView by default.
+The Android app is a Termux bootstrap + WebView shell for Marinara Engine. It is not a native Android server build, but it can help launch the Termux setup flow and then opens the local Marinara server in a fullscreen WebView by default.
 
 > **Android permission reality:** Android does not allow an ordinary APK to silently install another app or run commands inside Termux without user approval. First launch may still ask the user to install Termux, grant **Run commands in Termux environment** permission, and enable Termux external commands.
 
 ## How It Works
 
-- If YunYun Engine is already running in Termux, the APK opens `http://127.0.0.1:<PORT>` inside a fullscreen WebView. The default build-time port is `7860`.
-- If the server is not running, the APK shows bootstrap actions: **Install / Start YunYun**, **Get Termux manually**, and **Retry connection**.
-- **Install / Start YunYun** downloads the current suggested Termux APK from F-Droid when Termux is missing, hands it to Android's package installer, then continues setup after the user approves the install.
-- After Termux is installed, **Install / Start YunYun** uses Termux's `RUN_COMMAND` integration to run the YunYun Termux installer command. This requires the Android **Run commands in Termux environment** permission to be granted to YunYun Engine, and `allow-external-apps=true` to be enabled in Termux.
+- If Marinara Engine is already running in Termux, the APK opens `http://127.0.0.1:<PORT>` inside a fullscreen WebView. The default build-time port is `7860`.
+- If the server is not running, the APK shows bootstrap actions: **Install / Start Marinara**, **Get Termux manually**, and **Retry connection**. A legacy manual server can be opened only after the APK detects the missing authentication route and you confirm that you started it.
+- **Install / Start Marinara** downloads the pinned Termux APK from F-Droid when Termux is missing, verifies its exact size, SHA-256, package identity, version, and F-Droid signer, then hands it to Android's package installer.
+- After Termux is installed, **Install / Start Marinara** uses Termux's `RUN_COMMAND` integration to run the Marinara Termux installer command. This requires the Android **Run commands in Termux environment** permission to be granted to Marinara Engine, and `allow-external-apps=true` to be enabled in Termux.
+- Before sending its private setup command, the APK accepts Termux builds signed by F-Droid, Google Play, or the Termux developers. Other signing certificates require an explicit, one-session confirmation.
 - If Termux blocks external commands, the APK copies the required `allow-external-apps` command to the clipboard and opens Termux so the user can paste it once.
-- The server, launcher updates, and `AUTO_OPEN_BROWSER` behavior are still owned by the Termux launcher, not by this APK.
+- The first APK bootstrap starts the exact embedded source commit with update checks skipped. Later launches, manual updates, and `AUTO_OPEN_BROWSER` behavior are still owned by the Termux launcher.
+- APK-managed installs use a private per-install secret to authenticate the WebView to the Termux server. This prevents another Android app from impersonating Marinara on the localhost port or inheriting loopback API access. Manual Termux-only installs retain their existing behavior.
+- The bootstrap fetches and checks out the exact source commit embedded in the APK. It does not fall back to a mutable branch when that commit cannot be fetched.
 - Release and versioning policy follows the main repo docs in [../CONTRIBUTING.md](../CONTRIBUTING.md): root `package.json` is canonical, Android `versionName` should match the app version, and `versionCode` must increase for every shipped APK.
 - If you build the APK with a non-default port, Termux must use the same `PORT` value in `.env`.
 
-**Fast path:** install the APK, open it, tap **Install / Start YunYun**, approve Android/Termux prompts, wait for the Termux launcher to finish, then return to the YunYun Engine app.
+**Fast path:** install the APK, open it, tap **Install / Start Marinara**, approve Android/Termux prompts, wait for the Termux launcher to finish, then return to the Marinara Engine app.
 
-**Manual fallback:** install Termux from F-Droid, paste the fresh-Termux command below so it creates/updates the YunYun folder, then open the YunYun Engine Android app.
+**Manual fallback:** install Termux from F-Droid, paste the fresh-Termux command below so it creates/updates the Marinara folder, then open the Marinara Engine Android app. When prompted, confirm **Open manual server**. Clipboard fallback commands never contain the APK's private local-access secret.
 
 ## Features
 
@@ -58,7 +61,9 @@ MARINARA_PORT=9000 ./build-apk.sh
 Build outputs:
 
 - Debug: `app/build/outputs/apk/debug/app-debug.apk`
-- Release: `app/build/outputs/apk/release/app-release.apk` (signed with your `ANDROID_SIGNING_*` keystore when set, otherwise debug-signed)
+- Release: `app/build/outputs/apk/release/app-release.apk` (requires your `ANDROID_SIGNING_*` release keystore; release builds fail rather than silently using the debug key)
+
+The embedded source commit is resolved from the current Git checkout. It must be reachable from the official repository for the on-device bootstrap to fetch it. Source archives can pass the exact commit with `-PmarinaraReleaseCommit=<40-hex-commit>`.
 
 ### Install
 
@@ -90,13 +95,13 @@ cd android
 ### Bootstrap Path
 
 1. Install the APK from the GitHub Release.
-2. Open **YunYun Engine**.
-3. If the server is not running, tap **Install / Start YunYun**.
-4. If Termux is missing, approve Android's install prompts so YunYun can install the F-Droid Termux APK.
+2. Open **Marinara Engine**.
+3. If the server is not running, tap **Install / Start Marinara**.
+4. If Termux is missing, approve Android's install prompts so Marinara can install the F-Droid Termux APK.
 5. If Android asks for **Run commands in Termux environment**, grant it.
-6. If Termux blocks external commands, paste the copied `allow-external-apps` command in Termux once, then tap **Install / Start YunYun** again.
-7. Wait for Termux to finish installing dependencies, building YunYun Engine, and starting the local server.
-8. Return to **YunYun Engine**. The WebView shell connects automatically once the server is ready.
+6. If Termux blocks external commands, paste the copied `allow-external-apps` command in Termux once, then tap **Install / Start Marinara** again.
+7. Wait for Termux to finish installing dependencies, building Marinara Engine, and starting the local server.
+8. Return to **Marinara Engine**. The WebView shell connects automatically once the server is ready.
 
 ### Manual Path
 
@@ -106,26 +111,34 @@ On a fresh Termux install, paste this command first:
 pkg update -y && pkg install -y git nodejs-lts && ([ -d "$HOME/Marinara-Engine/.git" ] || git clone https://github.com/Pasta-Devs/Marinara-Engine.git "$HOME/Marinara-Engine") && cd "$HOME/Marinara-Engine" && chmod +x start-termux.sh && ./start-termux.sh
 ```
 
-After YunYun has been installed once, start it again in Termux:
+After Marinara has been installed once, start it again in Termux:
 
 ```bash
 cd "$HOME/Marinara-Engine"
 ./start-termux.sh
 ```
 
+APK-managed installs also protect ordinary localhost browser sessions. The Termux launcher opens `/android-login`; paste the secret displayed by this Termux command when prompted:
+
+```bash
+cat ~/.marinara-engine/android-secret
+```
+
+The `mari` CLI continues to work automatically because the Termux launcher passes the same secret to it; direct local CLI runs also fall back to this private secret file. LAN access and manual installations remain governed by the normal Marinara authentication settings.
+
 To skip the update check and start the already-installed local copy, run `./start-termux.sh --skip-update`.
 To skip automatic Engine updates on every launch, add `AUTO_UPDATE_ENABLED=false` to the project `.env`; the launcher still checks for a newer published release and prints its download link when one is available, while manual update controls remain available.
 
-Then open the **YunYun Engine** app from your home screen. The app shows "Connecting..." until the local server is ready, then loads automatically.
+Then open the **Marinara Engine** app from your home screen. The app shows "Connecting..." until the local server is ready, then loads automatically.
 
-Because the APK points at `http://127.0.0.1:<PORT>`, it only works while the YunYun Engine server is running on the same Android device and using the same port value.
+Because the APK points at `http://127.0.0.1:<PORT>`, it only works while the Marinara Engine server is running on the same Android device and using the same port value.
 
-YunYun hides the Android status bar by default for a distraction-free view. Enable **Show Android status bar** under **Settings > General > App Behavior** to keep the time, battery level, and notification icons visible. The Android app remembers this choice across restarts.
+Marinara hides the Android status bar by default for a distraction-free view. Enable **Show Android status bar** under **Settings > General > App Behavior** to keep the time, battery level, and notification icons visible. The Android app remembers this choice across restarts.
 
-On Android 13 and newer, enabling **Mobile app** under **Background Notifications** opens Android's notification permission prompt. Browser notifications remain a separate setting. Notifications conceal reply content and ask the user to open YunYun to read the message.
+On Android 13 and newer, enabling **Mobile app** under **Background Notifications** opens Android's notification permission prompt. Browser notifications remain a separate setting. Notifications conceal reply content and ask the user to open Marinara to read the message.
 
 ## Pre-built APKs
 
 When maintainers attach them to a tagged release, pre-built APKs are available on the main [Releases](https://github.com/Pasta-Devs/Marinara-Engine/releases) page.
 
-Release APKs include the bootstrap controls above. They still rely on Termux for the local Linux/Node runtime, and Android still requires the user-visible permission handoff before the APK can ask Termux to install or start YunYun Engine.
+Release APKs include the bootstrap controls above. They still rely on Termux for the local Linux/Node runtime, and Android still requires the user-visible permission handoff before the APK can ask Termux to install or start Marinara Engine.
