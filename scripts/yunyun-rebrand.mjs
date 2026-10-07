@@ -43,11 +43,49 @@ const RULES = [
   // the OLD paths — NoodlerBulkCreatePanel.tsx arrived in v2.4.1 doing exactly
   // that, pointing at an asset we had deleted. Remap them here so every future
   // merge self-heals instead of silently shipping a 404'd image.
-  [/\/sprites\/mari\/chibi-professor-mari\.png/g, "/sprites/yunyun/chibi-yunyun.png"],
-  // The home assistant's six pixel-art states were replaced by one static
-  // YunYun image, so any re-added reference must collapse onto it or 404.
-  [/\/sprites\/mari\/generated\/professor-mari-assistant-[a-z0-9-]+\.png/g, "/sprites/yunyun/chibi-yunyun.png"],
-  [/\/sprites\/mari\/Mari_profile\.png/g, "/sprites/yunyun/yunyun-profile.png"],
+  // ── Deleted Marinara / Professor-Mari artwork ───────────────────────────
+  // The fork ships none of upstream's Marinara-branded art: everything under
+  // sprites/mari/ and the loose Professor-Mari / Marinara images were deleted,
+  // and every slot that used them now shows the one static chibi YunYun image.
+  // Upstream keeps adding files that point at the old paths, so collapse them
+  // here and every future merge self-heals instead of shipping a broken image.
+  // This matters more than a normal dead link: the SPA history fallback answers
+  // a missing asset with 200 text/html, not 404, so a stale path fails silently.
+  //
+  // These are written WITHOUT a leading slash so one rule covers both the
+  // served URL ("/sprites/mari/x.png") and the repository path that
+  // readFileSync/existsSync use ("packages/client/public/sprites/mari/x.png").
+  // Order matters: full paths collapse before bare basenames.
+
+  // The profile slot wants a portrait, so it keeps its own image, not the chibi.
+  [/sprites\/mari\/Mari_profile\.png/g, "sprites/yunyun/yunyun-profile.png"],
+  // Everything else under sprites/mari/ — the six assistant states, the chibi,
+  // the pointing/waving tutorial sprites, the memory wheel and its prompt note.
+  [/sprites\/mari\/(?:generated\/)?[A-Za-z0-9_][A-Za-z0-9_.-]*/g, "sprites/yunyun/chibi-yunyun.png"],
+  // The directory is also interpolated, e.g. `sprites/mari/${image}` in a
+  // Playwright avatar helper, which the path rules above cannot match.
+  [/sprites\/mari\//g, "sprites/yunyun/"],
+  // Loose Marinara-branded images outside sprites/.
+  [/illustrations\/marinara-universal-preset\.webp/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/releases\/2\.4\.2\/professor-mari-memories\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/releases\/2\.5\.0\/chat-ui-mari\.jpg/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/images\/chat-widgets\/mari-primogem\.svg/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/assets\/imagegen\/home-v5-tabs\/professor-mari-(?:blink-source|idle-reference)\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/assets\/imagegen\/professor-mari-assistant-source\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  // Bare basenames, for the test helpers and CSS assertions that use the
+  // filename on its own with no directory in front of it.
+  [/\bMari_profile\.png/g, "yunyun-profile.png"],
+  [/\bMari_(?:wave|greet|thinking|explaining|point_up_left|point_middle_left|point_down_left|noodler_teaser_locked|noodler_teaser_unlocked)\.(?:png|webp)/g, "chibi-yunyun.png"],
+  // Appears bare in an imagegen prompt note. NB: must stay anchored to ".png" so
+  // it cannot touch the "marinara:chibi-professor-mari-toast-seen" localStorage
+  // key in ChibiProfessorMariEasterEgg.tsx — renaming that wipes user state.
+  [/\bchibi-professor-mari\.png/g, "chibi-yunyun.png"],
+  // The memory-wheel sprite is asserted as a regex literal in an e2e spec, where
+  // the dot arrives backslash-escaped, so accept both spellings.
+  [/\bprofessor-mari-memory-wheel-v2\\?\.png/g, "chibi-yunyun.png"],
+  [/\bmari-primogem\.svg/g, "chibi-yunyun.png"],
+  [/\bchat-ui-mari\.jpg/g, "chibi-yunyun.png"],
+  [/\bprofessor-mari-memories\.png/g, "chibi-yunyun.png"],
   [/\/illustrations\/professor-mari-whats-new\.webp/g, "/illustrations/yunyun-whats-new.webp"],
   [/"\/logo\.png"/g, '"/yunyun-logo.png"'],
   [/"\/logo-splash\.gif"/g, '"/yunyun-logo-splash.gif"'],
