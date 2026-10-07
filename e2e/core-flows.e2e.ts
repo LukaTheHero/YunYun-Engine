@@ -20519,9 +20519,11 @@ test("Professor YunYun navigation can be repositioned within Home on desktop", a
   const droppedPosition = await sprite.boundingBox();
   await page.reload();
   await expect(sprite).toBeVisible({ timeout: 6_000 });
-  await expect(sprite.locator('[data-component="HomeBrowserHub.ProfessorAssistantImage"]')).toBeVisible({
-    timeout: 3_000,
-  });
+  // Upstream gated this on the idle-stage--active frame, which only appeared
+  // once the arrival animation had settled. The fork's static image renders
+  // immediately, so measure only after the slide-up actually finishes —
+  // otherwise the restored Y is still mid-flight by the arrival distance.
+  await sprite.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
   const restoredPosition = await sprite.boundingBox();
   expect(droppedPosition).not.toBeNull();
   expect(restoredPosition).not.toBeNull();
