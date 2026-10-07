@@ -1,4 +1,4 @@
-// #5073: Context Viewer for Professor Mari. Shows everything attached to the current Mari workspace
+// #5073: Context Viewer for Professor YunYun. Shows everything attached to the current YunYun workspace
 // chat (chat-history slices) with a per-item and total token estimate, and lets the user remove items
 // to free up context. Self-contained modal (createPortal).
 import { useMemo } from "react";

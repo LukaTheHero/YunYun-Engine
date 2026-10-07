@@ -104,10 +104,10 @@ async function waitFor(predicate: () => boolean, timeout = 8_000) {
   assert.ok(predicate(), output);
 }
 try {
-  await waitFor(() => output.includes("Marinara Engine server listening"), startupTimeout);
+  await waitFor(() => output.includes("YunYun Engine server listening"), startupTimeout);
   clearTimeout(deadline);
   deadline = setTimeout(() => child.kill("SIGKILL"), 20_000);
-  const readyLine = output.split("\n").find((line) => line.includes("Marinara Engine server listening"))!;
+  const readyLine = output.split("\n").find((line) => line.includes("YunYun Engine server listening"))!;
   serverPid = JSON.parse(readyLine).pid;
   assert.ok(serverPid);
   // Hold an actual in-flight request so both interrupts arrive while app.close

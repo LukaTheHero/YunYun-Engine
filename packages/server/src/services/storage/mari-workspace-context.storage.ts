@@ -1,20 +1,20 @@
 // ──────────────────────────────────────────────
-// Storage: Mari Workspace Context (#5073)
+// Storage: YunYun Workspace Context (#5073)
 //
 // Read/write surface for the reference context a user attaches to a Professor
-// Mari workspace conversation (today: slices of their own chat history). Scoped
-// to the Mari `chatId`. Reads back the prompt-injection block (mari-workspace-
+// YunYun workspace conversation (today: slices of their own chat history). Scoped
+// to the YunYun `chatId`. Reads back the prompt-injection block (mari-workspace-
 // context-prompt.ts) and the Context Viewer; writes back the chat-history picker
 // and the viewer's remove control. This is a user-managed set the user is the
 // reviewer of, so panel writes are DIRECT (no Keep/Restore review card) — like
-// the Skills / Memories panels, unlike Mari's own autonomous mutations.
+// the Skills / Memories panels, unlike YunYun's own autonomous mutations.
 // ──────────────────────────────────────────────
 import { and, eq } from "../../db/file-query.js";
 import type { DB } from "../../db/connection.js";
 import { mariWorkspaceContext } from "../../db/schema/index.js";
 import { newId, now } from "../../utils/id-generator.js";
 
-// A context item is injected into Mari's prompt VERBATIM every turn, so an
+// A context item is injected into YunYun's prompt VERBATIM every turn, so an
 // oversized blob would blow the model's context window (the injection block is
 // preserved by the context trimmer, unlike history). Cap per item as a hard
 // server-side sanity guard; the client estimates tokens and steers the user to

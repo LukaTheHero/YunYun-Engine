@@ -18,7 +18,7 @@ export const ASSISTANT_CONTINUATION_PROMPT =
 /**
  * Shared undici Agent settings. Both the headers timeout (time to first byte) and the
  * wait between streamed chunks follow CHAT_GENERATION_TIMEOUT_MS, so slow local models
- * get the same budget on background generation (Professor Mari, Noodle, agents) as on
+ * get the same budget on background generation (Professor YunYun, Noodle, agents) as on
  * the chat routes. A local server often sends headers at once and then spends minutes
  * on a long prompt before the first token; a fixed 2-minute chunk wait cut those calls
  * off (#6970). The wait stays finite so half-open streams cannot hang forever.

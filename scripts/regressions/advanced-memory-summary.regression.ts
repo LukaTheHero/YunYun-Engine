@@ -163,7 +163,7 @@ try {
   );
   const branching = scopeCharacterSummary('{{#if char == "Maukie"}}River{{else}}Bank{{/if}} Shared.', readers);
   const render = (text: string, char: string, variables: Record<string, string> = {}) =>
-    resolveMacros(text, { user: "Mari", char, characters: [char], variables });
+    resolveMacros(text, { user: "YunYun", char, characters: [char], variables });
   assert.equal(render(branching, "Maukie"), "River Shared.");
   assert.equal(render(branching, "Pantalone"), "Bank Shared.");
   assert.equal(render(branching, "Uninvited"), "");

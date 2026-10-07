@@ -49,10 +49,10 @@ try {
     # Keep matches scalar even when the growing redirected file is read in chunks.
     $output = (Get-Content $outputFile -Raw -ErrorAction SilentlyContinue) -join "`n"
     if ($server.HasExited) { throw "Server exited before readiness: $output" }
-  } until ($output -match 'Marinara Engine server listening' -or [DateTime]::UtcNow -gt $deadline)
-  if ($output -notmatch 'Marinara Engine server listening') {
+  } until ($output -match 'YunYun Engine server listening' -or [DateTime]::UtcNow -gt $deadline)
+  if ($output -notmatch 'YunYun Engine server listening') {
     $outputType = if ($null -eq $output) { 'null' } else { $output.GetType().FullName }
-    $matchingChunks = @($output | Where-Object { [string]$_ -match 'Marinara Engine server listening' }).Count
+    $matchingChunks = @($output | Where-Object { [string]$_ -match 'YunYun Engine server listening' }).Count
     throw "Server readiness timed out (elapsedMs=$($readinessClock.ElapsedMilliseconds), utcNow=$([DateTime]::UtcNow.ToString('o')), deadline=$($deadline.ToString('o')), outputType=$outputType, matchingChunks=$matchingChunks): $output"
   }
   Write-Phase 'Production server ready'
@@ -69,7 +69,7 @@ try {
   if ($output -notmatch 'Received SIGINT; shutting down') { throw "No SIGINT reached production shutdown: $output" }
   if ($output -notmatch 'Shutdown complete') { throw "Graceful shutdown was interrupted: $output" }
   if ($output -match 'forcing exit now') { throw "Shutdown exceeded its deadline: $output" }
-  $ready = ($output -split "`n" | Where-Object { $_ -match 'Marinara Engine server listening' } | Select-Object -First 1) | ConvertFrom-Json
+  $ready = ($output -split "`n" | Where-Object { $_ -match 'YunYun Engine server listening' } | Select-Object -First 1) | ConvertFrom-Json
   if (Get-Process -Id $ready.pid -ErrorAction SilentlyContinue) { throw 'Server survived its supervisor' }
   Write-Output 'Native Windows console Ctrl+C reached the server and completed graceful shutdown.'
 } catch {

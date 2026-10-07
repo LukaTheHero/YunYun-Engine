@@ -191,7 +191,7 @@ try {
     { id: "chat-b", name: "Side", mode: "conversation", characterIds: "[]", createdAt: created, updatedAt: created },
     {
       id: "chat-mari",
-      name: "Mari",
+      name: "YunYun",
       mode: "conversation",
       characterIds: "[]",
       metadata: JSON.stringify({ internalAssistant: "professor-mari" }),

@@ -32,7 +32,7 @@ for (const theme of ["dark", "light"] as const) {
     await expect(page.getByRole("dialog", { name: "Character Schedule Manager", exact: true })).toBeVisible();
   });
 
-  test(`Professor Mari copies only fenced code, with original whitespace (${theme})`, async ({ page }, info) => {
+  test(`Professor YunYun copies only fenced code, with original whitespace (${theme})`, async ({ page }, info) => {
     const chatResponse = await page.request.get("/api/chats/internal/professor-mari");
     expect(chatResponse.ok()).toBeTruthy();
     const chat = await chatResponse.json();

@@ -78,7 +78,7 @@ try {
   const [alice, bob, narrator] = participants;
   assert(alice && bob && narrator);
   selectorAnswer = [bob.id];
-  const persona = await characters.createPersona("Mari", "The player.");
+  const persona = await characters.createPersona("YunYun", "The player.");
   assert(persona);
   const presets = createPromptsStorage(db);
   const preset = await presets.create({
@@ -243,7 +243,7 @@ try {
     url: `/api/chats/${chat.id}/messages`,
     payload: {
       role: "user",
-      content: 'Visible. [whisper: character="Mari" text="INVALID_PERSONA_SECRET"] [notes: content="UNFINISHED_SECRET',
+      content: 'Visible. [whisper: character="YunYun" text="INVALID_PERSONA_SECRET"] [notes: content="UNFINISHED_SECRET',
     },
   });
   assert.equal(invalid.statusCode, 200, invalid.body);

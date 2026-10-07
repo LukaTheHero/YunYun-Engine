@@ -46,7 +46,7 @@ const room = {
   participants: [
     {
       id: "host_12345",
-      displayName: "Mari",
+      displayName: "YunYun",
       persona: { name: "Luna", description: "Exact <leaf> & {{user}}" },
       isHost: true,
     },

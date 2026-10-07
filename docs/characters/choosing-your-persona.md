@@ -4,7 +4,7 @@ This guide explains how to pick which persona represents you in a chat, includin
 
 ## Each chat has its own persona
 
-A persona is your own character card, the identity Marinara Engine uses to represent you. It gives the AI your name and details so the AI knows who it is talking to. To learn how to build one, see [User Personas](personas.md).
+A persona is your own character card, the identity YunYun Engine uses to represent you. It gives the AI your name and details so the AI knows who it is talking to. To learn how to build one, see [User Personas](personas.md).
 
 Choose a persona for each chat where you want to use it. The selection applies to that chat only. Choose **None** to use no persona; the AI receives the generic name "User" and no persona details.
 

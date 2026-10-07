@@ -55,7 +55,7 @@ To learn more about styles, see [Image Style Profiles](../media/style-profiles.m
 
 **Attach Card Appearance** is a toggle that is off by default. When it is on, YunYun adds the character card's appearance text to the selfie description. This gives the model more detail about how the character looks.
 
-If the card or persona also has **Image Appearance Override** turned on, Marinara sends that override instead of the **Appearance** text. Turn it on under **Appearance** in the Character or Persona editor when the full **Appearance** description is written for the narrator rather than for an image model.
+If the card or persona also has **Image Appearance Override** turned on, YunYun sends that override instead of the **Appearance** text. Turn it on under **Appearance** in the Character or Persona editor when the full **Appearance** description is written for the narrator rather than for an image model.
 
 ### Resolution
 

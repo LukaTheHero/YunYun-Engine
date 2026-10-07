@@ -43,11 +43,11 @@ test("Conversation Tools translates an unsent draft without enabling the shortcu
     const calls: Record<string, unknown>[] = [];
     await page.route("**/api/translate", (route) => {
       calls.push(route.request().postDataJSON());
-      return route.fulfill({ json: { translatedText: "Witaj, Mari." } });
+      return route.fulfill({ json: { translatedText: "Witaj, YunYun." } });
     });
     await page.goto("/");
     const composer = page.locator("textarea[data-chat-composer]");
-    await composer.fill("Hello, Mari.");
+    await composer.fill("Hello, YunYun.");
     await page.getByRole("button", { name: "Emoji, GIFs, stickers & tools", exact: true }).click();
     const picker = page.locator("[data-conversation-media-picker]:visible");
     await picker.getByRole("button", { name: "Tools", exact: true }).click();
@@ -55,8 +55,8 @@ test("Conversation Tools translates an unsent draft without enabling the shortcu
     await expect(translate).toBeVisible();
     await page.screenshot({ path: info.outputPath("conversation-translate-tools.png") });
     await translate.click();
-    await expect(composer).toHaveValue("Witaj, Mari.");
-    expect(calls).toEqual([expect.objectContaining({ text: "Hello, Mari.", targetLanguage: "pl", chatId: chat.id })]);
+    await expect(composer).toHaveValue("Witaj, YunYun.");
+    expect(calls).toEqual([expect.objectContaining({ text: "Hello, YunYun.", targetLanguage: "pl", chatId: chat.id })]);
     expect(await (await request.get(`/api/chats/${chat.id}/messages`)).json()).toEqual([]);
     await page.getByRole("button", { name: "Emoji, GIFs, stickers & tools", exact: true }).click();
     await expect(translate).toBeVisible();
@@ -65,7 +65,7 @@ test("Conversation Tools translates an unsent draft without enabling the shortcu
     );
     await translate.click();
     await expect(page.getByText("Synthetic provider failure", { exact: true })).toBeVisible();
-    await expect(composer).toHaveValue("Witaj, Mari.");
+    await expect(composer).toHaveValue("Witaj, YunYun.");
   } finally {
     await request.delete(`/api/chats/${chat.id}`);
   }

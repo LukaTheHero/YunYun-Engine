@@ -99,7 +99,7 @@ try {
       );
     }
   }
-  // Exercise the actual Gemini adapter and Mari repair loop, with no external requests.
+  // Exercise the actual Gemini adapter and YunYun repair loop, with no external requests.
   const originalFetch = globalThis.fetch;
   try {
     for (const provider of ["google", "google_vertex"] as const) {
@@ -259,7 +259,7 @@ try {
             assert.equal(
               request.body.tools,
               undefined,
-              "Mari's command envelope must remain text JSON, not native tools",
+              "YunYun's command envelope must remain text JSON, not native tools",
             );
             assert.ok(request.url.includes(stream ? ":streamGenerateContent?alt=sse" : ":generateContent"));
           }
@@ -269,7 +269,7 @@ try {
   } finally {
     globalThis.fetch = originalFetch;
   }
-  console.log("Mari mixed completion frames preserve edits and permission boundaries.");
+  console.log("YunYun mixed completion frames preserve edits and permission boundaries.");
 } finally {
   await closeDB();
   if (previousStorageDir === undefined) delete process.env.FILE_STORAGE_DIR;

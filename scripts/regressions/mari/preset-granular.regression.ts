@@ -1,4 +1,4 @@
-// #4812: Prof Mari can now SEE and EDIT specific parts of a preset — sections, groups, and
+// #4812: Prof YunYun can now SEE and EDIT specific parts of a preset — sections, groups, and
 // choice-blocks — through granular actions modeled on the lorebook entry actions, instead of only
 // creating/replacing a whole preset. This drives the REAL MariDbService against a file-native store
 // and asserts the read/update/add/delete surface plus the folded #4813 child-clobber guard.
@@ -58,7 +58,7 @@ try {
     assert.equal(
       createdPreset.scopedRegexMode,
       "disabled",
-      "Mari creates presets with the same scoped-regex default as the UI",
+      "YunYun creates presets with the same scoped-regex default as the UI",
     );
     const setRegexMode = await mari.executeAction({
       action: "preset.update",
@@ -543,7 +543,7 @@ try {
       "deleteChoiceBlock removes the block",
     );
 
-    // (5d) #7014: Mari can turn "Send without wrapper" (skipWrap) on AND off for an existing block, nested in
+    // (5d) #7014: YunYun can turn "Send without wrapper" (skipWrap) on AND off for an existing block, nested in
     // `data` or top-level, and addSection keeps a top-level skipWrap instead of dropping it.
     const sectionField = async (sectionId: string, field: string) =>
       (
@@ -760,4 +760,4 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log("Mari preset granular-edit regressions passed.");
+console.log("YunYun preset granular-edit regressions passed.");

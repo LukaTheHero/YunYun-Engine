@@ -25,7 +25,7 @@ try {
     data: { name, description: "", personality: "", scenario: "", first_mes: "", mes_example: "" },
   });
   writeFileSync(join(dataDir, "characters", "Doctor_Dottore.json"), JSON.stringify(characterCard("Il Dottore")));
-  writeFileSync(join(dataDir, "characters", "Professor_Mari.json"), JSON.stringify(characterCard("Professor Mari")));
+  writeFileSync(join(dataDir, "characters", "Professor_Mari.json"), JSON.stringify(characterCard("Professor YunYun")));
   writeFileSync(
     join(dataDir, "groups", "lab-group.JSON"),
     JSON.stringify({
@@ -40,7 +40,7 @@ try {
     join(dataDir, "group chats", "current-chat.JSONL"),
     [
       { user_name: "unused", character_name: "unused", chat_metadata: {} },
-      { name: "Mari", is_user: true, mes: "Begin the experiment." },
+      { name: "YunYun", is_user: true, mes: "Begin the experiment." },
       {
         name: "The Doctor",
         original_avatar: "Doctor_Dottore.png",
@@ -56,7 +56,7 @@ try {
     [
       { user_name: "unused", character_name: "unused", chat_metadata: {} },
       {
-        name: "Professor Mari",
+        name: "Professor YunYun",
         is_user: false,
         mes: "I have the notes.",
       },
@@ -110,7 +110,7 @@ try {
   assert.equal(importedMessages.get("Begin the experiment.")?.role, "user");
   assert.equal(importedMessages.get("Begin the experiment.")?.characterId, null);
   assert.equal(importedMessages.get("Naturally.")?.characterId, characterIdsByName.get("Il Dottore"));
-  assert.equal(importedMessages.get("I have the notes.")?.characterId, characterIdsByName.get("Professor Mari"));
+  assert.equal(importedMessages.get("I have the notes.")?.characterId, characterIdsByName.get("Professor YunYun"));
 } finally {
   await db?._fileStore.close();
   rmSync(fixtureRoot, { recursive: true, force: true });

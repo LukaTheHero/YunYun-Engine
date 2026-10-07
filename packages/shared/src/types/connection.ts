@@ -157,11 +157,11 @@ export interface APIConnection {
   promptPresetId: string | null;
   /** Hard cap on max_tokens for the API response (for providers with lower limits, e.g. DeepSeek at 8192). */
   maxTokensOverride: number | null;
-  /** Maximum number of agent LLM jobs Marinara may run at once for this connection. */
+  /** Maximum number of agent LLM jobs YunYun may run at once for this connection. */
   maxParallelJobs: number;
   /** Cap on outbound requests per minute to this connection (null = unlimited). */
   maxRequestsPerMinute: number | null;
-  /** Treat this endpoint as local/custom for Professor Mari tool-protocol fallbacks. */
+  /** Treat this endpoint as local/custom for Professor YunYun tool-protocol fallbacks. */
   treatAsLocalEndpoint: boolean;
   /** Folder this connection belongs to (null = root/unfiled). */
   folderId: string | null;

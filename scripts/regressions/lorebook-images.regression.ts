@@ -64,7 +64,7 @@ try {
   assert.deepEqual(entry.images, [], "legacy entries default to no images");
   for (const [asset, mime] of [
     ["../../packages/server/src/assets/default-backgrounds/winter_mountains.jpg", "image/jpeg"],
-    ["../../packages/client/public/illustrations/professor-mari-whats-new.webp", "image/webp"],
+    ["../../packages/client/public/illustrations/yunyun-whats-new.webp", "image/webp"],
   ]) {
     const bytes = await readFile(new URL(asset!, import.meta.url));
     const formatEntry = (await storage.createEntry({ lorebookId: book.id, name: mime!, content: "Format reference" }))!;

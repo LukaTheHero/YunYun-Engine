@@ -25,9 +25,9 @@ export interface Persona {
   scenario: string;
   backstory: string;
   appearance: string;
-  /** Marinara Engine: use `imageAppearance` instead of `appearance` in image prompts. */
+  /** YunYun Engine: use `imageAppearance` instead of `appearance` in image prompts. */
   imageAppearanceEnabled?: boolean;
-  /** Marinara Engine: appearance text used for image prompts when the override is enabled. */
+  /** YunYun Engine: appearance text used for image prompts when the override is enabled. */
   imageAppearance?: string;
   /** Avatar image path */
   avatarPath: string | null;

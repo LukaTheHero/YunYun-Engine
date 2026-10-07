@@ -558,7 +558,7 @@ export function resolveGameSetupImport(
       }
     : {};
   // A ruleset follows the Experience rule: restored for a new game when this install has it, at
-  // the shared version or newer, and otherwise dropped so the game starts on Marinara's own rules.
+  // the shared version or newer, and otherwise dropped so the game starts on YunYun's own rules.
   // The wizard says so; the pin itself is always rebuilt by the server from what is installed.
   // Ruleset versions are whole numbers (the schema that parsed this pin refuses anything else), so
   // `>=` is a numeric comparison, the same one the server's registry makes.

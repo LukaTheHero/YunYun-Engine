@@ -24,17 +24,17 @@ const professorMariHomeSource = readFileSync(
 assert.match(
   professorMariHomeSource,
   /const showConnectionFirstHint =\s*chatId !== null &&\s*loadedMessagesChatId === chatId &&\s*!sending &&\s*!messages\.some\(\(message\) => message\.role === "user"\);/u,
-  "Professor Mari's connection guidance must wait for the active chat history and remain visible until the first user message",
+  "Professor YunYun's connection guidance must wait for the active chat history and remain visible until the first user message",
 );
 assert.match(
   professorMariHomeSource,
   /setMessages\(\[\]\);\s*setLoadedMessagesChatId\(chat\.id\);/u,
-  "Restarting Professor Mari must mark the new empty chat history as loaded",
+  "Restarting Professor YunYun must mark the new empty chat history as loaded",
 );
 assert.equal(
   professorMariHomeSource.match(/showConnectionFirstHint &&/gu)?.length,
   2,
-  "Both Professor Mari transcript layouts must show the fresh-chat connection guidance",
+  "Both Professor YunYun transcript layouts must show the fresh-chat connection guidance",
 );
 
 const englishLocale = JSON.parse(

@@ -74,9 +74,9 @@ Some rulesets ship ready-made spells, attacks and features. Lists they fill have
 
 A sheet for a ruleset you do not have installed is kept, not deleted. It shows as one line with a **Remove** button, it is never sent to the AI, and it becomes editable again when you install that ruleset. It also travels with the card when you export it. Each sheet is limited to 64 KB.
 
-A sheet for an installed ruleset that this version of Marinara cannot read, for example one saved by a newer version, is also kept as it is. Its entry offers **Remove this sheet** only, so adding a new sheet can never overwrite it by accident.
+A sheet for an installed ruleset that this version of YunYun cannot read, for example one saved by a newer version, is also kept as it is. Its entry offers **Remove this sheet** only, so adding a new sheet can never overwrite it by accident.
 
-Ruleset sheets are separate from **Enable RPG Stats** and **Enable RPG Attributes**. A game that uses Marinara's own rules ignores them, and a game on a ruleset uses them instead of the Attributes above for its checks.
+Ruleset sheets are separate from **Enable RPG Stats** and **Enable RPG Attributes**. A game that uses YunYun's own rules ignores them, and a game on a ruleset uses them instead of the Attributes above for its checks.
 
 ## How agents update your stats
 

@@ -107,7 +107,7 @@ export interface ChatOptions {
   signal?: AbortSignal;
   /**
    * Invoked when a rate-limit-aware retry pauses before re-attempting the request (proxy 429 /
-   * per-connection throttle). Callers (e.g. Professor Mari) use this to surface a "paused,
+   * per-connection throttle). Callers (e.g. Professor YunYun) use this to surface a "paused,
    * resuming in Ns" indicator instead of appearing to hang.
    */
   onRateLimitPause?: (info: { attempt: number; delayMs: number; reason: "rate_limit" | "throttle" }) => void;

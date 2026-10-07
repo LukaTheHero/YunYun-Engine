@@ -489,7 +489,7 @@ const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
     id: "personal-extensions",
     tab: "addons",
     label: "Personal Extensions",
-    description: "Sandboxed extension drafts authored by Professor Mari.",
+    description: "Sandboxed extension drafts authored by Professor YunYun.",
     aliases: ["extensions", "addons", "local code", "browser", "server", "professor mari"],
   },
   {
@@ -502,8 +502,8 @@ const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   {
     id: "profile-marinara",
     tab: "import",
-    label: "Profile & Marinara",
-    description: "Restore full profiles or import individual Marinara files.",
+    label: "Profile & YunYun",
+    description: "Restore full profiles or import individual YunYun files.",
     aliases: ["profile", "import", "restore", "marinara", "json", "zip"],
   },
   {
@@ -615,7 +615,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "docs-language",
     sectionId: "application",
     label: "Documentation Language",
-    description: "Choose the language for Marinara's built-in guides.",
+    description: "Choose the language for YunYun's built-in guides.",
     aliases: [
       "documentation",
       "guides",
@@ -682,24 +682,24 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
   {
     id: "mini-mari",
     sectionId: "application",
-    label: "Mini Mari surprise visits",
-    description: "Allow rare Chibi Professor Mari messages while scrolling.",
+    label: "Mini YunYun surprise visits",
+    description: "Allow rare Chibi Professor YunYun messages while scrolling.",
     aliases: ["chibi", "professor", "surprise"],
     kind: "Toggle",
   },
   {
     id: "professor-mari-navigation",
     sectionId: "application",
-    label: "Professor Mari navigation",
-    description: "Show Professor Mari's deterministic navigator on Home.",
+    label: "Professor YunYun navigation",
+    description: "Show Professor YunYun's deterministic navigator on Home.",
     aliases: ["home", "helper", "navigation", "navigator", "where is", "find"],
     kind: "Toggle",
   },
   {
     id: "mari-permissions-mode",
     sectionId: "application",
-    label: "Professor Mari Permissions Mode",
-    description: "When Mari may stage or apply workspace changes: Auto, Manual, Accept edits, Plan, or Bypass.",
+    label: "Professor YunYun Permissions Mode",
+    description: "When YunYun may stage or apply workspace changes: Auto, Manual, Accept edits, Plan, or Bypass.",
     aliases: ["mari", "permissions", "mode", "plan", "bypass", "accept", "manual", "approve"],
     kind: "Select",
   },
@@ -738,8 +738,8 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
   {
     id: "notification-unfocused-only",
     sectionId: "notifications",
-    label: "Only when Marinara is unfocused",
-    description: "Play notification sounds only while Marinara is not focused.",
+    label: "Only when YunYun is unfocused",
+    description: "Play notification sounds only while YunYun is not focused.",
     aliases: ["sound", "background", "unfocused"],
     kind: "Toggle",
   },
@@ -1015,7 +1015,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "visual-theme",
     sectionId: "app-style",
     label: "Visual Style",
-    description: "Switch between Marinara and SillyTavern visual themes.",
+    description: "Switch between YunYun and SillyTavern visual themes.",
     aliases: ["theme", "style", "sillytavern", "marinara"],
     kind: "Button group",
   },
@@ -1040,7 +1040,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "custom-cursor",
     sectionId: "app-style",
     label: "Custom Mouse Pointer",
-    description: "Use Marinara's accent-colored cursor.",
+    description: "Use YunYun's accent-colored cursor.",
     aliases: ["cursor", "mouse", "pointer"],
     kind: "Toggle",
   },
@@ -1072,7 +1072,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "rgb-mode",
     sectionId: "app-style",
     label: "RGB Mode",
-    description: "Cycle the app accent through Marinara's rainbow palette.",
+    description: "Cycle the app accent through YunYun's rainbow palette.",
     aliases: ["rainbow", "accent", "color"],
     kind: "Toggle",
   },
@@ -1081,7 +1081,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     sectionId: "app-style",
     label: "Chat widget style",
     description:
-      "Choose a look for movable chat buttons, windows and sections. Picking a preset resets Font, Shape and Colors. Professor Mari can create custom themes for you.",
+      "Choose a look for movable chat buttons, windows and sections. Picking a preset resets Font, Shape and Colors. Professor YunYun can create custom themes for you.",
     aliases: ["dottore", "mari", "preset", "window", "drawer", "button", "sci-fi", "fantasy"],
     kind: "Button group",
   },
@@ -1508,7 +1508,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "restart-server",
     sectionId: "admin-access",
     label: "Restart Server",
-    description: "Gracefully restart the Marinara server from this browser.",
+    description: "Gracefully restart the YunYun server from this browser.",
     aliases: ["server", "restart", "maintenance", "remote"],
     kind: "Button group",
   },
@@ -1620,7 +1620,7 @@ const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMeta[] = [
     id: "avatar-storage-optimization",
     sectionId: "storage-optimization",
     label: "Optimize avatar storage",
-    description: "Find old avatar image files that are no longer referenced by Marinara data.",
+    description: "Find old avatar image files that are no longer referenced by YunYun data.",
     aliases: ["storage", "avatar", "cleanup", "orphan", "abandoned", "disk space"],
     kind: "Button group",
   },
@@ -1750,10 +1750,10 @@ function isStandaloneIosInstall(): boolean {
 function getNativeConsoleShortcutHelp(): string {
   const bridge = getMarinaraAndroidBridge();
   if (typeof bridge?.openConsole === "function") {
-    return "Opens Termux from the Android APK so you can view Marinara server logs while Debug mode is enabled.";
+    return "Opens Termux from the Android APK so you can view YunYun server logs while Debug mode is enabled.";
   }
   if (isMarinaraAndroidShell()) {
-    return "This Android APK build cannot expose the Termux console shortcut yet. Update Marinara, or open Termux manually.";
+    return "This Android APK build cannot expose the Termux console shortcut yet. Update YunYun, or open Termux manually.";
   }
   if (isStandaloneIosInstall()) {
     return "iPhone installations do not expose a native console shortcut yet. Use the host server logs or Safari Web Inspector.";
@@ -1886,7 +1886,7 @@ const EXPUNGE_SCOPE_OPTIONS: Array<{ id: ExpungeScope; label: string; descriptio
   {
     id: "characters",
     label: "Characters",
-    description: "Characters and character groups. Professor Mari is always preserved.",
+    description: "Characters and character groups. Professor YunYun is always preserved.",
   },
   { id: "personas", label: "Personas", description: "Personas and persona groups." },
   { id: "lorebooks", label: "Lorebooks", description: "Lorebooks and lorebook entries." },
@@ -5270,7 +5270,7 @@ function AppearanceSettings({ group = "app" }: { group?: AppearanceGroup }) {
                     [
                       {
                         id: "default" as VisualTheme,
-                        label: "Default (Marinara)",
+                        label: "Default (YunYun)",
                         desc: "Y2K / retro aesthetic with glow effects",
                       },
                       {
@@ -8621,7 +8621,7 @@ function AdvancedSettings() {
     // only the timeout carve-out is new.
     retry: (failureCount, error) => !isRequestTimeoutError(error) && failureCount < 1,
   });
-  // #5740: the report includes what Mari last reported acting on. Safari only
+  // #5740: the report includes what YunYun last reported acting on. Safari only
   // lets a tap write to the clipboard while the tap is handled, so this cannot
   // be fetched after the tap; it reloads whenever Settings opens instead. The
   // deadline keeps a frozen host from disabling the copy button (#5657).
@@ -8676,7 +8676,7 @@ function AdvancedSettings() {
       model: activeConnection?.model ?? null,
     });
     // Fenced so Discord and GitHub render the report as a code block (#6668). Discord only knows
-    // ``` fences, so a backtick run inside the report (a connection name, Mari's phrase) is split
+    // ``` fences, so a backtick run inside the report (a connection name, YunYun's phrase) is split
     // with a zero-width space instead of lengthening the fence.
     const copied = await copyToClipboard(
       `\`\`\`\n${report.replace(/``+/gu, (run) => run.split("").join("\u200b"))}\n\`\`\``,
@@ -8867,7 +8867,7 @@ function AdvancedSettings() {
         open={exportProfileDialogOpen}
         title={localizeUi("settings.transfer.exportProfile.title")}
         description={localizeUi("settings.transfer.exportProfile.description")}
-        nativeDescription="Keeps Marinara fields, lorebook folders, character/persona metadata, presets, agents, themes, and inline assets for re-import."
+        nativeDescription="Keeps YunYun fields, lorebook folders, character/persona metadata, presets, agents, themes, and inline assets for re-import."
         compatibleDescription="Exports direct character JSON, simple persona JSON, and folderless lorebooks for other roleplay tools."
         onClose={() => setExportProfileDialogOpen(false)}
         onSelect={handleExportProfileChoice}

@@ -1,5 +1,5 @@
-// #5073 regression: the server foundation for Professor Mari's attached workspace context
-// (chat-history slices the user attaches so Mari can read their roleplay). Two layers:
+// #5073 regression: the server foundation for Professor YunYun's attached workspace context
+// (chat-history slices the user attaches so YunYun can read their roleplay). Two layers:
 //   1) Storage (mari_workspace_context): create / listForChat (chat-scoped, ordered, id-tiebroken) /
 //      remove, plus the content size guard.
 //   2) The prompt renderer (renderMariWorkspaceContextPrompt) — the exact text buildPromptMessages
@@ -101,7 +101,7 @@ try {
     "the injected closing delimiter is neutralized to square brackets, so it can't close the block early",
   );
 
-  console.log("Mari workspace context regression checks passed.");
+  console.log("YunYun workspace context regression checks passed.");
 } finally {
   for (const id of createdIds) await store.remove(id).catch(() => {});
   await closeDB();

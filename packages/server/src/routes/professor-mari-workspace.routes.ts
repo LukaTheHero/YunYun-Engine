@@ -135,17 +135,17 @@ const permissionsModeSchema = z.object({
 /**
  * What the user reads when Keep or Restore fails (#6842), instead of a bare "Internal Server
  * Error". Keep and Restore first move the review's saved file under the data folder, and a
- * folder Marinara cannot write to is the usual cause.
+ * folder YunYun cannot write to is the usual cause.
  */
 export function reviewActionFailure(err: unknown, action: "keep" | "restore"): string {
   const code = (err as NodeJS.ErrnoException | null)?.code;
   const cause = (err as { cause?: NodeJS.ErrnoException } | null)?.cause?.code;
   const fileCode = code ?? cause;
   if (fileCode === "EACCES" || fileCode === "EPERM" || fileCode === "EROFS") {
-    return `Marinara could not update this review's saved file (${fileCode}), so the card stays. Check that Marinara can write to its data folder.`;
+    return `YunYun could not update this review's saved file (${fileCode}), so the card stays. Check that YunYun can write to its data folder.`;
   }
   if (fileCode === "EBUSY") {
-    return `Marinara could not update this review's saved file (EBUSY): another program has it open. Try again in a moment.`;
+    return `YunYun could not update this review's saved file (EBUSY): another program has it open. Try again in a moment.`;
   }
   const detail = err instanceof Error && err.message ? ` ${err.message}` : "";
   return `The ${action === "keep" ? "Keep" : "Restore"} did not finish, so the card stays.${detail}`;

@@ -1,4 +1,4 @@
-// #5073: the composer attach control for Professor Mari — a paperclip that opens a small menu
+// #5073: the composer attach control for Professor YunYun — a paperclip that opens a small menu
 // (like Claude's "+") instead of jumping straight to the file picker. Shared by both the floating
 // and docked composers so the menu can't drift between them. Mirrors the adjacent connection popover
 // (anchored div + outside-click), matching the surrounding composer code.
@@ -13,7 +13,7 @@ interface Props {
   onViewContext: () => void;
   /** Pending file attachments on the composer (drives the active paperclip state). */
   attachedFileCount: number;
-  /** Attached reference-context items on this Mari chat (drives the menu badge). */
+  /** Attached reference-context items on this YunYun chat (drives the menu badge). */
   attachedContextCount: number;
   disabled: boolean;
   isReading: boolean;

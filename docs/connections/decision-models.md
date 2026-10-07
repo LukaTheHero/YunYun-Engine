@@ -1,14 +1,14 @@
 # Decision Models
 
-This guide explains the **Decision model**: what it is, the three ways to get one, how to set each up, and where Marinara uses it. It is optional. Without one, chats still generate, but each feature uses the fallback described below.
+This guide explains the **Decision model**: what it is, the three ways to get one, how to set each up, and where YunYun uses it. It is optional. Without one, chats still generate, but each feature uses the fallback described below.
 
 ## What a decision model is
 
-A decision model answers one kind of question. It is given the recent messages of a chat and a statement, such as "The latest message moves the scene to a new place", and it says how likely that statement is to be true, as a number from 0 to 1. Marinara compares that number with a threshold and treats the result as yes or no. It can also pick one answer from a short list, such as "angry", "sad" or "none of these".
+A decision model answers one kind of question. It is given the recent messages of a chat and a statement, such as "The latest message moves the scene to a new place", and it says how likely that statement is to be true, as a number from 0 to 1. YunYun compares that number with a threshold and treats the result as yes or no. It can also pick one answer from a short list, such as "angry", "sad" or "none of these".
 
-Its answers control Marinara's behavior; they are not posted as replies in the chat. A purpose-built decision model scores statements directly. A local chat model is normally asked for a single yes/no token, though some models need to reason first. Decisions can be faster than a full reply, but many statements or a reasoning model can add noticeable time.
+Its answers control YunYun's behavior; they are not posted as replies in the chat. A purpose-built decision model scores statements directly. A local chat model is normally asked for a single yes/no token, though some models need to reason first. Decisions can be faster than a full reply, but many statements or a reasoning model can add noticeable time.
 
-## Where Marinara uses it
+## Where YunYun uses it
 
 - **[Activation questions](../agents/custom-agents.md#activation-questions)** decide whether a custom agent runs, before the agent's work in its phase. With no answer, the question does not stop it; keywords and **Trigger Cadence** still apply.
 - **[Prompt statements](../prompts/conditional-prompts.md#asking-the-decision-model)** choose text when preparing a chat or agent prompt. With no answer, the decision reads as no, so a simple decision block uses its `{{else}}` branch, if present.
@@ -48,12 +48,12 @@ Entries that cannot answer right now stay in the list, greyed out with the reaso
 
 If you already run a local model, try it first. In a small wording test from one roleplay scene, Gemma 4 E4B answered 32 of 32 recommended statements correctly, and Open-Jev 2B and 9B each answered 31. This is an example of why wording matters, not a general accuracy ranking. Test representative turns from your own chats; see [Writing statements](../prompts/conditional-prompts.md#writing-statements).
 
-**Jev and Open-Jev are different models.** Jev is TypeSafe's hosted model, available directly or through OpenRouter. [Open-Jev](https://huggingface.co/ZefanCai/Open-Jev-2B) is a separately published model built on Qwen, which Marinara can run locally. The Open-Jev wording tests do not measure hosted Jev's accuracy.
+**Jev and Open-Jev are different models.** Jev is TypeSafe's hosted model, available directly or through OpenRouter. [Open-Jev](https://huggingface.co/ZefanCai/Open-Jev-2B) is a separately published model built on Qwen, which YunYun can run locally. The Open-Jev wording tests do not measure hosted Jev's accuracy.
 
 | Option | Costs | Needs | Good for |
 | --- | --- | --- | --- |
 | A model you already run | Nothing extra | A local model in **Local Model** | Most people who run a local model |
-| A chat model on your own server | Nothing extra | Ollama, LM Studio, llama.cpp or another OpenAI-compatible server you already run | People whose model runs outside Marinara, so it is not loaded twice |
+| A chat model on your own server | Nothing extra | Ollama, LM Studio, llama.cpp or another OpenAI-compatible server you already run | People whose model runs outside YunYun, so it is not loaded twice |
 | A hosted Decision connection | Billed requests; one turn can make several | An API key (TypeSafe or OpenRouter) | Phones, and PCs that do not run a local model |
 | The installable decision model | Separate disk and GPU memory; see [model sizes](#let-marinara-install-a-decision-model) | Linux x86-64 and a supported NVIDIA GPU | A separate decision model beside your chat model |
 
@@ -61,7 +61,7 @@ If you already run a local model, try it first. In a small wording test from one
 
 Presets, cards and agents should be written for "a Decision model", never "requires Jev". They use the same statement syntax whichever model a user picks, but different models can give different answers.
 
-When someone imports content that uses decisions, Marinara shows a notice with a link to this guide. This includes custom agents and Agent catalog installs. If no Decision model is selected, the notice explains the fallback: prompt statements read as no, lorebook entries cannot activate on a decision, and agent activation questions let the agent run whenever its keywords and **Trigger Cadence** allow. Give an agent a cadence as well if it should not run every turn without a Decision model. Whole-profile ZIP restoration does not show this import notice.
+When someone imports content that uses decisions, YunYun shows a notice with a link to this guide. This includes custom agents and Agent catalog installs. If no Decision model is selected, the notice explains the fallback: prompt statements read as no, lorebook entries cannot activate on a decision, and agent activation questions let the agent run whenever its keywords and **Trigger Cadence** allow. Give an agent a cadence as well if it should not run every turn without a Decision model. Whole-profile ZIP restoration does not show this import notice.
 
 ## Use a model you already run
 
@@ -70,7 +70,7 @@ If you have a local model in **Local Model**, you can use it for decisions and n
 1. In **Connections**, open **Connection defaults** and set **Decision model** to **Primary local model**, or to **Utility local model** if you have one set up.
 2. Click **Test**. A successful result shows the probability and request time, plus two things that are specific to a local model: whether log-probabilities were available, and whether the model answers directly.
 
-Marinara asks the model a single yes/no question, lets it produce one token, and reads the answer from that token's probabilities. No reply is written, so the request is short. A choice between several answers is asked as one yes/no question per answer. How many recent messages fit is worked out from the slot's own context size.
+YunYun asks the model a single yes/no question, lets it produce one token, and reads the answer from that token's probabilities. No reply is written, so the request is short. A choice between several answers is asked as one yes/no question per answer. How many recent messages fit is worked out from the slot's own context size.
 
 **Thinking.** Most models answer in one word. Some always reason first, whatever they are asked. The **Thinking** setting below the dropdown controls this:
 
@@ -84,12 +84,12 @@ A model that thinks first takes seconds, so by default it only answers for thing
 
 ### On a server you already run
 
-If your chat model already runs in Ollama, LM Studio, llama.cpp or another OpenAI-compatible server, it can answer decisions without Marinara loading a second copy.
+If your chat model already runs in Ollama, LM Studio, llama.cpp or another OpenAI-compatible server, it can answer decisions without YunYun loading a second copy.
 
 1. Open the **Custom** connection you use for that server and click **Use this model for decisions**. This creates a Decision connection with the source **OpenAI-compatible chat model** that uses the same base URL, model and key. Or create one yourself: a Decision connection, that source, the same base URL as your chat connection (for example `http://localhost:11434/v1` for Ollama), and the model name the server serves.
 2. Select it under **Decision model** and click **Test**. The result also says whether the server returned log-probabilities and whether the model had to think first.
 
-It is asked the same way as a local model: one yes/no word per statement, read from its probabilities. Statements are sent one at a time, because Marinara cannot know how many requests your server works on at once. **Thinking** is always **Auto** for a connection, so a model that has to think first switches over after two failed answers, and then only answers for gates after the reply unless **Also gate agents that run before the reply** is on. A server on another machine on your network also needs `PROVIDER_LOCAL_URLS_ENABLED`, as any local provider does; see [Connecting a Local or Self-Hosted Model](local-self-hosted.md).
+It is asked the same way as a local model: one yes/no word per statement, read from its probabilities. Statements are sent one at a time, because YunYun cannot know how many requests your server works on at once. **Thinking** is always **Auto** for a connection, so a model that has to think first switches over after two failed answers, and then only answers for gates after the reply unless **Also gate agents that run before the reply** is on. A server on another machine on your network also needs `PROVIDER_LOCAL_URLS_ENABLED`, as any local provider does; see [Connecting a Local or Self-Hosted Model](local-self-hosted.md).
 
 ## Set up a Decision connection
 
@@ -100,7 +100,7 @@ It is asked the same way as a local model: one yes/no word per statement, read f
 
 The Decision default is separate from your chat, agent, image, video, and audio defaults. Choosing **None** turns decisions off without deleting any activation questions or decision statements.
 
-Hosted decisions send the selected recent messages and statements to the chosen provider and can incur charges. Smart response order also includes the [character roster](#what-the-model-sees). The **Recent-message token budget** defaults to 30,000 estimated tokens for hosted sources and 3,500 for custom servers. Reduce it if your server has a smaller context limit. Marinara drops older messages first, then trims the oldest portion of the newest message. Token estimates can differ from a server's tokenizer; a rejected or over-budget request gives no answer.
+Hosted decisions send the selected recent messages and statements to the chosen provider and can incur charges. Smart response order also includes the [character roster](#what-the-model-sees). The **Recent-message token budget** defaults to 30,000 estimated tokens for hosted sources and 3,500 for custom servers. Reduce it if your server has a smaller context limit. YunYun drops older messages first, then trims the oldest portion of the newest message. Token estimates can differ from a server's tokenizer; a rejected or over-budget request gives no answer.
 
 **Time limit (seconds)** is how long each Decision connection waits for each statement's answer during chats, from 0.5 to 30 seconds (1.5 by default, or 4 for an **OpenAI-compatible chat model** connection). A turn that asks several statements in one request gets this much for each of them. A later answer counts as no answer. Some hosted providers are sometimes slower than 1.5 seconds, which makes decisions look randomly broken, so click **Test** a few times and set the limit above the slowest answer. The trade-off: statements asked before the reply, such as decisions in a preset or an activation question for an agent that runs before the reply, can hold up the reply for up to this long each.
 
@@ -108,7 +108,7 @@ Deleting a connection used for a linked key warns you and leaves the Decision co
 
 ### Run Strands decider yourself
 
-[Strands decider 2B](https://huggingface.co/StrandsAgents/strands-decider-2B-hobson-v19) is another open decision model (Apache-2.0) that speaks System One. Marinara cannot install it, but it works as a **Custom System One endpoint** while you keep it running.
+[Strands decider 2B](https://huggingface.co/StrandsAgents/strands-decider-2B-hobson-v19) is another open decision model (Apache-2.0) that speaks System One. YunYun cannot install it, but it works as a **Custom System One endpoint** while you keep it running.
 
 1. In a Python 3.10 or newer environment, install it and start its server:
 
@@ -125,9 +125,9 @@ Its probabilities are calibrated, so the default 0.5 threshold for a custom conn
 
 To switch between it and the Decision sidecar, pick either one under **Decision model**. Both stay set up.
 
-## Let Marinara install a decision model
+## Let YunYun install a decision model
 
-Marinara can also download and run a purpose-built decision model for you. It runs as its own local process, whether or not you also run a local chat model. Its memory use is added to that of your chat model. If you already have a local model, try its decisions before downloading another one.
+YunYun can also download and run a purpose-built decision model for you. It runs as its own local process, whether or not you also run a local chat model. Its memory use is added to that of your chat model. If you already have a local model, try its decisions before downloading another one.
 
 The built-in Open-Jev models need Linux **x86-64**, an NVIDIA GPU of compute capability 7.5 or newer (Turing, the RTX 20 series, or later), and driver 580 or newer. Linux ARM devices and Pascal cards or older are not supported by these packages. Where a model cannot run, the option stays visible, says why, and offers to set up a Decision connection instead.
 
@@ -143,9 +143,9 @@ These are the catalog's estimates, based on the pinned model versions and measur
 3. Pick a model and confirm its size, hardware verdict and licenses. Nothing downloads before that point. **Open-Jev 2B** needs much less memory than **Open-Jev 9B**; neither guarantees correct answers for your chat.
 4. Select **Decision sidecar** under **Decision model**.
 
-**Speed.** A model's first answer after it starts is slower, so Marinara asks it one warm-up question while it loads. When the warm-up succeeds, **Test** and the first turn show its normal speed. If it fails, the model still starts, and the first question pays the delay instead. Every statement reads the recent chat again, so a turn with many statements on a long chat takes longer: on a long chat, Open-Jev 2B takes about a quarter of a second per statement.
+**Speed.** A model's first answer after it starts is slower, so YunYun asks it one warm-up question while it loads. When the warm-up succeeds, **Test** and the first turn show its normal speed. If it fails, the model still starts, and the first question pays the delay instead. Every statement reads the recent chat again, so a turn with many statements on a long chat takes longer: on a long chat, Open-Jev 2B takes about a quarter of a second per statement.
 
-You can also paste a decision model's HuggingFace repository. Marinara reads that repository's own manifest, checks that the artifact type maps to a runtime this build ships, and shows you the base weights it will pull and the total size before offering to install it. A repository it cannot vouch for is refused with the reason rather than installed hopefully.
+You can also paste a decision model's HuggingFace repository. YunYun reads that repository's own manifest, checks that the artifact type maps to a runtime this build ships, and shows you the base weights it will pull and the total size before offering to install it. A repository it cannot vouch for is refused with the reason rather than installed hopefully.
 
 On a machine with more than one NVIDIA GPU, a **GPU** menu chooses the card it loads on. The verdicts are for that card, and changing it stops the model so it starts again there.
 
@@ -153,7 +153,7 @@ Turning the sidecar off stops the process and keeps the files. **Remove files** 
 
 ## Thresholds
 
-Probabilities are not directly comparable between models. The same positive example might score 0.99 on one model and 0.2 on another. Marinara's default threshold depends on how the model is connected:
+Probabilities are not directly comparable between models. The same positive example might score 0.99 on one model and 0.2 on another. YunYun's default threshold depends on how the model is connected:
 
 | Selected backend | Default yes/no threshold |
 | --- | --- |
@@ -163,7 +163,7 @@ Probabilities are not directly comparable between models. The same positive exam
 
 An agent's **Run when probability is at least** can override this default. The editor offers to restore the backend's recommendation when the saved value differs. Check the setting whenever you switch models.
 
-Prompt statements and lorebook Decision fields use the backend's default; changing an agent's threshold does not change theirs. **A self-hosted Open-Jev behind a Custom System One connection still uses 0.5.** Marinara cannot identify and calibrate arbitrary custom endpoints automatically. Its results can therefore differ from the managed Open-Jev sidecar, including reading a positive result below 0.5 as no.
+Prompt statements and lorebook Decision fields use the backend's default; changing an agent's threshold does not change theirs. **A self-hosted Open-Jev behind a Custom System One connection still uses 0.5.** YunYun cannot identify and calibrate arbitrary custom endpoints automatically. Its results can therefore differ from the managed Open-Jev sidecar, including reading a positive result below 0.5 as no.
 
 ## Time limits
 

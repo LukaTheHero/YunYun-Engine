@@ -1,5 +1,5 @@
-// Professor Mari's package_service tool: packages that declare `mari-actions` register
-// `mari-actions:<package-id>`, and Mari can list those actions and run one with JSON input.
+// Professor YunYun's package_service tool: packages that declare `mari-actions` register
+// `mari-actions:<package-id>`, and YunYun can list those actions and run one with JSON input.
 import assert from "node:assert/strict";
 import { capabilityPackageManifestSchema } from "../../packages/shared/src/schemas/capability-package.schema.js";
 import {
@@ -50,7 +50,7 @@ assert.throws(
 );
 assert.throws(
   () => assertCapabilityMariActionsServiceRegistration("evil", ["mari-actions"], "mari-actions:slurp2"),
-  /cannot register Mari actions for another package/,
+  /cannot register YunYun actions for another package/,
 );
 
 // ── Listing and running ─────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ for (const replace of [false, true]) {
 }
 const long = listed[0]!.actions.find((action) => action.name === "long")!;
 assert.ok((long.summary?.length ?? 0) <= 301, "package-authored list text is capped");
-assert.deepEqual(long.inputs, { ok: "fine" }, "only string input descriptions reach Mari");
+assert.deepEqual(long.inputs, { ok: "fine" }, "only string input descriptions reach YunYun");
 assert.equal(listed[0]!.actions.find((action) => action.name === "odd")!.summary, undefined);
 
 const input = { accountId: "creator-1", text: "A rainy-day cafe post" };
@@ -185,9 +185,9 @@ assert.deepEqual(await runCapabilityMariAction("slurp2", "add-idea", input, live
 assert.deepEqual(received.at(-1), input);
 assert.notEqual(received.at(-1), input, "the package receives a plain-data copy, not the caller's object");
 await assert.rejects(runCapabilityMariAction("slurp2", "add-idea", { text: "too many" }, live), /plenty of ideas/);
-await assert.rejects(runCapabilityMariAction("slurp2", "delete-everything", {}, live), /has no Mari action/);
-await assert.rejects(runCapabilityMariAction("slurp2", "bad name with spaces", {}, live), /has no Mari action/);
-await assert.rejects(runCapabilityMariAction("other", "add-idea", {}, live), /offers no Mari actions/);
+await assert.rejects(runCapabilityMariAction("slurp2", "delete-everything", {}, live), /has no YunYun action/);
+await assert.rejects(runCapabilityMariAction("slurp2", "bad name with spaces", {}, live), /has no YunYun action/);
+await assert.rejects(runCapabilityMariAction("other", "add-idea", {}, live), /offers no YunYun actions/);
 await assert.rejects(runCapabilityMariAction("../slurp2", "add-idea", {}, live), /is not a package id/);
 await assert.rejects(runCapabilityMariAction("slurp2", "add-idea", ["x"], live), /must be a JSON object/);
 await assert.rejects(
@@ -201,14 +201,14 @@ await new Promise((resolve) => setImmediate(resolve));
 
 const hugeError = await runCapabilityMariAction("slurp2", "huge-error", {}, live).catch((err: Error) => err.message);
 assert.ok(String(hugeError).length < 2_200, "package error text is capped");
-assert.doesNotMatch(String(hugeError), /BBBBBBBBBB/, "a data URL in an error never reaches Mari");
+assert.doesNotMatch(String(hugeError), /BBBBBBBBBB/, "a data URL in an error never reaches YunYun");
 assert.match(String(hugeError), /<data URL, \d+ characters, omitted> bad/);
 
 const stop = new AbortController();
 const hanging = runCapabilityMariAction("slurp2", "hang", {}, stop.signal);
 await new Promise((resolve) => setTimeout(resolve, 20));
 stop.abort();
-await assert.rejects(hanging, /slurp2 hang failed: slurp2 hang was stopped/, "Mari's stop ends a stuck action");
+await assert.rejects(hanging, /slurp2 hang failed: slurp2 hang was stopped/, "YunYun's stop ends a stuck action");
 assert.equal(hangSignal?.aborted, true, "the package is told to stop too");
 await assert.rejects(runCapabilityMariAction("slurp2", "add-idea", input, stop.signal), /abort/i);
 
@@ -216,7 +216,7 @@ const callsBefore = received.length;
 await assert.rejects(runCapabilityMariAction("slurp2", "add-idea", "nope", live), /must be a JSON object/);
 assert.equal(received.length, callsBefore, "rejected input never reaches the package");
 
-// ── Mari: protocol, permissions classification, JSON and XML fallback ───────
+// ── YunYun: protocol, permissions classification, JSON and XML fallback ───────
 assert.match(workspaceCommandProtocolPrompt(), /package_service/);
 const listCall = { id: "1", name: "package_service" as const, arguments: {} };
 const runCall = { id: "2", name: "package_service" as const, arguments: { package: "slurp2", action: "add-idea" } };
@@ -262,7 +262,7 @@ const listRead = { id: "l", name: "package_service" as const, input: {}, output:
 assert.equal(resolveWorkspaceMutationVerification([unverifiedWrite, listRead]), "unverified");
 assert.notEqual(auditWorkspaceCompletionClaim(doneClaim, [listRead]).issue, null);
 
-// ── Mari: running the tool end to end ───────────────────────────────────────
+// ── YunYun: running the tool end to end ───────────────────────────────────────
 const service = new ProfessorMariWorkspaceService({} as never);
 const runner = service as unknown as {
   executeWorkspaceCommand(
@@ -284,7 +284,7 @@ const listResult = await run({});
 assert.equal(listResult.success, true);
 assert.match(listResult.output, /"package": "slurp2"/);
 assert.match(listResult.output, /Give a Creator an idea/);
-assert.match((await run({ package: "nothing" })).output, /offers no Mari actions/);
+assert.match((await run({ package: "nothing" })).output, /offers no YunYun actions/);
 
 const ideaResult = await run({ package: "slurp2", action: "add-idea", input: JSON.stringify(input) });
 assert.equal(ideaResult.success, true, "a JSON-string input from a text-protocol model is accepted");
@@ -293,7 +293,7 @@ assert.deepEqual(received.at(-1), input);
 
 const pictureResult = await run({ package: "slurp2", action: "draw-picture" });
 assert.equal(pictureResult.success, true);
-assert.doesNotMatch(pictureResult.output, /AAAAAAAAAA/, "a data URL never reaches Mari's context");
+assert.doesNotMatch(pictureResult.output, /AAAAAAAAAA/, "a data URL never reaches YunYun's context");
 assert.match(pictureResult.output, /<data URL, \d+ characters, omitted>/);
 
 const badInput = await run({ package: "slurp2", action: "add-idea", input: [1, 2] });

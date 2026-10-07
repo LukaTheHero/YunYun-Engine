@@ -225,19 +225,19 @@ const whisperPeople = [
   { id: "alice", name: "Alice" },
   { id: "bob", name: "Bob" },
 ];
-assert.deepEqual(resolveRoleplayWhisperRecipient(" bob ", whisperPeople, { id: "mari", name: "Mari" }), {
+assert.deepEqual(resolveRoleplayWhisperRecipient(" bob ", whisperPeople, { id: "mari", name: "YunYun" }), {
   id: "bob",
   kind: "character",
 });
-assert.deepEqual(resolveRoleplayWhisperRecipient("Mari", whisperPeople, { id: "mari", name: "Mari" }), {
+assert.deepEqual(resolveRoleplayWhisperRecipient("YunYun", whisperPeople, { id: "mari", name: "YunYun" }), {
   id: "mari",
   kind: "persona",
 });
-assert.equal(resolveRoleplayWhisperRecipient("Unknown", whisperPeople, { id: "mari", name: "Mari" }), null);
+assert.equal(resolveRoleplayWhisperRecipient("Unknown", whisperPeople, { id: "mari", name: "YunYun" }), null);
 assert.equal(
   resolveRoleplayWhisperRecipient("Bob", [...whisperPeople, { id: "other", name: "BOB" }], {
     id: "mari",
-    name: "Mari",
+    name: "YunYun",
   }),
   null,
 );
@@ -301,12 +301,12 @@ const cut = (content: string, part: string) => {
   return result.ok ? result.content : "";
 };
 assert.equal(
-  cut('Mari cries. "And I really hate myself! I want to just finish myself already!"', "I really hate myself!"),
-  'Mari cries. "And I really hate myself—"',
+  cut('YunYun cries. "And I really hate myself! I want to just finish myself already!"', "I really hate myself!"),
+  'YunYun cries. "And I really hate myself—"',
 );
 assert.equal(
-  cut("Mari reaches for the heavy door. She steps outside.", "for the heavy door."),
-  "Mari reaches for the heavy door—",
+  cut("YunYun reaches for the heavy door. She steps outside.", "for the heavy door."),
+  "YunYun reaches for the heavy door—",
 );
 assert.equal(cut("“Please listen to me!” She leaves.", "Please listen to me!”"), "“Please listen to me—”");
 assert.equal(cut("„Proszę zostań tutaj jeszcze chwilę!” Odchodzi.", "Proszę zostań tutaj"), "„Proszę zostań tutaj—“");
@@ -752,7 +752,7 @@ const diceCharacters: { id: string; name: string; rpgStats?: RPGStatsConfig }[] 
       ],
     },
   },
-  { id: "mari", name: "Mari" },
+  { id: "mari", name: "YunYun" },
 ];
 const dice = (args: Record<string, unknown>) =>
   prepareRoleplayRoll({ notation: "d20", character: "Dottore", ...args }, diceCharacters, "mari");
@@ -761,8 +761,8 @@ assert.equal(dice({ attribute: "STR", notation: "d20+2" }).notation, "d20+3");
 assert.equal(dice({ attribute: "DEX" }).notation, "d20-1");
 assert.equal(dice({ attribute: "Luck" }).notation, "d20+2");
 assert.equal(dice({ attribute: "Unknown" }).notation, "d20");
-assert.equal(dice({ character: "Mari", attribute: "Strength" }).notation, "d20");
-assert.equal(dice({ character: undefined, attribute: "Strength" }).character, "Mari");
+assert.equal(dice({ character: "YunYun", attribute: "Strength" }).notation, "d20");
+assert.equal(dice({ character: undefined, attribute: "Strength" }).character, "YunYun");
 assert.equal(
   prepareRoleplayRoll(
     { notation: "d20", attribute: "STR" },
@@ -818,11 +818,11 @@ try {
       assert.equal(isDiceRollResult(result.payload), true);
     }
   }
-  const legacy = await executeRoll({ notation: "d20", character: "Mari" });
+  const legacy = await executeRoll({ notation: "d20", character: "YunYun" });
   assert.equal(legacy.payload.total, 1);
   assert.equal("dc" in legacy.payload, false);
   assert.equal("success" in legacy.payload, false);
-  const withoutStats = await executeRoll({ notation: "d20", character: "Mari", modifier: -2, dc: 0 });
+  const withoutStats = await executeRoll({ notation: "d20", character: "YunYun", modifier: -2, dc: 0 });
   assert.equal(withoutStats.payload.total, -1);
   assert.equal(withoutStats.payload.success, false);
 

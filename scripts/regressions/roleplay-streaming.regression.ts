@@ -938,7 +938,7 @@ assert.match(
 assert.match(
   generateRouteSource,
   /while \(true\) \{[\s\S]{0,700}let currentIterationSavedMsg: typeof lastSavedMsg = null/u,
-  "Each Mari follow-up iteration must reset the assistant message eligible for TTS",
+  "Each YunYun follow-up iteration must reset the assistant message eligible for TTS",
 );
 assert.match(
   generateRouteSource,

@@ -10,8 +10,8 @@ const content = "Keep user-authored &apos; and <markup> verbatim.";
 const store = {
   async listEntries() {
     return [
-      { id: "existing", name: "Mari's beach", content: "", locked: false },
-      { id: "locked", name: "Dottore & Mari", content: "Private", locked: true },
+      { id: "existing", name: "YunYun's beach", content: "", locked: false },
+      { id: "locked", name: "Dottore & YunYun", content: "Private", locked: true },
     ];
   },
   async createEntry(input: Record<string, unknown>) {
@@ -24,9 +24,9 @@ const store = {
   },
 };
 const updates = [
-  { name: "Mari&apos;s beach", content },
+  { name: "YunYun&apos;s beach", content },
   { entry: { name: "The &#34;Doctor&#34; &amp; Co.", content } },
-  { entryName: "Dottore &amp; Mari", content: "Must not overwrite a locked entry" },
+  { entryName: "Dottore &amp; YunYun", content: "Must not overwrite a locked entry" },
 ];
 await persistLorebookKeeperUpdates({
   lorebooksStore: store as unknown as Parameters<typeof persistLorebookKeeperUpdates>[0]["lorebooksStore"],
@@ -44,7 +44,7 @@ assert.ok(
   "Lore content must remain verbatim",
 );
 const approval = formatLorebookWriteApprovalText(updates);
-assert.ok(approval.includes("### Mari's beach"));
+assert.ok(approval.includes("### YunYun's beach"));
 assert.ok(approval.includes('### The "Doctor" & Co.'));
 assert.ok(approval.includes(content));
 await persistLorebookKeeperUpdates({

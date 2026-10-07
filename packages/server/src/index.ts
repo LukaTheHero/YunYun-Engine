@@ -110,7 +110,7 @@ async function main() {
     }
 
     isShuttingDown = true;
-    logger.info("Received %s; shutting down Marinara Engine", signal);
+    logger.info("Received %s; shutting down YunYun Engine", signal);
     // #5838: bound the whole close - sever connections at 4 s, force-exit at
     // 8 s - so a supervisor's stop window (earlyoom ~10 s, Docker 10 s) never
     // expires on a connection-wait and escalates to a write-dropping SIGKILL.
@@ -154,7 +154,7 @@ async function main() {
 
   try {
     await startup.phase("http.listen", () => app.listen({ port, host }));
-    logger.info(`Marinara Engine server listening on ${protocol}://${host}:${port}`);
+    logger.info(`YunYun Engine server listening on ${protocol}://${host}:${port}`);
     const ready = startup.summary();
     logger.info(ready, "[startup] Ready in %d ms", ready.elapsedMs);
     startFreezeDetector();
@@ -171,7 +171,7 @@ async function main() {
     if (isAddressInUseError(err)) {
       logger.error(
         err,
-        "Port %d is already in use. Marinara Engine could not start. Close the app using that port or set PORT to another value, for example PORT=7869 bash ./start.sh on macOS/Linux or set PORT=7869 && start.bat in Windows cmd.",
+        "Port %d is already in use. YunYun Engine could not start. Close the app using that port or set PORT to another value, for example PORT=7869 bash ./start.sh on macOS/Linux or set PORT=7869 && start.bat in Windows cmd.",
         port,
       );
     } else {

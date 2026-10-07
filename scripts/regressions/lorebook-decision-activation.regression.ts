@@ -600,7 +600,7 @@ try {
     const nativeEntries = await lorebooks.listEntries(nativeCopy.id);
     assert.equal(nativeEntries.find((e: { name: string }) => e.name === "Scale")?.decisionMode, "require");
 
-    // ── Professor Mari reads and writes the fields like the entry API ─────────
+    // ── Professor YunYun reads and writes the fields like the entry API ─────────
     const { MariDbService } = await import("../../packages/server/src/services/mari-db/mari-db.service.js");
     const mariDb = new MariDbService(db);
     const characterContextUpdate = await mariDb.executeAction({
@@ -614,11 +614,11 @@ try {
     const created = await mariDb.executeAction({
       action: "lorebook.createEntry",
       lorebookId: genBook.id,
-      data: { name: "Mari entry", content: "x", decisionMode: "Trigger", decisionStatement: "A storm breaks" },
+      data: { name: "YunYun entry", content: "x", decisionMode: "Trigger", decisionStatement: "A storm breaks" },
       apply: true,
     });
     assert.equal(created.ok, true, JSON.stringify(created));
-    const mariEntry = (await lorebooks.listEntries(genBook.id)).find((e: { name: string }) => e.name === "Mari entry")!;
+    const mariEntry = (await lorebooks.listEntries(genBook.id)).find((e: { name: string }) => e.name === "YunYun entry")!;
     assert.equal(mariEntry.decisionMode, "trigger");
     assert.equal(mariEntry.decisionStatement, "A storm breaks");
     const cleared = await mariDb.executeAction({

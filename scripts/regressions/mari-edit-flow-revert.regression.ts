@@ -1,14 +1,14 @@
-// #5721: Professor Mari's post-#4838 server-side authorization gate is REMOVED,
+// #5721: Professor YunYun's post-#4838 server-side authorization gate is REMOVED,
 // and the hidden-reasoning disable now covers custom providers.
 //
 // Problem B: the gate required a verbatim user-message excerpt for every
 // mutating command, so an intent-phrased request ("rework her personality to be
 // more cynical") had its first, correct attempt discarded ("Mutation blocked
-// before execution"), forced a typed approval, and made Mari regenerate the
+// before execution"), forced a typed approval, and made YunYun regenerate the
 // same edit into the review window - two generations and two confirmations for
 // one change. #4838's intent-keyed prompt guidance plus the Keep/Restore
 // review card is the intended contract; the memory system (#4851) is the
-// per-user lever for people who want Mari less forward.
+// per-user lever for people who want YunYun less forward.
 //
 // Problem A: disableHiddenReasoning excluded custom providers, so a
 // reasoning-capable model on a local OpenAI-compatible server (the reporter's
@@ -48,10 +48,10 @@ assert.match(
   "#4838's intent guidance must remain",
 );
 assert.match(workspaceAgent, /Default to read-only\./u);
-// The self-declared approval pause (Mari asks first, commands deferred) survives.
+// The self-declared approval pause (YunYun asks first, commands deferred) survives.
 assert.match(workspaceAgent, /awaitingAuthorization/u);
 assert.match(workspaceAgent, /visibleTextRequestsUserApproval/u);
-assert.match(workspaceAgent, /"authorization-accept"/u, "the Accept chip for Mari's own deferrals stays");
+assert.match(workspaceAgent, /"authorization-accept"/u, "the Accept chip for YunYun's own deferrals stays");
 // Ordinary command validation still runs before execution.
 assert.match(workspaceAgent, /const validationIssue = workspaceCommandValidationIssue\(command\);/u);
 
@@ -59,7 +59,7 @@ assert.match(workspaceAgent, /const validationIssue = workspaceCommandValidation
 assert.match(
   workspaceAgent,
   /Proactive preference memories/u,
-  "Mari must be told she may record repeated workflow mismatches",
+  "YunYun must be told she may record repeated workflow mismatches",
 );
 assert.match(workspaceAgent, /"propose changes" means describing the changes in chat/u);
 
@@ -84,4 +84,4 @@ assert.match(openaiProvider, /enable_thinking: false/u);
 const chatTypes = readSource("packages/shared/src/types/chat.ts");
 assert.doesNotMatch(chatTypes, /mariPendingMutation(?:Categories|Signatures)/u);
 
-console.log("Mari edit-flow revert regression passed.");
+console.log("YunYun edit-flow revert regression passed.");

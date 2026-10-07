@@ -15,7 +15,7 @@ Both are described in full under [Resolution kinds](#resolution-kinds).
 
 A mechanic that does not fit either shape cannot be written in a ruleset file. Taking the highest die of a pool, roll-under percentile checks, symbol dice, and opposed pools are examples. Each of those needs a new resolution kind inside the Engine, which is a code contribution with tests, not a JSON file. If your system needs one, open a feature request on the Engine repository and describe the mechanic with a few worked rolls. Those worked rolls become the tests.
 
-Game Mode can resolve a fight using Marinara's own combat or your ruleset's rules. An optional `battle` block lends Marinara's combat the numbers on your character sheets: see [Battles](#battles-lending-the-sheet-to-marinaras-combat). An optional `combat` block instead defines how the ruleset resolves the fight: see [Combat](#combat-a-fight-your-own-rules-resolve). The Engine plays those rules today. The game's Combat Preference selects the Classic presentation or, when the ruleset defines distance, a Tactical battlefield.
+Game Mode can resolve a fight using YunYun's own combat or your ruleset's rules. An optional `battle` block lends YunYun's combat the numbers on your character sheets: see [Battles](#battles-lending-the-sheet-to-marinaras-combat). An optional `combat` block instead defines how the ruleset resolves the fight: see [Combat](#combat-a-fight-your-own-rules-resolve). The Engine plays those rules today. The game's Combat Preference selects the Classic presentation or, when the ruleset defines distance, a Tactical battlefield.
 
 ## Quickstart
 
@@ -571,7 +571,7 @@ An entry may carry an optional `mechanics` block that says what it does in numbe
 The picker shows this block as one line. Who reads the rest depends on which block your ruleset opted in with:
 
 - With a [`combat` block](#combat-a-fight-your-own-rules-resolve), the fight reads its combat effects. `range`, `area` and `friendlyFire` apply on a battlefield with positions; `reaction` marks an entry as one that answers something rather than one taken on a turn, and names the moment it waits for (see [Windows](#windows-holding-the-fight-open)); one marked plain `true` names none and is on no menu. `check` applies to skill checks, as described above.
-- With only a [`battle` block](#battles-lending-the-sheet-to-marinaras-combat), a battle reads `kind`, `range`, `area`, `friendlyFire`, `amount`, `damageType` and `cost`, because those are the parts Marinara's own combat has somewhere to put.
+- With only a [`battle` block](#battles-lending-the-sheet-to-marinaras-combat), a battle reads `kind`, `range`, `area`, `friendlyFire`, `amount`, `damageType` and `cost`, because those are the parts YunYun's own combat has somewhere to put.
 
 The vocabulary is closed, so a key or a value that is not in the list above is refused instead of being quietly ignored.
 
@@ -1116,16 +1116,16 @@ The same `use` works outside a fight (Capability API 1.60 for `restore`; the res
 
 What happened is said in one line: "Juno uses Poultice: heals 4 (Grit 6/11). 1 left." The Use button sends it to the Game Master in an `[item_used]` block after "I use my Poultice.", which the chat shows as a badge; the Game Master's own tag is answered with it, measured from where the turn began like its other tags, so a regenerated reply never uses an item twice. An item without a `use`, or in a game without a ruleset, is still simply said: "I use my rope."
 
-## Battles: lending the sheet to Marinara's combat
+## Battles: lending the sheet to YunYun's combat
 
 By default a battle knows nothing about the sheet. It builds its fighters the way it always has, and
 a character can walk out of a fight with their hit points on the sheet untouched.
 
 An optional `battle` block changes that, in one direction only: it lends the fight the sheet's
 numbers, and writes the fight's outcome back. **It does not make combat follow your rules.** The
-dice math is still Marinara's, and so is who hits whom and for how much. Because of that, health is
+dice math is still YunYun's, and so is who hits whom and for how much. Because of that, health is
 carried as a share of the maximum rather than as your own number: a character at half health on the
-sheet starts the fight at half of the health bar Marinara built for them. Your 9-point health pool
+sheet starts the fight at half of the health bar YunYun built for them. Your 9-point health pool
 is never dropped into a fight where one blow does 12.
 
 ```json
@@ -1152,9 +1152,9 @@ is never dropped into a fight where one blow does 12.
 ### What is carried in, and what is carried out
 
 **In**, for each party member whose sheet the game has: the health pool's share of its maximum sets
-where the fighter starts on Marinara's own health bar, the energy pool becomes MP, each slot pool
+where the fighter starts on YunYun's own health bar, the energy pool becomes MP, each slot pool
 becomes that level's slots, and the marked rows become skills. Maximum hit points, attack, defense,
-speed and level stay Marinara's own numbers. A character at zero in the health pool starts the fight
+speed and level stay YunYun's own numbers. A character at zero in the health pool starts the fight
 down, because that is what the sheet says, and a character above zero never starts below one hit
 point, so a small share cannot knock somebody out by rounding.
 
@@ -1177,21 +1177,21 @@ fight never reaches its end, the sheet is exactly as it was: the fight did not h
 A catalog entry's `mechanics` block is read like this:
 
 - `kind` becomes the skill's type. `utility` entries and anything marked `reaction` are left out,
-  because Marinara's combat has nowhere to put them.
+  because YunYun's combat has nowhere to put them.
 - `amount` sets how hard it lands, as a multiplier against the fighter's own attack rather than as a
   damage number. Bigger dice never land softer, and the multiplier stays inside the range a
   generated skill already uses.
 - `range` and `area.size` are divided by the catalog's `units.distance.perCell` to get grid cells,
   and never round down to nothing. A burst becomes its radius, a cone half of it, and a line one
   cell. Anything with an area targets every enemy it covers, and `friendlyFire` is honoured.
-- `damageType` becomes the skill's element. `targets` is not carried: Marinara's combat decides who
+- `damageType` becomes the skill's element. `targets` is not carried: YunYun's combat decides who
   a heal, a buff or an attack can be pointed at from the skill's type.
 - `cost` on the energy pool becomes the MP cost, and several energy costs are added up. A `cost` of
-  exactly one slot spends one slot of that level. Marinara's combat charges one number of energy
+  exactly one slot spends one slot of that level. YunYun's combat charges one number of energy
   or one slot, never both, so an entry that costs two slots, slots of two levels, or a slot plus
   energy is left out of the fight. So is a cost on any other pool, such as hit points or a class
   resource, because the Engine would otherwise hand it out for free.
-- A `buff` or a `debuff` becomes Marinara's own buff or debuff. Whatever else the entry's text
+- A `buff` or a `debuff` becomes YunYun's own buff or debuff. Whatever else the entry's text
   promises, such as clearing a condition on the sheet, is not applied in the fight. Leave
   `mechanics` off an entry whose effect only makes sense outside a battle.
 
@@ -1200,7 +1200,7 @@ follow your system's rules.
 
 ## Combat: a fight your own rules resolve
 
-The `battle` block above lends a fight the sheet's numbers while the arithmetic stays Marinara's.
+The `battle` block above lends a fight the sheet's numbers while the arithmetic stays YunYun's.
 The optional `combat` block is the other thing: it says how a fight is RESOLVED by your rules. It
 parameterises a combat kind the Engine owns, exactly as `resolution` parameterises a check kind, and
 every name in it is yours. There are two kinds: `attack-vs-defense`, where dice are added up and

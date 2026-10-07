@@ -249,7 +249,7 @@ try {
       peak = Math.max(peak, active);
       try {
         let content = '{"summary":"The gate was opened."}';
-        if (text.includes("You are Marinara's Game Lorebook Keeper.")) {
+        if (text.includes("You are YunYun's Game Lorebook Keeper.")) {
           await new Promise<void>((done) => {
             releaseKeeper = done;
             keeperStarted();

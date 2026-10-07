@@ -169,8 +169,8 @@ You cannot turn on **Sound effects** or **Music** until the chosen connection is
 
 During play:
 
-- **Sound effects**: after GM turns, Marinara asks ElevenLabs for short sound effects that fit the scene.
-- **Music**: Marinara composes one instrumental track, about two minutes long, for each place the party visits and for each kind of fight, such as a boss fight. Each track is made only once and then reused. A new place's track starts at a later scene change, so the music does not cut in mid-scene. A fight's track fades in as soon as it is ready.
+- **Sound effects**: after GM turns, YunYun asks ElevenLabs for short sound effects that fit the scene.
+- **Music**: YunYun composes one instrumental track, about two minutes long, for each place the party visits and for each kind of fight, such as a boss fight. Each track is made only once and then reused. A new place's track starts at a later scene change, so the music does not cut in mid-scene. A fight's track fades in as soon as it is ready.
 
 Generated sounds and tracks are saved with your game assets, so the same sound is not made twice. If **Music DJ** plays music for the game, Game Mode does not generate music.
 

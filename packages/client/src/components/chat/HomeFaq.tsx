@@ -867,7 +867,7 @@ export function HomeFaq({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                     <div className="mx-auto flex h-28 w-20 shrink-0 items-start justify-center overflow-hidden rounded-[1.25rem] border border-[var(--border)] bg-[var(--card)]/80 shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:mx-0 sm:h-32 sm:w-24">
                       <img
-                        src="/sprites/mari/Mari_explaining.png"
+                        src="/sprites/yunyun/chibi-yunyun.png"
                         alt={localizeUi("ui.chat.homefaq.professorMari")}
                         className="h-full w-full object-cover object-[center_14%]"
                       />

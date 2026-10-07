@@ -22,7 +22,7 @@ function fixture(request: APIRequestContext) {
     const row = await create("/api/characters", { data: { name, description: `${name} character card.` } });
     let avatarUrl: string | null = null;
     if (image) {
-      const avatar = readFileSync(new URL(`../packages/client/public/sprites/mari/${image}`, import.meta.url));
+      const avatar = readFileSync(new URL(`../packages/client/public/sprites/yunyun/${image}`, import.meta.url));
       const response = await request.post(`/api/characters/${row.id}/avatar`, {
         data: { avatar: `data:image/png;base64,${avatar.toString("base64")}`, filename: `${name}.png` },
       });
@@ -80,10 +80,10 @@ test("saved narrator references add only valid outside avatars without reviving 
 }, info) => {
   const data = fixture(request);
   try {
-    const alice = await data.character("Alice", "Mari_wave.png");
-    const bob = await data.character("Bob", "Mari_thinking.png");
-    const inactive = await data.character("Inactive member", "Mari_greet.png");
-    const guest = await data.character("Referenced visitor", "Mari_profile.png");
+    const alice = await data.character("Alice", "chibi-yunyun.png");
+    const bob = await data.character("Bob", "chibi-yunyun.png");
+    const inactive = await data.character("Inactive member", "chibi-yunyun.png");
+    const guest = await data.character("Referenced visitor", "yunyun-profile.png");
     const noAvatar = await data.character("Visitor without portrait");
     const memberIds = [alice.id, bob.id, inactive.id];
     const chat = await data.create("/api/chats", {
@@ -159,9 +159,9 @@ test("lorebook narrator avatar references clear on regeneration and follow the s
       maxContext: 32768,
       treatAsLocalEndpoint: true,
     });
-    const alice = await data.character("Alice", "Mari_wave.png");
-    const bob = await data.character("Bob", "Mari_thinking.png");
-    const guest = await data.character("Referenced visitor", "Mari_profile.png");
+    const alice = await data.character("Alice", "chibi-yunyun.png");
+    const bob = await data.character("Bob", "chibi-yunyun.png");
+    const guest = await data.character("Referenced visitor", "yunyun-profile.png");
     const memberIds = [alice.id, bob.id];
     const preset = await data.create("/api/prompts", { name: "Narrator reference cards", wrapFormat: "none" });
     for (const [order, type] of ["lorebook", "id_macro_cards", "chat_history"].entries()) {
@@ -267,9 +267,9 @@ for (const variant of ["single-roleplay", "individual-roleplay", "conversation",
     test.skip(baseline || !info.project.name.includes("desktop"), "Mode gates are shared across viewports.");
     const data = fixture(request);
     try {
-      const alice = await data.character("Alice", "Mari_wave.png");
-      const bob = await data.character("Bob", "Mari_thinking.png");
-      const guest = await data.character("Outside visitor", "Mari_profile.png");
+      const alice = await data.character("Alice", "chibi-yunyun.png");
+      const bob = await data.character("Bob", "chibi-yunyun.png");
+      const guest = await data.character("Outside visitor", "yunyun-profile.png");
       const mode = variant.endsWith("roleplay") ? "roleplay" : variant;
       const chat = await data.create("/api/chats", {
         name: `No narrator reference in ${variant}`,

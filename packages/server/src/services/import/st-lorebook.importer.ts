@@ -18,7 +18,7 @@ import { resolveLorebookEntryRole } from "./lorebook-role.js";
 
 interface STWorldInfoEntry {
   uid?: number;
-  /** Marinara extension (#6570). */
+  /** YunYun extension (#6570). */
   decisionStatement?: string;
   decisionMode?: string;
   id?: number;
@@ -514,7 +514,7 @@ export async function importSTLorebook(
         delayUntilRecursion: Boolean(entry.delayUntilRecursion ?? false),
         excludeFromVectorization: entry.vectorized === false ? true : entry.excludeFromVectorization === true,
         locked: Boolean(entry.locked ?? false),
-        // Marinara's own exports carry decision activation (#6570); SillyTavern files do not.
+        // YunYun's own exports carry decision activation (#6570); SillyTavern files do not.
         ...parseLorebookDecisionActivation(entry),
       };
 

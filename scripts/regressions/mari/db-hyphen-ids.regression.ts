@@ -87,4 +87,4 @@ try {
   rmSync(directory, { recursive: true, force: true });
 }
 
-console.log("Mari hyphen-prefixed CLI ID regressions passed.");
+console.log("YunYun hyphen-prefixed CLI ID regressions passed.");

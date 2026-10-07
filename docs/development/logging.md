@@ -1,6 +1,6 @@
 # Server logging
 
-This page explains how to read a Marinara Engine server log and how to write lines that stay useful. It adds to the [Logging section of CONTRIBUTING.md](../../CONTRIBUTING.md#logging) and does not replace it. The shared Pino logger, error-object-first calls, format specifiers and the four-level table still apply.
+This page explains how to read a YunYun Engine server log and how to write lines that stay useful. It adds to the [Logging section of CONTRIBUTING.md](../../CONTRIBUTING.md#logging) and does not replace it. The shared Pino logger, error-object-first calls, format specifiers and the four-level table still apply.
 
 ## What every line carries
 

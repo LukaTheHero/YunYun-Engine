@@ -31,7 +31,7 @@ When you create a Game Mode chat, a **setup wizard** opens. It has seven steps. 
 The seven steps are:
 
 1. **Connection.** Set the game name, pick the GM connection, and optionally set a scene-effects connection. Scene effects default to **Local Model (Gemma)**.
-2. **World.** Set the genre, setting, tone, difficulty, content rating, and language. Choose **Classic** or **Tactical** under **Combat Preference**. Tactical games also offer optional battlefield seed, size and terrain guidance. When a Game Mode ruleset is installed, a **Rules** choice appears below it: keep **Marinara's own rules**, or pick the ruleset. See [Choosing rules](#choosing-rules).
+2. **World.** Set the genre, setting, tone, difficulty, content rating, and language. Choose **Classic** or **Tactical** under **Combat Preference**. Tactical games also offer optional battlefield seed, size and terrain guidance. When a Game Mode ruleset is installed, a **Rules** choice appears below it: keep **YunYun's own rules**, or pick the ruleset. See [Choosing rules](#choosing-rules).
 3. **Party.** Pick your persona (the character you play), the **Game Master Mode**, and any party members.
 4. **Goals.** Tell the GM what you want from the adventure.
 5. **Lorebooks.** Attach any lorebooks whose facts the GM should treat as canon. A lorebook is a set of background world facts. See [Lorebooks](../lorebooks/overview.md).
@@ -46,8 +46,8 @@ For Tactical games, leaving the battlefield options blank lets the GM choose a s
 
 **Rules** only appears when at least one ruleset is installed, and only for a new game. It is separate from **Combat Preference**: one decides how checks and character sheets work, the other decides how battles are shown.
 
-- **Marinara's own rules** is the default: the built-in d20 checks and the six-attribute sheet.
-- A ruleset, such as **5e (SRD 5.1)**, shows a short summary of what it covers, and one line saying what battles will do. A ruleset that resolves its own fights says so. One that only lends the sheet says that battles run on Marinara's combat with the sheet's own health, energy and abilities. One that does neither says that battles run on Marinara's combat and names the **Combat Preference** you picked.
+- **YunYun's own rules** is the default: the built-in d20 checks and the six-attribute sheet.
+- A ruleset, such as **5e (SRD 5.1)**, shows a short summary of what it covers, and one line saying what battles will do. A ruleset that resolves its own fights says so. One that only lends the sheet says that battles run on YunYun's combat with the sheet's own health, energy and abilities. One that does neither says that battles run on YunYun's combat and names the **Combat Preference** you picked.
 
 When the ruleset resolves its own fights, the battle screen is that ruleset's: the menu is your character's own attacks and abilities, each saying what it spends out of the ruleset's own action economy and pools; the panel below shows the turn order, the round, everybody's conditions by the ruleset's own names, and what is left of each budget; and the log prints the real arithmetic, such as "Juno attacks Rust jackal with Road axe: 8 (5 + 3) + 3 = 11 against Guard 6, a hit." Every action is written to the character sheet the moment it lands, so closing the tab mid-fight loses nothing and the Game Master is told afterwards that the numbers are already settled. If that ruleset also says what one square of a battlefield is worth in its own distance, your **Combat Preference** decides how the fight is shown: **Classic** plays it without positions, and **Tactical** plays it on a generated board where you walk, measure reach and range in the ruleset's own unit, and aim a shape at a square. See [Combat](combat.md#games-whose-ruleset-resolves-its-own-fights). A ruleset that says nothing about distance keeps the preference and does not use it.
 
@@ -59,7 +59,7 @@ Rulesets come from two places. Official ones are installed from **Download Agent
 
 After you pick a ruleset, the **Party** step lists your persona and party members below the pickers and says who **Has a sheet** for it and who **Starts on a blank sheet**. A sheet is added under **Stats** in the character or persona editor (see [Ruleset sheets](../characters/colors-and-stats.md#ruleset-sheets)). The game takes a copy of each sheet when the world is generated. Nothing you change in the game goes back to the character or persona. A member without a sheet gets a blank one with every value at the ruleset's default; world generation never makes up scores.
 
-A shared setup file remembers its ruleset. If you import one and do not have that ruleset, or have an older version of it, the wizard tells you which ruleset it was and the game uses Marinara's own rules unless you install it and pick it.
+A shared setup file remembers its ruleset. If you import one and do not have that ruleset, or have an older version of it, the wizard tells you which ruleset it was and the game uses YunYun's own rules unless you install it and pick it.
 
 ### Defaults worth knowing
 

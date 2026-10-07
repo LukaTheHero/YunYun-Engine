@@ -414,7 +414,7 @@ test("Playwright color parsing preserves supported force values only", () => {
   }
 });
 
-test("What's New opens once for each Marinara Engine version", async ({ page }) => {
+test("What's New opens once for each YunYun Engine version", async ({ page }) => {
   await page.goto("/api/health");
   await page.evaluate(
     ({ bypassKey, seenKey }) => {
@@ -467,7 +467,7 @@ test("available app updates wait for confirmation before refreshing", async ({ p
   );
 
   await page.goto("/");
-  await expect(page.getByText("A Marinara update is ready.", { exact: true })).toBeVisible();
+  await expect(page.getByText("A YunYun update is ready.", { exact: true })).toBeVisible();
   const refresh = page.getByRole("button", { name: "Refresh", exact: true });
   await expect(refresh).toBeVisible();
   const navigationsAtPrompt = mainFrameNavigations;
@@ -3181,7 +3181,7 @@ test("NovelAI style plate upload keeps the connection editor mounted", async ({ 
     await editor.locator('input[type="file"][accept*="image/png"]').setInputFiles({
       name: "style-plate.png",
       mimeType: "image/png",
-      buffer: readFileSync(new URL("../packages/client/public/sprites/mari/Mari_wave.png", import.meta.url)),
+      buffer: readFileSync(new URL("../packages/client/public/sprites/yunyun/chibi-yunyun.png", import.meta.url)),
     });
 
     await expect(editor).toBeVisible();
@@ -4264,7 +4264,7 @@ test("Character and Persona avatar actions stay separated and visually balanced"
   const connection = (await connectionResponse.json()) as { id: string };
 
   const characterName = `Avatar Character ${suffix}`;
-  const characterCreator = "Professor Mari and the Fatui Research Collective";
+  const characterCreator = "Professor YunYun and the Fatui Research Collective";
   const characterVersion = "12.34";
   const characterResponse = await page.request.post("/api/characters", {
     data: {
@@ -4286,7 +4286,7 @@ test("Character and Persona avatar actions stay separated and visually balanced"
   expect(characterAvatarResponse.ok()).toBeTruthy();
 
   const personaName = `Avatar Persona ${suffix}`;
-  const personaCreator = "Professor Mari and the Snezhnayan Institute";
+  const personaCreator = "Professor YunYun and the Snezhnayan Institute";
   const personaVersion = "56.78";
   const personaResponse = await page.request.post("/api/characters/personas", {
     data: {
@@ -7337,7 +7337,7 @@ test("generation fallbacks identify the replacement connection in a toast", asyn
     await page.locator("button.mari-chat-send-btn").click();
     await expect(page.getByText("Main switched to Backup API (fallback-model).")).toBeVisible();
     await expect(
-      page.getByText("The primary generation failed, so Marinara retried with your configured fallback."),
+      page.getByText("The primary generation failed, so YunYun retried with your configured fallback."),
     ).toBeVisible();
   } finally {
     await page.request.delete(`/api/chats/${chat.id}`);
@@ -8039,7 +8039,7 @@ test("Roleplay Tracker preserves named characters with missing or malformed card
     characterId = (await characterResponse.json()).id;
     const avatarResponse = await request.post(`/api/characters/${characterId}/avatar`, {
       data: {
-        avatar: `data:image/png;base64,${readFileSync(new URL("../packages/client/public/sprites/mari/Mari_wave.png", import.meta.url)).toString("base64")}`,
+        avatar: `data:image/png;base64,${readFileSync(new URL("../packages/client/public/sprites/yunyun/chibi-yunyun.png", import.meta.url)).toString("base64")}`,
         filename: "tracker-fixture.png",
       },
     });
@@ -8461,7 +8461,7 @@ test("legacy browser records are cleaned while extension imports stay locked", a
   await expect(
     page
       .getByText(
-        "Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
+        "Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
         { exact: true },
       )
       .first(),
@@ -8478,7 +8478,7 @@ test("legacy browser records are cleaned while extension imports stay locked", a
   await expect(page.getByRole("button", { name: /Export extension/i })).toHaveCount(0);
 });
 
-test("Personal Extensions default to the Professor Mari-only locked workflow", async ({ page }) => {
+test("Personal Extensions default to the Professor YunYun-only locked workflow", async ({ page }) => {
   await page.goto("/");
   await clickTopbarPanel(page, "settings");
   await page.getByRole("tab", { name: "Addons" }).click();
@@ -8487,7 +8487,7 @@ test("Personal Extensions default to the Professor Mari-only locked workflow", a
   await expect(
     page
       .getByText(
-        "Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
+        "Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.",
         { exact: true },
       )
       .first(),
@@ -11810,14 +11810,14 @@ test("PocketTTS discovers server voices and uses its speech endpoint", async ({ 
     });
 
     const speechResponse = await request.post("/api/tts/speak", {
-      data: { text: "Hello from Marinara." },
+      data: { text: "Hello from YunYun." },
     });
     expect(speechResponse.ok()).toBeTruthy();
     expect(receivedPath).toBe("/v1/audio/speech");
     expect(receivedContentType).toContain("application/json");
     expect(JSON.parse(receivedBody)).toMatchObject({
       model: "pocket-tts",
-      input: "Hello from Marinara.",
+      input: "Hello from YunYun.",
       voice: "alba",
       response_format: "mp3",
       speed: 1,
@@ -12302,9 +12302,9 @@ test(
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("tab", { name: "Home", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/home");
-    await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/favicon.png");
-    await expect(page.locator('.mari-home-browser-chrome img[src="/logo-splash.gif"]')).toBeVisible();
-    await expect(page.locator('.mari-home-hero img[src="/logo-splash.gif"]')).toHaveCount(0);
+    await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
+    await expect(page.locator('.mari-home-browser-chrome img[src="/yunyun-logo-splash.gif"]')).toBeVisible();
+    await expect(page.locator('.mari-home-hero img[src="/yunyun-logo-splash.gif"]')).toHaveCount(0);
     await expect(page.locator('[data-tour="noodle-tab"]')).toHaveCount(0);
     const guideGeometry = await page.locator('[data-home-widget-id="professor"]').evaluate((guide) => {
       const panel = guide.querySelector<HTMLElement>('[data-component="HomeBrowserHub.ProfessorWidget"]')!;
@@ -12337,7 +12337,7 @@ test(
         artInsidePanel: inside(artBounds, panelBounds),
         actionInsidePanel: inside(actionBounds, panelBounds),
         preservesGridGap: siblingSeparations.every((separation) => separation >= gap - 1),
-        // The card lets Mari rise past its top border (#7032), so its text column clips the overflow instead.
+        // The card lets YunYun rise past its top border (#7032), so its text column clips the overflow instead.
         contentOverflowY: getComputedStyle(content).overflowY,
       };
     });
@@ -12661,7 +12661,7 @@ test("installed Home destinations appear as browser tabs without returning to th
   await expect(page.getByRole("region", { name: "Noodle package surface" })).toHaveText("Familiar Noodle interface");
   await expect(noodleTab).toHaveAttribute("aria-selected", "true");
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/noodle");
-  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/favicon.png");
+  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
   await page.getByRole("tab", { name: "Home", exact: true }).click();
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/home");
   await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible();
@@ -12926,10 +12926,10 @@ test("Home feed prioritizes read-only visits and exposes current Game presentati
   }
 });
 
-test("new Professor Mari Home widgets receive a movable layout slot immediately", async ({ page }) => {
+test("new Professor YunYun Home widgets receive a movable layout slot immediately", async ({ page }) => {
   const widget = {
     id: `mari-widget-${Date.now()}`,
-    title: "Mari's Field Formula",
+    title: "YunYun's Field Formula",
     description: "A safe custom note created for the Home layout regression.",
     accent: "cyan",
     icon: "sparkles",
@@ -12979,12 +12979,12 @@ test("new Professor Mari Home widgets receive a movable layout slot immediately"
   }
 });
 
-test("Professor Mari visibly arrives on Home and navigates without AI", async ({ page }, testInfo) => {
+test("Professor YunYun visibly arrives on Home and navigates without AI", async ({ page }, testInfo) => {
   test.setTimeout(45_000);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({ timeout: 30_000 });
 
-  const assistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+  const assistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
   await expect(assistant).toBeVisible({ timeout: 6_000 });
   const navigationInput = assistant.getByRole("textbox");
   await expect(navigationInput).toBeVisible();
@@ -13005,18 +13005,18 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
   ).toBeVisible();
   await expect(assistant.locator(".mari-home-professor-popup__idle")).toHaveAttribute(
     "src",
-    "/sprites/mari/generated/professor-mari-assistant-idle.png",
+    "/sprites/yunyun/chibi-yunyun.png",
   );
   await expect(assistant.locator(".mari-home-professor-popup__blink")).toHaveAttribute(
     "src",
-    "/sprites/mari/generated/professor-mari-assistant-blink-v3.png",
+    "/sprites/yunyun/chibi-yunyun.png",
   );
-  await assistant.getByRole("button", { name: "Minimize Professor Mari navigation", exact: true }).click();
+  await assistant.getByRole("button", { name: "Minimize Professor YunYun navigation", exact: true }).click();
   await expect(assistant).toBeHidden();
   const recallButton = page.getByRole("button", { name: "Help Me Navigate", exact: true });
   await expect(recallButton).toBeVisible();
   const recallSprite = recallButton.locator("img");
-  await expect(recallSprite).toHaveAttribute("src", "/sprites/mari/generated/professor-mari-assistant-idle.png");
+  await expect(recallSprite).toHaveAttribute("src", "/sprites/yunyun/chibi-yunyun.png");
   await expect(recallSprite).toHaveCSS("object-position", "calc(50% + 1.5px) 100%");
   const [recallBounds, viewportWidth] = await Promise.all([
     recallButton.boundingBox(),
@@ -13039,12 +13039,12 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
   await expect(assistant.locator(".mari-home-professor-popup__idle-stage")).toHaveCSS("opacity", "0");
   await assistant.getByRole("button", { name: "Back to search", exact: true }).click();
   await expect(navigationInput).toBeFocused();
-  await navigationInput.fill("Could I talk to Professor Mari?");
+  await navigationInput.fill("Could I talk to Professor YunYun?");
   await navigationInput.press("Enter");
   await expect(assistant.getByText("Here, found it!", { exact: true })).toBeVisible();
   await expect(assistant.locator(".mari-home-professor-popup__state-image--map")).toHaveAttribute(
     "src",
-    "/sprites/mari/generated/professor-mari-assistant-map.png",
+    "/sprites/yunyun/chibi-yunyun.png",
   );
   await expect(assistant.locator(".mari-home-professor-popup__idle-stage")).toHaveCSS("opacity", "0");
   await expect(page.locator('[data-component="HomeProfessorMariChat.Window"]')).toBeVisible();
@@ -13052,7 +13052,7 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
     page.locator('[data-component="HomeProfessorMariChat.Window"]').getByRole("button", { name: "Close", exact: true }),
   ).toHaveCount(0);
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/professor");
-  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/favicon.png");
+  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
   await expect(page.locator(".mari-home-browser-chrome")).toBeVisible();
 
   await page.getByRole("tab", { name: "Home", exact: true }).click();
@@ -13079,13 +13079,13 @@ test("Professor Mari visibly arrives on Home and navigates without AI", async ({
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({
       timeout: 30_000,
     });
-    await expect(page.locator('aside[aria-label="Professor Mari assistant"]')).toBeVisible({ timeout: 6_000 });
+    await expect(page.locator('aside[aria-label="Professor YunYun assistant"]')).toBeVisible({ timeout: 6_000 });
   } finally {
     await page.request.delete(`/api/chats/${chat.id}?force=true`).catch(() => undefined);
   }
 });
 
-test("Professor Mari opens a named character directly in its editor", async ({ page }) => {
+test("Professor YunYun opens a named character directly in its editor", async ({ page }) => {
   const resourceName = `Maukie Navigator ${Date.now()}`;
   const characterResponse = await page.request.post("/api/characters", {
     data: { data: { name: resourceName } },
@@ -13103,7 +13103,7 @@ test("Professor Mari opens a named character directly in its editor", async ({ p
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({
       timeout: 30_000,
     });
-    const assistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+    const assistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
     await expect(assistant).toBeVisible({ timeout: 6_000 });
     await page.evaluate(async () => {
       const module = (await import("/src/stores/ui.store.ts" as string)) as PageUiStoreModule;
@@ -13129,10 +13129,10 @@ test("Professor Mari opens a named character directly in its editor", async ({ p
   }
 });
 
-test("Professor Mari introduces Characters and Personas in topbar order without a Browser step", async ({ page }) => {
+test("Professor YunYun introduces Characters and Personas in topbar order without a Browser step", async ({ page }) => {
   await prepareOnboardingReplay(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Welcome to Marinara Engine!", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to YunYun Engine!", exact: true })).toBeVisible();
 
   const next = page.getByRole("button", { name: "Next", exact: true });
   await next.click();
@@ -13142,12 +13142,12 @@ test("Professor Mari introduces Characters and Personas in topbar order without 
   await expect(page.locator("h3").filter({ hasText: /^Personas$/ })).toBeVisible();
 });
 
-test("Professor Mari replaces the Noodle tour with highlighted Home guidance", async ({ page }, testInfo) => {
+test("Professor YunYun replaces the Noodle tour with highlighted Home guidance", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.includes("mobile"), "Desktop verifies the individual Home spotlight anchors.");
 
   await prepareOnboardingReplay(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Welcome to Marinara Engine!", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome to YunYun Engine!", exact: true })).toBeVisible();
 
   const next = page.getByRole("button", { name: "Next", exact: true });
   const stepsBeforeHome = [
@@ -14353,7 +14353,7 @@ test("Character and Persona panels launch card downloads and their local librari
   expect(errors.filter((error) => !error.includes("status of 503 (Service Unavailable)"))).toEqual([]);
 });
 
-test("Downloaded cards use Marinara destination and lorebook choices", async ({ page }, testInfo) => {
+test("Downloaded cards use YunYun destination and lorebook choices", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.includes("mobile"), "The import contract is covered once on desktop.");
 
   const cardName = `Native Import ${Date.now().toString(36)}`;
@@ -14370,7 +14370,7 @@ test("Downloaded cards use Marinara destination and lorebook choices", async ({ 
           {
             id: "native-import-card",
             name: cardName,
-            creator: { displayName: "Marinara Tester" },
+            creator: { displayName: "YunYun Tester" },
             tagline: "A card with an attached lorebook",
             tags: ["testing", "native"],
             rating: "none",
@@ -14385,8 +14385,8 @@ test("Downloaded cards use Marinara destination and lorebook choices", async ({ 
         name: cardName,
         description: "A detailed imported persona.",
         personality: "Curious and precise.",
-        scenario: "Inside the Marinara test kitchen.",
-        creator: "Marinara Tester",
+        scenario: "Inside the YunYun test kitchen.",
+        creator: "YunYun Tester",
         creator_notes: [
           "<style>",
           "body { --unsafe-note-leak: yes; }",
@@ -14490,8 +14490,8 @@ test("Downloaded cards use Marinara destination and lorebook choices", async ({ 
     name: cardName,
     description: "A detailed imported persona.",
     personality: "Curious and precise.",
-    scenario: "Inside the Marinara test kitchen.",
-    creator: "Marinara Tester",
+    scenario: "Inside the YunYun test kitchen.",
+    creator: "YunYun Tester",
   });
   expect(importedLorebook).toMatchObject({
     name: `${cardName} Lore`,
@@ -14844,7 +14844,7 @@ test("downloadable agent catalog is usable on desktop and mobile", async ({ page
   } else {
     await expect(allAgentsButton).toBeHidden();
   }
-  await expect(catalogView.getByText("Marinara Engine v2.3.0+")).toBeVisible();
+  await expect(catalogView.getByText("YunYun Engine v2.3.0+")).toBeVisible();
   const documentationLink = catalogView.getByRole("link", { name: "Read how this agent works" });
   await expect(documentationLink).toHaveAttribute("href", "https://github.com/Pasta-Devs/Marinara-Agents#uno");
   const installButton = catalogView.getByRole("button", { name: "Install", exact: true });
@@ -15068,7 +15068,7 @@ test("agent catalog reports API failures without diagnosing an internet outage",
 
   const catalogView = page.locator('[data-component="AgentCatalogView"]');
   await expect(catalogView.getByText("The agent catalog is unavailable.")).toBeVisible();
-  await expect(catalogView.getByText(/Marinara Engine returned HTTP 400: Validation Error\./)).toBeVisible();
+  await expect(catalogView.getByText(/YunYun Engine returned HTTP 400: Validation Error\./)).toBeVisible();
   await expect(catalogView.getByText(/Check the server internet connection/)).toHaveCount(0);
 });
 
@@ -17928,17 +17928,17 @@ test("desktop Connections and Lorebooks folders expand without a React hook erro
   }
 });
 
-test("Professor Mari chat fills the mobile home viewport and keeps its composer visible", async ({
+test("Professor YunYun chat fills the mobile home viewport and keeps its composer visible", async ({
   page,
 }, testInfo) => {
-  test.skip(!testInfo.project.name.includes("mobile"), "Professor Mari mobile viewport regression.");
+  test.skip(!testInfo.project.name.includes("mobile"), "Professor YunYun mobile viewport regression.");
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Ask Professor Mari", exact: true }).click();
+  await page.getByRole("button", { name: "Ask Professor YunYun", exact: true }).click();
 
   const topBar = page.locator('[data-component="TopBar"]');
   const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
-  const composer = window.getByPlaceholder("Ask Professor Mari");
+  const composer = window.getByPlaceholder("Ask Professor YunYun");
   await expect(window).toBeVisible();
   await expect(composer).toBeVisible();
   await expect
@@ -17961,10 +17961,10 @@ test("Professor Mari chat fills the mobile home viewport and keeps its composer 
   await page.screenshot({ path: testInfo.outputPath("professor-chat-mobile.png") });
 });
 
-test("Professor Mari follows an open conversation across chats and mobile navigation", async ({ page }, testInfo) => {
+test("Professor YunYun follows an open conversation across chats and mobile navigation", async ({ page }, testInfo) => {
   const chatResponse = await page.request.post("/api/chats", {
     data: {
-      name: "Professor Mari floating handoff",
+      name: "Professor YunYun floating handoff",
       mode: "conversation",
       characterIds: [],
     },
@@ -17974,18 +17974,18 @@ test("Professor Mari follows an open conversation across chats and mobile naviga
 
   try {
     await page.goto("/");
-    await page.getByRole("button", { name: "Ask Professor Mari", exact: true }).click();
+    await page.getByRole("button", { name: "Ask Professor YunYun", exact: true }).click();
     const professorWindow = page.locator('[data-component="HomeProfessorMariChat.Window"]');
     await expect(professorWindow).toBeVisible();
 
     if (testInfo.project.name.includes("mobile")) {
       await page.locator('[data-tour="sidebar-toggle"]').click();
-      const reopenProfessorMari = page.getByRole("button", { name: "Open Professor Mari chat" });
+      const reopenProfessorMari = page.getByRole("button", { name: "Open Professor YunYun chat" });
       await expect(reopenProfessorMari).toBeVisible();
-      await expect(page.getByRole("button", { name: "Dismiss Professor Mari floating chat" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Dismiss Professor YunYun floating chat" })).toBeVisible();
       await reopenProfessorMari.dispatchEvent("click");
       await expect(reopenProfessorMari).toHaveCount(0);
-      await expect(page.getByPlaceholder("Ask Professor Mari").last()).toBeVisible();
+      await expect(page.getByPlaceholder("Ask Professor YunYun").last()).toBeVisible();
     }
 
     await page.evaluate(async (chatId) => {
@@ -17994,10 +17994,10 @@ test("Professor Mari follows an open conversation across chats and mobile naviga
     }, chat.id);
 
     if (testInfo.project.name.includes("mobile")) {
-      await page.getByRole("button", { name: "Close Professor Mari chat" }).last().click();
-      await expect(page.getByRole("button", { name: "Open Professor Mari chat" })).toBeVisible();
+      await page.getByRole("button", { name: "Close Professor YunYun chat" }).last().click();
+      await expect(page.getByRole("button", { name: "Open Professor YunYun chat" })).toBeVisible();
     } else {
-      const dismissProfessorMari = page.getByRole("button", { name: "Dismiss Professor Mari floating chat" });
+      const dismissProfessorMari = page.getByRole("button", { name: "Dismiss Professor YunYun floating chat" });
       await expect(dismissProfessorMari).toBeVisible();
       await expect(dismissProfessorMari).toHaveClass(/mari-chrome-control--small/u);
       const [buttonBox, iconBox] = await Promise.all([
@@ -18008,29 +18008,29 @@ test("Professor Mari follows an open conversation across chats and mobile naviga
       expect(buttonBox?.height).toBeLessThanOrEqual(32);
       expect(iconBox?.width).toBeLessThanOrEqual(18);
       expect(iconBox?.height).toBeLessThanOrEqual(18);
-      await expect(page.getByPlaceholder("Ask Professor Mari")).toBeVisible();
+      await expect(page.getByPlaceholder("Ask Professor YunYun")).toBeVisible();
     }
 
     await page.locator('[data-component="TopBar"]').getByTitle("Home").click();
-    await expect(page.getByRole("button", { name: "Dismiss Professor Mari floating chat" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Open Professor Mari chat" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Dismiss Professor YunYun floating chat" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Open Professor YunYun chat" })).toHaveCount(0);
   } finally {
     await page.request.delete(`/api/chats/${chat.id}`).catch(() => undefined);
   }
 });
 
-test("Professor Mari suggestions stay visible after chat history loads", async ({ page }) => {
+test("Professor YunYun suggestions stay visible after chat history loads", async ({ page }) => {
   const chatResponse = await page.request.get("/api/chats/internal/professor-mari");
   expect(chatResponse.ok()).toBeTruthy();
   const chat = (await chatResponse.json()) as { id: string };
-  const messageContent = `Professor Mari suggestion stability ${Date.now()}`;
+  const messageContent = `Professor YunYun suggestion stability ${Date.now()}`;
   const createdMessageIds: string[] = [];
 
   try {
     const userMessageResponse = await page.request.post(`/api/chats/${chat.id}/messages`, {
       data: {
         role: "user",
-        content: `Professor Mari chrome color request ${Date.now()}`,
+        content: `Professor YunYun chrome color request ${Date.now()}`,
       },
     });
     const userMessage = (await userMessageResponse.json().catch(() => null)) as { id?: unknown } | null;
@@ -18090,7 +18090,7 @@ test("Professor Mari suggestions stay visible after chat history loads", async (
   }
 });
 
-test("Professor Mari shows the latest context budget when token usage is enabled", async ({ page }) => {
+test("Professor YunYun shows the latest context budget when token usage is enabled", async ({ page }) => {
   const chatResponse = await page.request.get("/api/chats/internal/professor-mari");
   expect(chatResponse.ok()).toBeTruthy();
   const chat = (await chatResponse.json()) as { id: string };
@@ -18186,7 +18186,7 @@ test("Professor Mari shows the latest context budget when token usage is enabled
   }
 });
 
-test("Professor Mari history opens a loaded chat at its newest message", async ({ page }) => {
+test("Professor YunYun history opens a loaded chat at its newest message", async ({ page }) => {
   const createdChatIds: string[] = [];
 
   try {
@@ -18198,7 +18198,7 @@ test("Professor Mari history opens a loaded chat at its newest message", async (
       const messageResponse = await page.request.post(`/api/chats/${firstChat.id}/messages`, {
         data: {
           role: index % 2 === 0 ? "user" : "assistant",
-          content: `Professor Mari history message ${index + 1}. ${"A long transcript line makes the pane overflow. ".repeat(8)}`,
+          content: `Professor YunYun history message ${index + 1}. ${"A long transcript line makes the pane overflow. ".repeat(8)}`,
         },
       });
       expect(messageResponse.ok()).toBeTruthy();
@@ -18209,7 +18209,7 @@ test("Professor Mari history opens a loaded chat at its newest message", async (
     createdChatIds.push(secondChat.id);
 
     await page.goto("/");
-    await page.getByRole("button", { name: "Ask Professor Mari", exact: true }).click();
+    await page.getByRole("button", { name: "Ask Professor YunYun", exact: true }).click();
 
     const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
     await window.getByRole("button", { name: "Chats" }).click();
@@ -18234,7 +18234,7 @@ test("Professor Mari history opens a loaded chat at its newest message", async (
   }
 });
 
-test("Professor Mari bulk chat deletion follows the active accent", async ({ page }) => {
+test("Professor YunYun bulk chat deletion follows the active accent", async ({ page }) => {
   const firstResponse = await page.request.get("/api/chats/internal/professor-mari");
   expect(firstResponse.ok()).toBeTruthy();
   const firstChat = (await firstResponse.json()) as { id: string };
@@ -18246,14 +18246,14 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
     await page.goto("/");
     await setAppAccentColor(page, "#14b8a6");
     const activeAccentColor = await readCssVariableColor(page, "--marinara-chat-chrome-button-text-active");
-    await page.getByRole("button", { name: "Ask Professor Mari", exact: true }).click();
+    await page.getByRole("button", { name: "Ask Professor YunYun", exact: true }).click();
 
     const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
     await window.getByRole("button", { name: "Chats" }).click();
     await window.getByRole("button", { name: "Select", exact: true }).click();
     await window
       .locator(`[data-professor-mari-chat-id="${firstChat.id}"]`)
-      .getByRole("button", { name: /Professor Mari/u })
+      .getByRole("button", { name: /Professor YunYun/u })
       .click();
 
     const deleteSelected = window.getByRole("button", { name: "Delete selected" });
@@ -18270,7 +18270,7 @@ test("Professor Mari bulk chat deletion follows the active accent", async ({ pag
   }
 });
 
-test("Professor Mari dependency and sensitive-file reviews stay explicit across viewports", async ({ page }) => {
+test("Professor YunYun dependency and sensitive-file reviews stay explicit across viewports", async ({ page }) => {
   await page.route("**/api/professor-mari/workspace/status*", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -18328,7 +18328,7 @@ test("Professor Mari dependency and sensitive-file reviews stay explicit across 
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Ask Professor Mari", exact: true }).click();
+  await page.getByRole("button", { name: "Ask Professor YunYun", exact: true }).click();
 
   const window = page.locator('[data-component="HomeProfessorMariChat.Window"]');
   await expect(window.getByText("Install this dependency?")).toBeVisible();
@@ -18377,7 +18377,7 @@ function respondWithProfessorMariAction(response: import("node:http").ServerResp
   );
 }
 
-test("Professor Mari creates a character when its own authorization quote omits the intent verb", async ({
+test("Professor YunYun creates a character when its own authorization quote omits the intent verb", async ({
   request,
 }) => {
   const suffix = Date.now().toString(36);
@@ -18389,7 +18389,7 @@ test("Professor Mari creates a character when its own authorization quote omits 
     incoming.on("end", () => {
       if (incoming.method !== "POST" || incoming.url !== "/v1/chat/completions") {
         response.writeHead(404, { "content-type": "application/json" });
-        response.end(JSON.stringify({ error: "Unexpected Professor Mari provider request" }));
+        response.end(JSON.stringify({ error: "Unexpected Professor YunYun provider request" }));
         return;
       }
       callCount += 1;
@@ -18426,11 +18426,11 @@ test("Professor Mari creates a character when its own authorization quote omits 
   let characterId = "";
   try {
     const address = providerServer.address();
-    if (!address || typeof address === "string") throw new Error("Professor Mari provider fixture did not bind");
+    if (!address || typeof address === "string") throw new Error("Professor YunYun provider fixture did not bind");
 
     const connectionResponse = await request.post("/api/connections", {
       data: {
-        name: `Mari Authorization Provider ${suffix}`,
+        name: `YunYun Authorization Provider ${suffix}`,
         provider: "custom",
         baseUrl: `http://127.0.0.1:${address.port}/v1`,
         apiKey: "e2e-mari-authorization",
@@ -18495,7 +18495,7 @@ test("Professor Mari creates a character when its own authorization quote omits 
 // plus a long pasted card whose example dialogue quotes "Don't tell me it's nothing." and whose bio
 // prose says "Juli should never feel like a quest objective" must not be mistaken for an
 // English-only intent gate miss or a denial phrase buried in the pasted card.
-test("Professor Mari creates a character from a German instruction and a card with quoted denial-like dialogue", async ({
+test("Professor YunYun creates a character from a German instruction and a card with quoted denial-like dialogue", async ({
   request,
 }) => {
   const suffix = Date.now().toString(36);
@@ -18529,7 +18529,7 @@ Her expression hardens slightly.
     incoming.on("end", () => {
       if (incoming.method !== "POST" || incoming.url !== "/v1/chat/completions") {
         response.writeHead(404, { "content-type": "application/json" });
-        response.end(JSON.stringify({ error: "Unexpected Professor Mari provider request" }));
+        response.end(JSON.stringify({ error: "Unexpected Professor YunYun provider request" }));
         return;
       }
       callCount += 1;
@@ -18564,11 +18564,11 @@ Her expression hardens slightly.
   let characterId = "";
   try {
     const address = providerServer.address();
-    if (!address || typeof address === "string") throw new Error("Professor Mari provider fixture did not bind");
+    if (!address || typeof address === "string") throw new Error("Professor YunYun provider fixture did not bind");
 
     const connectionResponse = await request.post("/api/connections", {
       data: {
-        name: `Mari German Provider ${suffix}`,
+        name: `YunYun German Provider ${suffix}`,
         provider: "custom",
         baseUrl: `http://127.0.0.1:${address.port}/v1`,
         apiKey: "e2e-mari-german",
@@ -19505,11 +19505,11 @@ test("Home Community and clock widgets are useful, timezone-aware, and optional"
   await expect(community.getByRole("heading", { name: "Around the table" })).toBeVisible();
   await expect(community.getByRole("link", { name: /Discord/ })).toHaveAttribute(
     "href",
-    "https://discord.com/invite/KdAkTg94ME",
+    "https://discord.gg/canalpa",
   );
   await expect(community.getByRole("link", { name: /Support/ })).toHaveAttribute(
     "href",
-    "https://ko-fi.com/marinara_spaghetti",
+    "https://ko-fi.com/lukathehero",
   );
   await community.getByRole("button", { name: /Credits/ }).click();
   const creditsWindow = page.getByRole("dialog", { name: "Credits", exact: true });
@@ -19529,7 +19529,7 @@ test("Home Community and clock widgets are useful, timezone-aware, and optional"
   await expect(
     page
       .locator('[data-home-widget-id="learn"]')
-      .getByText("Search official documentation and guides without leaving Marinara.", { exact: true }),
+      .getByText("Search official documentation and guides without leaving YunYun.", { exact: true }),
   ).toBeVisible();
 
   const timeZone = "America/Los_Angeles";
@@ -19576,7 +19576,7 @@ test("Home Community and clock widgets are useful, timezone-aware, and optional"
   const widgetManager = page.getByRole("dialog", { name: "Home Widgets" });
   await expect(widgetManager.getByRole("switch")).toHaveCount(10);
   for (const label of [
-    "Your guide — Professor Mari",
+    "Your guide — Professor YunYun",
     "Continue chatting — Recent chats",
     "From the kitchen — What's New",
     "Discovery desk — Something new for your engine",
@@ -19654,7 +19654,7 @@ test("mobile Home collects its bookmarks into a Marinara-colored menu", async ({
     return document.contains(menuElement);
   });
   expect(menuStayedMountedForExit).toBe(true);
-  await expect(page.getByRole("dialog", { name: "Professor Mari's FAQ" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Professor YunYun's FAQ" })).toBeVisible();
   await expect(menu).toHaveCount(0);
 });
 
@@ -19779,7 +19779,7 @@ test("Home achievements preview the latest unlock and nearest measurable goal", 
             titleKey: "achievements.definitions.diligentStudent.title",
             title: "Diligent Student",
             descriptionKey: "achievements.definitions.diligentStudent.description",
-            description: "Completed Professor Mari's tutorial.",
+            description: "Completed Professor YunYun's tutorial.",
             category: "milestone",
             icon: "graduation",
           },
@@ -19996,7 +19996,7 @@ test("Character of the Day stays vertically centered inside its mobile widget", 
       localStorage.setItem("marinara:home:widget-visibility:v2", JSON.stringify(["character"]));
       localStorage.removeItem("marinara:home:widget-layout:v2");
       localStorage.removeItem("marinara:home:widget-order:v1");
-      // The floating Professor Mari assistant popup overlaps the widget's
+      // The floating Professor YunYun assistant popup overlaps the widget's
       // action row on the iPhone-profile viewport and intercepts the "View
       // character" click. It is unrelated to the layout under test.
     });
@@ -20084,7 +20084,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   ).toBeVisible();
   await expect(page.locator('[data-component="HomeBrowserHub.AnimatedLogo"]')).toHaveAttribute(
     "src",
-    "/logo-splash.gif",
+    "/yunyun-logo-splash.gif",
   );
   await expect(page.locator('[data-component="HomeBrowserHub.AnimatedLogo"]')).toBeVisible();
   expect(
@@ -20093,7 +20093,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
       return element.complete && element.naturalWidth > 0 && element.naturalHeight > 0;
     }),
   ).toBe(true);
-  await expect(page.locator(".mari-home-hero img")).toHaveAttribute("src", "/logo.png");
+  await expect(page.locator(".mari-home-hero img")).toHaveAttribute("src", "/yunyun-logo.png");
   await expect(page.locator('.mari-home-hero [data-chat-mode-icon="conversation"]')).toHaveClass(
     /lucide-message-square/,
   );
@@ -20104,7 +20104,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   await expect(page.locator('[data-component="HomeFaq.MobileLauncher"]')).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "FAQ", exact: true })).toHaveCount(0);
   await openHomeBookmark(page, "FAQ");
-  const faqWindow = page.getByRole("dialog", { name: "Professor Mari's FAQ" });
+  const faqWindow = page.getByRole("dialog", { name: "Professor YunYun's FAQ" });
   await expect(faqWindow).toBeVisible();
   await expect(faqWindow.getByRole("searchbox", { name: "Search FAQ" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -20164,7 +20164,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   await expect(page.locator("[data-home-widget-id]")).toHaveCount(5);
   await expectHomeWidgetHeightsMatch(page, baselineCompactHeight);
 
-  await activateControl(widgetManager.getByRole("switch", { name: "Hide Your guide — Professor Mari" }), testInfo);
+  await activateControl(widgetManager.getByRole("switch", { name: "Hide Your guide — Professor YunYun" }), testInfo);
   await expect(page.locator("[data-home-widget-id]")).toHaveCount(4);
   await expectHomeWidgetHeightsMatch(page, baselineCompactHeight);
 
@@ -20188,7 +20188,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
     "From the kitchen — What's New",
     "Discovery desk — Something new for your engine",
     "Your shelf — Achievements",
-    "Your guide — Professor Mari",
+    "Your guide — Professor YunYun",
     "Daily encounter — Character of the Day",
     "Community — Around the table",
     "Clock & calendar — Right now",
@@ -20255,17 +20255,17 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
       const module = (await import("/src/stores/ui.store.ts" as string)) as PageUiStoreModule;
       module.useUIStore.getState().setProfessorMariNavigationEnabled(false);
     });
-    await expect(page.locator('aside[aria-label="Professor Mari assistant"]')).toBeHidden();
+    await expect(page.locator('aside[aria-label="Professor YunYun assistant"]')).toBeHidden();
     await page.reload();
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible();
     await page.waitForTimeout(1_300);
-    await expect(page.locator('aside[aria-label="Professor Mari assistant"]')).toBeHidden();
+    await expect(page.locator('aside[aria-label="Professor YunYun assistant"]')).toBeHidden();
     await page.evaluate(async () => {
       const module = (await import("/src/stores/ui.store.ts" as string)) as PageUiStoreModule;
       module.useUIStore.getState().setReduceAmbientEffects(true);
       module.useUIStore.getState().setProfessorMariNavigationEnabled(true);
     });
-    const restoredAssistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+    const restoredAssistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
     await expect(restoredAssistant).toBeVisible({ timeout: 1_000 });
     await expect(restoredAssistant.locator(".mari-home-professor-popup__idle-stage--active")).toBeVisible();
     await expect(restoredAssistant.locator(".mari-home-professor-popup__arrival-frame")).toHaveCSS("opacity", "0");
@@ -20274,8 +20274,8 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
       module.useUIStore.getState().setReduceAmbientEffects(false);
     });
     await clickTopbarPanel(page, "settings");
-    const suggestionsToggle = page.getByRole("checkbox", { name: "Professor Mari suggestions" });
-    const navigationToggle = page.getByRole("checkbox", { name: "Professor Mari navigation" });
+    const suggestionsToggle = page.getByRole("checkbox", { name: "Professor YunYun suggestions" });
+    const navigationToggle = page.getByRole("checkbox", { name: "Professor YunYun navigation" });
     await expect(suggestionsToggle).toBeVisible();
     await expect(navigationToggle).toBeChecked();
     const [suggestionsBounds, navigationBounds, settingsSearchBounds, addressRowBounds] = await Promise.all([
@@ -20387,7 +20387,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   expect(errors).toEqual([]);
 });
 
-test("Professor Mari navigation can be repositioned within Home on desktop", async ({ page }, testInfo) => {
+test("Professor YunYun navigation can be repositioned within Home on desktop", async ({ page }, testInfo) => {
   const mobile = testInfo.project.name.includes("mobile");
   await page.addInitScript(() => {
     if (sessionStorage.getItem("marinara:e2e:professor-position-cleared") === "true") return;
@@ -20408,7 +20408,7 @@ test("Professor Mari navigation can be repositioned within Home on desktop", asy
     return;
   }
 
-  const assistant = page.locator('aside[aria-label="Professor Mari assistant"]');
+  const assistant = page.locator('aside[aria-label="Professor YunYun assistant"]');
   const content = page.locator('[data-component="HomeBrowserHub.Content"]');
   const sprite = page.locator('[data-component="HomeBrowserHub.ProfessorAssistantSprite"]');
   const bubble = page.locator('[data-component="HomeBrowserHub.ProfessorAssistantBubble"]');
@@ -20423,7 +20423,7 @@ test("Professor Mari navigation can be repositioned within Home on desktop", asy
       before: getComputedStyle(element, "::before").display,
     })),
   ).toEqual({ after: "none", before: "none" });
-  // Mari arrives by sliding up past the Home hub's bottom edge. Hovering her mid-arrival lets Playwright
+  // YunYun arrives by sliding up past the Home hub's bottom edge. Hovering her mid-arrival lets Playwright
   // scroll the hub to reveal her, and the hub keeps that offset (her hidden drag frame overflows it), so
   // every bound measured below shifts. Let the arrival finish first.
   await sprite.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
@@ -24463,7 +24463,7 @@ test("background prompt review preserves edits through rerenders and resumes the
               resultData: {
                 generateBackground: true,
                 backgroundPlan: {
-                  locationName: "Marinara test kitchen",
+                  locationName: "YunYun test kitchen",
                   prompt,
                   tags: ["kitchen"],
                   reason: "Manual Gallery background request",
@@ -24498,7 +24498,7 @@ test("background prompt review preserves edits through rerenders and resumes the
     expect(submittedTargets).toEqual(["background"]);
     expect(submittedResultData).toMatchObject({
       generateBackground: true,
-      backgroundPlan: { locationName: "Marinara test kitchen" },
+      backgroundPlan: { locationName: "YunYun test kitchen" },
     });
     await expect(promptEditor).toHaveValue(editedPrompt);
     await expect(dialog.getByRole("button", { name: "Generate", exact: true })).toBeDisabled();

@@ -110,7 +110,7 @@ export function ConnectionModelPicker({
     return () => window.cancelAnimationFrame(frame);
   }, [autoFocusSearch, connection.id]);
 
-  // Marinara's built-in models fill in only when the provider lists none or cannot be reached; next to a
+  // YunYun's built-in models fill in only when the provider lists none or cannot be reached; next to a
   // provider's own list they are noise. A custom endpoint never gets them: its built-in list is the OpenAI
   // and Z.AI catalog, which says nothing about what that server runs.
   const remoteModels = modelList.data?.models;

@@ -148,7 +148,7 @@ assert.match(
 );
 assert.match(
   NOODLE_TIMELINE_BASE_DEFAULT_PROMPT,
-  /^You write a fake social media timeline for Marinara Engine's in-app parody site called Noodle\./u,
+  /^You write a fake social media timeline for YunYun Engine's in-app parody site called Noodle\./u,
 );
 assert.equal(NOODLE_TIMELINE_BASE_DEFAULT_PROMPT.includes(NOODLE_ADULT_PLATFORM_POLICY), true);
 assert.equal(NOODLE_TIMELINE_BASE_DEFAULT_PROMPT.includes(NOODLE_PERSONA_AUTHORSHIP_INSTRUCTION), true);
@@ -219,11 +219,11 @@ const threadedTimeline = formatNoodleTimelineForPrompt(
         kind: "persona",
         entityId: "persona-1",
         handle: "smarinara_spaghetti",
-        displayName: "Mari",
+        displayName: "YunYun",
         avatarUrl: null,
       },
       type: "reply",
-      content: "Mari asks a follow-up question.",
+      content: "YunYun asks a follow-up question.",
       imageUrl: null,
       createdAt: "2026-07-10T10:05:00.000Z",
     },
@@ -232,7 +232,7 @@ const threadedTimeline = formatNoodleTimelineForPrompt(
 );
 assert.match(threadedTimeline, /replyId=persona-comment-1/u);
 assert.match(threadedTimeline, /@smarinara_spaghetti/u);
-assert.match(threadedTimeline, /Mari asks a follow-up question/u);
+assert.match(threadedTimeline, /YunYun asks a follow-up question/u);
 assert.deepEqual(
   noodlePersonaCommentPostIds(
     [

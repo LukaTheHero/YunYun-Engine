@@ -270,7 +270,7 @@ test("multiplayer requires separate consent and reviews only selected persona te
   await expect(page.getByText("Moonlit Harbor <img src=x>", { exact: false })).toBeVisible();
   await expect(page.locator("#fixture img")).toHaveCount(0);
   await page.getByLabel("Room password (at least 12 characters)").fill("separate-password");
-  await page.getByLabel("Your display name").fill("Mari");
+  await page.getByLabel("Your display name").fill("YunYun");
   await page.getByLabel("Choose your persona").selectOption("persona_123");
   await expect(page.getByLabel("Description to share")).toHaveValue("An astronomer.");
   const join = page.getByRole("button", { name: "Request to join" });
@@ -288,7 +288,7 @@ test("multiplayer requires separate consent and reviews only selected persona te
       body: {
         inviteCode: "fixture-code",
         password: "separate-password",
-        displayName: "Mari",
+        displayName: "YunYun",
         persona: { name: "Mira", description: "An astronomer." },
         consent: true,
       },
@@ -560,7 +560,7 @@ test("Players reuses chat settings for invitations, approval, AI proposals and g
       players: [
         {
           id: "host_123456",
-          displayName: "Mari",
+          displayName: "YunYun",
           personaName: "Mira",
           isHost: true,
           connected: true,
@@ -830,7 +830,7 @@ test("editing a hosted Game setup synchronizes the reviewed roster before saving
       players: [
         {
           id: "host_123456",
-          displayName: "Mari",
+          displayName: "YunYun",
           personaName: "Mira",
           isHost: true,
           connected: true,
@@ -1078,7 +1078,7 @@ test("Players labels offline players and explains a name already in use", async 
             players: [
               {
                 id: "host_123456",
-                displayName: "Mari",
+                displayName: "YunYun",
                 personaName: "Mira",
                 isHost: true,
                 connected: true,
@@ -1139,7 +1139,7 @@ test("joining while another shared chat is open says to leave it first", async (
   await page.getByLabel("Invite code", { exact: true }).fill("fixture-code");
   await page.getByRole("button", { name: "Review invitation" }).click();
   await page.getByLabel("Room password (at least 12 characters)").fill("separate-password");
-  await page.getByLabel("Your display name").fill("Mari");
+  await page.getByLabel("Your display name").fill("YunYun");
   await page.getByLabel("Choose your persona").selectOption("persona_123");
   await page
     .getByLabel("I verified the host and agree to share only the display name and persona text shown above.")

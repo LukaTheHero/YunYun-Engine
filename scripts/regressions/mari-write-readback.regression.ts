@@ -108,12 +108,12 @@ try {
   );
 
   // End-to-end chain: the compacted result still carries the readBack JSON
-  // for Mari to read, and the guard's ENGINE-WRITTEN sentinel - anchored at
+  // for YunYun to read, and the guard's ENGINE-WRITTEN sentinel - anchored at
   // position zero of the output, where model-authored text can never sit -
   // marks the applied mutation verified WITHOUT any separate read.
   const compacted = compactMutationResult(updated);
   const serialized = JSON.stringify(compacted, null, 2);
-  assert.match(serialized, /"readBack":\s*\{\s*"status":\s*"verified"/u, "Mari must see the read-back detail");
+  assert.match(serialized, /"readBack":\s*\{\s*"status":\s*"verified"/u, "YunYun must see the read-back detail");
   const commandOutput = [
     READ_BACK_VERIFIED_SENTINEL,
     "Command: app_data character.update",
@@ -383,4 +383,4 @@ assert.match(workspaceAgent, /include the confirmatory read in the SAME response
 // The mismatch alarm is loud and unsmoothing.
 assert.match(workspaceAgent, /does NOT match the intended change \(see readBack\.mismatches\)/u);
 
-console.log("Mari write read-back regression passed.");
+console.log("YunYun write read-back regression passed.");

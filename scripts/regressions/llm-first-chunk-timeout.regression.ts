@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
 // #6970: a local server that sends headers at once and the first token minutes later (a long
-// Professor Mari prompt) must be waited on for the Text generation timeout, not a fixed 2 minutes.
+// Professor YunYun prompt) must be waited on for the Text generation timeout, not a fixed 2 minutes.
 process.env.CHAT_GENERATION_TIMEOUT_MS = "10000";
 const { llmFetch } = await import("../../packages/server/src/services/llm/base-provider.js");
 

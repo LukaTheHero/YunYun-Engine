@@ -1729,7 +1729,7 @@ export function parseTrackerCastCharacterId(value: unknown): { cardId: string; n
  * A tracked entry that matches a card by id, exact name, or an explicit alias
  * takes the card's id, name, and avatar, and duplicates collapse into one row.
  * That keeps single-character cards stable when a model drifts between
- * "Mari" and 'Marisol "Mari"'.
+ * "YunYun" and 'Marisol "YunYun"'.
  *
  * Some cards describe several people (a scenario card with a cast). The
  * tracker reports each of them with the card's id and their own name. Merging

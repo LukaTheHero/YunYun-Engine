@@ -69,7 +69,7 @@ function platformReason(
   // is not: a card that launched it before has not changed, and refusing to start
   // over one failed query would stop a working install.
   if (capable === null && options.beforeDownload)
-    return "Could not read this GPU's compute capability, so Marinara cannot tell whether it can run this model. Try again, or update the NVIDIA driver";
+    return "Could not read this GPU's compute capability, so YunYun cannot tell whether it can run this model. Try again, or update the NVIDIA driver";
   return null;
 }
 

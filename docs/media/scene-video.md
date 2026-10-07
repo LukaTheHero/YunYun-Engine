@@ -1,6 +1,6 @@
 # Scene Video Generation
 
-This guide explains how Marinara Engine turns a scene illustration into a short MP4 video clip. It covers the video providers, how to generate a clip from the Gallery, the Game Mode controls, and the video settings. A scene video is a brief animated clip made from one still image.
+This guide explains how YunYun Engine turns a scene illustration into a short MP4 video clip. It covers the video providers, how to generate a clip from the Gallery, the Game Mode controls, and the video settings. A scene video is a brief animated clip made from one still image.
 
 ## What scene video does
 
@@ -39,11 +39,11 @@ The **Video Service** picker offers eight choices. Each one fills in a default w
 
 For **ComfyUI**, use the usual local address `http://127.0.0.1:8188` and paste an API-format video workflow into **ComfyUI Workflow**. The workflow is required. See [ComfyUI Workflow Setup](comfyui.md#comfyui-video-workflows) for placeholders and output-node requirements.
 
-For **SwarmUI**, Marinara fills in the local address `http://127.0.0.1:7801`. Paste an API-format video workflow into **ComfyUI Workflow**. The workflow is required. SwarmUI cannot use the `%reference_image_name%` placeholders, so use `%reference_image%` for the reference image instead. If your SwarmUI server requires an account, paste a Swarm Auth Token into **API Key**. **Fetch Models from API** lists the models on your SwarmUI server.
+For **SwarmUI**, YunYun fills in the local address `http://127.0.0.1:7801`. Paste an API-format video workflow into **ComfyUI Workflow**. The workflow is required. SwarmUI cannot use the `%reference_image_name%` placeholders, so use `%reference_image%` for the reference image instead. If your SwarmUI server requires an account, paste a Swarm Auth Token into **API Key**. **Fetch Models from API** lists the models on your SwarmUI server.
 
 ### Make it the default video connection
 
-The connection editor for a Video Generation connection shows a **Default for Videos** group. Turn on **Use as default video connection** so Marinara can use this connection when a chat has no video connection of its own. Only mark one connection as the default video connection.
+The connection editor for a Video Generation connection shows a **Default for Videos** group. Turn on **Use as default video connection** so YunYun can use this connection when a chat has no video connection of its own. Only mark one connection as the default video connection.
 
 ### Connection video defaults
 
@@ -65,11 +65,11 @@ Gemini Omni has no resolution field, and its length is written into the prompt t
 
 ### Seedance reference frames
 
-Seedance must fetch your reference image over a public web link before it can animate it. A local Marinara server has no public link, so plain local setups need one extra step.
+Seedance must fetch your reference image over a public web link before it can animate it. A local YunYun server has no public link, so plain local setups need one extra step.
 
 Open the Seedance connection and turn on **Upload Seedance reference frames temporarily**. This uploads the reference frame to a temporary public link so Seedance can read it. You can pick how long that link lasts under **Temporary link lifetime**, which defaults to 12 hours.
 
-If your Marinara server already has a public web address, you can set an environment variable instead of using temporary uploads. See the [Server Configuration Reference](../CONFIGURATION.md) for the video reference setting.
+If your YunYun server already has a public web address, you can set an environment variable instead of using temporary uploads. See the [Server Configuration Reference](../CONFIGURATION.md) for the video reference setting.
 
 ## Choosing a provider
 
@@ -80,23 +80,23 @@ All eight services make short clips from your image. They differ in speed, clip 
 - **xAI Imagine**: 1 to 15 second clips. It uses a shorter prompt limit than the other services.
 - **OpenRouter Video**: 1 to 60 seconds, and lets you type any video model your OpenRouter account supports.
 - **NanoGPT**: 1 to 60 seconds. It has no default model, so load NanoGPT's video models with **Fetch Models from API** and pick one.
-- **Atlas Cloud**: **Fetch Models** loads Atlas Cloud's current video catalog, image-to-video models first, each with its starting price per second of output. If the catalog cannot be reached, Marinara shows Veo 3.1 and Seedance 2.0 starter models instead. You can also type an exact Atlas Cloud video model ID; model-specific duration, resolution, and reference-image limits still apply.
+- **Atlas Cloud**: **Fetch Models** loads Atlas Cloud's current video catalog, image-to-video models first, each with its starting price per second of output. If the catalog cannot be reached, YunYun shows Veo 3.1 and Seedance 2.0 starter models instead. You can also type an exact Atlas Cloud video model ID; model-specific duration, resolution, and reference-image limits still apply.
 - **Seedance 2.0**: 4 to 15 second clips with first-frame and first and last frame modes. It needs a public link to your reference image.
-- **ComfyUI**: local generation through your own API-format workflow. Marinara uploads the reference image directly to ComfyUI when the workflow uses `%reference_image_name%`.
+- **ComfyUI**: local generation through your own API-format workflow. YunYun uploads the reference image directly to ComfyUI when the workflow uses `%reference_image_name%`.
 - **SwarmUI**: local generation through your own API-format workflow, sent through your SwarmUI server. The reference image goes into the workflow through `%reference_image%`.
 
-Expect video jobs to take a while. The provider starts the job, then Marinara waits and checks until the clip is ready. This can take several minutes per clip, longer than a still image. Large local WAN models may need more than the 30-minute default; raise `VIDEO_GEN_TIMEOUT_MS` and restart Marinara when necessary.
+Expect video jobs to take a while. The provider starts the job, then YunYun waits and checks until the clip is ready. This can take several minutes per clip, longer than a still image. Large local WAN models may need more than the 30-minute default; raise `VIDEO_GEN_TIMEOUT_MS` and restart YunYun when necessary.
 
 ### Atlas Cloud model differences
 
-Atlas Cloud models do not all accept the same settings. Before each request, Marinara reads the model's published input schema from `static.atlascloud.ai` and fits your connection defaults to it:
+Atlas Cloud models do not all accept the same settings. Before each request, YunYun reads the model's published input schema from `static.atlascloud.ai` and fits your connection defaults to it:
 
 - The source illustration is sent in the image field that model uses.
 - Clip length moves to the nearest length the model offers. A model limited to 5 or 10 seconds turns an 8 second default into 10.
 - Resolution moves to the nearest tier the model offers. Models that take a pixel size instead receive the closest `width*height` for your aspect ratio and resolution.
 - A setting the model does not have is left out, so the model's own default applies.
 
-The server log lists every value that was changed, on a line starting with `[video-gen/atlas-cloud] fitted request`. If the schema cannot be read, Marinara sends the same general request as before.
+The server log lists every value that was changed, on a line starting with `[video-gen/atlas-cloud] fitted request`. If the schema cannot be read, YunYun sends the same general request as before.
 
 Pick an **image-to-video** model for scene videos. A text-to-video model has no image field, so it ignores your illustration and makes an unrelated clip from the prompt alone. The server log says when this happens.
 
@@ -116,7 +116,7 @@ Each option is named exactly as Atlas Cloud names it and shows Atlas Cloud's own
 
 Choices are saved per model, so switching the connection to another model and back keeps each model's options. **Reset model options** clears the choices for the current model. Click **Save** on the connection to keep your changes.
 
-If a saved option no longer fits the model, for example after Atlas Cloud changes a model's inputs, Marinara leaves it out of the request and names it in the `[video-gen/atlas-cloud] fitted request` log line.
+If a saved option no longer fits the model, for example after Atlas Cloud changes a model's inputs, YunYun leaves it out of the request and names it in the `[video-gen/atlas-cloud] fitted request` log line.
 
 ## Generate a video from the Gallery
 
@@ -142,7 +142,7 @@ The same **Review Video Prompt** window appears for **Animate illustration** whe
 
 Under the **Videos** tab, each clip plays inline and shows its length and model name. You can pin a clip with **Pin video to chat**, or save it with **Download scene video**. If there are no clips yet, the tab reads **No videos yet**.
 
-If you try to make a video with no picture in the chat, Marinara shows this message: "Add or generate a gallery image before generating a scene video." Generate or upload a picture first, then try again.
+If you try to make a video with no picture in the chat, YunYun shows this message: "Add or generate a gallery image before generating a scene video." Generate or upload a picture first, then try again.
 
 ## Game Mode scene video
 
@@ -175,7 +175,7 @@ The **Game Video Prompt** continues to control manual Gallery and Game Assets vi
 
 When you first create a Game Mode chat, the setup wizard also has a **Video Generation Connection** picker. It is on the **Features** step, and it appears after you turn on **Visual Generation**.
 
-If a chat has no video connection of its own, Marinara falls back to the connection you marked **Use as default video connection**. If there is no chat connection and no default, video actions show a warning telling you to pick one.
+If a chat has no video connection of its own, YunYun falls back to the connection you marked **Use as default video connection**. If there is no chat connection and no default, video actions show a warning telling you to pick one.
 
 ## Video generation settings
 
@@ -189,7 +189,7 @@ The same section has an **Animated expression length** setting. That belongs to 
 
 ## Storyboards
 
-The downloadable Storyboard Agent can build ordered keyframe images and clips in Roleplay and Game Mode. Game Mode uses one completed GM turn; Roleplay combines completed exchanges into an inline episode. When animations are enabled, Marinara animates each successful keyframe with the selected video connection and the Agent's **Storyboard Video Prompt**.
+The downloadable Storyboard Agent can build ordered keyframe images and clips in Roleplay and Game Mode. Game Mode uses one completed GM turn; Roleplay combines completed exchanges into an inline episode. When animations are enabled, YunYun animates each successful keyframe with the selected video connection and the Agent's **Storyboard Video Prompt**.
 
 Storyboards have their own controls and their own guide. See the [Storyboard Agent Guide](../game/storyboard.md) for installation and both mode workflows.
 
@@ -205,7 +205,7 @@ Scene video always animates an existing picture. Use **Illustrate**, upload a pi
 
 ### The video takes a long time
 
-This is normal. The provider starts the job, and Marinara waits and checks until the clip is ready. Veo, xAI, OpenRouter, NanoGPT, Atlas Cloud, and Seedance all work this way, and a clip can take several minutes.
+This is normal. The provider starts the job, and YunYun waits and checks until the clip is ready. Veo, xAI, OpenRouter, NanoGPT, Atlas Cloud, and Seedance all work this way, and a clip can take several minutes.
 
 ### Seedance fails to read the reference image
 

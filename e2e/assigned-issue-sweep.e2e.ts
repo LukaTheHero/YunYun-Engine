@@ -187,7 +187,7 @@ test("single random choices can be overridden and greetings resolve choices with
     const character = await f.create("characters", {
       data: { name: "Aster", first_mes: "{{char}} invites {{user}} into {{genre}}." },
     });
-    const persona = await f.create("characters/personas", { name: "Mari", description: "Greeting persona" });
+    const persona = await f.create("characters/personas", { name: "YunYun", description: "Greeting persona" });
     const chat = await f.create("chats", {
       name: "Greeting variables",
       mode: "roleplay",
@@ -221,7 +221,7 @@ test("single random choices can be overridden and greetings resolve choices with
 
     await modal.getByRole("button", { name: /^Adventure\b/ }).click();
     await modal.getByRole("button", { name: /Confirm/ }).click();
-    await expect(page.getByText("Aster invites Mari into an adventure.", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("Aster invites YunYun into an adventure.", { exact: false }).first()).toBeVisible();
     const saved = record((await (await request.get(`/api/chats/${chat.id}`)).json()).metadata).presetChoices;
     expect(saved.genre).toBe("an adventure");
     const messages = await (await request.get(`/api/chats/${chat.id}/messages`)).json();
@@ -230,7 +230,7 @@ test("single random choices can be overridden and greetings resolve choices with
     await expect(modal.getByRole("button", { name: /^Adventure\b/ })).toBeVisible();
     await modal.getByRole("button", { name: /^Mystery\b/ }).click();
     await modal.getByRole("button", { name: /Confirm/ }).click();
-    await expect(page.getByText("Aster invites Mari into a mystery.", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("Aster invites YunYun into a mystery.", { exact: false }).first()).toBeVisible();
     await page.getByRole("button", { name: "Close chat settings", exact: true }).click();
     await page.screenshot({ path: testInfo.outputPath("greeting-variables.png"), fullPage: true });
 
@@ -429,7 +429,7 @@ test("Android browser handoff signs in without typing a secret and clears the on
   app.addHook("onRequest", androidLocalAuthHook);
   await app.register(androidLocalAuthRoutes, { prefix: "/api/android-auth" });
   await androidLocalLoginRoute(app);
-  app.get("/", async (_req, reply) => reply.type("text/html").send("<h1>Marinara browser authenticated</h1>"));
+  app.get("/", async (_req, reply) => reply.type("text/html").send("<h1>YunYun browser authenticated</h1>"));
   const origin = await app.listen({ host: "127.0.0.1", port: 0 });
   try {
     await page.goto(`${origin}/android-login`);
@@ -451,7 +451,7 @@ test("Android browser handoff signs in without typing a secret and clears the on
     const { browserTicket } = await response.json();
     expect(browserTicket).not.toBe(secret);
     await page.goto(`${origin}/android-login#ticket=${browserTicket}`);
-    await expect(page.getByRole("heading", { name: "Marinara browser authenticated" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "YunYun browser authenticated" })).toBeVisible();
     expect(page.url()).toBe(`${origin}/`);
     const cookie = (await page.context().cookies(origin)).find((cookie) => cookie.name === "MarinaraAndroidSession");
     expect(cookie).toMatchObject({ httpOnly: true, sameSite: "Strict" });

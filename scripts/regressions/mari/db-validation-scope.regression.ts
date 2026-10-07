@@ -194,4 +194,4 @@ try {
   else process.env.FILE_STORAGE_DIR = previousDirectory;
   rmSync(directory, { recursive: true, force: true });
 }
-console.log("Mari validation scope regressions passed.");
+console.log("YunYun validation scope regressions passed.");

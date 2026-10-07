@@ -8633,7 +8633,7 @@ function GameSurfaceComponent({
   // ── Battles on a ruleset sheet ──
   // A ruleset that opted in with a `battle` block lends the fight the sheet's own health, energy
   // and slots, and turns the catalog rows the sheet carries into skills. Health travels as a share
-  // of the maximum, because the damage is still Marinara's and the two scales are nothing alike,
+  // of the maximum, because the damage is still YunYun's and the two scales are nothing alike,
   // which is what the notice says out loud. A game with no ruleset, or one whose ruleset has no
   // block, never reaches any of this. (`gameRuleset` is read further up, where the fight's items are.)
   // The ruleset's items, which the inventory shows and offers; undefined without an items block.
@@ -8746,7 +8746,7 @@ function GameSurfaceComponent({
     rulesetBattleSeedsRef.current = null;
   }, [activeChatId]);
 
-  /** The rules THIS fight is resolved by, or null when it is one of Marinara's own. Read from the
+  /** The rules THIS fight is resolved by, or null when it is one of YunYun's own. Read from the
    *  blocks the ruleset declares rather than from what its coverage flag claims, because what
    *  resolves a fight has to be what the file really says. */
   const rulesetFightDefinition =

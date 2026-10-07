@@ -108,7 +108,7 @@ function toCharacterBookEntry(entry: LoreEntryRow, index: number): CharacterBook
     delayUntilRecursion: asBoolean(entry.delayUntilRecursion),
     vectorized: !asBoolean(entry.excludeFromVectorization),
     excludeFromVectorization: asBoolean(entry.excludeFromVectorization),
-    // Marinara extension (#6570), passed back through on import.
+    // YunYun extension (#6570), passed back through on import.
     ...parseLorebookDecisionActivation(entry),
   };
 }

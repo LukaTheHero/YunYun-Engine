@@ -750,17 +750,17 @@ try {
     await reopened._fileStore.close();
   }
 
-  // The Professor Mari service follows the current DB identity after a clean
+  // The Professor YunYun service follows the current DB identity after a clean
   // close/reopen instead of retaining a service bound to the closed store.
   {
     useTempStorage("mari-db-rebind");
     const firstDb = await getDB();
     const firstService = getMariDbService(firstDb);
-    assert.strictEqual(getMariDbService(firstDb), firstService, "the same DB keeps one Mari service");
+    assert.strictEqual(getMariDbService(firstDb), firstService, "the same DB keeps one YunYun service");
     await closeDB();
     const secondDb = await getDB();
     const secondService = getMariDbService(secondDb);
-    assert.notStrictEqual(secondService, firstService, "Mari rebinds to the reopened DB");
+    assert.notStrictEqual(secondService, firstService, "YunYun rebinds to the reopened DB");
     await closeDB();
   }
 

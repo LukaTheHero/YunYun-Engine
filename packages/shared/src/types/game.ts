@@ -249,7 +249,7 @@ export interface GameSetupConfig {
    *  experience owns the whole run. Omitted = the built-in Game mode, unchanged. */
   gameExperienceId?: string;
   /** The Game Mode ruleset chosen for a NEW game. The server pins it as `chat.metadata.gameRuleset`
-   *  from its own registry, so only `id` is trusted. Absent means Marinara's own rules. */
+   *  from its own registry, so only `id` is trusted. Absent means YunYun's own rules. */
   ruleset?: import("../schemas/ruleset.schema.js").RulesetRef;
   /** Whatever the experience's own setup collected, stored verbatim and never interpreted by the host, so
    *  it can always recover the options the game was created with. */

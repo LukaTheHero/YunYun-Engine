@@ -32,14 +32,14 @@ const server = createServer(async (request, response) => {
           { type: "content_block_stop", index: 0 },
           { type: "content_block_start", index: 1, content_block: { type: "text", text: "" } },
           { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "Hello " } },
-          { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "Mari" } },
+          { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "YunYun" } },
           { type: "content_block_stop", index: 1 },
           { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 8 } },
           { type: "message_stop" },
         ]
       : [
           { choices: [{ delta: { content: "Hello " } }] },
-          { choices: [{ delta: { content: "Mari" }, finish_reason: "stop" }] },
+          { choices: [{ delta: { content: "YunYun" }, finish_reason: "stop" }] },
         ];
     response.end(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""));
   } else {
@@ -50,13 +50,13 @@ const server = createServer(async (request, response) => {
           ? {
               content: [
                 { type: "thinking", thinking: "Reasoned." },
-                { type: "text", text: "Hello Mari" },
+                { type: "text", text: "Hello YunYun" },
               ],
               stop_reason: "end_turn",
               usage: { input_tokens: 12, output_tokens: 8 },
             }
           : {
-              choices: [{ message: { content: "Hello Mari" }, finish_reason: "stop" }],
+              choices: [{ message: { content: "Hello YunYun" }, finish_reason: "stop" }],
               usage: { prompt_tokens: 12, completion_tokens: 8 },
             },
       ),
@@ -121,9 +121,9 @@ try {
               thoughts.push(thought);
             },
           });
-          assert.equal(result.content, "Hello Mari");
+          assert.equal(result.content, "Hello YunYun");
           assert.equal(thoughts.join(""), "Reasoned.");
-          if (stream) assert.deepEqual(text, ["Hello ", "Mari"]);
+          if (stream) assert.deepEqual(text, ["Hello ", "YunYun"]);
           const body = requests.at(-1)!;
           assert.equal(body.model, model);
           assert.equal(body.max_tokens, 128_000);
@@ -245,7 +245,7 @@ try {
           };
           assert.equal(
             (await provider.chatComplete([...messages, { role: "assistant", content: "The door" }], options)).content,
-            "Hello Mari",
+            "Hello YunYun",
           );
           const body = requests.at(-1)!;
           const effort = reasoningEffort === "none" ? "low" : reasoningEffort;
@@ -259,7 +259,7 @@ try {
           assert.equal(body.messages.at(-1).role, "user");
           const chunks: string[] = [];
           for await (const chunk of provider.chat(messages, options)) chunks.push(chunk);
-          assert.equal(chunks.join(""), "Hello Mari");
+          assert.equal(chunks.join(""), "Hello YunYun");
           assert.equal(requests.at(-1)!.tool_choice, "auto");
           for (const sampler of Object.keys(options.customParameters!)) {
             assert.equal(sampler in requests.at(-1)!, false, `${kind} streaming must omit saved ${sampler}`);
@@ -277,7 +277,7 @@ try {
         return (async function* () {
           yield {
             type: "stream_event",
-            event: { type: "content_block_delta", delta: { type: "text_delta", text: "Hello Mari" } },
+            event: { type: "content_block_delta", delta: { type: "text_delta", text: "Hello YunYun" } },
           };
           yield {
             type: "result",

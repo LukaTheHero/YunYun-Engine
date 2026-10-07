@@ -101,7 +101,7 @@ try {
 
   duringTranslation = undefined;
   const gameContent =
-    'The door opens. [music: quiet] [sheet: target="Mari" op="set" path="hp" value=2] [Note: "Read me"]\n\n[Alice] [main] [happy]: "Welcome, traveler."';
+    'The door opens. [music: quiet] [sheet: target="YunYun" op="set" path="hp" value=2] [Note: "Read me"]\n\n[Alice] [main] [happy]: "Welcome, traveler."';
   const game = await create(gameContent);
   await resolve(game.id, 0, "game");
   // The Game screen shows a saved translation only when its source is the text it builds itself (#7010).

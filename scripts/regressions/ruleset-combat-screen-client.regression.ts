@@ -1063,7 +1063,7 @@ const line = (definition: RulesetDefinition, state: RulesetEncounterState, event
   // All three, and it is the ruleset's fight.
   assert.equal(isRulesetCombatFight({ combatDirector: true, definition: both, anchor: "m1" }), true);
   assert.equal(isRulesetCombatFight({ combatDirector: true, definition: combatOnly, anchor: "m1" }), true);
-  // Take any one away and it is one of Marinara's own.
+  // Take any one away and it is one of YunYun's own.
   assert.equal(isRulesetCombatFight({ combatDirector: false, definition: both, anchor: "m1" }), false);
   assert.equal(isRulesetCombatFight({ combatDirector: true, definition: battleOnly, anchor: "m1" }), false);
   assert.equal(isRulesetCombatFight({ combatDirector: true, definition: both, anchor: null }), false);

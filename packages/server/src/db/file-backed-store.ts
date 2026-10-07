@@ -2,7 +2,7 @@
 // File-Native Storage
 // ──────────────────────────────────────────────
 //
-// Marinara stores user data as JSON table snapshots under DATA_DIR/storage.
+// YunYun stores user data as JSON table snapshots under DATA_DIR/storage.
 // This in-memory table store persists dirty tables back to those files.
 import {
   chmodSync,
@@ -451,7 +451,7 @@ const BUILT_IN_FILE_BACKED_TABLES = [
  * table-name constants stay compile-checked. The runtime list is a widened copy
  * because capability packages register their own tables into a live store
  * (registerTables): every consumer that walks "all file-backed tables" — the
- * flush loop, the manifest, the Mari db tooling — must see them, and an
+ * flush loop, the manifest, the YunYun db tooling — must see them, and an
  * `as const` tuple could never grow.
  */
 type FileBackedTable = (typeof BUILT_IN_FILE_BACKED_TABLES)[number];
@@ -700,7 +700,7 @@ function fileBackedRowNeedsMigration(table: string, row: Row): boolean {
   return false;
 }
 
-// Parent→child delete graph. Exported as the single source of truth: the Mari
+// Parent→child delete graph. Exported as the single source of truth: the YunYun
 // DB CLI (services/mari-db) consumes it for cascade deletes and its
 // dangling-reference validator, so every new relation added here reaches both.
 /**
@@ -828,7 +828,7 @@ export const CASCADES: Array<{ parent: FileBackedTable; child: FileBackedTable; 
     { parent: "chats", child: "chat_images", parentKey: "id", childKey: "chatId" },
     { parent: "chats", child: "memory_chunks", parentKey: "id", childKey: "chatId" },
     { parent: "chats", child: "advanced_memory_records", parentKey: "id", childKey: "chatId" },
-    // #5073: a Mari workspace chat's attached context is scoped to it and must
+    // #5073: a YunYun workspace chat's attached context is scoped to it and must
     // not outlive it (a leaked shard + stale injection into a reused chat id).
     { parent: "chats", child: "mari_workspace_context", parentKey: "id", childKey: "chatId" },
     // The influences/notes schemas declare onDelete: cascade on BOTH chat
@@ -1384,7 +1384,7 @@ export class StorageFormatTooNewError extends Error {
   constructor(onDiskVersion: number, supportedVersion: number) {
     super(
       `This data directory was written by storage format ${onDiskVersion}, but this build supports up to ` +
-        `format ${supportedVersion}. Update Marinara Engine (or restore a matching backup) instead of ` +
+        `format ${supportedVersion}. Update YunYun Engine (or restore a matching backup) instead of ` +
         `running an older build against newer data.`,
     );
     this.name = "StorageFormatTooNewError";
@@ -1704,7 +1704,7 @@ const WRITER_LEASE_RETRY_DELAY_MS = 10;
 
 function invalidWriterLeaseError(path: string, cause: unknown) {
   return new StorageWriterLeaseError(
-    `The storage writer lease at ${path} is incomplete or invalid. Stop every Marinara Engine process using this data directory, remove only that lease directory, then retry.`,
+    `The storage writer lease at ${path} is incomplete or invalid. Stop every YunYun Engine process using this data directory, remove only that lease directory, then retry.`,
     { cause },
   );
 }
@@ -2679,7 +2679,7 @@ class FileTableStore {
       }
       if (!staleReason) {
         throw new StorageWriterLeaseError(
-          `Another Marinara Engine process (PID ${existing.record.pid}, host ${existing.record.hostname}) may be using ${this.rootDir}. ` +
+          `Another YunYun Engine process (PID ${existing.record.pid}, host ${existing.record.hostname}) may be using ${this.rootDir}. ` +
             `Close it before retrying. If it no longer exists, verify every process is stopped and remove only ${path}.`,
         );
       }

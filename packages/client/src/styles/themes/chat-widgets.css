@@ -115,7 +115,7 @@
   );
   --mari-widget-header-padding: 0.75rem 1.75rem;
   --mari-widget-crest-height: 1.75rem;
-  --mari-widget-crest: url("/images/chat-widgets/mari-primogem.svg");
+  --mari-widget-crest: url("/sprites/yunyun/chibi-yunyun.png");
   --mari-widget-crest-content: "";
   --mari-widget-ornament-content: "";
   --mari-widget-isolation: isolate;
@@ -355,7 +355,7 @@
     border-radius: var(--mari-drawer-radius, var(--mari-widget-drawer-radius, 0));
   }
 
-  /* Attached Mari sections form one continuous stack inside the outer frame. */
+  /* Attached YunYun sections form one continuous stack inside the outer frame. */
   :root[data-chat-widget-preset="mari"] .mari-drawer[data-detached="false"],
   [data-chat-widget-preview][data-chat-widget-preset="mari"] .mari-drawer {
     border-radius: var(--mari-drawer-radius, 0);

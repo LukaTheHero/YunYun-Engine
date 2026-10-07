@@ -131,7 +131,7 @@ try {
     await chunkAndEmbedMessages(
       db,
       chat.id,
-      { userName: "Mari", characterNames: {} },
+      { userName: "YunYun", characterNames: {} },
       {
         embeddingSource: {
           spaceId: "test:private-memory",

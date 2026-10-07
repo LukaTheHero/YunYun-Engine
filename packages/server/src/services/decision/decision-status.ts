@@ -15,7 +15,7 @@ interface DecisionConnectionRowSummary {
   profileImportReviewRequired?: unknown;
 }
 
-/** Shared by selection, the options list and Mari. This is not a network health test. */
+/** Shared by selection, the options list and YunYun. This is not a network health test. */
 export function decisionConnectionUnavailable(
   row: DecisionConnectionRowSummary,
   rows: DecisionConnectionRowSummary[],
@@ -65,7 +65,7 @@ export async function readDecisionAuthoringStatus(db: DB) {
       health: "untested" as const,
     };
   } catch (err) {
-    logger.warn(err, "Mari could not read Decision model status");
+    logger.warn(err, "YunYun could not read Decision model status");
     return { state: "unknown" as const, selected: null, health: "untested" as const };
   }
 }

@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari image command service
+// Professor YunYun image command service
 // ──────────────────────────────────────────────
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
@@ -284,7 +284,7 @@ function capabilityForConnection(conn: ImageConnection): ImageCapability {
           "OpenAI GPT Image mask/inpaint exists at the provider level, but mari images currently exposes whole-image/reference editing only.",
         );
       if (!canEdit)
-        notes.push("Current Marinara OpenAI edit path requires a GPT Image model such as gpt-image-1 or gpt-image-2.");
+        notes.push("Current YunYun OpenAI edit path requires a GPT Image model such as gpt-image-1 or gpt-image-2.");
       break;
     case "gemini_image":
       canEdit = true;
@@ -316,7 +316,7 @@ function capabilityForConnection(conn: ImageConnection): ImageCapability {
       editMode = canEdit ? "image-to-image" : "none";
       if (!canEdit)
         notes.push(
-          "Stability legacy v1 path in Marinara is generation-only; use the v2beta Stable Image API for image-to-image.",
+          "Stability legacy v1 path in YunYun is generation-only; use the v2beta Stable Image API for image-to-image.",
         );
       break;
     case "automatic1111":
@@ -336,7 +336,7 @@ function capabilityForConnection(conn: ImageConnection): ImageCapability {
     case "novelai":
       canEdit = /^nai-diffusion-4-5(?:-(?:curated|full))?$/i.test(model.trim());
       editMode = canEdit ? "reference" : "none";
-      if (!canEdit) notes.push("NovelAI precise reference images require a V4.5 model in Marinara.");
+      if (!canEdit) notes.push("NovelAI precise reference images require a V4.5 model in YunYun.");
       break;
     case "xai":
       notes.push("The current xAI adapter rejects reference images, so edits are not available through this path yet.");
@@ -345,7 +345,7 @@ function capabilityForConnection(conn: ImageConnection): ImageCapability {
     case "togetherai":
     case "horde":
     default:
-      notes.push("This connection path is treated as generation-only by the current Marinara adapter.");
+      notes.push("This connection path is treated as generation-only by the current YunYun adapter.");
       break;
   }
 
@@ -643,7 +643,7 @@ export class MariImagesService {
       const capability = capabilityForConnection(selected);
       if (requireEdit && !capability.canEdit) {
         throw new Error(
-          `Connection "${selected.name}" is not edit-capable through Marinara right now. ${capability.notes.join(" ") || "Choose a different image model."}`,
+          `Connection "${selected.name}" is not edit-capable through YunYun right now. ${capability.notes.join(" ") || "Choose a different image model."}`,
         );
       }
       const withKey = (await createConnectionsStorage(this.db).getWithKey(selected.id)) as ImageConnection | null;

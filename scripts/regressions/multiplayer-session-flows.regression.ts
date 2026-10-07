@@ -194,7 +194,7 @@ try {
       chatId: prepared.chatId,
       publicOrigin: `https://127.0.0.1:${await unusedPort()}`,
       password: "a safe fixture password",
-      displayName: "Mari",
+      displayName: "YunYun",
       persona: { name: "Luna", description: "A patient investigator." },
     });
     assert.ok(hosted?.invite);

@@ -107,7 +107,7 @@ assert.ok(
 );
 assert.equal(replaceUnreadablePlaceholders("Nothing to do here.", "lane").changed, false);
 assert.equal(
-  replaceUnreadablePlaceholders('A [dice: 2d6] and a [roll: character="Mari"].', "lane").changed,
+  replaceUnreadablePlaceholders('A [dice: 2d6] and a [roll: character="YunYun"].', "lane").changed,
   false,
   "the sweep claims only the doubled opener; no shipped tag spelling is touched",
 );

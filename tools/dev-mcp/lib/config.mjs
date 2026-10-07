@@ -27,7 +27,7 @@ export const SERVER_DIR = join(REPO, "packages", "server");
 export const REPO_LOOKS_RIGHT = existsSync(join(SERVER_DIR, "package.json"));
 if (!REPO_LOOKS_RIGHT) {
   process.stderr.write(
-    `[dev-mcp] ${REPO} does not look like a Marinara Engine checkout (no packages/server). ` +
+    `[dev-mcp] ${REPO} does not look like a YunYun Engine checkout (no packages/server). ` +
       "Set MARINARA_DEV_REPO to the repository root.\n",
   );
 }

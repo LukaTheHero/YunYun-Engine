@@ -14,7 +14,7 @@ import {
 const room = {
   roomId: "room_fixture",
   participants: [
-    { id: "host_fixture", displayName: "Mari", persona: { name: "Luna", description: "" }, isHost: true },
+    { id: "host_fixture", displayName: "YunYun", persona: { name: "Luna", description: "" }, isHost: true },
     { id: "guest_fixture", displayName: "Alex", persona: { name: "Rowan", description: "" }, isHost: false },
   ],
   characters: [

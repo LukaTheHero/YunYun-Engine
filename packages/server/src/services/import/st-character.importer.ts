@@ -30,7 +30,7 @@ import { restoreSprites } from "./marinara.importer.js";
 const AVATAR_DIR = join(DATA_DIR, "avatars");
 const IMPORT_METADATA_KEY = "importMetadata";
 
-/** Remove Marinara sprite binaries from card metadata before the normalized card is stored. */
+/** Remove YunYun sprite binaries from card metadata before the normalized card is stored. */
 export function takeEmbeddedMarinaraSprites(raw: Record<string, unknown>): unknown {
   const cardData = raw.data && typeof raw.data === "object" ? (raw.data as Record<string, unknown>) : raw;
   if (!cardData.extensions || typeof cardData.extensions !== "object") return undefined;

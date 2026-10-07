@@ -273,7 +273,7 @@ try {
     await mari.executeCli({ argv: ["personas", "active"] }),
   ]) {
     assert.equal(result.ok, true);
-    assert.equal(result.output, null, "Legacy Mari active-persona reads must remain compatible and inert");
+    assert.equal(result.output, null, "Legacy YunYun active-persona reads must remain compatible and inert");
   }
   assert.equal((PROFESSOR_MARI_APP_DATA_ACTIONS as readonly string[]).includes("persona.active"), false);
 

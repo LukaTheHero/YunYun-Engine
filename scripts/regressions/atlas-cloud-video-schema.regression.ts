@@ -15,7 +15,7 @@ import {
 import { normalizeVideoGenerationProfile } from "../../packages/shared/src/constants/video-generation-defaults.js";
 
 // Atlas Cloud models do not share one input shape. Each fixture below mirrors the published
-// `Input` schema of a real model family so the request Marinara sends is one that model accepts.
+// `Input` schema of a real model family so the request YunYun sends is one that model accepts.
 
 function inputSchema(required: string[], properties: Record<string, unknown>) {
   const schema = parseAtlasCloudModelSchema({ components: { schemas: { Input: { required, properties } } } });
@@ -155,7 +155,7 @@ assert.ok(squareRequest.adjustments.some((note) => note.includes("aspect ratio 1
 
 assert.throws(() => adaptAtlasCloudVideoRequest({ ...common, model: "  " }, ranged), /requires a model/);
 
-// Model options: the editor lists every input Marinara does not fill itself, and the request carries
+// Model options: the editor lists every input YunYun does not fill itself, and the request carries
 // only the saved values that model declares and accepts.
 const optionModel = inputSchema(["model", "image", "prompt", "resolution"], {
   model: { type: "string" },
@@ -207,7 +207,7 @@ const optionRequest = adaptAtlasCloudVideoRequest(
       seed: 42,
       guidance_scale: 7.5,
       loras: [{ path: "motion.safetensors", scale: 1 }],
-      // Rejected: managed by Marinara, unknown to the model, or outside what the model accepts.
+      // Rejected: managed by YunYun, unknown to the model, or outside what the model accepts.
       prompt: "override",
       image: "https://example.test/other.png",
       resolution: "1080p",

@@ -209,11 +209,11 @@ const canonicalPartyNameReminder = buildGmFormatReminder({
   gameActiveState: "exploration",
   sessionNumber: 1,
   map: null,
-  partyNames: ["Mari"],
+  partyNames: ["YunYun"],
   playerName: "Player",
 });
 assert.match(canonicalPartyNameReminder, /Party speaker labels must use the exact canonical names listed under PARTY/u);
-assert.match(canonicalPartyNameReminder, /You also play Mari\./u);
+assert.match(canonicalPartyNameReminder, /You also play YunYun\./u);
 
 const REGRESSION_AGENT_IDS = [
   "about-me-keeper",
@@ -909,7 +909,7 @@ function makeRegressionAgentContext(overrides: Partial<AgentContext> = {}): Agen
     mainResponse: null,
     gameState: null,
     characters: [{ id: "char-dottore", name: "Dottore", description: "A precise researcher." }],
-    persona: { name: "Mari", description: "The active user persona." },
+    persona: { name: "YunYun", description: "The active user persona." },
     memory: {},
     writableLorebookIds: null,
     chatSummary: null,
@@ -1576,7 +1576,7 @@ const cases: RegressionCase[] = [
     },
   },
   {
-    name: "Professor Mari and the public reference cover every official downloadable agent",
+    name: "Professor YunYun and the public reference cover every official downloadable agent",
     run() {
       const publicReference = readFileSync(new URL("../../docs/agents/built-in-agents.md", import.meta.url), "utf8");
       const publicReferenceLines = new Set(publicReference.split(/\r?\n/u));
@@ -1627,7 +1627,7 @@ const cases: RegressionCase[] = [
       for (const entry of OFFICIAL_AGENT_KNOWLEDGE_ENTRIES) {
         assert.ok(
           PROFESSOR_MARI_AGENT_CATALOG_KNOWLEDGE.includes(`- ${entry.name} (package \`${entry.id}\`;`),
-          `Professor Mari knowledge is missing ${entry.name}`,
+          `Professor YunYun knowledge is missing ${entry.name}`,
         );
         assert.ok(publicReferenceLines.has(`### ${entry.name}`), `Public agent reference is missing ${entry.name}`);
         assert.ok(readme.includes(entry.name), `README agent catalog is missing ${entry.name}`);
@@ -1747,7 +1747,7 @@ const cases: RegressionCase[] = [
       const messages: SimpleMessage[] = [
         { role: "system", content: "base system" },
         { role: "assistant", content: '<speaker="Dottore">"An older line."</speaker>' },
-        { role: "user", content: '<speaker="Mari">"A user-authored tag."</speaker>' },
+        { role: "user", content: '<speaker="YunYun">"A user-authored tag."</speaker>' },
         { role: "assistant", content: '<speaker="Pantalone">"The latest example."</speaker>' },
       ];
 
@@ -1778,7 +1778,7 @@ const cases: RegressionCase[] = [
           { role: "user" as const, content: "A question from the current Persona." },
         ],
         {
-          personaName: "Mari",
+          personaName: "YunYun",
           characterNamesById: new Map([["dottore", "Dottore"]]),
         },
       );
@@ -1788,7 +1788,7 @@ const cases: RegressionCase[] = [
         [
           "Powers That Be: A decree from the old Persona.",
           "Dottore: An answer.",
-          "Mari: A question from the current Persona.",
+          "YunYun: A question from the current Persona.",
         ],
       );
 
@@ -1806,7 +1806,7 @@ const cases: RegressionCase[] = [
           { role: "assistant" as const, content: "An answer.", characterId: "dottore" },
         ],
         {
-          personaName: "Mari",
+          personaName: "YunYun",
           characterNamesById: new Map([["dottore", "Dottore"]]),
         },
       );
@@ -2750,7 +2750,7 @@ const cases: RegressionCase[] = [
     name: "macros expose generation type, idle duration, timezone, and input",
     run() {
       const resolved = resolveMacros("{{lastGenerationType}} | {{idle_duration}} | {{timezone}} | {{input}}", {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -2769,7 +2769,7 @@ const cases: RegressionCase[] = [
       const referencedId = "V1StGXR8_Z5jdHi6B-myT";
       const unknownId = "A1StGXR8_Z5jdHi6BmyTX";
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: { [unknownId]: "Variable collision" },
@@ -2790,14 +2790,14 @@ const cases: RegressionCase[] = [
       const referencedId = "P1StGXR8_Z5jdHi6B-myT";
       const unknownId = "Q1StGXR8_Z5jdHi6B-myT";
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
-        personaReferences: { [referencedId]: "Professor Mari" },
+        personaReferences: { [referencedId]: "Professor YunYun" },
       };
 
-      assert.equal(resolveMacros(`I consulted {{persona-${referencedId}}}.`, context), "I consulted Professor Mari.");
+      assert.equal(resolveMacros(`I consulted {{persona-${referencedId}}}.`, context), "I consulted Professor YunYun.");
       assert.equal(
         resolveMacros(`I consulted {{persona-${unknownId}}}.`, context),
         `I consulted {{persona-${unknownId}}}.`,
@@ -2805,7 +2805,7 @@ const cases: RegressionCase[] = [
       );
       assert.equal(
         resolveCharacterScopedMacros(
-          `{{#if {{persona-${referencedId}}} == "Professor Mari"}}known{{else}}unknown{{/if}}`,
+          `{{#if {{persona-${referencedId}}} == "Professor YunYun"}}known{{else}}unknown{{/if}}`,
           { name: "Dottore" },
           0,
           context,
@@ -2838,7 +2838,7 @@ const cases: RegressionCase[] = [
       });
       assert.equal(
         resolveMacros("Before\n{{outlet:: rules }}\nAfter", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -2848,7 +2848,7 @@ const cases: RegressionCase[] = [
       );
       assert.equal(
         resolveMacros("{{outlet::RULES}}", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -2858,7 +2858,7 @@ const cases: RegressionCase[] = [
       );
       assert.equal(
         resolveMacros("{{outlet::toString}}", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -2868,7 +2868,7 @@ const cases: RegressionCase[] = [
       );
       assert.equal(
         resolveMacros("{{outlet::nested}}", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -2882,7 +2882,7 @@ const cases: RegressionCase[] = [
     name: "lorebook size macros resolve known counts and treat inherited object keys as unknown IDs",
     run() {
       const context: MacroContext = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -2898,7 +2898,7 @@ const cases: RegressionCase[] = [
     run() {
       assert.equal(
         resolveMacros("{{userNamePhonetic}} calls {{charNamePhonetic}}.", {
-          user: "Mari",
+          user: "YunYun",
           userPhonetic: "Mah-ree",
           char: "Dottore",
           charPhonetic: "Doctor-ray",
@@ -2910,12 +2910,12 @@ const cases: RegressionCase[] = [
 
       assert.equal(
         resolveMacros("{{userNamePhonetic}} calls {{charNamePhonetic}}.", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
         }),
-        "Mari calls Dottore.",
+        "YunYun calls Dottore.",
       );
     },
   },
@@ -2923,7 +2923,7 @@ const cases: RegressionCase[] = [
     name: "macro passthrough preserves plain text and deferred sentinels",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -2940,7 +2940,7 @@ const cases: RegressionCase[] = [
     name: "persona aggregate text is lazy when persona macro is absent",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {} as Record<string, string>,
@@ -2961,7 +2961,7 @@ const cases: RegressionCase[] = [
     run() {
       const resolve = (template: string) =>
         resolveMacros(template, {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -2988,7 +2988,7 @@ const cases: RegressionCase[] = [
       const prototypeNamedVariables: Record<string, string> = {};
       const resolvePrototypeName = (template: string) =>
         resolveMacros(template, {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -3003,7 +3003,7 @@ const cases: RegressionCase[] = [
 
       const firstChatVariables: Record<string, string> = {};
       resolveMacros("{{setvar::remembered::across turns}}", {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3012,7 +3012,7 @@ const cases: RegressionCase[] = [
       const reloadedFirstChatVariables = { ...firstChatVariables };
       assert.equal(
         resolveMacros("{{getvar::remembered}}", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -3023,7 +3023,7 @@ const cases: RegressionCase[] = [
       );
       assert.equal(
         resolveMacros("{{getvar::remembered}}", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -3037,7 +3037,7 @@ const cases: RegressionCase[] = [
       // message, resolves as a bare tag in the user's own typed message.
       const typedMessageVariables: Record<string, string> = { char1: "Mary" };
       const typedMessageContext = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3070,7 +3070,7 @@ const cases: RegressionCase[] = [
       const previewVariables: Record<string, string> = { char1: "Mary" };
       assert.equal(
         resolveMacrosForPreview("{{setvar::char1::Anna}}{{char1}}", {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -3082,7 +3082,7 @@ const cases: RegressionCase[] = [
 
       const conditionalVariables = { score: "10" };
       resolveMacros("{{#if addnumvar::score::5}}unchanged{{/if}}", {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: conditionalVariables,
@@ -3100,7 +3100,7 @@ const cases: RegressionCase[] = [
     name: "macro conditionals support numeric comparisons",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3115,7 +3115,7 @@ const cases: RegressionCase[] = [
     name: "macro conditionals support else-if and nested macro conditions",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3133,7 +3133,7 @@ const cases: RegressionCase[] = [
     name: "macro conditionals support OR, AND, grouping, and equality shorthand",
     run() {
       const baseContext = {
-        user: "Mari",
+        user: "YunYun",
         char: "Pantalone",
         characters: ["Maukie", "Pantalone", "Dottore"],
         variables: {},
@@ -3191,7 +3191,7 @@ const cases: RegressionCase[] = [
     name: "conversation character macros defer to the active Individual group responder",
     run() {
       const initialContext = {
-        user: "Mari",
+        user: "YunYun",
         char: "Pantalone",
         characters: ["Pantalone", "Dottore"],
         variables: {},
@@ -3223,11 +3223,11 @@ const cases: RegressionCase[] = [
               charDisplayName: "Il Dottore",
               charAbout: "A researcher from Snezhnaya.",
               personaAbout: "AI engineer.",
-              convoBehavior: "Be playful with Mari.",
+              convoBehavior: "Be playful with YunYun.",
             },
           },
         ),
-        "Il Dottore|A researcher from Snezhnaya.|AI engineer.|Be playful with Mari.|playful",
+        "Il Dottore|A researcher from Snezhnaya.|AI engineer.|Be playful with YunYun.|playful",
       );
     },
   },
@@ -3257,7 +3257,7 @@ const cases: RegressionCase[] = [
         "Powers That Be, Maukie",
       );
       assert.equal(
-        resolveMacros("{{group}}", { user: "Mari", char: "Dottore", characters: ["Dottore"], variables: {} }),
+        resolveMacros("{{group}}", { user: "YunYun", char: "Dottore", characters: ["Dottore"], variables: {} }),
         "",
       );
 
@@ -3302,7 +3302,7 @@ const cases: RegressionCase[] = [
     name: "deferred relocation conditionals support reply rules",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3336,7 +3336,7 @@ const cases: RegressionCase[] = [
     name: "random range macros normalize reversed bounds and zero-sided dice",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3354,7 +3354,7 @@ const cases: RegressionCase[] = [
     name: "random and roll macros can resolve stably per message seed",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3378,7 +3378,7 @@ const cases: RegressionCase[] = [
     name: "macro expansion caps stop runaway nested random output",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3409,7 +3409,7 @@ const cases: RegressionCase[] = [
     name: "character field macros resolve nested macros",
     run() {
       const resolved = resolveMacros("Profile: {{description}}", {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3418,7 +3418,7 @@ const cases: RegressionCase[] = [
         },
       });
 
-      assert.equal(resolved, "Profile: Dottore keeps notes for Mari.");
+      assert.equal(resolved, "Profile: Dottore keeps notes for YunYun.");
     },
   },
   {
@@ -3427,7 +3427,7 @@ const cases: RegressionCase[] = [
       const instruction = buildGenerationGuideInstruction(
         buildNarratorInstructionMessage("Steer the scene toward {{char}} reassuring {{user}}."),
         {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore"],
           variables: {},
@@ -3436,7 +3436,7 @@ const cases: RegressionCase[] = [
 
       assert.ok(instruction);
       assert.match(instruction, /^Take the following into special consideration for your next message:/);
-      assert.match(instruction, /Dottore reassuring Mari/);
+      assert.match(instruction, /Dottore reassuring YunYun/);
       assert.equal(instruction.includes("{{user}}"), false);
       assert.equal(instruction.includes("{{char}}"), false);
     },
@@ -3445,7 +3445,7 @@ const cases: RegressionCase[] = [
     name: "provider-bound greeting and /guided messages resolve identity macros",
     run() {
       const baseContext = {
-        user: "Mari",
+        user: "YunYun",
         char: "Wrong responder",
         characters: ["Dottore", "Pantalone"],
         variables: {},
@@ -3474,8 +3474,8 @@ const cases: RegressionCase[] = [
         profilesById,
       );
 
-      assert.equal(resolved[0]?.content, "Welcome, Mari. I am Dottore.");
-      assert.match(resolved[1]?.content ?? "", /Let Dottore reassure Mari/);
+      assert.equal(resolved[0]?.content, "Welcome, YunYun. I am Dottore.");
+      assert.match(resolved[1]?.content ?? "", /Let Dottore reassure YunYun/);
       assert.equal(
         resolved.some((message) => /\{\{(?:user|char)\}\}/i.test(message.content)),
         false,
@@ -3497,7 +3497,7 @@ const cases: RegressionCase[] = [
     name: "/guided lorebook scans resolve macros before embedding or routing",
     run() {
       const context = {
-        user: "Mari",
+        user: "YunYun",
         char: "Dottore",
         characters: ["Dottore"],
         variables: {},
@@ -3511,7 +3511,7 @@ const cases: RegressionCase[] = [
         (value) => resolveMacros(value, context, { trimResult: false }),
       );
 
-      assert.match(messages.at(-1)?.content ?? "", /Have Dottore answer Mari/);
+      assert.match(messages.at(-1)?.content ?? "", /Have Dottore answer YunYun/);
       assert.equal(messages.at(-1)?.content.includes("{{user}}"), false);
       assert.equal(messages.at(-1)?.content.includes("{{char}}"), false);
     },
@@ -3924,7 +3924,7 @@ const cases: RegressionCase[] = [
       assert.equal(normalizeGameStoryboardKeyframeCount(undefined), 3);
       assert.equal(normalizeGameStoryboardKeyframeCount(0), 1);
       assert.equal(normalizeGameStoryboardKeyframeCount(12), 12);
-      assert.doesNotMatch(sharedPlannerSource, /You are Marinara's/u);
+      assert.doesNotMatch(sharedPlannerSource, /You are YunYun's/u);
       assert.doesNotMatch(sharedImageSource, /promptTemplate:/u);
       assert.equal(listPromptOverrideKeys().includes("game.storyboardIllustrationDirector"), false);
       assert.equal(listPromptOverrideKeys().includes("game.storyboardAnimationDirector"), false);
@@ -4920,9 +4920,9 @@ const cases: RegressionCase[] = [
           { id: "character-maukie", name: "Maukie", avatarPath: null, appearance: "Wet brown hair." },
           { id: "character-dottore", name: "Dottore", avatarPath: null, appearance: "A masked scientist." },
         ],
-        persona: { id: "persona-mari", name: "Mari", avatarPath: null, appearance: "Chubby woman." },
-        requestedNames: ["Maukie", "Dottore", "Mari"],
-        promptText: "Maukie and Dottore carry Mari through the reeds.",
+        persona: { id: "persona-mari", name: "YunYun", avatarPath: null, appearance: "Chubby woman." },
+        requestedNames: ["Maukie", "Dottore", "YunYun"],
+        promptText: "Maukie and Dottore carry YunYun through the reeds.",
         includeReferenceImages: false,
         maxReferences: 1,
       });
@@ -4938,9 +4938,9 @@ const cases: RegressionCase[] = [
           { id: "character-maukie", name: "Maukie", avatarPath: null, appearance: "Wet brown hair." },
           { id: "character-dottore", name: "Dottore", avatarPath: null, appearance: "A masked scientist." },
         ],
-        persona: { id: "persona-mari", name: "Mari", avatarPath: null, appearance: "Chubby woman." },
+        persona: { id: "persona-mari", name: "YunYun", avatarPath: null, appearance: "Chubby woman." },
         requestedNames: [],
-        promptText: "A group selfie of Maukie and Dottore, seen from Mari's point of view.",
+        promptText: "A group selfie of Maukie and Dottore, seen from YunYun's point of view.",
         includeReferenceImages: false,
         includePersonaWhenMentionedInPrompt: false,
       });
@@ -5214,7 +5214,7 @@ const cases: RegressionCase[] = [
         characterAppearanceContextBlock: appearanceContextBlock,
       });
       const narrationSummarySystemPrompt = narrationSummaryMessages[0]?.content ?? "";
-      assert.match(narrationSummarySystemPrompt, /^You are Marinara's Game Mode narration summarizer/u);
+      assert.match(narrationSummarySystemPrompt, /^You are YunYun's Game Mode narration summarizer/u);
       assert.ok(narrationSummarySystemPrompt.indexOf(appearanceContextBlock) > 0);
       assert.ok(
         narrationSummarySystemPrompt.indexOf(appearanceContextBlock) <
@@ -5238,7 +5238,7 @@ const cases: RegressionCase[] = [
               id: "regression-still-planner",
               name: "Regression Still Planner",
               promptTemplate: [
-                "You are Marinara's Game Mode Storyboard Illustrator.",
+                "You are YunYun's Game Mode Storyboard Illustrator.",
                 "Turn exactly one completed GM narration into a concise storyboard.",
                 "If a visual trait is not supplied, omit it instead of guessing.",
               ].join("\n"),
@@ -5265,7 +5265,7 @@ const cases: RegressionCase[] = [
         maxVisibleCharacters: 1,
         characterAppearanceContextBlock: appearanceContextBlock,
       });
-      assert.match(storyboardMessages.systemPrompt, /^You are Marinara's Game Mode Storyboard Illustrator/u);
+      assert.match(storyboardMessages.systemPrompt, /^You are YunYun's Game Mode Storyboard Illustrator/u);
       assert.ok(storyboardMessages.systemPrompt.indexOf(appearanceContextBlock) > 0);
       assert.ok(
         storyboardMessages.systemPrompt.indexOf(appearanceContextBlock) <
@@ -5438,7 +5438,7 @@ const cases: RegressionCase[] = [
         gameRouteSource,
         /const includeCharacterAppearanceAtRender = includeCharacterAppearance && usedFallbackStoryboardPlanner/u,
       );
-      assert.match(gameRouteSource, /Marinara used narration-based fallback keyframes and skipped video generation/u);
+      assert.match(gameRouteSource, /YunYun used narration-based fallback keyframes and skipped video generation/u);
       assert.equal(gameRouteSource.match(/meta\.storyboardAgentIncludeCharacterAppearance !== false/gu)?.length, 1);
       assert.equal(gameRouteSource.match(/meta\.storyboardAgentUseAvatarReferences !== false/gu)?.length, 1);
       assert.equal(gameRouteSource.match(/meta\.gameImageIncludeCharacterAppearance !== false/gu)?.length, 2);
@@ -5873,7 +5873,7 @@ const cases: RegressionCase[] = [
         '<output_format>{"prompt":"Draw a three-panel comic from {{user}} POV."}</output_format>',
         `${"Scene guidance. ".repeat(900)}Draw a three-panel comic from {{user}} POV.`,
       ]) {
-        const capture = makeCapturingProvider('{"prompt":"A three-panel comic from Mari POV."}');
+        const capture = makeCapturingProvider('{"prompt":"A three-panel comic from YunYun POV."}');
         const selectedPrompt = resolveAgentPromptTemplate({
           promptTemplate: "Draw an ordinary scene using the global default.",
           settings: { promptTemplates: [{ id: "user-pov", name: "User POV", promptTemplate }] },
@@ -5885,10 +5885,10 @@ const cases: RegressionCase[] = [
             provider: capture.provider,
             model: "regression-model",
           } as any,
-          context: { ...makeRegressionAgentContext(), persona: { name: "Mari" } },
+          context: { ...makeRegressionAgentContext(), persona: { name: "YunYun" } },
         });
         const system = capture.calls[0]![0]!.content;
-        assert.match(system, /Draw a three-panel comic from Mari POV\./u);
+        assert.match(system, /Draw a three-panel comic from YunYun POV\./u);
         assert.doesNotMatch(system, /ordinary scene using the global default/u);
         assert.doesNotMatch(system, /No selected Illustrator prompt mode supplied/u);
         assert.match(system, /<\/selected_illustrator_prompt_mode>/u);
@@ -6030,20 +6030,20 @@ const cases: RegressionCase[] = [
           recentMessages: [
             { role: "user", content: "CONTEXT_OUTSIDE_ILLUSTRATOR_LIMIT" },
             { role: "assistant", content: "Dottore opens the quarantine berth door." },
-            { role: "user", content: "Mari steps inside out of the rain." },
+            { role: "user", content: "YunYun steps inside out of the rain." },
           ],
-          mainResponse: "Mari steps inside out of the rain.",
+          mainResponse: "YunYun steps inside out of the rain.",
           gameState: null,
           characters: [
             {
               id: "dottore",
-              name: 'Dottore & "Mari" </character>',
+              name: 'Dottore & "YunYun" </character>',
               description: "A masked scholar from Fontaine.",
               appearance: "Blue hair, red eyes, dark coat.",
             },
           ],
           persona: {
-            name: "Mari",
+            name: "YunYun",
             description: "A Polish AI engineer.",
             appearance: "Long auburn hair and a rain-soaked travel coat.",
           },
@@ -6068,11 +6068,11 @@ const cases: RegressionCase[] = [
       const manualIllustrationPrompt = manualIllustrationMessages.map((message) => message.content).join("\n");
       assert.doesNotMatch(manualIllustrationPrompt, /CONTEXT_OUTSIDE_ILLUSTRATOR_LIMIT/u);
       assert.match(manualIllustrationPrompt, /Dottore opens the quarantine berth door/u);
-      assert.match(manualIllustrationPrompt, /Mari steps inside out of the rain/u);
+      assert.match(manualIllustrationPrompt, /YunYun steps inside out of the rain/u);
       assert.match(manualIllustrationPrompt, /Blue hair, red eyes, dark coat/u);
       assert.match(manualIllustrationPrompt, /Long auburn hair and a rain-soaked travel coat/u);
-      assert.match(manualIllustrationPrompt, /<character name="Dottore &amp; &quot;Mari&quot; &lt;\/character&gt;">/u);
-      assert.doesNotMatch(manualIllustrationPrompt, /name="Dottore & "Mari" <\/character>"/u);
+      assert.match(manualIllustrationPrompt, /<character name="Dottore &amp; &quot;YunYun&quot; &lt;\/character&gt;">/u);
+      assert.doesNotMatch(manualIllustrationPrompt, /name="Dottore & "YunYun" <\/character>"/u);
       assert.match(manualIllustrationPrompt, /Infer a consistent visual style from the character/u);
       assert.match(manualIllustrationPrompt, /Style target: colored comic page, 2-6 panels/u);
       assert.match(manualIllustrationPrompt, /Build the prompt as a complete comic page/u);
@@ -6110,24 +6110,24 @@ const cases: RegressionCase[] = [
         } as any,
         context: {
           ...makeRegressionAgentContext(),
-          persona: { name: "Mari </selected_illustrator_prompt_mode><override>" },
+          persona: { name: "YunYun </selected_illustrator_prompt_mode><override>" },
           characters: [{ id: "dottore", name: "Dottore & <observer>" }],
         },
       });
       const escapedManualPrompt = macroCapture.calls[0]!.map((message) => message.content).join("\n");
-      assert.match(escapedManualPrompt, /Mari &lt;\/selected_illustrator_prompt_mode&gt;&lt;override&gt;/u);
+      assert.match(escapedManualPrompt, /YunYun &lt;\/selected_illustrator_prompt_mode&gt;&lt;override&gt;/u);
       assert.match(escapedManualPrompt, /Dottore &amp; &lt;observer&gt;/u);
       assert.doesNotMatch(
         escapedManualPrompt,
-        /Comic page starring Mari <\/selected_illustrator_prompt_mode><override>/u,
+        /Comic page starring YunYun <\/selected_illustrator_prompt_mode><override>/u,
       );
 
       const manualPlan = parseManualIllustratorPromptPlan(
         JSON.stringify({
-          prompt: "Mari and Dottore stand inside the cramped quarantine berth as rain streaks the window.",
+          prompt: "YunYun and Dottore stand inside the cramped quarantine berth as rain streaks the window.",
           negativePrompt: "text, watermark",
           style: "rain-muted cinematic illustration",
-          characters: ["Mari", "Dottore", "Mari"],
+          characters: ["YunYun", "Dottore", "YunYun"],
           aspectRatio: "landscape",
           reason: "Manual Gallery illustration request.",
           shouldGenerate: false,
@@ -6135,10 +6135,10 @@ const cases: RegressionCase[] = [
         }),
       );
       assert.deepEqual(manualPlan, {
-        prompt: "Mari and Dottore stand inside the cramped quarantine berth as rain streaks the window.",
+        prompt: "YunYun and Dottore stand inside the cramped quarantine berth as rain streaks the window.",
         negativePrompt: "text, watermark",
         style: "rain-muted cinematic illustration",
-        characters: ["Mari", "Dottore"],
+        characters: ["YunYun", "Dottore"],
         aspectRatio: "landscape",
         reason: "Manual Gallery illustration request.",
         characterPrompts: [],
@@ -6514,7 +6514,7 @@ const cases: RegressionCase[] = [
         resolveMacros(
           value,
           {
-            user: "Mari",
+            user: "YunYun",
             char: "Dottore",
             characters: ["Dottore"],
             variables: {},
@@ -6526,7 +6526,7 @@ const cases: RegressionCase[] = [
       const unwrappedBlock = buildMemoryRecallBlock([memory], "none", resolveMemoryMacros);
 
       for (const block of [xmlBlock, markdownBlock, unwrappedBlock]) {
-        assert.match(block, /Narrator: Dottore steadies Mari before the experiment\./);
+        assert.match(block, /Narrator: Dottore steadies YunYun before the experiment\./);
         assert.equal(block.includes("{{char}}"), false);
         assert.equal(block.includes("{{user}}"), false);
       }
@@ -6567,12 +6567,12 @@ const cases: RegressionCase[] = [
     run() {
       for (const wrapFormat of ["xml", "markdown", "none"] as const) {
         const conversation = formatAwarenessConversationBlock(
-          ["Chat: Another Lab (Mari, Rana)", "[12:00] Rana: The experiment is stable."],
+          ["Chat: Another Lab (YunYun, Rana)", "[12:00] Rana: The experiment is stable."],
           wrapFormat,
         );
         const awareness = formatAwarenessContextBlock([conversation], wrapFormat);
 
-        assert.match(awareness, /Chat: Another Lab \(Mari, Rana\)/);
+        assert.match(awareness, /Chat: Another Lab \(YunYun, Rana\)/);
         if (wrapFormat === "xml") {
           assert.match(awareness, /^<awareness>/);
           assert.match(awareness, /<conversation>/);
@@ -6685,7 +6685,7 @@ const cases: RegressionCase[] = [
           connectedChatId: "rp-chat",
           conversationCommandsEnabled: true,
           chatMeta: {},
-          personaName: "Mari",
+          personaName: "YunYun",
           chats: {
             async getById() {
               return {
@@ -6707,7 +6707,7 @@ const cases: RegressionCase[] = [
           connectedChatId: "game-chat",
           conversationCommandsEnabled: true,
           chatMeta: {},
-          personaName: "Mari",
+          personaName: "YunYun",
           chats: {
             async getById() {
               return {
@@ -6831,7 +6831,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           },
         ],
         persona: {
-          name: "Mari",
+          name: "YunYun",
           description: "The player persona.",
           appearance: "Red dress.",
         },
@@ -6848,7 +6848,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
 
       assert.equal(
         rendered,
-        "Do NOT include the player's Mari. Track Dottore with care. Latest: Track the current party.",
+        "Do NOT include the player's YunYun. Track Dottore with care. Latest: Track the current party.",
       );
     },
   },
@@ -6863,7 +6863,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
             semanticScore: 0.812,
           },
         ],
-        recalledMemories: ["Mari previously found a silver key inside Dottore's field journal."],
+        recalledMemories: ["YunYun previously found a silver key inside Dottore's field journal."],
       };
       const enabledCapture = makeCapturingProvider("Vector context received.");
       const enabledConfig = makeRegressionAgentConfig({
@@ -6892,7 +6892,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.match(enabledSystem, /<semantic_lorebook_matches>/u);
       assert.match(enabledSystem, /The hidden laboratory is beneath the abandoned opera house\./u);
       assert.match(enabledSystem, /<recalled_chat_memories>/u);
-      assert.match(enabledSystem, /Mari previously found a silver key/u);
+      assert.match(enabledSystem, /YunYun previously found a silver key/u);
 
       const disabledCapture = makeCapturingProvider("Ordinary context received.");
       const disabledConfig = makeRegressionAgentConfig({
@@ -7440,7 +7440,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       });
       const context = makeRegressionAgentContext({
         wrapFormat: "xml",
-        persona: { name: "Mari <override>", description: "The active user persona." },
+        persona: { name: "YunYun <override>", description: "The active user persona." },
         memory: {
           _existingLorebookEntries: [
             {
@@ -7470,7 +7470,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.match(system, /<writable_lorebooks>/u);
       assert.match(system, /World &lt;Lore&gt;/u);
       assert.doesNotMatch(terminal, /&lt;chat_summary>/u);
-      assert.match(terminal, /Mari &lt;override&gt;/u);
+      assert.match(terminal, /YunYun &lt;override&gt;/u);
     },
   },
   {
@@ -7493,7 +7493,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       });
       const context = makeRegressionAgentContext({
         wrapFormat: "xml",
-        mainResponse: "Dottore notices Mari tense when the door opens.",
+        mainResponse: "Dottore notices YunYun tense when the door opens.",
       });
 
       const results = await executeAgentBatch(
@@ -8722,13 +8722,13 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         ],
         promptTargetCharacterId: null,
         promptMacroContext: {
-          user: "Mari",
+          user: "YunYun",
           char: "Injected Character",
           characters: ["Injected Character"],
           variables: {},
         },
         wrapFormat: "xml",
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "",
         personaFields: {},
         persona: null,
@@ -8774,13 +8774,13 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         ],
         promptTargetCharacterId: null,
         promptMacroContext: {
-          user: "Mari",
+          user: "YunYun",
           char: "Ordered Character",
           characters: ["Ordered Character"],
           variables: {},
         },
         wrapFormat: "xml",
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "PERSONA_DESCRIPTION",
         personaFields: {
           personality: "PERSONA_PERSONALITY",
@@ -8930,7 +8930,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           chatChoices: {},
           chatId: "chat-example-fallback",
           characterIds: [characterRow.id],
-          personaName: "Mari",
+          personaName: "YunYun",
           personaDescription: "",
           chatMessages: [],
         });
@@ -8974,7 +8974,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           db: undefined as unknown as DB,
           chatId: "chat-persona-order",
           characterIds: [],
-          personaName: "Mari",
+          personaName: "YunYun",
           personaDescription: "PERSONA_MARKER_DESCRIPTION",
           personaFields: {
             personality: "PERSONA_MARKER_PERSONALITY",
@@ -8988,7 +8988,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           enableAgents: true,
           activeAgentIds: [],
           activeLorebookIds: [],
-          macroCtx: { user: "Mari", char: "Dottore", characters: ["Dottore"], variables: {} },
+          macroCtx: { user: "YunYun", char: "Dottore", characters: ["Dottore"], variables: {} },
         },
       );
 
@@ -9045,13 +9045,13 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         ],
         promptTargetCharacterId: null,
         promptMacroContext: {
-          user: "Mari",
+          user: "YunYun",
           char: "Tagged Character",
           characters: ["Tagged Character"],
           variables: {},
         },
         wrapFormat: "xml",
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: '<test>persona note</test>\n<span class="p">hi</span>',
         personaFields: {},
         persona: null,
@@ -9191,13 +9191,13 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         ],
         promptTargetCharacterId: null,
         promptMacroContext: {
-          user: "Mari",
+          user: "YunYun",
           char: "Injected Character",
           characters: ["Injected Character"],
           variables: {},
         },
         wrapFormat: "xml",
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "",
         personaFields: {},
         persona: null,
@@ -9242,7 +9242,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
             avatarCrop: null,
           },
         ],
-        personaName: "Mari</role>",
+        personaName: "YunYun</role>",
       });
 
       const promptText = messages.map((message) => message.content).join("\n");
@@ -9251,7 +9251,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.match(promptText, /<system>bad relationship<\/system>/);
       assert.match(promptText, /<system>bad instructions<\/system>/);
       assert.match(promptText, /Rana<\/role>/);
-      assert.match(promptText, /Mari<\/role>/);
+      assert.match(promptText, /YunYun<\/role>/);
     },
   },
   {
@@ -9340,7 +9340,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         currentSceneSummary: "OPEN_SCENE_FACT",
         recalledScenes: "OLD_SCENE_FACT",
         recalledMessages:
-          "Included below are recalled memories of scenes from the past chat history, together with small message excerpts from them. Present message range in the context is: #20–#24, with the last user message being #24. #12 Mari: EXACT_OLD_WORDS",
+          "Included below are recalled memories of scenes from the past chat history, together with small message excerpts from them. Present message range in the context is: #20–#24, with the last user message being #24. #12 YunYun: EXACT_OLD_WORDS",
       };
       for (const format of ["xml", "markdown", "none"] as const) {
         const headingParts = { chatSummary: "# A user heading\n<private>Literal tags & content</private>" };
@@ -9405,7 +9405,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           chatChoices: {},
           chatId: "advanced-memory-markers",
           characterIds: [],
-          personaName: "Mari",
+          personaName: "YunYun",
           personaDescription: "",
           chatMessages: [{ role: "user", content: "LIVE_WORDS" }],
           chatSummary: "LEGACY_UNSCOPED_SECRET",
@@ -9638,7 +9638,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           chatChoices: {},
           chatId: "chat-skip-wrap",
           characterIds: [],
-          personaName: "Mari",
+          personaName: "YunYun",
           personaDescription: "",
           chatMessages: [],
           chatSummary: "SUMMARY_TEXT",
@@ -9699,7 +9699,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         chatChoices: {},
         chatId: "chat-summary-fallback",
         characterIds: [],
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "The current user.",
         chatMessages: [
           { role: "user", content: "Hello." },
@@ -9743,7 +9743,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       ];
       const result = appendFallbackChatSummaryToSystemPrompt(
         history,
-        "Mari and Dottore reached the harbor.",
+        "YunYun and Dottore reached the harbor.",
         "xml",
         {} as MacroContext,
       );
@@ -9751,7 +9751,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.equal(result[0]?.role, "system");
       assert.equal(result[0]?.contextKind, "prompt");
       assert.match(result[0]?.content ?? "", /<chat_summary>/u);
-      assert.match(result[0]?.content ?? "", /Mari and Dottore reached the harbor\./u);
+      assert.match(result[0]?.content ?? "", /YunYun and Dottore reached the harbor\./u);
       assert.deepEqual(result.slice(1), history);
 
       const generateRouteSource = readFileSync(
@@ -10080,7 +10080,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         chatChoices: {},
         chatId: "chat-summary-marker",
         characterIds: [],
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "The current user.",
         chatMessages: [
           { role: "user", content: "Hello." },
@@ -10122,7 +10122,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         db: undefined as unknown as DB,
         chatId: "chat-lorebook-markup",
         characterIds: [],
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "",
         chatMessages: [],
         chatSummary: null,
@@ -10130,7 +10130,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         enableAgents: true,
         activeAgentIds: [],
         activeLorebookIds: [],
-        macroCtx: { user: "Mari", char: "Dottore", characters: ["Dottore"], variables: {} },
+        macroCtx: { user: "YunYun", char: "Dottore", characters: ["Dottore"], variables: {} },
         lorebookScanResult,
       };
 
@@ -10150,7 +10150,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         db: undefined as unknown as DB,
         chatId: "chat-lorebook-marker-dedupe",
         characterIds: [],
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "",
         chatMessages: [],
         chatSummary: null,
@@ -10158,7 +10158,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         enableAgents: true,
         activeAgentIds: [],
         activeLorebookIds: [],
-        macroCtx: { user: "Mari", char: "Dottore", characters: ["Dottore"], variables: {} },
+        macroCtx: { user: "YunYun", char: "Dottore", characters: ["Dottore"], variables: {} },
         lorebookScanResult: {
           worldInfoBefore: "LORE_BEFORE_ENTRY",
           worldInfoAfter: "LORE_AFTER_ENTRY",
@@ -10264,7 +10264,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           chatChoices: {},
           chatId: "model-macro",
           characterIds: [],
-          personaName: "Mari",
+          personaName: "YunYun",
           personaDescription: "",
           chatMessages: [],
           disableLorebooks: true,
@@ -10334,7 +10334,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         chatChoices: {},
         chatId: "chat-impersonate",
         characterIds: [],
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "The current user.",
         chatMessages,
       };
@@ -10350,11 +10350,11 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const impersonateText = impersonate.messages.map((message) => message.content).join("\n");
       const dedicatedImpersonateText = dedicatedImpersonate.messages.map((message) => message.content).join("\n");
 
-      assert.match(normalText, /Never answer as Mari/);
-      assert.equal(impersonateText.includes("Never answer as Mari"), false);
+      assert.match(normalText, /Never answer as YunYun/);
+      assert.equal(impersonateText.includes("Never answer as YunYun"), false);
       assert.match(impersonateText, /Can you answer as me\?/);
       assert.match(impersonateText, /I can help\./);
-      assert.match(dedicatedImpersonateText, /Never answer as Mari/);
+      assert.match(dedicatedImpersonateText, /Never answer as YunYun/);
       assert.match(dedicatedImpersonateText, /Can you answer as me\?/);
       assert.match(dedicatedImpersonateText, /I can help\./);
     },
@@ -10629,12 +10629,12 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
     run() {
       const instruction = "Remember to prefix messages with `Name: message`!";
       const responseBoundary =
-        "Only respond for these characters: Dottore, Pantalone. Never respond for Mari or write Mari's messages.";
+        "Only respond for these characters: Dottore, Pantalone. Never respond for YunYun or write YunYun's messages.";
       const formatOutput = (wrapFormat: "xml" | "markdown" | "none") =>
         formatConversationGroupOutputFormat({
           wrapFormat,
           characterNames: ["Dottore", "Pantalone"],
-          userName: "Mari",
+          userName: "YunYun",
         });
       assert.equal(
         formatOutput("xml"),
@@ -10646,7 +10646,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         formatConversationGroupOutputFormat({
           wrapFormat: "markdown",
           characterNames: ["Dottore", "Pantalone"],
-          userName: "Mari",
+          userName: "YunYun",
           turnCharacterName: "Dottore",
         }),
         `## Output Format\nRespond only as Dottore.`,
@@ -10655,11 +10655,11 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const individualOutput = formatConversationGroupOutputFormat({
         wrapFormat: "xml",
         characterNames: ["Dottore", "Pantalone"],
-        userName: "Mari",
+        userName: "YunYun",
         turnCharacterName: "Dottore",
       });
       assert.match(individualOutput, /Respond only as Dottore\./u);
-      assert.doesNotMatch(individualOutput, /prefix messages|Pantalone|Never respond for Mari/u);
+      assert.doesNotMatch(individualOutput, /prefix messages|Pantalone|Never respond for YunYun/u);
 
       const contextCharacters = [
         {
@@ -10682,7 +10682,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         promptTimeZone: "Europe/Warsaw",
         convoCharInfo: contextCharacters,
         finalMessages: [{ role: "user" }],
-        personaName: "Mari",
+        personaName: "YunYun",
         userStatus: "active",
         mentionedCharacterNames: ["Dottore"],
         wrapFormat: "none",
@@ -10692,7 +10692,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         promptTimeZone: "Europe/Warsaw",
         convoCharInfo: contextCharacters,
         finalMessages: [{ role: "user" }],
-        personaName: "Mari",
+        personaName: "YunYun",
         userStatus: "active",
         mentionedCharacterNames: ["Dottore"],
         primaryCharacterId: "dottore",
@@ -10701,7 +10701,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.match(sharedContext, /Your current status: Dottore: online; Pantalone: online\./u);
       assert.match(dottoreContext, /^Your current status: Dottore: online\.\nPantalone's status: online\./u);
       assert.doesNotMatch(dottoreContext, /Your current status:.*Pantalone/u);
-      assert.match(dottoreContext, /Mari @mentioned: Dottore/u);
+      assert.match(dottoreContext, /YunYun @mentioned: Dottore/u);
       assert.equal(
         replaceConversationContextBlockForTarget(`Before\n${sharedContext}\nAfter`, sharedContext, dottoreContext),
         `Before\n${dottoreContext}\nAfter`,
@@ -10710,7 +10710,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const deferredIdentity = resolveMacros(
         "You are {{charName}}.",
         {
-          user: "Mari",
+          user: "YunYun",
           char: "Dottore",
           characters: ["Dottore", "Pantalone"],
           groupCharacters: ["Dottore", "Pantalone"],
@@ -12043,12 +12043,12 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
 
       const canonicalPartyCharacters: Array<Record<string, unknown>> = [
         {
-          name: 'Marisol "Mari"',
+          name: 'Marisol "YunYun"',
           mood: "Concerned",
           appearance: "Expanded-name appearance",
         },
         {
-          name: "Mari",
+          name: "YunYun",
           mood: "Focused",
           appearance: "Canonical-name appearance",
         },
@@ -12056,7 +12056,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const canonicalPartyMatches = applyTrackerCharacterCardIdentity(canonicalPartyCharacters, [
         {
           id: "party-card",
-          name: "Mari",
+          name: "YunYun",
           avatarPath: "/api/avatars/file/party-card.png",
         },
       ]);
@@ -12064,7 +12064,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.deepEqual(canonicalPartyCharacters, [
         {
           characterId: "party-card",
-          name: "Mari",
+          name: "YunYun",
           mood: "Focused",
           appearance: "Canonical-name appearance",
           avatarPath: "/api/avatars/file/party-card.png",
@@ -12072,9 +12072,9 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         },
       ]);
 
-      const unrelatedLongName: Array<Record<string, unknown>> = [{ name: "Mari Calder" }];
-      applyTrackerCharacterCardIdentity(unrelatedLongName, [{ id: "party-card", name: "Mari" }]);
-      assert.deepEqual(unrelatedLongName, [{ name: "Mari Calder" }]);
+      const unrelatedLongName: Array<Record<string, unknown>> = [{ name: "YunYun Calder" }];
+      applyTrackerCharacterCardIdentity(unrelatedLongName, [{ id: "party-card", name: "YunYun" }]);
+      assert.deepEqual(unrelatedLongName, [{ name: "YunYun Calder" }]);
 
       // Multi-character cards: two distinctly named members of one card stay separate.
       const castCard = { id: "resort-card", name: "Vacation Resort", avatarPath: "/api/avatars/file/resort.png" };
@@ -12223,14 +12223,14 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
 
       assert.equal(
         canonicalizeGamePartySpeakerLabels(
-          '[Marisol "Mari"] [main] [happy]: "Ready."\n\nMarisol "Mari" crosses the room.',
-          ["Mari"],
+          '[Marisol "YunYun"] [main] [happy]: "Ready."\n\nMarisol "YunYun" crosses the room.',
+          ["YunYun"],
         ),
-        '[Mari] [main] [happy]: "Ready."\n\nMarisol "Mari" crosses the room.',
+        '[YunYun] [main] [happy]: "Ready."\n\nMarisol "YunYun" crosses the room.',
       );
       assert.equal(
-        canonicalizeGamePartySpeakerLabels('[Mari Calder] [main] [happy]: "Ready."', ["Mari"]),
-        '[Mari Calder] [main] [happy]: "Ready."',
+        canonicalizeGamePartySpeakerLabels('[YunYun Calder] [main] [happy]: "Ready."', ["YunYun"]),
+        '[YunYun Calder] [main] [happy]: "Ready."',
       );
 
       assert.equal(resolveCharacterCustomFieldName("  ", "Goal"), "Goal");
@@ -12405,7 +12405,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const previousState = normalizeBeholderState({
         characters: [
           {
-            name: "Mari",
+            name: "YunYun",
             species: "human",
             body: {
               chest: {
@@ -12423,12 +12423,12 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         ],
       });
       assert.ok(previousState);
-      const requestContext = formatBeholderRequestContext(previousState, "Mari");
-      assert.match(requestContext, /^Persona: Mari\nCurrent state:/u);
+      const requestContext = formatBeholderRequestContext(previousState, "YunYun");
+      assert.match(requestContext, /^Persona: YunYun\nCurrent state:/u);
       assert.match(requestContext, /"self": \{/u);
       assert.match(requestContext, /"Dottore": \{/u);
 
-      const unchanged = resolveBeholderStateResponse({ changed: false }, previousState, "Mari");
+      const unchanged = resolveBeholderStateResponse({ changed: false }, previousState, "YunYun");
       assert.equal(unchanged.valid, true);
       assert.deepEqual(unchanged.state, previousState);
 
@@ -12454,10 +12454,10 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           },
         },
         previousState,
-        "Mari",
+        "YunYun",
       );
       assert.equal(merged.valid, true);
-      const mergedMari = merged.state.characters.find((character) => character.name === "Mari");
+      const mergedMari = merged.state.characters.find((character) => character.name === "YunYun");
       assert.deepEqual(mergedMari?.body.chest?.worn, [
         { item: "dress", color: "red", damage: "damaged" },
         { item: "coat", color: "black", damage: "pristine" },
@@ -12484,7 +12484,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const invalid = resolveBeholderStateResponse(
         { changed: true, delta: { self: { body: { invented_slot: { bare: true } } } } },
         previousState,
-        "Mari",
+        "YunYun",
       );
       assert.equal(invalid.valid, false);
       assert.deepEqual(invalid.state, previousState);
@@ -12492,7 +12492,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const legacy = resolveBeholderStateResponse(
         { characters: [{ name: "Mira", body: { left_hand: { holding: { item: "key" } } } }] },
         previousState,
-        "Mari",
+        "YunYun",
       );
       assert.equal(legacy.valid, true);
       assert.deepEqual(legacy.state.characters, [
@@ -12509,7 +12509,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         settings: { resultType: "context_injection" },
       });
       const context = makeRegressionAgentContext({
-        mainResponse: "Mari keeps hold of the silver key.",
+        mainResponse: "YunYun keeps hold of the silver key.",
         memory: { _beholderState: previousState },
       });
       const result = await executeAgent(config as any, context, provider as any, "regression-model");
@@ -12518,7 +12518,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.equal(calls[0]?.[0]?.role, "system");
       assert.equal(calls[0]?.[1]?.role, "user");
       assert.equal(system, "Return a physical-state delta as JSON.");
-      assert.match(user, /Persona: Mari\nCurrent state:/u);
+      assert.match(user, /Persona: YunYun\nCurrent state:/u);
       assert.match(user, /"self":\{/u);
       assert.equal(callOptions[0]?.temperature, 0);
       assert.equal(result.success, true);
@@ -12543,7 +12543,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const firstRunUser = firstRun.calls[0]?.[1]?.content ?? "";
       assert.equal(firstRun.calls[0]?.[0]?.role, "system");
       assert.equal(firstRun.calls[0]?.[1]?.role, "user");
-      assert.match(firstRunUser, /^Persona: Mari\nNarration:/u);
+      assert.match(firstRunUser, /^Persona: YunYun\nNarration:/u);
       assert.doesNotMatch(firstRunUser, /Current state:/u);
       assert.deepEqual(firstRunResult.data, { characters: [] });
 
@@ -12684,7 +12684,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
     },
   },
   {
-    name: "Professor Mari recovers malformed small-model app-data calls",
+    name: "Professor YunYun recovers malformed small-model app-data calls",
     run() {
       assert.deepEqual(professorMariWorkspaceResponseFormat("openrouter"), { type: "json_object" });
       assert.equal(professorMariWorkspaceResponseFormat("anthropic"), undefined);
@@ -13290,7 +13290,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
     },
   },
   {
-    name: "Professor Mari executes intent-authorized mutations without a server-side authorization gate (#5721)",
+    name: "Professor YunYun executes intent-authorized mutations without a server-side authorization gate (#5721)",
     run() {
       // Models fine-tuned on older transcripts may still emit the retired
       // "authorization" field - it must parse harmlessly and be ignored.

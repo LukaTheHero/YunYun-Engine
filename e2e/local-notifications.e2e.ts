@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("clicking a worker notification focuses Marinara or opens it when no window remains", async ({ page }) => {
+test("clicking a worker notification focuses YunYun or opens it when no window remains", async ({ page }) => {
   await page.goto("/");
   const result = await page.evaluate(async () => {
     const source = await (await fetch("/notification-events.js")).text();

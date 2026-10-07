@@ -97,7 +97,7 @@ try {
   const failedModels = await app.inject({ method: "GET", url: `/api/connections/${unreachable.id}/models` });
   assert.equal(failedModels.statusCode, 502);
   assert.match(failedModels.json().error, /ECONNREFUSED/);
-  assert.match(failedModels.json().error, /from the Marinara server/);
+  assert.match(failedModels.json().error, /from the YunYun server/);
   for (const defaults of [
     {},
     { temperature: 1, topP: 0.8, maxTokens: 2048, frequencyPenalty: 0.2, stopSequences: ["end"] },

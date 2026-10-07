@@ -1,5 +1,5 @@
 /**
- * The decision models Marinara can install and run itself.
+ * The decision models YunYun can install and run itself.
  *
  * Open-Jev is the first downloadable decision model, not the only one there will ever
  * be, so this is a catalog rather than an Open-Jev feature: adding a model later is an
@@ -122,7 +122,7 @@ export interface SidecarDecisionModelInfo {
    */
   perQuestionMs?: number;
   licenses: string[];
-  /** Drives the "not developed by Marinara" wording before anything downloads. */
+  /** Drives the "not developed by YunYun" wording before anything downloads. */
   thirdParty: true;
 }
 
@@ -293,7 +293,7 @@ export interface DecisionSidecarSettings {
    * third party's manifest to find out what is on disk.
    */
   customModel: SidecarDecisionModelInfo | null;
-  /** Start with Marinara, or on the first gate that needs it. */
+  /** Start with YunYun, or on the first gate that needs it. */
   startPolicy: "on_demand" | "with_marinara";
   confirmedAt: string | null;
   /** The preflight verdict displayed when the user confirmed. */

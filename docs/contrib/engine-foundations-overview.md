@@ -1,6 +1,6 @@
 # Engine foundations: overview of the series
 
-This page maps the engine foundations contribution (issue #6624). The work was first opened as one large pull request; it is now split into eight smaller ones, labelled A to H below, so each can be reviewed on its own. Every piece builds on code that is already in Marinara Engine and already works well. Nothing here renames an upstream API, replaces the shared logger or changes a file's conventions. Where a piece changes behaviour for everyone, that is said plainly. Everything else is off until you turn it on.
+This page maps the engine foundations contribution (issue #6624). The work was first opened as one large pull request; it is now split into eight smaller ones, labelled A to H below, so each can be reviewed on its own. Every piece builds on code that is already in YunYun Engine and already works well. Nothing here renames an upstream API, replaces the shared logger or changes a file's conventions. Where a piece changes behaviour for everyone, that is said plainly. Everything else is off until you turn it on.
 
 ## The pull requests
 
@@ -235,13 +235,13 @@ It checks that a held call runs after release and reaches a route added later, t
 
 - The registry is `packages/shared/src/schemas/feature-settings.schema.ts`: switch names and defaults, stored together as one JSON object in the `features` app setting. Only values that differ from the default are saved.
 - This PR registers two switches, both for behaviour it adds itself: **Stable lorebook picks** (`stableLorebookGroupPicks`, A3a) and **Retry failed provider calls** (`providerRetry`, A4d).
-- On the server, `isFeatureEnabled()` in `services/features/feature-settings.ts` reads an in-memory copy, so busy paths pay nothing. The copy is loaded when the app-settings routes register and refreshed on every write or removal of the row, after Professor Mari database commands that touch it, and after a `.env` reload. `GET` and `PUT /api/app-settings/features`; `PUT` validates strictly.
+- On the server, `isFeatureEnabled()` in `services/features/feature-settings.ts` reads an in-memory copy, so busy paths pay nothing. The copy is loaded when the app-settings routes register and refreshed on every write or removal of the row, after Professor YunYun database commands that touch it, and after a `.env` reload. `GET` and `PUT /api/app-settings/features`; `PUT` validates strictly.
 - Environment variables still win when set, both on and off. `LOREBOOK_STABLE_GROUP_WINNERS` and `PROVIDER_RETRY_TRANSIENT_ERRORS` now pin the two switches instead of being read on their own.
 - The client lists every switch in Settings > Advanced > Features and shows a switch pinned by an environment variable as locked with the variable's name. Other components use `useFeatureEnabled()`.
 
 **What stays exactly the same.** Every switch defaults off, so an install that never opens the section behaves exactly as before. An environment variable that was set before keeps the same effect.
 
-**How to check it yourself.** `node scripts/run-regressions.mjs --filter feature-settings` (registry and defaults, normalization, env precedence, routes, storage and Mari-style invalidation, listeners). In the app: Settings > Advanced > Features, or search settings for `features`.
+**How to check it yourself.** `node scripts/run-regressions.mjs --filter feature-settings` (registry and defaults, normalization, env precedence, routes, storage and YunYun-style invalidation, listeners). In the app: Settings > Advanced > Features, or search settings for `features`.
 
 **How to turn it off / revert.** Leave both switches off, or unset the environment variables. Reverting the feature switches commit removes the mechanism; the two environment variables then work on their own as before.
 
@@ -269,7 +269,7 @@ These sections are short on purpose. Each pull request fills in its own section,
 
 ## PR B: Dev MCP for coding assistants
 
-An optional Dev MCP server under `tools/dev-mcp` for coding assistants working on Marinara locally, outside the pnpm workspace and the Docker image. It uses the request id trail from A2 to follow a request through the logs. Setup and checks are in `tools/dev-mcp/README.md`, which PR B adds.
+An optional Dev MCP server under `tools/dev-mcp` for coding assistants working on YunYun locally, outside the pnpm workspace and the Docker image. It uses the request id trail from A2 to follow a request through the logs. Setup and checks are in `tools/dev-mcp/README.md`, which PR B adds.
 
 ## PR C: Command palette and keyboard shortcuts overlay
 

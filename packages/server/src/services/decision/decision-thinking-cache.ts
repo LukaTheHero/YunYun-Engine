@@ -1,7 +1,7 @@
 /**
  * What each locally loaded model turned out to do when asked for a one-token answer.
  *
- * Marinara gets bug reports whenever something forces thinking on or off, so the
+ * YunYun gets bug reports whenever something forces thinking on or off, so the
  * backend never trusts `enable_thinking: false` to have worked. It sends the request,
  * looks at what came back, and remembers the answer here.
  *

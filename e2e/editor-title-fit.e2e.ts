@@ -17,7 +17,7 @@ test("character editor shows the whole name when it fits beside the byline", asy
   const name = "Alexandria Nightshade";
   const response = await request.post("/api/characters", {
     data: {
-      data: { name, creator: "Professor Mari and the Fatui Research Collective", character_version: "12.34" },
+      data: { name, creator: "Professor YunYun and the Fatui Research Collective", character_version: "12.34" },
     },
   });
   expect(response.ok(), await response.text()).toBeTruthy();

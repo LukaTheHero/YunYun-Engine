@@ -1,5 +1,5 @@
 ---
-name: "Marinara Engine"
+name: "YunYun Engine"
 description: "A playful immersive AI chat, roleplay, and game engine with visual novel warmth."
 colors:
   void-night: "#050312"
@@ -84,13 +84,13 @@ components:
     padding: "8px 12px"
 ---
 
-# Design System: Marinara Engine
+# Design System: YunYun Engine
 
 ## 1. Overview
 
 **Creative North Star: "The Velvet Game Console"**
 
-Marinara should feel like a lovingly built story machine: visual, intimate, a little magical, and still practical enough for power users who live in settings panels. The default surface is dark because the main play moment is long-form chat, roleplay, or game mode in a focused evening setting, where bright white UI would fight the scene. Light mode exists for comfort and accessibility, but the brand signal lives in the logo gradient, violet surfaces, soft glow, character art, and compact tools.
+YunYun should feel like a lovingly built story machine: visual, intimate, a little magical, and still practical enough for power users who live in settings panels. The default surface is dark because the main play moment is long-form chat, roleplay, or game mode in a focused evening setting, where bright white UI would fight the scene. Light mode exists for comfort and accessibility, but the brand signal lives in the logo gradient, violet surfaces, soft glow, character art, and compact tools.
 
 The system rejects sterile SaaS dashboards, bland SillyTavern cloning, generic Discord surfaces, and developer-only control panels. Even dense controls should feel like part of an immersive engine, not a spreadsheet of toggles.
 
@@ -107,7 +107,7 @@ The palette is a nocturne of near-black violet, soft silver, logo-gradient accen
 
 ### Primary
 
-- **Marinara Gradient** (`linear-gradient(90deg, #ec4b97, #f29744, #36cdde)`): Default accent in both dark and light mode, available in the shared gradient picker. Use the existing accent and chrome text tokens for controls; solid-color consumers use the first stop when Pulse is off.
+- **YunYun Gradient** (`linear-gradient(90deg, #ec4b97, #f29744, #36cdde)`): Default accent in both dark and light mode, available in the shared gradient picker. Use the existing accent and chrome text tokens for controls; solid-color consumers use the first stop when Pulse is off.
 - **Accent Pulse**: On by default for desktop devices and off for mobile devices. Respect reduced motion and saved device preferences. Users can select any supported solid color or gradient and toggle Pulse independently.
 
 ### Secondary
@@ -118,7 +118,7 @@ The palette is a nocturne of near-black violet, soft silver, logo-gradient accen
 ### Tertiary
 
 - **Muted Orchid** (`#d4adfc`): Secondary emphasis, quiet metadata, and decorative highlights.
-- **SillyTavern Blue** (`#4a72b0`): Compatibility theme primary color only. Do not let it overtake the Marinara default identity.
+- **SillyTavern Blue** (`#4a72b0`): Compatibility theme primary color only. Do not let it overtake the YunYun default identity.
 
 ### Neutral
 
@@ -134,7 +134,7 @@ The palette is a nocturne of near-black violet, soft silver, logo-gradient accen
 
 **The Accent Follows the User Rule.** Use accent or chrome text tokens for actions, selection, and emphasis. Do not hard-code pink interface accents; logo artwork and user-selectable color palettes retain their intended colors.
 
-**The Compatibility Theme Rule.** The SillyTavern visual theme is a compatibility skin, not the source of Marinara's default visual identity.
+**The Compatibility Theme Rule.** The SillyTavern visual theme is a compatibility skin, not the source of YunYun's default visual identity.
 
 ## 3. Typography
 
@@ -160,7 +160,7 @@ The palette is a nocturne of near-black violet, soft silver, logo-gradient accen
 
 ## 4. Elevation
 
-Marinara uses a hybrid of tonal layering, soft glow, and selective frosted surfaces. Core reading areas should stay stable and legible; blur and glow belong to shell chrome, overlays, and special immersive moments.
+YunYun uses a hybrid of tonal layering, soft glow, and selective frosted surfaces. Core reading areas should stay stable and legible; blur and glow belong to shell chrome, overlays, and special immersive moments.
 
 ### Shadow Vocabulary
 
@@ -222,8 +222,8 @@ Conversation mode can use familiar message bubbles, but roleplay and game mode s
 
 ### Don't:
 
-- **Don't** turn Marinara into a sterile SaaS dashboard with gray card grids and dry enterprise spacing.
-- **Don't** make it a bland SillyTavern clone. Compatibility themes may exist, but Marinara's default should keep its own logo-gradient visual novel identity.
+- **Don't** turn YunYun into a sterile SaaS dashboard with gray card grids and dry enterprise spacing.
+- **Don't** make it a bland SillyTavern clone. Compatibility themes may exist, but YunYun's default should keep its own logo-gradient visual novel identity.
 - **Don't** make it feel like a generic Discord clone. Chat familiarity is useful, but roleplay and game mode need their own atmosphere.
 - **Don't** build developer-only control panels that assume technical confidence. Advanced settings still need clear labels, forgiving defaults, and helpful validation.
 - **Don't** use colored side-stripe borders, decorative gradient text, nested cards, or glassmorphism as the default layout answer.

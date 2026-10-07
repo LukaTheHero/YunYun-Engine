@@ -79,7 +79,7 @@ try {
   const settings = createAppSettingsStorage(db);
   const connections = createConnectionsStorage(db);
   const chat = await chats.create({
-    name: "Mari proof",
+    name: "YunYun proof",
     mode: "conversation",
     characterIds: [],
     promptPresetId: null,
@@ -154,7 +154,7 @@ try {
   await assert.rejects(
     record({ category: "setupReminder", answer: "allow", quote: "Add Decision guidance to my character." }),
     /new user reply/,
-    "Mari cannot answer her own warning in the same run",
+    "YunYun cannot answer her own warning in the same run",
   );
   const firstPending = (await mariDecisionContext(context)).interactions.setupReminder;
   await record({ category: "setupReminder", answer: "pending" });
@@ -262,14 +262,14 @@ try {
   assert.equal((await readAgent()).settings.activationQuestion, undefined, "explicit clearing removes the setting");
   assert.equal((await readAgent()).settings.unrelated, "keep");
 
-  // Chat metadata survives service re-creation and history longer than Mari's 40-message window.
+  // Chat metadata survives service re-creation and history longer than YunYun's 40-message window.
   for (let i = 0; i < 45; i++) await turn(`Unrelated message ${i}`);
   const continued = await mariDecisionContext({ ...context });
   assert.equal((continued.interactions.setupReminder as { answer: string }).answer, "allow");
   const cardId = await findId("character.list", "Decision card");
   // A new chat has no local permissions, but unrelated edits/removing Decisions remain possible.
   const chat2 = await chats.create({
-    name: "New Mari chat",
+    name: "New YunYun chat",
     mode: "conversation",
     characterIds: [],
     promptPresetId: null,
@@ -478,7 +478,7 @@ try {
   assert.equal(forged.ok, false, "raw metadata cannot reset or forge authoring permission");
   assert.match(JSON.stringify(forged.validation), /decision.record/);
   console.log(
-    "Mari Decision authoring: status, write paths, consent, long/new chats, Memory/Skill lifecycle and validation passed.",
+    "YunYun Decision authoring: status, write paths, consent, long/new chats, Memory/Skill lifecycle and validation passed.",
   );
 } finally {
   await db._fileStore.close();

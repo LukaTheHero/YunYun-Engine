@@ -18,7 +18,7 @@ A variable's behavior depends on its options and two toggles. By default a varia
 
 **Multi-Select.** Turn on the **Multi-Select** toggle to let users pick more than one option. By default the selected values are joined together with a separator. The separator is a short text field, and the default is a comma and a space. For example, options Romance, Fantasy, and Action joined with `, ` become the text "Romance, Fantasy, Action".
 
-**Random Pick.** For a single-select variable, Marinara preselects a random option for each new chat. You can change it before confirming, and the saved choice stays fixed until you edit it. With **Multi-Select** on, the app picks one of the user's selected options at random each time it generates. This is useful for variety: the user chooses a pool of options, and each reply draws one from that pool.
+**Random Pick.** For a single-select variable, YunYun preselects a random option for each new chat. You can change it before confirming, and the saved choice stays fixed until you edit it. With **Multi-Select** on, the app picks one of the user's selected options at random each time it generates. This is useful for variety: the user chooses a pool of options, and each reply draws one from that pool.
 
 ## Adding a preset variable
 
@@ -57,7 +57,7 @@ You do not have to reopen a preset from scratch to change your answers. In the c
 
 YunYun resolves many built-in macros, such as `{{user}}` and `{{char}}`. After those, any leftover placeholder in the form `{{NAME}}` (letters, numbers, and underscores only) is matched against your preset variables.
 
-If a variable with that exact name exists, the placeholder becomes the chosen value. If none matches, Marinara tries the chat's own variables next, the ones listed in the **Chat Variables** section of the **Chat Settings** panel. A preset variable wins when both use the same name. If neither has it, the `{{NAME}}` text is left exactly as typed. This is why an unknown placeholder shows up unchanged in the output instead of raising an error. For the full macro list, see [Prompt Macros](macros.md).
+If a variable with that exact name exists, the placeholder becomes the chosen value. If none matches, YunYun tries the chat's own variables next, the ones listed in the **Chat Variables** section of the **Chat Settings** panel. A preset variable wins when both use the same name. If neither has it, the `{{NAME}}` text is left exactly as typed. This is why an unknown placeholder shows up unchanged in the output instead of raising an error. For the full macro list, see [Prompt Macros](macros.md).
 
 ## Decision blocks in options
 

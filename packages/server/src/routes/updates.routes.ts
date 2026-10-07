@@ -85,7 +85,7 @@ const MANUAL_GIT_UPDATE_COMMAND = `git fetch origin +refs/heads/main:refs/remote
 const DOCKER_UPDATE_COMMAND = "docker compose pull && docker compose up -d";
 const ANDROID_APK_NOTICE =
   "> [!IMPORTANT]\n" +
-  "> **Android APK notice:** The APK is a Termux bootstrap + WebView shell, not a native Android server build. It opens an already-running local Marinara server, and on first launch it can download Termux from F-Droid, hand it to Android's installer, and start Marinara through Termux after Android permission prompts.";
+  "> **Android APK notice:** The APK is a Termux bootstrap + WebView shell, not a native Android server build. It opens an already-running local YunYun server, and on first launch it can download Termux from F-Droid, hand it to Android's installer, and start YunYun through Termux after Android permission prompts.";
 
 // ── Cached release info (15-min TTL) ──
 let cachedRelease: {
@@ -269,9 +269,9 @@ export function getManualUpdateHint(
   }
   if (installType === "git") {
     const launcher = getGitLauncherCommand(platform);
-    return `Relaunch Marinara with ${launcher} to let the platform launcher fetch the current checkout's update branch, install dependencies, rebuild, and start the new version. The command below changes into the install folder first.${windowsShellNote(" and run \`./start.bat\` - bash does not resolve a bare batch file from the current folder")}`;
+    return `Relaunch YunYun with ${launcher} to let the platform launcher fetch the current checkout's update branch, install dependencies, rebuild, and start the new version. The command below changes into the install folder first.${windowsShellNote(" and run \`./start.bat\` - bash does not resolve a bare batch file from the current folder")}`;
   }
-  return "Download the release asset or update the host install manually, then restart Marinara.";
+  return "Download the release asset or update the host install manually, then restart YunYun.";
 }
 
 async function fetchUpdateRef(root: string, channel = UPDATE_CHANNELS.stable) {
@@ -570,7 +570,7 @@ function buildFallbackRelease(tag: string) {
 }
 
 function withAndroidApkNotice(notes: string) {
-  if (/Android APK notice|not a standalone Marinara Engine app|requires Termux/i.test(notes)) {
+  if (/Android APK notice|not a standalone YunYun Engine app|requires Termux/i.test(notes)) {
     return notes;
   }
 

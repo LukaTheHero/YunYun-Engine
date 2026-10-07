@@ -1159,10 +1159,10 @@ Rules worth knowing:
 
 `scenes` is refused on a manifest that declares a `capabilityApi` older than 1.66.
 
-### Capability API 1.50: Professor Mari actions
+### Capability API 1.50: Professor YunYun actions
 
-A package holding the new `mari-actions` permission can offer named actions to Professor Mari. It
-registers one service under its own id; Mari's `package_service` tool lists every offered action and
+A package holding the new `mari-actions` permission can offer named actions to Professor YunYun. It
+registers one service under its own id; YunYun's `package_service` tool lists every offered action and
 runs one when the user asks for it.
 
 ```ts
@@ -1183,21 +1183,21 @@ export async function activate({ api }) {
 Rules worth knowing:
 
 - The key must be `mari-actions:<package-id>` for the registering package. Registration throws without
-  the permission or under another package's id, so an action Mari runs always belongs to the package it
+  the permission or under another package's id, so an action YunYun runs always belongs to the package it
   names.
 - `list()` returns `{ name, summary?, inputs? }` entries. Names are 1 to 80 letters, digits, `.`, `_` or
-  `-`; other entries are not shown. `summary` and `inputs` are what Mari reads, so write them in plain
-  words. Only the first 50 actions can be seen or run, Mari sees at most 40 inputs per action, input
+  `-`; other entries are not shown. `summary` and `inputs` are what YunYun reads, so write them in plain
+  words. Only the first 50 actions can be seen or run, YunYun sees at most 40 inputs per action, input
   names are cut at 80 characters and each text at 300 characters.
   `list()` must answer within 5 seconds, or the package's actions are left out.
 - `run(name, input, { signal })` is called only with a listed name and a plain JSON object of at most 64,000
   characters. The input comes from a model: validate it against your own schema before doing anything.
-  Answer `{ ok: true, value }` or `{ ok: false, status?, error }`; Mari sees the first 2,000 characters
-  of the error text. `signal` aborts when the user stops Mari or after 5 minutes; the Engine stops
+  Answer `{ ok: true, value }` or `{ ok: false, status?, error }`; YunYun sees the first 2,000 characters
+  of the error text. `signal` aborts when the user stops YunYun or after 5 minutes; the Engine stops
   waiting at that point, so stop your work too.
-- The Engine elides data URLs in `value` before Mari reads it, and truncates long answers. Return ids
+- The Engine elides data URLs in `value` before YunYun reads it, and truncates long answers. Return ids
   and short text, not files.
-- Listing is read-only. Every run counts as a change for Mari's Permissions Mode: Plan refuses it,
+- Listing is read-only. Every run counts as a change for YunYun's Permissions Mode: Plan refuses it,
   Manual holds it for the user's Accept. The Engine cannot preview or undo a package action, so no
   Keep/Restore card is shown; offer an undo action of your own when a change is hard to take back.
   Because of this, Plan mode also refuses actions that only read.

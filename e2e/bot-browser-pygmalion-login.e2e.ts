@@ -51,8 +51,8 @@ test("Pygmalion login masks the token, explains failures and handles an expired 
   await expect(field).toHaveAttribute("type", "password");
   await expect(field).toHaveAttribute("spellcheck", "false");
   await expect(field).toHaveAttribute("autocomplete", "off");
-  await expect(page.getByText(/Marinara keeps it in memory until restart or Log Out/u)).toBeVisible();
-  await expect(field).toHaveAccessibleDescription(/Marinara keeps it in memory until restart or Log Out/u);
+  await expect(page.getByText(/YunYun keeps it in memory until restart or Log Out/u)).toBeVisible();
+  await expect(field).toHaveAccessibleDescription(/YunYun keeps it in memory until restart or Log Out/u);
   await field.fill("rejected-token");
   const screenshot = testInfo.outputPath("pygmalion-login-modal.png");
   await page.screenshot({ path: screenshot });
@@ -69,6 +69,6 @@ test("Pygmalion login masks the token, explains failures and handles an expired 
   await expect(page.getByText("Pygmalion session expired — please log in again.")).toBeVisible();
   await expect(browser.getByRole("button", { name: "Log In", exact: true })).toBeVisible();
   expect(tokens).toEqual(["rejected-token", "accepted-token"]);
-  await expect(page.getByText("Marinara hit a recoverable UI error.")).toHaveCount(0);
+  await expect(page.getByText("YunYun hit a recoverable UI error.")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

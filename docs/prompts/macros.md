@@ -1,10 +1,10 @@
 # Prompt Macros
 
-This guide explains prompt macros in Marinara Engine. A macro is a short `{{tag}}` that Marinara replaces with a live value. The value is filled in when a prompt is built, such as your name or the current date. You will learn every built-in macro, where you can type them, and the mistakes to avoid.
+This guide explains prompt macros in YunYun Engine. A macro is a short `{{tag}}` that YunYun replaces with a live value. The value is filled in when a prompt is built, such as your name or the current date. You will learn every built-in macro, where you can type them, and the mistakes to avoid.
 
 ## What macros are and where they work
 
-A macro is literal text wrapped in double braces, like `{{user}}` or `{{char}}`. When Marinara builds the text it sends to the AI, it scans for these tags and swaps each one for its current value. There is no switch to turn macros on. Any field that supports them always resolves them.
+A macro is literal text wrapped in double braces, like `{{user}}` or `{{char}}`. When YunYun builds the text it sends to the AI, it scans for these tags and swaps each one for its current value. There is no switch to turn macros on. Any field that supports them always resolves them.
 
 Macro names are not case sensitive for built-in tags. So `{{user}}` and `{{USER}}` both work.
 
@@ -18,11 +18,11 @@ You can type macros in many places across the app:
 - Agent prompt templates.
 - The chat message box. Type `{{roll:1d20}}` in a message and it resolves before the message is sent.
 
-A macro value can contain another macro, and Marinara resolves that one too.
+A macro value can contain another macro, and YunYun resolves that one too.
 
 ## Before you start
 
-You do not need to set anything up. The built-in macros work right away, with no API key and no extra connection. An API key is the secret code that lets Marinara talk to an AI provider, but macros run inside Marinara on their own.
+You do not need to set anything up. The built-in macros work right away, with no API key and no extra connection. An API key is the secret code that lets YunYun talk to an AI provider, but macros run inside YunYun on their own.
 
 Two macro features do depend on other parts of the app:
 
@@ -69,9 +69,9 @@ In a chat with one character, these resolve against that character. In a group c
 
 The Phonetic name field has two jobs. It sets how the name is pronounced by text-to-speech. It also feeds `{{charNamePhonetic}}` and `{{userNamePhonetic}}`. You will find it in both the **Character Editor** and the **Persona Editor**.
 
-To reference a character who is not part of the current chat, copy that card's ID and place it directly inside double braces, such as `{{V1StGXR8_Z5jdHi6B-myT}}`. Do not include literal `<` or `>` characters. Marinara replaces the macro with the character's name. In Roleplay chats that use a prompt preset, it also adds the referenced card's Description, Personality, Appearance, Backstory, Scenario, and Example Dialogue to the system prompt; in other chats the macro only becomes the name. This works in chat messages and prompt fields, and in Roleplay chats with a preset also in activated lorebook entries. The referenced card's initial greetings are excluded. Enabled lorebooks attached to that card remain subject to their normal keyword, constant, filter, probability, and token-budget rules. If the character is already in the chat, the macro still turns into their name, and their card is not added a second time.
+To reference a character who is not part of the current chat, copy that card's ID and place it directly inside double braces, such as `{{V1StGXR8_Z5jdHi6B-myT}}`. Do not include literal `<` or `>` characters. YunYun replaces the macro with the character's name. In Roleplay chats that use a prompt preset, it also adds the referenced card's Description, Personality, Appearance, Backstory, Scenario, and Example Dialogue to the system prompt; in other chats the macro only becomes the name. This works in chat messages and prompt fields, and in Roleplay chats with a preset also in activated lorebook entries. The referenced card's initial greetings are excluded. Enabled lorebooks attached to that card remain subject to their normal keyword, constant, filter, probability, and token-budget rules. If the character is already in the chat, the macro still turns into their name, and their card is not added a second time.
 
-To reference a persona other than the active one, prefix its copied ID with `persona-`, such as `{{persona-P1StGXR8_Z5jdHi6B-myT}}`. Marinara replaces the macro with the persona's name and adds that card's Description, Personality, Appearance, Backstory, and Scenario to the same ID Macro Cards context. Enabled lorebooks attached to that persona keep their normal activation rules.
+To reference a persona other than the active one, prefix its copied ID with `persona-`, such as `{{persona-P1StGXR8_Z5jdHi6B-myT}}`. YunYun replaces the macro with the persona's name and adds that card's Description, Personality, Appearance, Backstory, and Scenario to the same ID Macro Cards context. Enabled lorebooks attached to that persona keep their normal activation rules.
 
 ## Conversation mode macros
 
@@ -88,7 +88,7 @@ You edit these fields on the **Convo** tab of the **Character Editor** and the *
 
 ## Conversation placement macros
 
-Conversation Mode automatically inserts several blocks into the prompt for you. These macros let a preset **move** a block to wherever you place the macro. When you use one, Marinara renders that block at the macro and **skips** its automatic insertion, so the content is never duplicated. Each macro has one or more aliases; every alias behaves the same.
+Conversation Mode automatically inserts several blocks into the prompt for you. These macros let a preset **move** a block to wherever you place the macro. When you use one, YunYun renders that block at the macro and **skips** its automatic insertion, so the content is never duplicated. Each macro has one or more aliases; every alias behaves the same.
 
 | Macro (and aliases) | Places |
 | --- | --- |
@@ -99,7 +99,7 @@ Conversation Mode automatically inserts several blocks into the prompt for you. 
 | `{{memories}}`, `{{memoryRecall}}` | The memory-recall block. |
 | `{{lorebook}}`, `{{lore}}` | Lorebook injections. |
 
-These only apply in Conversation Mode. In a one-character conversation, placing the participant bios yourself with `{{char_about}}` / `{{persona_about}}` (see above) works the same way: Marinara then skips its automatic participant "about me" block so the bios are not inserted twice. Group conversations keep the automatic participant block because either singular macro covers only one participant and must not hide everyone else's bio.
+These only apply in Conversation Mode. In a one-character conversation, placing the participant bios yourself with `{{char_about}}` / `{{persona_about}}` (see above) works the same way: YunYun then skips its automatic participant "about me" block so the bios are not inserted twice. Group conversations keep the automatic participant block because either singular macro covers only one participant and must not hide everyone else's bio.
 
 ## Context macros
 
@@ -119,7 +119,7 @@ The value of `{{lastGenerationType}}` is a plain label. Example values seen in t
 
 `{{gameStoryboardKeyframeCount}}` is supplied to Game Mode GM prompts, including the built-in **Storyboard Game Prompt**. It is a narrative target, not a demand for exactly that many paragraphs. The storyboard planner still returns fewer shots when a turn does not contain enough distinct visual moments.
 
-The `{{agent::TYPE}}` macro inserts the saved output of an agent (a background helper that fills in things like a scene tracker). The easiest way to add it is inside the **Preset Editor**: click **Add Section**, open the **Agent Sections** group, and pick an agent. Marinara creates a section that already contains the right `{{agent::TYPE}}` tag. This macro is resolved last, so agent text cannot inject more macros into your prompt.
+The `{{agent::TYPE}}` macro inserts the saved output of an agent (a background helper that fills in things like a scene tracker). The easiest way to add it is inside the **Preset Editor**: click **Add Section**, open the **Agent Sections** group, and pick an agent. YunYun creates a section that already contains the right `{{agent::TYPE}}` tag. This macro is resolved last, so agent text cannot inject more macros into your prompt.
 
 ## Lorebook Outlet macros
 
@@ -218,11 +218,11 @@ Variables let one part of your prompt store a value and let a later part read it
 | `{{setvar::name::value}}` | Stores a value and leaves nothing in the text. |
 | `{{getvar::name}}` | Reads a stored value (nothing if it was never set). |
 | `{{addvar::name::value}}` | Adds numbers when both values are numeric; otherwise appends the new text. |
-| `{{addnumvar::name::value}}` | Marinara extension: always adds a number to a stored numeric value. Missing or invalid numbers count as 0; an overflowing addition is ignored. |
+| `{{addnumvar::name::value}}` | YunYun extension: always adds a number to a stored numeric value. Missing or invalid numbers count as 0; an overflowing addition is ignored. |
 | `{{incvar::name}}` | Adds 1 to a numeric variable and inserts the new value. |
 | `{{decvar::name}}` | Takes 1 away from a numeric variable and inserts the new value. |
 
-Variables resolve from left to right in one prompt build. A value set early, for example in a lorebook entry that comes first, can be read later in the same prompt. Marinara also saves them in the current chat, matching SillyTavern local-variable behavior: later turns and app restarts retain them, while another chat has its own separate values.
+Variables resolve from left to right in one prompt build. A value set early, for example in a lorebook entry that comes first, can be read later in the same prompt. YunYun also saves them in the current chat, matching SillyTavern local-variable behavior: later turns and app restarts retain them, while another chat has its own separate values.
 
 Any `{{NAME}}` that is not a built-in macro is looked up by name: first among the preset variables, then among the chat's own variables. If neither has that name, the tag is left in the text exactly as you typed it. A preset variable wins when both use the same name. See [Preset Variables](preset-variables.md) for the preset side.
 
@@ -257,7 +257,7 @@ These macros shape the text around them.
 
 ## Showing literal double braces
 
-There is no escape character for macros. If you want double braces to stay in the text, use a name that Marinara does not know. Any unknown `{{name}}` is left exactly as typed, as long as no preset variable and no chat variable shares that name. If you need a private note that never reaches the AI, use `{{// like this}}` instead.
+There is no escape character for macros. If you want double braces to stay in the text, use a name that YunYun does not know. Any unknown `{{name}}` is left exactly as typed, as long as no preset variable and no chat variable shares that name. If you need a private note that never reaches the AI, use `{{// like this}}` instead.
 
 ## The Macro reference and /macros
 
@@ -277,7 +277,7 @@ A condition can also ask your Decision model about the scene: `{{#if decision:"T
 - Do not write variables inside a `{{random::...}}` block. A `{{setvar}}` inside a random option runs for every option before the choice is made, not just the chosen one.
 - Do not use a local variable as global state. It persists only inside the chat where it was set.
 - A prompt section or lorebook entry that runs `{{setvar}}` overwrites a chat variable of the same name, because both use one storage per chat. Give them different names if you want both.
-- `{{prompt}}` is not a macro. If your whole message is `{{prompt}}`, Marinara opens the **Peek Prompt** viewer instead of sending it. See [Peek Prompt](../chats/peek-prompt.md).
+- `{{prompt}}` is not a macro. If your whole message is `{{prompt}}`, YunYun opens the **Peek Prompt** viewer instead of sending it. See [Peek Prompt](../chats/peek-prompt.md).
 - Custom Tools do not use `{{macro}}` text. Do not paste `{{roll:1d20}}` into a tool field expecting it to resolve.
 - The **Impersonate** prompt template accepts only a few placeholders, not the full macro list. Its names differ too, so a macro that works in a card may not work there.
 - Very large or deeply nested macro output is cut off silently. There is no error, so keep macro expansions reasonable.

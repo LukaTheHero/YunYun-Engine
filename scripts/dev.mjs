@@ -81,7 +81,7 @@ async function fetchMarinaraHealth() {
     typeof health.version !== "string" ||
     typeof health.build !== "string"
   ) {
-    throw new Error("the port answered, but it was not a Marinara Engine health response");
+    throw new Error("the port answered, but it was not a YunYun Engine health response");
   }
   return health;
 }
@@ -163,7 +163,7 @@ try {
 
   if (existingServer) {
     console.log(
-      `[dev] Marinara Engine ${existingServer.build} is already running at ${SERVER_HEALTH_URL}. ` +
+      `[dev] YunYun Engine ${existingServer.build} is already running at ${SERVER_HEALTH_URL}. ` +
         "Reusing it and starting the client.",
     );
   } else {

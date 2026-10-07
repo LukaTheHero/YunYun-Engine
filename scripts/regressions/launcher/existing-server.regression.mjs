@@ -49,7 +49,7 @@ const healthyAddress = healthyServer.address();
 assert.ok(healthyAddress && typeof healthyAddress === "object");
 const healthyResult = await runChecker(healthyAddress.port);
 assert.equal(healthyResult.status, 2, healthyResult.stderr);
-assert.match(healthyResult.stdout, /Marinara Engine v2\.4\.4 regression is already running/u);
+assert.match(healthyResult.stdout, /YunYun Engine v2\.4\.4 regression is already running/u);
 await close(healthyServer);
 
 const unrelatedServer = createServer((_request, response) => {
@@ -75,7 +75,7 @@ for (const launcherPath of ["start.bat", "start.sh"]) {
     firstPortCheck >= 0 && firstPortCheck < updateCheck,
     `${launcherPath} must reuse the server before updates`,
   );
-  assert.match(source, /Reopening the running Marinara Engine instance/u);
+  assert.match(source, /Reopening the running YunYun Engine instance/u);
 }
 
 console.log("Existing-server launcher regressions passed.");

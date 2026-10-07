@@ -154,7 +154,7 @@ function appendOriginHint(origin: string): string {
   if (origin.trim().toLowerCase() === "null") {
     return (
       "Origin 'null' is opaque and cannot be added to CSRF_TRUSTED_ORIGINS. " +
-      "Open Marinara from its HTTP(S) server URL; Android APK users should install the latest APK and retry setup."
+      "Open YunYun from its HTTP(S) server URL; Android APK users should install the latest APK and retry setup."
     );
   }
   // Non-destructive instruction: tell the operator to APPEND the offending

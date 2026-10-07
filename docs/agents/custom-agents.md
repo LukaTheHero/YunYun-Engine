@@ -1,12 +1,12 @@
 # Creating Custom Agents
 
-This guide shows you how to build your own agent in Marinara Engine. An agent is a small AI helper that runs automatically alongside your chat. You will learn how to set its phase, powers, output type, activation keywords and questions, tools, and prompt, with one full worked example.
+This guide shows you how to build your own agent in YunYun Engine. An agent is a small AI helper that runs automatically alongside your chat. You will learn how to set its phase, powers, output type, activation keywords and questions, tools, and prompt, with one full worked example.
 
 New to agents? Read [Agents: AI Helpers for Your Chats](agents-overview.md) first for the basics, then come back here.
 
 ## When to build a custom agent
 
-Marinara Engine offers many official downloadable agents. See the [Downloadable Agents Reference](built-in-agents.md) and the public [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents) package repository before you build your own. A catalog agent may already do what you want, and the official manifests provide working package examples.
+YunYun Engine offers many official downloadable agents. See the [Downloadable Agents Reference](built-in-agents.md) and the public [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents) package repository before you build your own. A catalog agent may already do what you want, and the official manifests provide working package examples.
 
 Build a custom agent when you need something the built-ins do not cover. Good reasons include:
 
@@ -79,7 +79,7 @@ If you turn on **Edit lorebooks**, a **Lorebook Writer** section appears. Turn o
 
 ## Result Type
 
-The **Result Type** tells Marinara how to read your agent's output. Most result types expect the agent to return JSON. JSON is a simple text format written with braces and quotation marks. Each result type needs the matching ability from the table above.
+The **Result Type** tells YunYun how to read your agent's output. Most result types expect the agent to return JSON. JSON is a simple text format written with braces and quotation marks. Each result type needs the matching ability from the table above.
 
 | Result Type | What it does | Ability needed |
 |---|---|---|
@@ -136,7 +136,7 @@ Leave the keyword box empty to disable the keyword filter. Cadence and any activ
 
 An **Activation question** asks whether the recent scene needs your custom agent, for example `In the latest message, the characters move to a different location.` It can recognize paraphrases that keywords miss. Leave it empty to keep the existing behavior.
 
-A **Decision model** answers it. Pick one under **Decision model** in the Connections panel: the local model you already run, a hosted Decision connection, or a decision model Marinara installs for you. [Decision Models](../connections/decision-models.md) explains each one, which to pick, and how to set it up. With **Decision model** set to **None**, the default, the question fields in the agent editor stay disabled, and an agent with a question runs as if it had none.
+A **Decision model** answers it. Pick one under **Decision model** in the Connections panel: the local model you already run, a hosted Decision connection, or a decision model YunYun installs for you. [Decision Models](../connections/decision-models.md) explains each one, which to pick, and how to set it up. With **Decision model** set to **None**, the default, the question fields in the agent editor stay disabled, and an agent with a question runs as if it had none.
 
 ### Set up your agent
 
@@ -242,7 +242,7 @@ The agent returns JSON like this after each reply:
 {"editedText":"The colour of the harbour caught her eye.","changes":[{"description":"color to colour, harbor to harbour"}]}
 ```
 
-Marinara reads `editedText` and swaps it into the reply. You see the message in British English. The `changes` notes appear as a short summary of what the agent adjusted.
+YunYun reads `editedText` and swaps it into the reply. You see the message in British English. The `changes` notes appear as a short summary of what the agent adjusted.
 
 ## Importing and exporting agents
 
@@ -252,11 +252,11 @@ To export from the editor, click the **Export agent** button (the upload icon) i
 
 To export several agents at once, use **Select agents** in the **Agents** panel, pick the agents you want, and export the group.
 
-External Agent imports are locked by default. Open **Settings → Advanced → Danger Zone** and enable **Allow custom Agent imports** first. This toggle does not need an `.env` change. It affects only Agents supplied through files, folders, or custom repositories: Agents you create in Marinara and official Agents installed through **Download Agents** remain available normally.
+External Agent imports are locked by default. Open **Settings → Advanced → Danger Zone** and enable **Allow custom Agent imports** first. This toggle does not need an `.env` change. It affects only Agents supplied through files, folders, or custom repositories: Agents you create in YunYun and official Agents installed through **Download Agents** remain available normally.
 
-To import, open the **Agents** panel and click **Import agents** for a single file, or **Import agent folder** to pick a whole folder. Marinara shows a permission review before anything is stored. Approve only the capabilities the Agent needs; unchecked capabilities stay blocked. Each file import receives a new custom identity, so it cannot replace a curated Agent with the same internal type.
+To import, open the **Agents** panel and click **Import agents** for a single file, or **Import agent folder** to pick a whole folder. YunYun shows a permission review before anything is stored. Approve only the capabilities the Agent needs; unchecked capabilities stay blocked. Each file import receives a new custom identity, so it cannot replace a curated Agent with the same internal type.
 
-For safety, Marinara ignores bundled functions, clears tool selections from imported settings, sanitizes temporary CSS before applying it, and checks approved capabilities before an imported Agent can change messages, trackers, lorebooks, backgrounds, sprites, media, haptics, About Me data, prompts, or generated images. Import trusted functions separately from **Function Calls**, review them, and explicitly attach them to the Agent afterward. Turning the Danger Zone toggle off again prevents externally imported Agents from running; locally authored and official Agents are not affected.
+For safety, YunYun ignores bundled functions, clears tool selections from imported settings, sanitizes temporary CSS before applying it, and checks approved capabilities before an imported Agent can change messages, trackers, lorebooks, backgrounds, sprites, media, haptics, About Me data, prompts, or generated images. Import trusted functions separately from **Function Calls**, review them, and explicitly attach them to the Agent afterward. Turning the Danger Zone toggle off again prevents externally imported Agents from running; locally authored and official Agents are not affected.
 
 ## Related guides
 

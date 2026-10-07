@@ -83,4 +83,4 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log("Mari chat app_data regressions passed.");
+console.log("YunYun chat app_data regressions passed.");

@@ -32,7 +32,7 @@ assert.match(
 assert.match(
   appShellSource,
   /hasProfessorMariFloatingFollowup\(\)[\s\S]{0,220}Boolean\(activeChatId\)[\s\S]{0,220}hasDetailView[\s\S]{0,220}mobileNavigationPanel/u,
-  "Professor Mari must follow an open conversation into chats, editors, and mobile navigation",
+  "Professor YunYun must follow an open conversation into chats, editors, and mobile navigation",
 );
 assert.match(
   professorMariSource,
@@ -42,17 +42,17 @@ assert.match(
 assert.match(
   professorMariSource,
   /mari-chrome-token-scope fixed z-\[95\] flex h-\[min\(32rem/u,
-  "Professor Mari's desktop floating window must use chat-chroma tokens",
+  "Professor YunYun's desktop floating window must use chat-chroma tokens",
 );
 assert.match(
   professorMariSource,
   /mari-chrome-control mari-chrome-control--small mari-accent-animated h-7 w-7 shrink-0 p-0/u,
-  "Professor Mari's desktop floating window must use the compact close control",
+  "Professor YunYun's desktop floating window must use the compact close control",
 );
 assert.match(
   professorMariSource,
   /mari-chrome-token-scope fixed inset-x-0 top-\[calc\(3rem_/u,
-  "Professor Mari's mobile floating window must use chat-chroma tokens",
+  "Professor YunYun's mobile floating window must use chat-chroma tokens",
 );
 assert.doesNotMatch(
   globalsSource,

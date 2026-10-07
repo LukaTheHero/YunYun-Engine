@@ -450,10 +450,10 @@ assert.equal(
   buildUncaptionedCharacterAppearanceBlock(
     [
       { name: "Ensemble", appearance: "[Aster] red hair, old coat | [Briar] blue hair | [Absent] green hair" },
-      { name: "Mari", appearance: "silver hair" },
+      { name: "YunYun", appearance: "silver hair" },
       { name: "Briar", appearance: "duplicate must not be added" },
     ],
-    ["Aster", "Briar", "Mari"],
+    ["Aster", "Briar", "YunYun"],
     [{ name: "Aster", prompt: "girl, red hair, new dress", position: { x: 0.5, y: 0.5 } }],
   ),
   "Briar's Appearance: blue hair\nMari's Appearance: silver hair",

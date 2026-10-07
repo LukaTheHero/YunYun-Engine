@@ -2,7 +2,7 @@
 // Per-connection outbound rate limit registry
 // ──────────────────────────────────────────────
 // A connection's `maxRequestsPerMinute` is a property of the proxy behind it, so the throttle
-// must apply wherever that connection is used — not only Professor Mari. Rather than thread the
+// must apply wherever that connection is used — not only Professor YunYun. Rather than thread the
 // value through every createLLMProvider() call site, we keep it in a small module-level map keyed
 // by connection id (mirroring connection-admission's state map) that the connections storage layer
 // keeps in sync, and that the RateLimitAwareProvider decorator reads at request time.

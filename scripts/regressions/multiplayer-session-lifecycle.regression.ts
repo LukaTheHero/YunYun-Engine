@@ -139,7 +139,7 @@ try {
         chatId: conversation.chatId,
         publicOrigin: `https://127.0.0.1:${heldPort}`,
         password,
-        displayName: "Mari",
+        displayName: "YunYun",
         persona: { name: "Captain", description: "" },
       }),
     );
@@ -154,7 +154,7 @@ try {
     chatId: conversation.chatId,
     publicOrigin: `https://127.0.0.1:${await unusedPort()}`,
     password,
-    displayName: "Mari",
+    displayName: "YunYun",
     persona: { name: "Captain", description: "" },
   });
   assert.equal(roomA!.snapshot.status, "active", "the same prepared chat hosts on a free port");
@@ -207,7 +207,7 @@ try {
     chatId: game.chatId,
     publicOrigin: `https://127.0.0.1:${await unusedPort()}`,
     password,
-    displayName: "Mari",
+    displayName: "YunYun",
     persona: { name: "Captain", description: "" },
   });
   const lobbyInvite = decodeMultiplayerInvite(lobby!.invite!.code);
@@ -260,7 +260,7 @@ try {
   await host.hostAction({ type: "decline", requestId: impostorRequest.id });
   assert.deepEqual((await host.hostState())!.snapshot.players.map((player) => player.displayName).sort(), [
     "Alex",
-    "Mari",
+    "YunYun",
   ]);
   await joinLyra();
   await approve("Alex");

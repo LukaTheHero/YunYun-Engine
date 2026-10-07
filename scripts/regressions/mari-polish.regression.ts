@@ -1,4 +1,4 @@
-// Mari panel polish batch (#5741 header combine, #5742 chip scroll affordance,
+// YunYun panel polish batch (#5741 header combine, #5742 chip scroll affordance,
 // #5743 compact mobile bookmarks, #5752 New-chat discoverability, #5753 chips
 // slot hygiene, #5754 same-frame verification without the apology round).
 import assert from "node:assert/strict";
@@ -66,7 +66,7 @@ const useGenerate = readSource("packages/client/src/hooks/use-generate.ts");
 const useGenerateFlat = flatten(useGenerate);
 assert.ok(
   useGenerateFlat.includes("if (agentState.mariChipsChatId === params.chatId) clearMariChips();"),
-  "a regular chat's generation must never clear another chat's Mari chips",
+  "a regular chat's generation must never clear another chat's YunYun chips",
 );
 assert.ok(useGenerateFlat.includes("if (agentState.mariPlanChatId === params.chatId) clearMariPlan();"));
 assert.ok(
@@ -157,7 +157,7 @@ assert.ok("home.browser.bookmarksCompact" in enJson);
 
 // #5820: the Accept action for held edits must never be captioned as a mere
 // suggestion. Users read "Suggestions only. Pick one, or type your own." and
-// concluded Mari had silently done nothing, so the safety mechanism's only
+// concluded YunYun had silently done nothing, so the safety mechanism's only
 // visible surface read as a failure of it.
 assert.ok(
   mariChatFlat.includes(
@@ -203,4 +203,4 @@ assert.ok(
 );
 assert.match(sharedChips, /Continue the task/u, "the id collision is documented where the predicate lives");
 
-console.log("Mari polish regression passed.");
+console.log("YunYun polish regression passed.");

@@ -37,8 +37,8 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 
 assert.equal(resolvePocketTtsApiMode({ paths: { "/tts": {}, "/health": {} } }), "official");
 assert.equal(resolvePocketTtsApiMode({ paths: { "/v1/audio/speech": {}, "/v1/voices": {} } }), "openai");
-assert.deepEqual(Object.fromEntries(buildOfficialPocketTtsForm("Hello from Marinara.", "alba").entries()), {
-  text: "Hello from Marinara.",
+assert.deepEqual(Object.fromEntries(buildOfficialPocketTtsForm("Hello from YunYun.", "alba").entries()), {
+  text: "Hello from YunYun.",
   voice_url: "alba",
 });
 const ttsRouteSource = readFileSync(join(repositoryRoot, "packages/server/src/routes/tts.routes.ts"), "utf8");
@@ -223,7 +223,7 @@ const combatCache = new Function(
     voice?: string,
   ) => string;
 };
-const combatLine = { character: "Mari", type: "main", content: "Strike! [Private tactic] <secret>Wait.</secret>" };
+const combatLine = { character: "YunYun", type: "main", content: "Strike! [Private tactic] <secret>Wait.</secret>" };
 const combatConfig = ttsConfigSchema.parse({});
 const combatSignature = combatCache.signature(combatConfig);
 const combatKey = combatCache.key(combatSignature, combatLine, splitTTSChunks(combatLine.content, combatConfig));
@@ -272,10 +272,10 @@ assert.equal(
 );
 assert.deepEqual(
   buildTTSVoiceRequests(
-    '<speaker="Mari">"Hello." <simulation>"Do not read."</simulation></speaker>',
+    '<speaker="YunYun">"Hello." <simulation>"Do not read."</simulation></speaker>',
     filteredConfig,
   ).map((request) => ({ text: request.text, speaker: request.speaker })),
-  [{ text: "Hello.", speaker: "Mari" }],
+  [{ text: "Hello.", speaker: "YunYun" }],
 );
 assert.ok(
   !filterTTSText("Visible <simulation>secret thought</simulation>", filteredConfig).includes("secret"),
@@ -449,12 +449,12 @@ assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorEnabled, f
 assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorConnectionId, "");
 assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorEmotionsEnabled, false);
 
-const extractorMessage = 'Dottore sighs. "Enough of this," he says. A pause follows. "Skill issue," Mari chuckles.';
+const extractorMessage = 'Dottore sighs. "Enough of this," he says. A pause follows. "Skill issue," YunYun chuckles.';
 const extractedSegments = parseRoleplaySpeakerExtractorOutput(
   JSON.stringify({
     dialogue: [
       { speaker: "Dottore", text: '"Enough of this,"', speech: '[irritated] "Enough of this,"' },
-      { speaker: "Mari", text: '"Skill issue,"', speech: '[chuckle] "Skill issue,"' },
+      { speaker: "YunYun", text: '"Skill issue,"', speech: '[chuckle] "Skill issue,"' },
     ],
   }),
   extractorMessage,
@@ -464,8 +464,8 @@ assert.deepEqual(extractedSegments, [
   { kind: "narration", text: "Dottore sighs." },
   { kind: "dialogue", speaker: "Dottore", text: '[irritated] "Enough of this,"' },
   { kind: "narration", text: "he says. A pause follows." },
-  { kind: "dialogue", speaker: "Mari", text: '[chuckle] "Skill issue,"' },
-  { kind: "narration", text: "Mari chuckles." },
+  { kind: "dialogue", speaker: "YunYun", text: '[chuckle] "Skill issue,"' },
+  { kind: "narration", text: "YunYun chuckles." },
 ]);
 assert.throws(
   () =>
@@ -522,8 +522,8 @@ assert.deepEqual(
 assert.match(
   buildRoleplaySpeakerExtractorPrompt({
     group: "Lab group",
-    user: "Mari",
-    characters: ["Dottore", "Mari"],
+    user: "YunYun",
+    characters: ["Dottore", "YunYun"],
     messageAuthor: "Dottore",
     includeEmotions: true,
   }),
@@ -532,8 +532,8 @@ assert.match(
 assert.match(
   buildRoleplaySpeakerExtractorPrompt({
     group: "Lab group",
-    user: "Mari",
-    characters: ["Dottore", "Mari"],
+    user: "YunYun",
+    characters: ["Dottore", "YunYun"],
     messageAuthor: "Dottore",
     includeEmotions: true,
   }),
@@ -542,7 +542,7 @@ assert.match(
 assert.match(
   buildRoleplaySpeakerExtractorPrompt({
     group: "Lab group",
-    user: "Mari",
+    user: "YunYun",
     characters: ["Dottore", "Maukie"],
     messageAuthor: "Maukie",
     includeEmotions: true,
@@ -557,11 +557,11 @@ const reportedLongRoleplayMessage = `Columbina guides the clam’s narrow hinge 
 
 “One verse. When it ends, the sea remembers its weight.”
 
-Her first note vibrates through Mari’s teeth. Moonlight spreads in pale rings, and the surrounding ocean leans away from Belleau. Mari’s new Hydro sense reels beneath the scale of it: tons of water peel from the maintenance throat and gather in a revolving halo behind Columbina.
+Her first note vibrates through YunYun’s teeth. Moonlight spreads in pale rings, and the surrounding ocean leans away from Belleau. YunYun’s new Hydro sense reels beneath the scale of it: tons of water peel from the maintenance throat and gather in a revolving halo behind Columbina.
 
 Warm air hisses through the rosette.
 
-The scratched bolt turns by a quarter. Hidden cams retract all five corroded fasteners at once. The shell fractures between Mari’s fingers; the brass cover springs outward and lands neatly in Columbina’s waiting palm.
+The scratched bolt turns by a quarter. Hidden cams retract all five corroded fasteners at once. The shell fractures between YunYun’s fingers; the brass cover springs outward and lands neatly in Columbina’s waiting palm.
 
 A shoulder-wide passage climbs into Belleau. Fresh scrapes mark its lower wall. Eleven meters in, an open isolation wheel gleams beneath a blue lamp.
 
@@ -598,7 +598,7 @@ const reportedLongRoleplayRequests = buildExtractedRoleplayTTSVoiceRequests(
   "Columbina",
 );
 const reportedLongRoleplaySpeech = reportedLongRoleplayRequests.map(({ text }) => text).join(" ");
-assert.match(reportedLongRoleplaySpeech, /Her first note vibrates through Mari’s teeth\./);
+assert.match(reportedLongRoleplaySpeech, /Her first note vibrates through YunYun’s teeth\./);
 assert.match(reportedLongRoleplaySpeech, /Red light floods the shaft\./);
 assert.match(reportedLongRoleplaySpeech, /INNER ISOLATION: OPEN/);
 assert.match(reportedLongRoleplaySpeech, /The first red digit falls\. 00:42\./);
@@ -613,12 +613,12 @@ const extractedVoiceConfig = ttsConfigSchema.parse({
   voiceMode: "per-character",
   voiceAssignments: [
     { characterId: "dottore-id", characterName: "Dottore", voice: "dottore-voice" },
-    { characterId: "mari-id", characterName: "Mari", voice: "mari-voice" },
+    { characterId: "mari-id", characterName: "YunYun", voice: "mari-voice" },
   ],
   narratorVoiceEnabled: true,
   narratorVoice: "narrator-voice",
 });
-const extractedCharacterIds: Record<string, string> = { Dottore: "dottore-id", Mari: "mari-id" };
+const extractedCharacterIds: Record<string, string> = { Dottore: "dottore-id", YunYun: "mari-id" };
 const extractedVoiceRequests = buildExtractedRoleplayTTSVoiceRequests(
   extractedSegments,
   extractedVoiceConfig,
@@ -632,8 +632,8 @@ assert.deepEqual(
     { speaker: "Narrator", voice: "narrator-voice", text: "Dottore sighs." },
     { speaker: "Dottore", voice: "dottore-voice", text: '[irritated] "Enough of this,"' },
     { speaker: "Narrator", voice: "narrator-voice", text: "he says. A pause follows." },
-    { speaker: "Mari", voice: "mari-voice", text: '[chuckle] "Skill issue,"' },
-    { speaker: "Narrator", voice: "narrator-voice", text: "Mari chuckles." },
+    { speaker: "YunYun", voice: "mari-voice", text: '[chuckle] "Skill issue,"' },
+    { speaker: "Narrator", voice: "narrator-voice", text: "YunYun chuckles." },
   ],
 );
 const extractedGlobalNarrationRequests = buildExtractedRoleplayTTSVoiceRequests(
@@ -663,7 +663,7 @@ assert.deepEqual(
   extractedDialogueOnlyRequests.map(({ speaker, pauseAfterMs }) => ({ speaker, pauseAfterMs })),
   [
     { speaker: "Dottore", pauseAfterMs: 2000 },
-    { speaker: "Mari", pauseAfterMs: undefined },
+    { speaker: "YunYun", pauseAfterMs: undefined },
   ],
 );
 

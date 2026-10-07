@@ -171,7 +171,7 @@ interface ProviderConfig {
   search: (params: SearchParams) => Promise<{ cards: BrowseCard[]; totalCount: number }>;
   fetchDetail: (card: BrowseCard, options?: { skipCompleteCard?: boolean }) => Promise<CardDetail | null>;
   siteName: string;
-  /** Set when Marinara can no longer reach the site: it stays in the picker, and a notice replaces search. */
+  /** Set when YunYun can no longer reach the site: it stays in the picker, and a notice replaces search. */
   unavailable?: { noticeKey: string; siteUrl: string };
 }
 
@@ -958,7 +958,7 @@ const jannyProvider: ProviderConfig = {
 // Provider: CharacterTavern (unavailable)
 // ════════════════════════════════════════════════
 
-// CharacterTavern's rebuilt site no longer serves the search API Marinara used (#7072).
+// CharacterTavern's rebuilt site no longer serves the search API YunYun used (#7072).
 // It stays in the picker so choosing it explains why instead of failing a search.
 const chartavernProvider: ProviderConfig = {
   id: "chartavern",

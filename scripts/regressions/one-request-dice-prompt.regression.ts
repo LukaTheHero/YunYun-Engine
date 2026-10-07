@@ -36,7 +36,7 @@ const baseContext = {
   sessionNumber: 1,
   turnNumber: 4,
   map: null,
-  partyNames: ["Mari"],
+  partyNames: ["YunYun"],
   playerName: "Player",
 } as ReminderContext;
 

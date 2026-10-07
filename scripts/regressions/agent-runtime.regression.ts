@@ -980,7 +980,7 @@ await executeAgent(
   {
     ...context,
     recentMessages: [
-      { role: "user", content: "Hello, everyone.", speakerName: "Mari" },
+      { role: "user", content: "Hello, everyone.", speakerName: "YunYun" },
       { role: "assistant", content: "I made tea.", characterId: "alice", speakerName: "Alice" },
       { role: "assistant", content: "Bob: I brought cake.", characterId: "bob", speakerName: "Bob" },
       { role: "user", content: "Thank you both." },
@@ -998,7 +998,7 @@ await executeAgent(
 const groupHistory = groupHistoryProvider.messages[0]!.filter((message) => message.role !== "system")
   .map((message) => String(message.content))
   .join("\n---\n");
-assert.match(groupHistory, /Mari: Hello, everyone\./, "group history must name the persona");
+assert.match(groupHistory, /YunYun: Hello, everyone\./, "group history must name the persona");
 assert.match(groupHistory, /Alice: I made tea\.\n\nBob: I brought cake\./, "merged same-role turns must keep speakers");
 assert.doesNotMatch(groupHistory, /Bob:\s*Bob:/, "an existing speaker prefix must not be doubled");
 assert.match(

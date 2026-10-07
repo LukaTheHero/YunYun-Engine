@@ -88,7 +88,7 @@ try {
     },
     {
       id: "chat-mari",
-      name: "Professor Mari",
+      name: "Professor YunYun",
       mode: "conversation",
       characterIds: "[]",
       metadata: JSON.stringify({ internalAssistant: "professor-mari" }),

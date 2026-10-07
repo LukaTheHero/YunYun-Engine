@@ -96,7 +96,7 @@ export async function adminRoutes(app: FastifyInstance) {
       if (!docker && process.env.MARINARA_RESTART_SUPERVISOR !== String(process.ppid)) {
         return reply.status(409).send({
           error:
-            "Restart is unavailable for an unmanaged server. Start Marinara with its platform launcher or pnpm start; restart a development watcher from its terminal.",
+            "Restart is unavailable for an unmanaged server. Start YunYun with its platform launcher or pnpm start; restart a development watcher from its terminal.",
         });
       }
       const exitCode = docker ? 0 : 75;

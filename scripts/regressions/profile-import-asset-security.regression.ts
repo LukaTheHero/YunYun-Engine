@@ -122,7 +122,7 @@ try {
     "Windows media containment must reject a different drive",
   );
   assert.equal(
-    isCanonicalMediaPathInsideRoot("/srv/Marinara/data/gallery/selfie.png", "/srv/marinara/data", "linux"),
+    isCanonicalMediaPathInsideRoot("/srv/YunYun/data/gallery/selfie.png", "/srv/marinara/data", "linux"),
     false,
     "case-sensitive hosts must retain case-sensitive media containment",
   );

@@ -1,4 +1,4 @@
-// The Rules choice of the Game setup wizard: Marinara's own rules, or one installed ruleset. The
+// The Rules choice of the Game setup wizard: YunYun's own rules, or one installed ruleset. The
 // choice is made once, for a new game, and is independent of combat presentation. The Party step,
 // where the persona and the party are picked, shows GameSetupRulesetSheetStatus: which members
 // already have a sheet for the chosen ruleset. A member without one starts the game on a blank
@@ -108,7 +108,7 @@ export function GameSetupRulesChooser({
 }: {
   rulesets: InstalledRuleset[];
   activeId: string | null;
-  /** The Combat Preference picked above, named in the note so "Marinara's combat" is never read as Classic. */
+  /** The Combat Preference picked above, named in the note so "YunYun's combat" is never read as Classic. */
   combatStyle: GameCombatStyle;
   /** The layers checked on the chosen ruleset. Empty for a ruleset that ships none. */
   layerIds: string[];
@@ -182,7 +182,7 @@ export function GameSetupRulesChooser({
           {/* What battles will do is read from the BLOCKS this file declares, never from the
               `coverage.combat` flag beside them: the flag is what an author says the ruleset
               covers, and what resolves a fight has to be what the file really carries. A `combat`
-              block resolves the fight itself, a `battle` block only lends the sheet to Marinara's
+              block resolves the fight itself, a `battle` block only lends the sheet to YunYun's
               own combat, and a ruleset with neither leaves battles exactly as they were. */}
           <p className="text-[var(--muted-foreground)]">
             {active.definition.combat

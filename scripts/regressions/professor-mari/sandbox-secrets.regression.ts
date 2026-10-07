@@ -1,4 +1,4 @@
-// Professor Mari's boundaries around server secrets and code she can edit:
+// Professor YunYun's boundaries around server secrets and code she can edit:
 // - the auto-generated encryption key (DATA_DIR/.encryption-key) is as secret as .env, for her tools and shell;
 // - saved data (DATA_DIR/storage) is read-only to her shell, as it already is to her write tool;
 // - `mari code check` runs pnpm check in the shell sandbox without the server's environment, or not at all when
@@ -185,7 +185,7 @@ try {
     assert.equal(readFileSync(join(workspace, "ordinary.txt"), "utf8"), "ok", "ordinary files stay writable");
   }
 
-  // 3. `mari code check`: a pnpm stand-in runs the workspace's own check script, which Mari could have edited.
+  // 3. `mari code check`: a pnpm stand-in runs the workspace's own check script, which YunYun could have edited.
   writeFileSync(
     join(workspace, "check.mjs"),
     [
@@ -229,7 +229,7 @@ try {
     assert.equal(existsSync(join(workspace, "check-result.json")), false, "nothing ran without a sandbox");
   }
   console.log(
-    `Professor Mari secret-boundary regression passed${sandbox.available ? ` with ${sandbox.backend}` : " without a sandbox"}.`,
+    `Professor YunYun secret-boundary regression passed${sandbox.available ? ` with ${sandbox.backend}` : " without a sandbox"}.`,
   );
 } finally {
   for (const [key, value] of Object.entries(originalEnv)) {

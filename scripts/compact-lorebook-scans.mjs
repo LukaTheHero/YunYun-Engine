@@ -18,7 +18,7 @@
 // are (still valid, just not smaller); the next time the server saves a table file it copies the compacted file
 // over that .bak.
 //
-// Usage (stop the Marinara server first: it keeps loaded chats in memory and would write them back):
+// Usage (stop the YunYun server first: it keeps loaded chats in memory and would write them back):
 //   node scripts/compact-lorebook-scans.mjs <storage-dir> [--apply] [--backup-dir <dir>] [--force]
 //
 //   <storage-dir>   The file storage folder (the one holding `tables/`, by default <DATA_DIR>/storage).
@@ -82,7 +82,7 @@ if (!existsSync(tablesDir)) usage(`No tables folder found under ${storageDir}`);
 
 if (existsSync(join(storageDir, WRITER_LEASE)) && !force) {
   console.error(
-    `${join(storageDir, WRITER_LEASE)} exists, so a Marinara server may be using this storage. ` +
+    `${join(storageDir, WRITER_LEASE)} exists, so a YunYun server may be using this storage. ` +
       "Stop it first. If no server is running (a crash left the lease behind), re-run with --force.",
   );
   process.exit(1);

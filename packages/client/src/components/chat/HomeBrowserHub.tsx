@@ -2578,7 +2578,7 @@ export function HomeBrowserHub({
                     : "border-transparent text-[var(--muted-foreground)] hover:bg-[var(--accent)]",
                 )}
               >
-                <img src="/sprites/mari/Mari_profile.png" alt="" className="h-4 w-4 rounded-sm object-cover" />
+                <img src="/sprites/yunyun/yunyun-profile.png" alt="" className="h-4 w-4 rounded-sm object-cover" />
                 <span className={cn("min-w-0 truncate", activeTab === "professor" ? "block" : "hidden sm:block")}>
                   {t("home.browser.professorTab")}
                 </span>
@@ -2665,7 +2665,7 @@ export function HomeBrowserHub({
                 data-component="HomeBrowserHub.Address"
               >
                 <img
-                  src="/favicon.png"
+                  src="/yunyun-favicon.png"
                   alt=""
                   className="h-[0.9rem] w-[0.9rem] shrink-0 object-contain sm:h-[1.05rem] sm:w-[1.05rem]"
                 />
@@ -2688,7 +2688,7 @@ export function HomeBrowserHub({
             >
               <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
                 <BrowserBookmark
-                  href="https://discord.com/invite/KdAkTg94ME"
+                  href="https://discord.gg/canalpa"
                   onClick={() => trackHomeAction("discord_clicked")}
                   icon={<img src="/home/tab-icons/discord.svg" alt="" className="h-4 w-4 object-contain" />}
                   tone="#5865F2"
@@ -2696,7 +2696,7 @@ export function HomeBrowserHub({
                   {t("home.browser.bookmarks.discord")}
                 </BrowserBookmark>
                 <BrowserBookmark
-                  href="https://ko-fi.com/marinara_spaghetti"
+                  href="https://ko-fi.com/lukathehero"
                   onClick={() => trackHomeAction("kofi_clicked")}
                   icon={<img src="/home/tab-icons/kofi.png" alt="" className="h-4 w-4 object-contain" />}
                   tone="#ff6433"
@@ -2772,7 +2772,7 @@ export function HomeBrowserHub({
                 data-bookmarks-motion="slide"
               >
                 <MobileBrowserBookmark
-                  href="https://discord.com/invite/KdAkTg94ME"
+                  href="https://discord.gg/canalpa"
                   onClick={() => {
                     setMobileBookmarksOpen(false);
                     trackHomeAction("discord_clicked");
@@ -2783,7 +2783,7 @@ export function HomeBrowserHub({
                   {t("home.browser.bookmarks.discord")}
                 </MobileBrowserBookmark>
                 <MobileBrowserBookmark
-                  href="https://ko-fi.com/marinara_spaghetti"
+                  href="https://ko-fi.com/lukathehero"
                   onClick={() => {
                     setMobileBookmarksOpen(false);
                     trackHomeAction("kofi_clicked");
@@ -3019,7 +3019,7 @@ export function HomeBrowserHub({
                         className="mari-chrome-accent-frame mari-chrome-accent-panel mari-accent-animated mari-home-professor-widget relative grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_minmax(5.5rem,40%)] rounded-2xl border p-(--mari-home-professor-pad) [--mari-home-professor-pad:0.75rem] sm:[--mari-home-professor-pad:clamp(0.85rem,1vw,1.2rem)]"
                         data-component="HomeBrowserHub.ProfessorWidget"
                       >
-                        {/* The card no longer clips, so Mari can rise past its top border (#7032). The text column
+                        {/* The card no longer clips, so YunYun can rise past its top border (#7032). The text column
                             clips instead, reaching into the card's vertical padding so a large UI font is cut at
                             the card's padding edge, as before, rather than further in. */}
                         <div

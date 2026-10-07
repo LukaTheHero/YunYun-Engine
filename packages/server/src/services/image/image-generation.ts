@@ -202,7 +202,7 @@ export function imageAdmissionKey(normalizedBaseUrl: string, resolvedSource: str
  *
  * Self-wrapped in the global media-generation concurrency ceiling (#5097), the
  * way generateVideo already is, so EVERY image path is capped at this single
- * point — game assets, sprites, avatars, storyboards, Mari images — instead of
+ * point — game assets, sprites, avatars, storyboards, YunYun images — instead of
  * relying on per-caller wiring. Callers that additionally wrap in
  * runImageGenerationRequest for the per-connection FIFO are safe: the nested
  * acquire re-uses their held permit (AsyncLocalStorage re-entrancy guard), as
@@ -1325,7 +1325,7 @@ export async function generateChatGPTImage(
   );
   if (resp.status === 401) {
     throw new Error(
-      "ChatGPT did not accept the Codex login. Run `codex login` again on the computer running Marinara.",
+      "ChatGPT did not accept the Codex login. Run `codex login` again on the computer running YunYun.",
     );
   }
   return readOpenAIImageResult(resp, request, endpoint === "edits" ? "edit" : "generation", "ChatGPT");

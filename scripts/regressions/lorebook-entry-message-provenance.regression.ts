@@ -816,7 +816,7 @@ try {
     assert.ok(await lorebooks.getEntry(entry.id), "failed chunk preserves both sides of the source link");
   }
 
-  // Mari treats provenance arrays as JSON, including their stored undo references.
+  // YunYun treats provenance arrays as JSON, including their stored undo references.
   {
     const mari = new MariDbService(db);
     const entry = (await lorebooks.createEntry({

@@ -94,7 +94,7 @@ for (const action of ["Import", "Download as PNG"] as const) {
         expect(await download.failure()).toBeNull();
       }
       await expect(button).toBeEnabled();
-      await expect(page.getByText("Marinara hit a recoverable UI error.")).toHaveCount(0);
+      await expect(page.getByText("YunYun hit a recoverable UI error.")).toHaveCount(0);
       expect(errors).toEqual([]);
     }
     const screenshot = testInfo.outputPath("character-download-after.png");

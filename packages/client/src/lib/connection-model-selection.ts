@@ -23,7 +23,7 @@ export type ConnectionModelOption = {
   capabilities?: ModelParameterCapabilities;
   subscriptionIncluded?: boolean;
   inputTokenMultiplier?: number;
-  /** Came from the provider's own list rather than Marinara's built-in one. */
+  /** Came from the provider's own list rather than YunYun's built-in one. */
   isRemote: boolean;
 };
 
@@ -50,7 +50,7 @@ export function connectionFieldsForModelPick(
   };
 }
 
-/** The provider's list first, then Marinara's built-in models it did not report, each ID once. */
+/** The provider's list first, then YunYun's built-in models it did not report, each ID once. */
 export function mergeConnectionModelOptions(
   remoteModels: readonly RemoteConnectionModel[],
   knownModels: readonly KnownModel[],

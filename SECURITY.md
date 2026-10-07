@@ -12,12 +12,12 @@ Include the affected version and install type, operating system, relevant config
 
 ## Local-first threat model
 
-Marinara Engine is a local-first, single-user application. Importing and exporting user data, connecting to local models, and preserving user-authored prompt content are supported behavior, not vulnerabilities by themselves.
+YunYun Engine is a local-first, single-user application. Importing and exporting user data, connecting to local models, and preserving user-authored prompt content are supported behavior, not vulnerabilities by themselves.
 
 Some features intentionally execute code only after explicit opt-in:
 
 - External Extensions require the host environment gate, the in-app Danger Zone gate, and approval of the exact code hash. Full-page extensions are explicitly disclosed as unsandboxed.
-- Server Extensions and Professor Mari shell commands run only when a supported operating-system sandbox is available.
+- Server Extensions and Professor YunYun shell commands run only when a supported operating-system sandbox is available.
 - Custom script tools are disabled unless the host enables them and run inside the isolated QuickJS runtime.
 - Official capability-package and local-model runtimes are integrity checked before execution.
 

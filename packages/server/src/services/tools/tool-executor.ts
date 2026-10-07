@@ -1844,7 +1844,7 @@ async function spotifySearch(
   try {
     const tracks: Array<{ uri: string; name: string; artist: string; album: string }> = [];
     while (tracks.length < limit) {
-      // Spotify accepts at most 10 search results per request. Keep Marinara's
+      // Spotify accepts at most 10 search results per request. Keep YunYun's
       // useful 20-result contract by paging within the provider limit.
       const pageSize = Math.min(10, limit - tracks.length);
       const res = await fetch(

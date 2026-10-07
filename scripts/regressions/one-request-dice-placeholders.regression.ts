@@ -86,7 +86,7 @@ function scriptedRoller(values: number[]): (sides: number) => number {
 // the span is already known to be unreadable before any grammar runs.
 assert.equal(hasRollPlaceholder("plain prose"), false);
 assert.equal(hasRollPlaceholder("a [[ROLL: 1d4]] here"), true, "the opener is case-insensitive");
-assert.equal(hasRollPlaceholder('a [roll: character="Mari"] here'), false, "the Roleplay command is not claimed");
+assert.equal(hasRollPlaceholder('a [roll: character="YunYun"] here'), false, "the Roleplay command is not claimed");
 
 const wellFormed = scanRollPlaceholders("He swings for [[roll: 2d6+3]] damage.");
 assert.equal(wellFormed.length, 1);

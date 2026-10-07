@@ -27,7 +27,7 @@ try {
   );
 
   // Deterministic, collision-free bag-of-words embedder shared with the other
-  // Mari fetch regressions (token overlap → exact cosine).
+  // YunYun fetch regressions (token overlap → exact cosine).
   const embeddingSource = createBowStubEmbedder(undefined, "fetch-integration regression");
 
   const db = await createFileNativeDB();
@@ -58,7 +58,7 @@ await insertCharacter("vlad-impaler", "Vlad", "a warlord who impales his enemies
 const CHAT_ID = "mari-home-chat";
 await db.insert(chats).values({
   id: CHAT_ID,
-  name: "Professor Mari",
+  name: "Professor YunYun",
   mode: "conversation",
   characterIds: "[]",
   metadata: "{}",
@@ -111,7 +111,7 @@ function fetchedValue(mariContext: Record<string, string>, prefix: string): stri
 // ── Ambiguous term → candidate list (not a guess), data_candidates action ──
 {
   const { result, actions, mariContext } = await runFetch("vampire");
-  assert.equal(result.fetchSucceeded, true, "a candidate list still triggers the follow-up so Mari can present it");
+  assert.equal(result.fetchSucceeded, true, "a candidate list still triggers the follow-up so YunYun can present it");
   const optionsKey = Object.keys(mariContext).find((k) => k.startsWith("character options"));
   assert.ok(optionsKey, "an ambiguous fetch stores a candidate options block");
   assert.match(mariContext[optionsKey!]!, /Dracula/);
@@ -166,7 +166,7 @@ function fetchedValue(mariContext: Record<string, string>, prefix: string): stri
   assert.equal(actions.length, 0, "an unresolved fetch emits no assistant action");
 }
 
-process.stdout.write("Professor Mari fetch-integration regression passed.\n");
+process.stdout.write("Professor YunYun fetch-integration regression passed.\n");
 } finally {
   try {
     if (fileDb) await fileDb._fileStore.close();

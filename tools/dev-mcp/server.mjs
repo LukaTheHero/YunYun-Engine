@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Marinara Engine developer MCP server (optional; nothing in the app depends on it).
+// YunYun Engine developer MCP server (optional; nothing in the app depends on it).
 //
-// Lets an MCP client (Claude Code, Codex, or any other) inspect and drive a local Marinara Engine while you develop
+// Lets an MCP client (Claude Code, Codex, or any other) inspect and drive a local YunYun Engine while you develop
 // it: logs and error references, the exact prompts the engine sent, prompt-cache health, characters and chat
 // settings, typecheck / regressions / build, a guarded restart, and a sanitized sandbox copy on another port.
 // Read tools are free; write, build and restart tools are backed up, recorded in an activity log, and serialized by

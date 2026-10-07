@@ -555,7 +555,7 @@ The GM may use this broader encounter awareness to predict threats while choosin
 
 ### Three distinct timing windows
 
-Reference behavior: the [2014 legendary-action rules](https://www.dndbeyond.com/sources/dnd/basic-rules-2014/monsters) place legendary actions after another creature's turn and replenish their budget at the boss's own turn. Anticipating the newly selected mage **before** its action is a deliberate Marinara extension, not standard 5e timing. Keep it available independently of ruleset through an explicit, encounter-pinned boss modifier; a faithful 5e profile uses native timing unless that house rule is enabled. Do not silently mix this with the [2024 monster rules](https://www.dndbeyond.com/sources/dnd/br-2024/how-to-use-a-monster).
+Reference behavior: the [2014 legendary-action rules](https://www.dndbeyond.com/sources/dnd/basic-rules-2014/monsters) place legendary actions after another creature's turn and replenish their budget at the boss's own turn. Anticipating the newly selected mage **before** its action is a deliberate YunYun extension, not standard 5e timing. Keep it available independently of ruleset through an explicit, encounter-pinned boss modifier; a faithful 5e profile uses native timing unless that house rule is enabled. Do not silently mix this with the [2024 monster rules](https://www.dndbeyond.com/sources/dnd/br-2024/how-to-use-a-monster).
 
 | Window | Trigger and available information | Budget and continuation |
 | --- | --- | --- |
@@ -570,7 +570,7 @@ Classic currently collects commands before resolving a whole initiative round. A
 Proposed generic modifier defaults:
 
 - Author an explicit boss identity and a small legal legendary menu; do not infer GM privilege from highest HP.
-- Start with a visible budget of 3 points, actions costing 1–3, refreshed at the boss's ordinary activation start. Pin initial budget and any surprise/incapacitation policy at encounter start. This is Marinara's proposed tuning, not a requirement to copy a published monster.
+- Start with a visible budget of 3 points, actions costing 1–3, refreshed at the boss's ordinary activation start. Pin initial budget and any surprise/incapacitation policy at encounter start. This is YunYun's proposed tuning, not a requirement to copy a published monster.
 - Permit at most one anticipatory and one after-turn legendary choice per boss per eligible other-unit activation, both using that same finite pool. This tuning enables the requested anticipation without granting more points. A pass also closes its window. Resolve the previous after-turn window before beginning the next activation.
 - In Tactical, the after-turn window follows move-plus-action or Wait, not movement clicks, each strike, counters, animation frames or the whole player phase. In Classic it follows the resolved initiative slot. End Turn closes each eligible skipped activation at most once; summons follow pinned eligibility rules.
 - Offer `pass` and only legal candidates within budget. No legendary action opens another legendary window or grants speed doubling. A spell cast as a legendary action may trigger Counterspell only when the selected rules adapter supports that reaction; budgets remain separate.
@@ -622,7 +622,7 @@ Boundary:
 | Owner | Work |
 | --- | --- |
 | `Pasta-Devs/Marinara-Agents`, `staging` | Agent definition, default prompt, package runtime, catalog/manifest, assets, settings owned by that Agent |
-| Marinara Engine, `staging` | Encounter-preparation hook, bounded scene input contract, validated Agent result delivery, configured provider routing, caching and fallback, saved terrain provenance |
+| YunYun Engine, `staging` | Encounter-preparation hook, bounded scene input contract, validated Agent result delivery, configured provider routing, caching and fallback, saved terrain provenance |
 
 Inputs must carry encounter/location revision and distinguish observed facts from uncertain suggestions. Output: a short supported-environment summary, bounded terrain features using the existing `TacticalBattlefieldBrief` schema where relevant, and source references. No executable rules, arbitrary tile coordinates, invented resources, boss privilege or HP changes. Classic can receive descriptive hazards/context, but no grid modifiers unless its resolver supports them.
 

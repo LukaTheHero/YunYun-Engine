@@ -1,6 +1,6 @@
-// #5080 regression: Professor Mari's preset authoring guidance must make preset variables actually
+// #5080 regression: Professor YunYun's preset authoring guidance must make preset variables actually
 // work. A choice block (`{ variableName, question, options }`) only affects the assembled prompt
-// where a section's content references it with the `{{variableName}}` macro; if Mari defines a
+// where a section's content references it with the `{{variableName}}` macro; if YunYun defines a
 // variable and never references it, the user sees a picker in the preset UI that changes nothing.
 //
 // Pins two things in the workspace command-protocol prompt:
@@ -16,7 +16,7 @@ import { workspaceCommandProtocolPrompt } from "../../packages/server/src/servic
 const prompt = workspaceCommandProtocolPrompt();
 
 // 1) Guidance names the macro and the "inert until referenced" rule.
-assert.ok(prompt.includes("{{variableName}}"), "guidance must name the {{variableName}} macro so Mari references her variables");
+assert.ok(prompt.includes("{{variableName}}"), "guidance must name the {{variableName}} macro so YunYun references her variables");
 assert.ok(
   /does nothing on its own|only takes effect|changes nothing/i.test(prompt),
   "guidance must state a choice block is inert until a section references it",

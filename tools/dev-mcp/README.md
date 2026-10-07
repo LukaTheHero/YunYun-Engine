@@ -1,8 +1,8 @@
-# dev-mcp: a developer MCP server for Marinara Engine
+# dev-mcp: a developer MCP server for YunYun Engine
 
 Version 1.0.0
 
-`tools/dev-mcp` is an **optional developer tool**. It is a small [MCP](https://modelcontextprotocol.io) server that lets a coding agent (Claude Code, Codex, or any other MCP client) look inside a Marinara Engine running on your machine and, when you allow it, change and restart it. Nothing in the app depends on it: it is not part of the pnpm workspace, it is not built or shipped, and you can ignore or delete the folder without affecting anything.
+`tools/dev-mcp` is an **optional developer tool**. It is a small [MCP](https://modelcontextprotocol.io) server that lets a coding agent (Claude Code, Codex, or any other MCP client) look inside a YunYun Engine running on your machine and, when you allow it, change and restart it. Nothing in the app depends on it: it is not part of the pnpm workspace, it is not built or shipped, and you can ignore or delete the folder without affecting anything.
 
 ## Why it exists
 

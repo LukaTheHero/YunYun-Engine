@@ -4,7 +4,7 @@ This guide explains how characters in Conversation Mode message you first, and h
 
 ## What autonomous messages and schedules do
 
-An autonomous message is a message a character sends you first, without you writing anything. Marinara Engine (Marinara for short) sends these when you have been quiet for a while, so a chat feels like a real messaging relationship.
+An autonomous message is a message a character sends you first, without you writing anything. YunYun Engine (YunYun for short) sends these when you have been quiet for a while, so a chat feels like a real messaging relationship.
 
 Two settings control this behavior:
 
@@ -114,7 +114,7 @@ When you finish, click **Save schedule**. **Cancel** closes the editor without s
 
 Use **Export schedule** at the bottom of the editor to download the current draft as a JSON file. The export includes the weekly blocks, routine summary, talkativeness, check-in moments, and advanced timing settings.
 
-Open another character's schedule editor and choose **Import schedule** to load that file. Marinara validates the file before replacing the editor draft and moves the imported routine to the current week. The import is not saved automatically: choose **Save schedule** to keep it, or **Cancel** to leave the character's existing schedule unchanged.
+Open another character's schedule editor and choose **Import schedule** to load that file. YunYun validates the file before replacing the editor draft and moves the imported routine to the current week. The import is not saved automatically: choose **Save schedule** to keep it, or **Cancel** to leave the character's existing schedule unchanged.
 
 ### Schedule generation preferences
 
@@ -150,7 +150,7 @@ If the chat has only one character, you can leave the name out. Run **/status** 
 
 ## How autonomous messages are paced
 
-Marinara paces autonomous messages so a character never spams you. The rules below use each character's own schedule.
+YunYun paces autonomous messages so a character never spams you. The rules below use each character's own schedule.
 
 - A character waits until you have been silent for its **Wait before checking in** time. The default is 120 minutes.
 - A character whose current status is **Offline** does not message first.
@@ -174,7 +174,7 @@ Click the status pill to open four choices:
 - **Do Not Disturb**: stops all autonomous messages.
 - **Invisible**: hides your status from characters.
 
-**Idle** is mostly automatic. If your status is **Active** and you do nothing for 10 minutes, Marinara sets you to **Idle**. It sets you back to **Active** when you return. You can also pick **Idle** yourself from the popup. Picking any status by hand turns off the automatic switch until you choose **Active** again.
+**Idle** is mostly automatic. If your status is **Active** and you do nothing for 10 minutes, YunYun sets you to **Idle**. It sets you back to **Active** when you return. You can also pick **Idle** yourself from the popup. Picking any status by hand turns off the automatic switch until you choose **Active** again.
 
 Set **Do Not Disturb** when you want quiet. No character will message you first while it is on. **Idle** does not block autonomous messages. Characters can still check in while you are away.
 

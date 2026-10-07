@@ -4,7 +4,7 @@ This guide explains how to change the whole look of YunYun Engine with a custom 
 
 ## Ready-made chat window styles
 
-For a quick change without writing CSS, open **Settings > Appearance > App** and find **Chat widget style** at the bottom of **App Style**. **Dottore** gives your chat controls icy blue instrument frames, pale metal edges and cut corners. **Mari** adds gold-trimmed storybook frames, gemstone blues and Primogems on window titles. Its buttons use the same background as its windows. Each preset has its own font, works in light and dark mode, and styles buttons, windows and expandable sections together.
+For a quick change without writing CSS, open **Settings > Appearance > App** and find **Chat widget style** at the bottom of **App Style**. **Dottore** gives your chat controls icy blue instrument frames, pale metal edges and cut corners. **YunYun** adds gold-trimmed storybook frames, gemstone blues and Primogems on window titles. Its buttons use the same background as its windows. Each preset has its own font, works in light and dark mode, and styles buttons, windows and expandable sections together.
 
 The **Font** and **Shape** controls let you change those details separately. **Preset font** and **Preset shape** follow the selected style.
 
@@ -24,7 +24,7 @@ To carry the look into the rest of the chat, use the three switches below the co
 - **Apply preset shape** uses the selected frame shape for Roleplay messages in classic and visual-novel layouts, the Game dialogue box, side remarks, HUD widgets, map panel and character sheets, input boxes and controls. Conversation messages keep their own shape.
 - **Apply preset colors** uses the widget's border, background and text colors for those areas, including Conversation messages. Your custom colors and gradients apply too.
 
-Each switch starts off and works independently. For example, you can use Mari's lettering while keeping the chat's usual colors. Turning a switch off restores that part of the usual chat styling. Choosing another preset keeps your switch choices. Professor Mari can create custom themes for these areas too.
+Each switch starts off and works independently. For example, you can use YunYun's lettering while keeping the chat's usual colors. Turning a switch off restores that part of the usual chat styling. Choosing another preset keeps your switch choices. Professor YunYun can create custom themes for these areas too.
 
 Custom CSS themes can still override these presets. The public window and drawer variables below take precedence over the preset colors. Use `--mari-window-font-family` for window lettering, `--mari-drawer-radius` for section corners, and `--mari-window-ornament: none` to hide the title ornament. To remove all preset decoration, choose **Default** first.
 
@@ -214,7 +214,7 @@ Set a variable in `:root` to change every window, or on a selector to change one
 
 ## Styling messages, input boxes and chat controls
 
-The three **Apply preset** switches also let a custom theme use the widget design in the rest of the chat. A theme can override each part with the variables below. Ask Professor Mari for a matching chat theme if you would rather not write CSS yourself.
+The three **Apply preset** switches also let a custom theme use the widget design in the rest of the chat. A theme can override each part with the variables below. Ask Professor YunYun for a matching chat theme if you would rather not write CSS yourself.
 
 | Part | Class |
 | --- | --- |

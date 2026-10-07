@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari DB service
+// Professor YunYun DB service
 // ──────────────────────────────────────────────
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -497,7 +497,7 @@ function isUnchangedRow(change: PlanChange): boolean {
   return stableJson(withoutEmpty(before)) === stableJson(withoutEmpty(after));
 }
 
-/** A review whose every change is to Professor Mari's own built-in card (#6842). */
+/** A review whose every change is to Professor YunYun's own built-in card (#6842). */
 function onlyEditsBuiltInMariCard(record: { plan: Plan }): boolean {
   const changes = record.plan.changes;
   return (
@@ -1029,10 +1029,10 @@ function appDataCreateApply(source: Row): boolean {
   return firstBoolean(source, ["apply"]) !== false;
 }
 
-// #4851: Mari-authored memory rows. Writes flow through executeMutation so each
+// #4851: YunYun-authored memory rows. Writes flow through executeMutation so each
 // gets a Keep/Restore card showing the exact text before it becomes a standing
 // instruction. Over-cap fields are REJECTED, not silently truncated, so a long
-// file the user asks Mari to remember never lands half-saved without anyone knowing.
+// file the user asks YunYun to remember never lands half-saved without anyone knowing.
 function requireInstructionLength(value: string, max: number, field: string): string {
   if (value.length > max) {
     throw new Error(
@@ -1066,8 +1066,8 @@ function buildInstructionInsertRow(data: Row, id: string, timestamp: string): Ro
     content,
     persistent:
       firstBoolean(data, ["persistent", "pinned", "always", "alwaysInject", "always_inject"]) === true ? 1 : 0,
-    // Disabled, ALWAYS: a Mari-authored memory is inert until the USER enables it (via the
-    // Memories panel or "Keep & Enable" on the review card). Mari never sets `enabled` herself,
+    // Disabled, ALWAYS: a YunYun-authored memory is inert until the USER enables it (via the
+    // Memories panel or "Keep & Enable" on the review card). YunYun never sets `enabled` herself,
     // so a prompt-injection cannot induce a self-activating memory. Defense-in-depth.
     enabled: 0,
     createdAt: timestamp,
@@ -1099,7 +1099,7 @@ function buildInstructionPatch(data: Row): Row {
   }
   const persistent = firstBoolean(data, ["persistent", "pinned", "always", "alwaysInject", "always_inject"]);
   if (persistent !== undefined) patch.persistent = persistent ? 1 : 0;
-  // Intentionally no `enabled`: Mari never sets a memory's enabled state (create OR update).
+  // Intentionally no `enabled`: YunYun never sets a memory's enabled state (create OR update).
   // Only the user enables/disables, via "Keep & Enable" or the Memories panel, so an injected
   // instruction.update cannot silently activate a standing directive behind a small field diff.
   return patch;
@@ -1279,7 +1279,7 @@ export function buildLorebookEntryCreateRow(
       decisionMode: firstString(data, ["decisionMode", "decision_mode"]),
     }),
     locked: "false",
-    // Message provenance: rows Mari creates are human-directed, so they are
+    // Message provenance: rows YunYun creates are human-directed, so they are
     // born unattributed (and cascade-immune) with an empty source-refs array.
     sourceAgentId: null,
     sourceMessageRefs: "[]",
@@ -1299,7 +1299,7 @@ function normalizePersonaConvoBehavior(value: unknown): unknown {
     const parsed = JSON.parse(trimmed) as unknown;
     if (isRecord(parsed)) return parsed;
   } catch {
-    // A plain directive is still useful input from Professor Mari or the CLI.
+    // A plain directive is still useful input from Professor YunYun or the CLI.
   }
   return { instruction: trimmed, insertionStrategy: "constant_after" };
 }
@@ -1461,7 +1461,7 @@ function normalizePromptPresetActionData(input: Row, existing?: Row | null): Row
       firstBoolean(input, ["isDefault", "is_default"]) ?? (existing ? existing.isDefault === "true" : false),
     ),
     author: firstString(input, ["author"]) ?? (typeof existing?.author === "string" ? existing.author : ""),
-    // Engine-owned preset identity is never writable through Professor Mari.
+    // Engine-owned preset identity is never writable through Professor YunYun.
     systemKey: typeof existing?.systemKey === "string" ? existing.systemKey : "",
   };
   delete row.conversation_prompt;
@@ -1902,7 +1902,7 @@ function assignListField(target: Row, source: Row, sourceKeys: string[], targetK
 /**
  * Assign a nullable numeric field: an explicit `null` clears it to its default, a finite number (or
  * numeric string) sets it — optionally truncated to an integer and/or clamped to [min, max] — and an
- * absent or non-numeric value is ignored. Lets Mari both set and clear the entry's nullable numbers.
+ * absent or non-numeric value is ignored. Lets YunYun both set and clear the entry's nullable numbers.
  */
 function assignNullableNumberField(
   target: Row,
@@ -2328,7 +2328,7 @@ function summarizePromptPresetRow(row: Row): Row {
   };
 }
 
-// #4812: compact index rows so Prof Mari can SEE a preset's sections/groups/choice-blocks with
+// #4812: compact index rows so Prof YunYun can SEE a preset's sections/groups/choice-blocks with
 // their ids + a content preview, then read one in full and patch it — mirroring lorebook entries.
 function summarizePromptSectionRow(row: Row): Row {
   const parsed = parseRow("prompt_sections", row);
@@ -2562,7 +2562,7 @@ function buildMinimalCharacterData(
     if (val !== undefined) data[fieldName] = val;
   }
   data.summary = typeof data.summary === "string" ? data.summary.trim().slice(0, 500) : "";
-  // backstory and appearance are Marinara extensions stored under data.extensions.*
+  // backstory and appearance are YunYun extensions stored under data.extensions.*
   const extensions = data.extensions as Record<string, unknown>;
   const extMap: Array<[string, string]> = [
     ["backstory", "backstory"],
@@ -3378,7 +3378,7 @@ export class MariDbService {
     }
   }
 
-  // #4851: Professor Mari's persistent standing instructions ("memories").
+  // #4851: Professor YunYun's persistent standing instructions ("memories").
   // Reads (list/get) back the index-and-fetch injection; writes (remember/update/
   // forget) run through executeMutation so each surfaces a Keep/Restore card.
   private async executeInstructionAction(
@@ -3389,13 +3389,13 @@ export class MariDbService {
     const storage = createMariInstructionsStorage(this.db);
     switch (sub) {
       case "list": {
-        // The lean index Mari also sees injected each turn: title + one-liner, NO
+        // The lean index YunYun also sees injected each turn: title + one-liner, NO
         // content (she fetches a body with instruction.get only when it's relevant).
         //
         // Paged, because an unbounded list overflows the read budget: the envelope is
         // an object, so it runs through boundReadObject (MARI_READ_OUTPUT_BUDGET = 24k),
         // which elides an oversized `items` array AS A UNIT, hiding every id and making
-        // the tail unfetchable. Descriptions are truncated here (Mari fetches the full
+        // the tail unfetchable. Descriptions are truncated here (YunYun fetches the full
         // memory with instruction.get before acting on it), and the page is capped so the
         // worst case stays well under budget by construction: 50 rows x ~434 pretty chars
         // (120-char name + 120-char truncated description + flags/ts) ≈ 21.8k < 24k.
@@ -3430,7 +3430,7 @@ export class MariDbService {
         const data = actionDataWithTopLevel(
           args,
           ["data", "instruction", "memory", "row"],
-          // NB: no "enabled"; Mari never sets a memory's enabled state (see buildInstructionInsertRow).
+          // NB: no "enabled"; YunYun never sets a memory's enabled state (see buildInstructionInsertRow).
           [
             "name",
             "title",
@@ -3513,7 +3513,7 @@ export class MariDbService {
       case "forget": {
         const id = requiredString(args, ["id", "instructionId", "memoryId"], "memory id");
         // Fail loudly on a missing id instead of a no-op delete that reports success (which would
-        // make Mari tell the user a memory was forgotten when nothing changed).
+        // make YunYun tell the user a memory was forgotten when nothing changed).
         if (!(await this.getRawById(getMeta("mari_instructions"), id))) {
           throw new Error(`Memory ${id} not found.`);
         }
@@ -3983,7 +3983,7 @@ export class MariDbService {
         );
       }
       case "deleteentry": {
-        // A safe, scoped single-entry delete so Mari never reaches for a raw `mari db delete --where`
+        // A safe, scoped single-entry delete so YunYun never reaches for a raw `mari db delete --where`
         // (which can match — and remove — far more rows than intended).
         const entryId = requiredString(args, ["entryId", "id"], "lorebook entry id");
         const entryExists = await this.getRawById(getMeta("lorebook_entries"), entryId);
@@ -4287,7 +4287,7 @@ export class MariDbService {
             apply: appDataCreateApply(args),
             personalExtensionDraftMutation: true,
             cascade: false,
-            reason: firstString(args, ["reason"]) ?? "Professor Mari created a Personal Extension draft",
+            reason: firstString(args, ["reason"]) ?? "Professor YunYun created a Personal Extension draft",
             cwd: context.cwd,
           },
           context.command,
@@ -4378,7 +4378,7 @@ export class MariDbService {
             apply: firstBoolean(args, ["apply"]) === true,
             personalExtensionDraftMutation: true,
             cascade: false,
-            reason: firstString(args, ["reason"]) ?? "Professor Mari updated a Personal Extension draft",
+            reason: firstString(args, ["reason"]) ?? "Professor YunYun updated a Personal Extension draft",
             cwd: context.cwd,
           },
           context.command,
@@ -5183,7 +5183,7 @@ export class MariDbService {
     // Keep fails closed and the review remains pending both now and after restart.
     await this.deletePendingSidecar(id);
     this.pending.delete(id);
-    // #4851 "Keep & Enable": a Mari-authored memory lands disabled; flip it on when the
+    // #4851 "Keep & Enable": a YunYun-authored memory lands disabled; flip it on when the
     // user chooses that action, before we drop the pending record. Strictly gated to
     // mari_instructions inserts (deliberately never touches installed_extensions.enabled
     // or any other table).
@@ -5213,7 +5213,7 @@ export class MariDbService {
   }
 
   /**
-   * Keep every pending review made in a Mari chat, when that chat is deleted (#6842). The
+   * Keep every pending review made in a YunYun chat, when that chat is deleted (#6842). The
    * changes stay applied and their undo goes with the chat, instead of the cards following
    * the user into every other chat. Returns how many were kept; one that cannot be retired
    * stays pending, as Keep always leaves it.
@@ -5261,7 +5261,7 @@ export class MariDbService {
     } catch (err) {
       if (err instanceof RestoreStateChangedError) {
         await this.reactivatePendingSidecar(record, retiredSidecar);
-        // #4852 F2: a newer edit landed after Mari staged this change, so reverting would
+        // #4852 F2: a newer edit landed after YunYun staged this change, so reverting would
         // overwrite it. Leave the live data AND the pending review in place (do not delete the
         // pending record, drop the sidecar, or record a "restored" history entry) so the user can
         // re-review against current state instead of silently losing the newer edit.
@@ -5269,7 +5269,7 @@ export class MariDbService {
           approval,
           outcome: "state_changed",
           error:
-            "This data changed after Professor Mari made the change, so restoring would overwrite the newer version. Press Keep to dismiss this card; the current data stays as it is.",
+            "This data changed after Professor YunYun made the change, so restoring would overwrite the newer version. Press Keep to dismiss this card; the current data stays as it is.",
         };
       }
       if (err instanceof HomeWidgetCatalogConflictError) {
@@ -5425,13 +5425,13 @@ export class MariDbService {
     } catch (err) {
       if (err instanceof RestoreStateChangedError) {
         await this.reactivatePendingSidecar(record, retiredSidecar);
-        // #4852 F2: a newer edit landed after Mari staged one of these rows, so reverting would
+        // #4852 F2: a newer edit landed after YunYun staged one of these rows, so reverting would
         // overwrite it. Leave the live data AND the whole pending review intact (nothing was
         // written; the tx rolled back) so the user can re-review against current state.
         return {
           outcome: "state_changed",
           error:
-            "This data changed after Professor Mari made the change, so restoring would overwrite the newer version. Press Keep to dismiss this card; the current data stays as it is.",
+            "This data changed after Professor YunYun made the change, so restoring would overwrite the newer version. Press Keep to dismiss this card; the current data stays as it is.",
         };
       }
       this.pending.delete(id);
@@ -6007,11 +6007,11 @@ export class MariDbService {
             ? ["Reload the browser tab or rely on Vite HMR if it already updated.", "Continue after the UI reconnects."]
             : kind === "server"
               ? [
-                  "Restart the Marinara server or wait for tsx watch/dev launcher to restart it.",
+                  "Restart the YunYun server or wait for tsx watch/dev launcher to restart it.",
                   "Run mari code health after reconnecting.",
                 ]
               : [
-                  "Restart the Marinara server and reload the browser client.",
+                  "Restart the YunYun server and reload the browser client.",
                   "Run mari code health after reconnecting.",
                 ],
       },
@@ -6026,7 +6026,7 @@ export class MariDbService {
       mode: "read",
       command: context.command,
       error:
-        "Durable workspace run resume is planned but not implemented yet. Reopen Professor Mari and paste the run context or continue manually.",
+        "Durable workspace run resume is planned but not implemented yet. Reopen Professor YunYun and paste the run context or continue manually.",
     };
   }
 
@@ -7347,7 +7347,7 @@ export class MariDbService {
     }
   }
 
-  // #4927/#4932: keep an embedded character's data.character_book in sync after Mari mutates a lorebook
+  // #4927/#4932: keep an embedded character's data.character_book in sync after YunYun mutates a lorebook
   // through the generic mutation path — which, unlike the HTTP routes, never called the sync, so
   // add/update/delete of an embedded lorebook's entries left the derived copy stale. Safe for
   // standalone lorebooks: syncCharacterBookFromLorebook no-ops when the lorebook isn't embedded, and
@@ -7430,7 +7430,7 @@ export class MariDbService {
 
     // #6842: a write that leaves every row exactly as it was, bar its timestamp, changes nothing.
     // It is not applied and gets no Keep/Restore card: an empty "No field changes" card can only
-    // pile up. No summary, so Mari reads the plain message rather than "Applied and saved".
+    // pile up. No summary, so YunYun reads the plain message rather than "Applied and saved".
     if (plan.changes.length > 0 && plan.changes.every(isUnchangedRow)) {
       return {
         ok: true,
@@ -7522,7 +7522,7 @@ export class MariDbService {
     protectPromptPresetSystemKeys(changes);
 
     // Agent Home widget definitions are edited by the user in Agent Editor or by
-    // a verified package update. Mari's app_data and raw DB paths share this gate.
+    // a verified package update. YunYun's app_data and raw DB paths share this gate.
     const widgetDefinitions = (settings: unknown): unknown => {
       if (typeof settings !== "string") return undefined;
       try {
@@ -7543,7 +7543,7 @@ export class MariDbService {
           level: "error",
           table: "app_settings",
           id: change.id,
-          message: "Professor Mari cannot publish agent Home widget data. The owning agent must publish it.",
+          message: "Professor YunYun cannot publish agent Home widget data. The owning agent must publish it.",
         });
       }
       if (change.table !== "agent_configs" || !change.afterRaw) continue;
@@ -7555,12 +7555,12 @@ export class MariDbService {
           level: "error",
           table: "agent_configs",
           id: change.id,
-          message: "Professor Mari cannot change agent Home widgets. Edit them in Agent Editor.",
+          message: "Professor YunYun cannot change agent Home widgets. Edit them in Agent Editor.",
         });
       }
     }
 
-    // #5725: the Permissions Mode governs Mari herself, so she must never be
+    // #5725: the Permissions Mode governs YunYun herself, so she must never be
     // able to rewrite it - by ANY path, including raw db mutations and
     // transforms (change-level, so every planner is covered). Only the user's
     // validated PUT route writes this row.
@@ -7572,10 +7572,10 @@ export class MariDbService {
         level: "error",
         table: "app_settings",
         id: MARI_PERMISSIONS_MODE_SETTINGS_KEY,
-        message: "The Permissions Mode can only be changed by the user, from the Mari panel or Settings.",
+        message: "The Permissions Mode can only be changed by the user, from the YunYun panel or Settings.",
       });
     }
-    // #6842: Professor Mari's own built-in card is Engine data. Startup rewrites it to the
+    // #6842: Professor YunYun's own built-in card is Engine data. Startup rewrites it to the
     // shipped card, so an edit would vanish at the next start and its review could never be
     // restored. Change-level, like the floor above, so raw db commands are covered too.
     if (changes.some((change) => change.table === "characters" && change.id === PROFESSOR_MARI_ID)) {
@@ -7584,7 +7584,7 @@ export class MariDbService {
         table: "characters",
         id: PROFESSOR_MARI_ID,
         message:
-          "Professor Mari's own built-in card is managed by Marinara and reset on every start, so it cannot be edited or deleted.",
+          "Professor YunYun's own built-in card is managed by YunYun and reset on every start, so it cannot be edited or deleted.",
       });
     }
     // Same floor for the per-chat override: a chats-row write whose metadata
@@ -7609,7 +7609,7 @@ export class MariDbService {
           table: "chats",
           id: change.id,
           message:
-            "Use decision.record in the active Mari chat for Decision interaction state; raw metadata cannot authorize authoring.",
+            "Use decision.record in the active YunYun chat for Decision interaction state; raw metadata cannot authorize authoring.",
         });
       }
       if (chatModeMetadataValue(change.afterRaw.metadata) !== chatModeMetadataValue(change.beforeRaw?.metadata)) {
@@ -7618,7 +7618,7 @@ export class MariDbService {
           table: "chats",
           id: change.id,
           message:
-            "The chat's Permissions Mode override can only be changed by the user, from the Mari panel or Settings.",
+            "The chat's Permissions Mode override can only be changed by the user, from the YunYun panel or Settings.",
         });
       }
     }
@@ -7629,7 +7629,7 @@ export class MariDbService {
         level: "error",
         table: "installed_extensions",
         message:
-          "Professor Mari cannot mutate Personal Extensions through raw DB actions. Use personal_extension.create or personal_extension.update; only the user can approve execution in Settings > Addons.",
+          "Professor YunYun cannot mutate Personal Extensions through raw DB actions. Use personal_extension.create or personal_extension.update; only the user can approve execution in Settings > Addons.",
       });
     }
     if (request.personalExtensionDraftMutation) {
@@ -7644,13 +7644,13 @@ export class MariDbService {
             level: "error",
             table: "installed_extensions",
             id: change.id,
-            message: "Professor Mari can save Personal Extension drafts but cannot approve or enable them.",
+            message: "Professor YunYun can save Personal Extension drafts but cannot approve or enable them.",
           });
         }
       }
     }
 
-    // Raw Mari DB commands are model-driven and apply before the user sees the
+    // Raw YunYun DB commands are model-driven and apply before the user sees the
     // Keep/Restore review. Keep executable tool authoring available, but never
     // let that path arm a webhook/script or grant it hidden chat context. The
     // user can inspect and enable the saved draft in the privileged Tools UI.
@@ -7724,7 +7724,7 @@ export class MariDbService {
         level: "error",
         table: "mari_instructions",
         message:
-          "Professor Mari cannot mutate memories through raw DB actions. Use instruction.remember, instruction.update, or instruction.forget so length limits and flag rules apply.",
+          "Professor YunYun cannot mutate memories through raw DB actions. Use instruction.remember, instruction.update, or instruction.forget so length limits and flag rules apply.",
       });
     }
 
@@ -8533,7 +8533,7 @@ export class MariDbService {
           if ((change.action === "update" || change.action === "replace") && change.table === "characters") {
             await characterStorage.createVersionSnapshot(change.id, {
               source: "professor-mari-workspace",
-              reason: plan.reason ?? "Professor Mari database change",
+              reason: plan.reason ?? "Professor YunYun database change",
             });
           }
           if (change.action === "insert") {
@@ -8584,7 +8584,7 @@ export class MariDbService {
     await this.db.transaction(async (tx) => {
       // #4852 F2: abort the whole restore if any row it would revert was changed by a newer
       // write after this review applied. Read inside the tx, because restore is NOT serialized against
-      // a concurrent Mari apply (serializeWorkspaceMutation wraps only Mari's own tool mutations,
+      // a concurrent YunYun apply (serializeWorkspaceMutation wraps only YunYun's own tool mutations,
       // not this direct-service path), so reading here is what closes the race. The throw rolls
       // the tx back before any write, and the caller catches it and leaves the newer data plus the
       // pending review intact. Cascade rows carry apply:false because the parent delete removed
@@ -8867,7 +8867,7 @@ export class MariDbService {
       loaded.sort((a, b) => Date.parse(a.requestedAt) - Date.parse(b.requestedAt));
       loaded.forEach((record) => this.pending.set(record.id, record));
       for (const path of stale) this.safeRm(path);
-      // #6842: a review that only edited Professor Mari's own built-in card can never be
+      // #6842: a review that only edited Professor YunYun's own built-in card can never be
       // restored, because startup rewrites that card, and she can no longer make one. Ones
       // saved before that fix named no chat, so they followed the user into every chat.
       let retiredBuiltIn = 0;
@@ -8883,7 +8883,7 @@ export class MariDbService {
         }
       }
       if (retiredBuiltIn > 0) {
-        logger.info("[mari-db] retired %d review(s) of Professor Mari's built-in card on load", retiredBuiltIn);
+        logger.info("[mari-db] retired %d review(s) of Professor YunYun's built-in card on load", retiredBuiltIn);
       }
       const remaining = loaded.filter((record) => this.pending.has(record.id));
       const dropCount = Math.max(0, remaining.length - PENDING_REVIEW_LIMIT);
@@ -9086,7 +9086,7 @@ export class MariDbService {
         }
       }
       // status stays the FIRST key so it leads the serialized readBack object
-      // Mari reads; the workspace GUARD trusts only the engine-written
+      // YunYun reads; the workspace GUARD trusts only the engine-written
       // sentinel at position zero of the command output, never this JSON.
       // A plan that applied zero rows has nothing observed - report it as
       // unavailable rather than claiming a verification that never ran.

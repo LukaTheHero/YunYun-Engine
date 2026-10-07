@@ -342,7 +342,7 @@ function buildCompatibleLorebookExport(lb: Record<string, unknown>, entries: Arr
         delayUntilRecursion: entry.delayUntilRecursion === true,
         vectorized: entry.excludeFromVectorization !== true,
         extensions: { marinaraImages: entry.images ?? [] },
-        // Marinara extension, ignored by SillyTavern and read back on import (#6570).
+        // YunYun extension, ignored by SillyTavern and read back on import (#6570).
         ...parseLorebookDecisionActivation(entry),
       },
     ]),

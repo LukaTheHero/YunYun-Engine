@@ -36,14 +36,14 @@ const server = createServer(async (request, response) => {
           { type: "content_block_stop", index: 0 },
           { type: "content_block_start", index: 1, content_block: { type: "text", text: "" } },
           { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "Hello " } },
-          { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "Mari" } },
+          { type: "content_block_delta", index: 1, delta: { type: "text_delta", text: "YunYun" } },
           { type: "content_block_stop", index: 1 },
           { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 8 } },
           { type: "message_stop" },
         ]
       : [
           { choices: [{ delta: { content: "Hello " } }] },
-          { choices: [{ delta: { content: "Mari" }, finish_reason: "stop" }] },
+          { choices: [{ delta: { content: "YunYun" }, finish_reason: "stop" }] },
         ];
     response.end(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""));
   } else {
@@ -54,13 +54,13 @@ const server = createServer(async (request, response) => {
           ? {
               content: [
                 { type: "thinking", thinking: "Reasoned." },
-                { type: "text", text: "Hello Mari" },
+                { type: "text", text: "Hello YunYun" },
               ],
               stop_reason: "end_turn",
               usage: { input_tokens: 12, output_tokens: 8 },
             }
           : {
-              choices: [{ message: { content: "Hello Mari" }, finish_reason: "stop" }],
+              choices: [{ message: { content: "Hello YunYun" }, finish_reason: "stop" }],
               usage: { prompt_tokens: 12, completion_tokens: 8 },
             },
       ),
@@ -120,7 +120,7 @@ try {
             topP: 0.8,
             topK: 32,
           });
-          assert.equal(result.content, "Hello Mari");
+          assert.equal(result.content, "Hello YunYun");
           const body = requests.at(-1)!;
           assert.equal(body.model, model);
           assert.deepEqual(body.thinking, { type: "adaptive", display: "summarized" });
@@ -236,7 +236,7 @@ try {
         return (async function* () {
           yield {
             type: "stream_event",
-            event: { type: "content_block_delta", delta: { type: "text_delta", text: "Hello Mari" } },
+            event: { type: "content_block_delta", delta: { type: "text_delta", text: "Hello YunYun" } },
           };
           yield {
             type: "result",

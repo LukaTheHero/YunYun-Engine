@@ -398,10 +398,10 @@ goto :start_server
 
 :existing_server
 if defined AUTO_OPEN_BROWSER_ENABLED (
-    echo  [OK] Reopening the running Marinara Engine instance...
+    echo  [OK] Reopening the running YunYun Engine instance...
     start "" "%PROTOCOL%://%BROWSER_HOST%:%PORT%" || explorer "%PROTOCOL%://%BROWSER_HOST%:%PORT%"
 ) else (
-    echo  [OK] Marinara Engine is already running. Auto-open is disabled ^(AUTO_OPEN_BROWSER=%AUTO_OPEN_BROWSER%^)
+    echo  [OK] YunYun Engine is already running. Auto-open is disabled ^(AUTO_OPEN_BROWSER=%AUTO_OPEN_BROWSER%^)
 )
 exit /b 0
 

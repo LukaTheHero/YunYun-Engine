@@ -1439,7 +1439,7 @@ export async function connectionsRoutes(app: FastifyInstance) {
       const code = isRecord(cause) && typeof cause.code === "string" ? cause.code : undefined;
       const detail = err instanceof Error ? err.message : "Unknown error";
       return reply.status(502).send({
-        error: `Failed to fetch models: ${detail}${code && /^[A-Z0-9_]+$/.test(code) ? ` (${code})` : ""}. The connection is made from the Marinara server; check that the provider is reachable there.`,
+        error: `Failed to fetch models: ${detail}${code && /^[A-Z0-9_]+$/.test(code) ? ` (${code})` : ""}. The connection is made from the YunYun server; check that the provider is reachable there.`,
       });
     }
   };

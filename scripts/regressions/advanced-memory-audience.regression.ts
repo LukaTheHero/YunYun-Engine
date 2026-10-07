@@ -105,17 +105,17 @@ try {
     },
   });
   await chats.createMessagesBatch(chat.id, [
-    { role: "user", content: "ONLY_MAUKIE Mari and Maukie discuss the absent Pantalone and their compass promise." },
+    { role: "user", content: "ONLY_MAUKIE YunYun and Maukie discuss the absent Pantalone and their compass promise." },
     {
       role: "assistant",
       characterId: "narrator",
       content: "Maukie explains his compass promise. Pantalone is far away.",
     },
-    { role: "user", content: "SCENE_CHANGE USER_ALONE Mari considers the compass promise alone." },
+    { role: "user", content: "SCENE_CHANGE USER_ALONE YunYun considers the compass promise alone." },
     { role: "assistant", characterId: "narrator", content: "The compass promise remains a private memory." },
     {
       role: "user",
-      content: "SCENE_CHANGE EVERYONE_PRESENT Mari, Maukie and Pantalone meet to discuss the compass promise.",
+      content: "SCENE_CHANGE EVERYONE_PRESENT YunYun, Maukie and Pantalone meet to discuss the compass promise.",
     },
     { role: "assistant", characterId: "maukie", content: "Maukie and Pantalone agree on the compass promise." },
     { role: "user", content: "SCENE_CHANGE UNKNOWN_PARTICIPANT A stranger holds a compass." },

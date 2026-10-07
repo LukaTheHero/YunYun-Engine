@@ -1,6 +1,6 @@
-// #5073: Chat-history picker for Professor Mari. Pick one of the user's chats (searchable,
+// #5073: Chat-history picker for Professor YunYun. Pick one of the user's chats (searchable,
 // most-recent first), choose ALL / a RANGE / the LAST N messages, and attach the selected messages
-// as a JSON reference-context item Mari can read. Self-contained modal (createPortal), like
+// as a JSON reference-context item YunYun can read. Self-contained modal (createPortal), like
 // MariPromptPreviewModal.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -59,7 +59,7 @@ function visibleMessages(messages: Message[]): Message[] {
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** The Professor Mari workspace chat the attached context belongs to. */
+  /** The Professor YunYun workspace chat the attached context belongs to. */
   workspaceChatId: string;
 }
 

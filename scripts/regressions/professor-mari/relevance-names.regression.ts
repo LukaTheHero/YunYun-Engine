@@ -1,5 +1,5 @@
 // Guards the relevance-ranked <available_names> list (#4768 phase 3): the names
-// Mari sees are ordered by semantic relevance to the current conversation (top-K),
+// YunYun sees are ordered by semantic relevance to the current conversation (top-K),
 // not alphabetically — and it degrades to the alphabetical list when the embedder
 // is unavailable. Uses a real file-native DB + a deterministic stub embedder.
 import assert from "node:assert/strict";
@@ -23,7 +23,7 @@ try {
     "../../../packages/server/src/routes/generate/professor-mari-prompt-context.js"
   );
 
-  // Deterministic, collision-free bag-of-words embedder shared with the other Mari
+  // Deterministic, collision-free bag-of-words embedder shared with the other YunYun
   // fetch regressions (token overlap → exact cosine).
   const stubSource = createBowStubEmbedder("stub-space", "relevance regression");
 
@@ -183,7 +183,7 @@ for (const candidate of await warmStore.listCandidates("character")) {
   assert.equal(queryEmbedCalls, 1, "the query must be embedded once per turn, reused across follow-up passes");
 }
 
-process.stdout.write("Professor Mari relevance-names regression passed.\n");
+process.stdout.write("Professor YunYun relevance-names regression passed.\n");
 } finally {
   try {
     if (fileDb) await fileDb._fileStore.close();

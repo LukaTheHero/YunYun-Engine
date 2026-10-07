@@ -36,7 +36,7 @@ try {
   const mariUpdate = await mari.executeAction({
     action: "agent.update",
     agentId: agent.id,
-    data: { settings: { homeWidgets: [{ ...widget, title: "Mari changed this" }] } },
+    data: { settings: { homeWidgets: [{ ...widget, title: "YunYun changed this" }] } },
     apply: true,
   });
   assert.equal(mariUpdate.ok, false);

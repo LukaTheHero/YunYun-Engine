@@ -114,12 +114,12 @@ async function* scriptedChat(messages: ChatMessage[], options: ChatOptions): Asy
     if (messages.at(-1)?.content.includes("The engine resolved your roll request:")) {
       assert.match(messages.at(-1)!.content, /"total":[123]/);
       if (calls.length === 2) {
-        yield 'The real die total is below three; the lock stays shut. She tries the window. [roll: character="Mari" notation="2d2-1"] An invented second outcome.';
+        yield 'The real die total is below three; the lock stays shut. She tries the window. [roll: character="YunYun" notation="2d2-1"] An invented second outcome.';
       } else {
         yield "The window stays shut too.";
       }
     } else {
-      yield 'Mari reaches for the lock. [roll: character="Mari" notation="1d2" reason="The lock opens on a total of three"] The lock springs open without a real roll.';
+      yield 'YunYun reaches for the lock. [roll: character="YunYun" notation="1d2" reason="The lock opens on a total of three"] The lock springs open without a real roll.';
     }
   } else if (messages.at(-1)?.content.includes("The engine has now rolled the requested dice:")) {
     assert.equal(options.tools, undefined, "outcome continuation needs no native tools schema");
@@ -234,7 +234,7 @@ try {
     await chats.patchMetadata(chat.id, { gameDiceOutcomeNarration: true });
 
     roleplay = true;
-    const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Mari" }));
+    const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "YunYun" }));
     assert(character);
     const rp = await chats.create({
       name: "Roleplay text roll",
@@ -268,8 +268,8 @@ try {
     assert.deepEqual(
       inlineRolls.map(({ offset }) => rpSaved.content.slice(0, offset)),
       [
-        "Mari reaches for the lock.",
-        "Mari reaches for the lock. The real die total is below three; the lock stays shut. She tries the window.",
+        "YunYun reaches for the lock.",
+        "YunYun reaches for the lock. The real die total is below three; the lock stays shut. She tries the window.",
       ],
     );
     assert.doesNotMatch(rpSaved.content, /invented second outcome/);

@@ -51,7 +51,7 @@ function glm52ReasoningEffort(reasoningEffort?: string | null): "high" | "max" |
 }
 
 /**
- * Map Marinara's reasoning effort onto the three levels GLM 5.3 accepts. An
+ * Map YunYun's reasoning effort onto the three levels GLM 5.3 accepts. An
  * explicit reasoning-off request cannot be honored, so it becomes the lightest
  * level instead of a disable the provider rejects (Z.AI's own migration
  * guidance for `thinking.type: "disabled"`). No effort at all leaves the

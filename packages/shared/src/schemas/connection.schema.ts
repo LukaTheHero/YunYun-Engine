@@ -116,7 +116,7 @@ export const createConnectionSchema = z.object({
   maxParallelJobs: z.number().int().min(1).max(16).default(1),
   /**
    * Cap on outbound requests per minute to this connection (null = unlimited). Paces bursty
-   * callers — notably Professor Mari's tool-call loop — so a rate-limited proxy is not exceeded.
+   * callers — notably Professor YunYun's tool-call loop — so a rate-limited proxy is not exceeded.
    */
   maxRequestsPerMinute: z.number().int().min(1).max(600).nullable().default(null),
   treatAsLocalEndpoint: z.boolean().default(false),

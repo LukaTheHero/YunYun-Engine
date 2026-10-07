@@ -576,7 +576,7 @@ async function expectCompactFramedWidgets(page: Page, preset: "dottore" | "mari"
         .evaluate((element) => getComputedStyle(element, "::after").backgroundImage),
     ).toBe("none");
     expect(await header.evaluate((element) => getComputedStyle(element, "::after").backgroundImage)).toContain(
-      "mari-primogem.svg",
+      "chibi-yunyun.png",
     );
   }
 }

@@ -4,7 +4,7 @@ This guide covers what Roleplay Mode is, how to start a roleplay, and what you s
 
 ## What Roleplay Mode is
 
-Roleplay Mode is one of Marinara Engine's chat modes. The others are Conversation and Game. Roleplay gives you an immersive scene view built around a story.
+Roleplay Mode is one of YunYun Engine's chat modes. The others are Conversation and Game. Roleplay gives you an immersive scene view built around a story.
 
 A roleplay scene can show a background image, character sprites, and a heads-up display of world state. A sprite is a character picture that changes with emotion. A heads-up display, or HUD, shows that state: movable **World State** and **Player & Tracker** buttons on a phone, and the Tracker Panel or the Trackers window on a computer.
 
@@ -123,7 +123,7 @@ You can also keep a note on a single message. Choose **Bookmark, pin or note** u
 
 In **Chat Settings → Agents → Roleplay Commands**, enable **Interruptions** to let characters cut off the latest message when a verbal or physical intervention is plausible. It starts off and does not need a downloadable agent.
 
-The model uses `[interrupt: part="a verbatim phrase of at least three words"]`. Marinara matches that phrase only in the message immediately before the reply, retains text through the phrase, and replaces the ending with an interruption dash. Dialogue keeps its closing quote; actions do not gain one. A missing or ambiguous match leaves the message unchanged.
+The model uses `[interrupt: part="a verbatim phrase of at least three words"]`. YunYun matches that phrase only in the message immediately before the reply, retains text through the phrase, and replaces the ending with an interruption dash. Dialogue keeps its closing quote; actions do not gain one. A missing or ambiguous match leaves the message unchanged.
 
 Open the reply's command information and choose **Restore original message** to recover the original message. Rerolling first restores the full original input, so the new reply can choose whether to interrupt. Selecting an existing swipe applies that swipe's interruption unless you explicitly restored it. Later manual edits are preserved instead of being overwritten by an old interruption.
 
@@ -155,11 +155,11 @@ You can set a cheaper model for agents than for chat. Many users run chat on a s
 
 **HUD widgets show the wrong value.** A tracker agent fills each widget. Open the widget panel and edit the value by hand. If values keep drifting, switch the agent connection to a stronger model. You can also lock a field so the next automatic run does not overwrite it.
 
-**Sprite expressions do not change.** Check that the character has an uploaded sprite library. Image generation is needed only when you want Marinara to create new sprites. Without sprites to show, the expression agent runs but has nothing to display. You can also set an expression by hand with the **/emote** command.
+**Sprite expressions do not change.** Check that the character has an uploaded sprite library. Image generation is needed only when you want YunYun to create new sprites. Without sprites to show, the expression agent runs but has nothing to display. You can also set an expression by hand with the **/emote** command.
 
 **The background never changes.** The **Background** agent picks from your background library. With only one or two backgrounds, it keeps picking those. Add more backgrounds so the agent has more choices. See [Roleplay Backgrounds](backgrounds.md).
 
-**A regenerated reply keeps the wrong direction.** Turn on **Debug mode** in **Settings**, under **Advanced**. Open **Agent activity**, find the **Injections** tab, then edit or re-run the saved snippet before you regenerate. For more help, see [Troubleshooting Marinara Engine](../TROUBLESHOOTING.md).
+**A regenerated reply keeps the wrong direction.** Turn on **Debug mode** in **Settings**, under **Advanced**. Open **Agent activity**, find the **Injections** tab, then edit or re-run the saved snippet before you regenerate. For more help, see [Troubleshooting YunYun Engine](../TROUBLESHOOTING.md).
 
 ## Related guides
 

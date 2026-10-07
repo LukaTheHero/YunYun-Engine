@@ -697,7 +697,7 @@ test("only the real host's messages carry the Host badge, whatever the persona n
           {
             id: "other_123456",
             displayName: "Other",
-            personaName: "Mari",
+            personaName: "YunYun",
             isHost: false,
             connected: true,
             ready: false,
@@ -708,7 +708,7 @@ test("only the real host's messages carry the Host badge, whatever the persona n
           {
             id: "message_host_1",
             actorId: "host_123456",
-            actorName: "Mari",
+            actorName: "YunYun",
             kind: "user",
             text: "Sent by the host.",
             createdAt: "2026-09-29T10:01:00.000Z",
@@ -716,7 +716,7 @@ test("only the real host's messages carry the Host badge, whatever the persona n
           {
             id: "message_other_1",
             actorId: "other_123456",
-            actorName: "Mari",
+            actorName: "YunYun",
             kind: "user",
             text: "Sent by a look-alike.",
             createdAt: "2026-09-29T10:02:00.000Z",

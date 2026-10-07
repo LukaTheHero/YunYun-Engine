@@ -14,7 +14,7 @@ const LIST_TIMEOUT_MS = 5_000;
 // ponytail: one fixed ceiling for every action; a per-action deadline from list() if a package needs longer.
 const RUN_TIMEOUT_MS = 300_000;
 
-/** One action a package lets Professor Mari run. `summary` and `inputs` are what Mari reads. */
+/** One action a package lets Professor YunYun run. `summary` and `inputs` are what YunYun reads. */
 export interface CapabilityMariAction {
   name: string;
   summary?: string;
@@ -26,7 +26,7 @@ export type CapabilityMariActionOutcome = { ok: true; value: unknown } | { ok: f
 /**
  * Registered as `mari-actions:<package-id>` by a package holding the `mari-actions` permission.
  * `run` receives untrusted model input and must validate it against its own schema. `signal` aborts
- * when the user stops Mari or the Engine's deadline passes.
+ * when the user stops YunYun or the Engine's deadline passes.
  */
 export interface CapabilityMariActionsService {
   list(): readonly CapabilityMariAction[] | Promise<readonly CapabilityMariAction[]>;
@@ -37,7 +37,7 @@ export interface CapabilityMariActionsService {
   ): Promise<CapabilityMariActionOutcome>;
 }
 
-/** The key encodes the owner, so no package can offer Mari actions in another package's name. */
+/** The key encodes the owner, so no package can offer YunYun actions in another package's name. */
 export function assertCapabilityMariActionsServiceRegistration(
   packageId: string,
   permissions: readonly string[],
@@ -48,11 +48,11 @@ export function assertCapabilityMariActionsServiceRegistration(
     throw new Error(`Capability package ${packageId} must declare the "mari-actions" permission`);
   }
   if (key !== `${SERVICE_PREFIX}${packageId}`) {
-    throw new Error(`Capability package ${packageId} cannot register Mari actions for another package`);
+    throw new Error(`Capability package ${packageId} cannot register YunYun actions for another package`);
   }
 }
 
-/** A data URL (a drawn picture) is megabytes of base64 that would only fill Mari's context. */
+/** A data URL (a drawn picture) is megabytes of base64 that would only fill YunYun's context. */
 export function elideDataUrls(text: string): string {
   return text.replace(
     /data:[\w/+.-]+(?:;[\w=.-]+)*;base64,[A-Za-z0-9+/=]+/gu,
@@ -70,7 +70,7 @@ function serviceFor(packageId: string): CapabilityMariActionsService | null {
   return service && typeof service.list === "function" && typeof service.run === "function" ? service : null;
 }
 
-/** Package-authored text reaches Mari's prompt, so only bounded strings of well-formed actions pass. */
+/** Package-authored text reaches YunYun's prompt, so only bounded strings of well-formed actions pass. */
 async function actionsOf(
   packageId: string,
   service: CapabilityMariActionsService,
@@ -85,7 +85,7 @@ async function actionsOf(
     });
     listed = await withDeadline(
       Promise.race([Promise.resolve().then(() => service.list()), aborted]),
-      `${packageId} Mari action list`,
+      `${packageId} YunYun action list`,
       LIST_TIMEOUT_MS,
     );
   } finally {
@@ -110,7 +110,7 @@ async function actionsOf(
     });
 }
 
-/** Every active package that offers Mari actions, with the actions it offers. */
+/** Every active package that offers YunYun actions, with the actions it offers. */
 export async function listCapabilityMariActions(
   signal: AbortSignal,
 ): Promise<Array<{ package: string; actions: CapabilityMariAction[] }>> {
@@ -133,7 +133,7 @@ export async function listCapabilityMariActions(
   return listed.filter((entry) => entry !== null);
 }
 
-/** Runs one action of one package. Throws a bounded message Mari can act on. */
+/** Runs one action of one package. Throws a bounded message YunYun can act on. */
 export async function runCapabilityMariAction(
   packageId: string,
   action: string,
@@ -145,7 +145,7 @@ export async function runCapabilityMariAction(
   const service = serviceFor(packageId);
   if (!service) {
     throw new Error(
-      `Package "${packageId}" offers no Mari actions. Call package_service without a package to list the ones that do.`,
+      `Package "${packageId}" offers no YunYun actions. Call package_service without a package to list the ones that do.`,
     );
   }
   const payload = input ?? {};
@@ -154,7 +154,7 @@ export async function runCapabilityMariAction(
   if (serialized.length > MAX_INPUT_CHARS) throw new Error(`input is larger than ${MAX_INPUT_CHARS} characters`);
   if (!(await actionsOf(packageId, service, signal)).some((entry) => entry.name === action)) {
     throw new Error(
-      `Package "${packageId}" has no Mari action "${clip(action, 80)}". Call package_service with only package="${packageId}" to list its actions.`,
+      `Package "${packageId}" has no YunYun action "${clip(action, 80)}". Call package_service with only package="${packageId}" to list its actions.`,
     );
   }
   signal.throwIfAborted();
@@ -164,8 +164,8 @@ export async function runCapabilityMariAction(
       `Package "${packageId}" changed while listing its actions. List its actions again before running one.`,
     );
   }
-  // The package sees Mari's stop and the deadline through one signal, and the Engine stops waiting on
-  // either even if the package ignores it, so a stuck action cannot hold Mari's change lane forever.
+  // The package sees YunYun's stop and the deadline through one signal, and the Engine stops waiting on
+  // either even if the package ignores it, so a stuck action cannot hold YunYun's change lane forever.
   const controller = new AbortController();
   const abort = () => controller.abort(signal.reason);
   signal.addEventListener("abort", abort, { once: true });

@@ -81,7 +81,7 @@ async function homeWidgetFit(page: Page) {
   });
 }
 
-test("Home widgets: Daily Encounter empty state fits and Professor Mari is shown whole (#7032)", async ({
+test("Home widgets: Daily Encounter empty state fits and Professor YunYun is shown whole (#7032)", async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name.includes("mobile");
@@ -122,7 +122,7 @@ test("Home widgets: Daily Encounter empty state fits and Professor Mari is shown
     .toBe(true);
 });
 
-test("Home widgets: a large UI font never pushes the empty message over its title or cuts Mari's text early (#7032)", async ({
+test("Home widgets: a large UI font never pushes the empty message over its title or cuts YunYun's text early (#7032)", async ({
   page,
 }, testInfo) => {
   const mobile = testInfo.project.name.includes("mobile");
@@ -149,7 +149,7 @@ test("Home widgets: a large UI font never pushes the empty message over its titl
         const link = Array.from(card.querySelectorAll("button")).find(
           (button) => button.textContent?.trim() === "Open character library",
         )!;
-        // Mari's text column clips its own overflow, so its box must reach the card's padding edge (where the
+        // YunYun's text column clips its own overflow, so its box must reach the card's padding edge (where the
         // card's own clip used to cut) without passing the border, and hold her whole text.
         const guide = document.querySelector('[data-component="HomeBrowserHub.ProfessorWidget"]')!;
         const column = guide.querySelector("[data-home-professor-content]")!;

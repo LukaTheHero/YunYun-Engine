@@ -135,7 +135,7 @@ try {
   rmSync(structuredWorkspace, { recursive: true, force: true });
 }
 
-// #6984: build output (packages/<pkg>/dist and dist-* builds) stays readable but no Professor Mari tool, review
+// #6984: build output (packages/<pkg>/dist and dist-* builds) stays readable but no Professor YunYun tool, review
 // or shell command may create, change, move or delete anything in it.
 const buildWorkspace = realpathSync(mkdtempSync(join(tmpdir(), "marinara-mari-build-output-")));
 try {
@@ -381,7 +381,7 @@ try {
     assert.equal(readFileSync(join(buildWorkspace, "packages", "server", "src", "ok.ts"), "utf8"), "ok");
     if (seatbelt) assert.equal(existsSync(join(buildWorkspace, "packages", "client", "dist")), false);
   }
-  console.log(`Professor Mari build-output regression passed${sandbox.available ? ` with ${sandbox.backend}` : ""}.`);
+  console.log(`Professor YunYun build-output regression passed${sandbox.available ? ` with ${sandbox.backend}` : ""}.`);
 } finally {
   rmSync(buildWorkspace, { recursive: true, force: true });
 }
@@ -515,7 +515,7 @@ try {
 const status = getWorkspaceShellSandboxStatus();
 if (!status.available) {
   assert.ok(status.reason.length > 0);
-  console.log(`Professor Mari shell sandbox regression skipped runtime proof: ${status.reason}`);
+  console.log(`Professor YunYun shell sandbox regression skipped runtime proof: ${status.reason}`);
 } else {
   const workspace = mkdtempSync(join(tmpdir(), "marinara-mari-sandbox-workspace-"));
   const outside = mkdtempSync(join(tmpdir(), "marinara-mari-sandbox-outside-"));
@@ -559,7 +559,7 @@ if (!status.available) {
     assert.equal(readFileSync(outsideSecret, "utf8"), "outside-secret");
     assert.equal(readFileSync(workspaceSecret, "utf8"), "WORKSPACE_SECRET=must-not-leak");
     assert.equal(readFileSync(protectedManifest, "utf8"), '{"name":"sandbox-fixture"}\n');
-    console.log(`Professor Mari shell sandbox regression passed with ${sandboxed.backend}.`);
+    console.log(`Professor YunYun shell sandbox regression passed with ${sandboxed.backend}.`);
   } finally {
     rmSync(workspace, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });

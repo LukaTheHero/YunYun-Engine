@@ -772,7 +772,7 @@ export function buildCompatibleCharacterExport(data: any, sprites: Array<{ filen
     if (typeof value !== "string" || !value.trim()) continue;
     description.push(`${label}:\n${value}`);
     // V2 readers use description; omit the moved extension to avoid duplicate
-    // prompt fields when this compatible card is imported back into Marinara.
+    // prompt fields when this compatible card is imported back into YunYun.
     delete extensions[key];
   }
   delete extensions.characterSheetImageId;

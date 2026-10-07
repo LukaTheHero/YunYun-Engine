@@ -349,7 +349,7 @@ assert.match(
   capabilityCommandTag,
   "the placeholder's inner tag is shadowable, which is why roll is reserved",
 );
-assert.match('[roll: character="Mari" notation="2d6"]', capabilityCommandTag, "so is the Roleplay command");
+assert.match('[roll: character="YunYun" notation="2d6"]', capabilityCommandTag, "so is the Roleplay command");
 assert.equal(
   gmVerbSchema.safeParse({ name: "roll", description: "Shadow the dice", effect: "event" }).success,
   false,

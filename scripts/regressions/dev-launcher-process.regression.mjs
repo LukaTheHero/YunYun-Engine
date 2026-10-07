@@ -254,7 +254,7 @@ try {
   const reusableInvocations = readLines(reusableRun.logPath);
   assert.ok(
     reusableInvocations.every((line) => !line.includes("@marinara-engine/server")),
-    "A verified Marinara health response must prevent a duplicate server",
+    "A verified YunYun health response must prevent a duplicate server",
   );
   assert.match(reusableRun.output().stdout, /Reusing it and starting the client/u);
   await stopLauncher(reusableRun);
@@ -272,9 +272,9 @@ try {
   runs.push(unrelatedRun);
   const unrelatedExit = await waitForExit(unrelatedRun.child);
   assert.equal(unrelatedExit.code, 1, "An unrelated service on the server port must fail preflight");
-  assert.deepEqual(readLines(unrelatedRun.logPath), [], "Invalid health must not start either Marinara process");
+  assert.deepEqual(readLines(unrelatedRun.logPath), [], "Invalid health must not start either YunYun process");
   assert.match(unrelatedRun.output().stderr, /occupied or unavailable/u);
-  assert.match(unrelatedRun.output().stderr, /not a Marinara Engine health response/u);
+  assert.match(unrelatedRun.output().stderr, /not a YunYun Engine health response/u);
   await new Promise((resolveClose) => unrelatedServer.close(resolveClose));
 
   console.log("Dev launcher process regression checks passed.");

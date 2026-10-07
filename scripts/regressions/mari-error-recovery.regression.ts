@@ -15,7 +15,7 @@ try {
     await import("../../packages/server/src/services/professor-mari/workspace-agent.service.js");
   const { createChatsStorage } = await import("../../packages/server/src/services/storage/chats.storage.js");
   const chats = createChatsStorage(db);
-  const chat = await chats.create({ name: "Mari error recovery", mode: "conversation", characterIds: [] });
+  const chat = await chats.create({ name: "YunYun error recovery", mode: "conversation", characterIds: [] });
   const service = new ProfessorMariWorkspaceService({ db } as never);
   const reportedError =
     "Custom OpenAI-compatible endpoint error 400: GLM 5.3 always thinks and does not support disabling reasoning.";
@@ -53,7 +53,7 @@ try {
   assert.equal((await status()).error, reportedError, "A failed request must remain visible until a new run starts");
   assert.equal((await status()).active, false);
 
-  await assert.rejects(prompt("Invalid retry.", "missing-user-message"), /Existing Professor Mari user message/u);
+  await assert.rejects(prompt("Invalid retry.", "missing-user-message"), /Existing Professor YunYun user message/u);
   assert.equal((await status()).error, reportedError, "A rejected preflight must not erase the previous failure");
 
   complete = async () => {
@@ -110,7 +110,7 @@ try {
   await oldRun;
   assert.equal((await status()).error, newError, "A late superseded failure must not replace the current error");
 
-  console.log("Professor Mari error recovery regression passed.");
+  console.log("Professor YunYun error recovery regression passed.");
 } finally {
   await closeDB();
   if (previousStorageDir === undefined) delete process.env.FILE_STORAGE_DIR;

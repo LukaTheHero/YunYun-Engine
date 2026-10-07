@@ -25,7 +25,7 @@ async function readAccentPreferences(page: Page) {
   });
 }
 
-test.describe("Marinara accent defaults", () => {
+test.describe("YunYun accent defaults", () => {
   test.beforeEach(async ({ page }) => {
     await page.route("**/api/app-settings/ui", (route) => route.fulfill({ json: { value: null } }));
     await page.addInitScript((appVersion) => {
@@ -73,13 +73,13 @@ test.describe("Marinara accent defaults", () => {
         body: await page.screenshot(),
         contentType: "image/png",
       });
-      await picker.getByRole("button", { name: "Default Marinara Gradient", exact: true }).click();
+      await picker.getByRole("button", { name: "Default YunYun Gradient", exact: true }).click();
       for (const [index, color] of ["#ec4b97", "#f29744", "#36cdde"].entries()) {
         await expect(picker.getByRole("textbox", { name: `Edit color stop ${index + 1}`, exact: true })).toHaveValue(
           color,
         );
       }
-      await expect(picker.getByRole("button", { name: "Marinara Gradient", exact: true })).toBeVisible();
+      await expect(picker.getByRole("button", { name: "YunYun Gradient", exact: true })).toBeVisible();
 
       // Exercise the actual picker and switch, then preserve both explicit choices through reload.
       await picker.getByRole("button", { name: "Solid", exact: true }).click();
@@ -97,11 +97,11 @@ test.describe("Marinara accent defaults", () => {
       // Persisted panel state already reopens Appearance after reload.
       await expect(pulse).toBeChecked({ checked: !desktop });
       await picker.getByRole("button", { name: "Reset to default", exact: true }).click();
-      await expect(picker.getByRole("button", { name: "Default Marinara Gradient", exact: true })).toBeVisible();
+      await expect(picker.getByRole("button", { name: "Default YunYun Gradient", exact: true })).toBeVisible();
       await expect(pulse).toBeChecked({ checked: !desktop });
-      await picker.getByRole("button", { name: "Default Marinara Gradient", exact: true }).click();
+      await picker.getByRole("button", { name: "Default YunYun Gradient", exact: true }).click();
       await picker.getByRole("button", { name: "Gay RGB rainbow", exact: true }).click();
-      await picker.getByRole("button", { name: "Marinara Gradient", exact: true }).click();
+      await picker.getByRole("button", { name: "YunYun Gradient", exact: true }).click();
       // Choosing the default preset restores the existing "follow default" sentinel.
       await expect.poll(async () => (await readAccentPreferences(page)).color).toBe("");
       await page.getByRole("button", { name: "Reset Appearance", exact: true }).click();

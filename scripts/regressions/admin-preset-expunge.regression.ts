@@ -54,7 +54,7 @@ try {
     const preset = await presets.create({
       name: imitateStock ? "Marinara's Universal Preset" : `${label} preset`,
       description: "Must be deleted",
-      author: imitateStock ? "Marinara" : undefined,
+      author: imitateStock ? "YunYun" : undefined,
     });
     assert.ok(preset);
     const group = await presets.createGroup({

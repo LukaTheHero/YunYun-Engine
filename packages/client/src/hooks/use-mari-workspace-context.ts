@@ -1,7 +1,7 @@
 // ──────────────────────────────────────────────
-// React Query: Professor Mari attached workspace context (#5073)
+// React Query: Professor YunYun attached workspace context (#5073)
 // ──────────────────────────────────────────────
-// The reference context (chat-history slices) a user attaches to a Mari
+// The reference context (chat-history slices) a user attaches to a YunYun
 // workspace conversation. Backed by /professor-mari/workspace/context.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api-client";

@@ -722,7 +722,7 @@ node ../../scripts/run-server.mjs dist/index.js
 MARINARA_SERVER_STATUS=$?
 set -e
 if [ "$MARINARA_SERVER_STATUS" -ne 0 ]; then
-    echo "  [ERROR] Marinara Engine server exited with status $MARINARA_SERVER_STATUS." >&2
+    echo "  [ERROR] YunYun Engine server exited with status $MARINARA_SERVER_STATUS." >&2
 fi
 if [ -n "$MARINARA_TERMUX_LOG_TEE_PID" ]; then
     # Close the pipe before waiting so tee sees EOF and flushes the final lines.

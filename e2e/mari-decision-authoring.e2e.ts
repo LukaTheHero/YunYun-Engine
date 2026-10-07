@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createServer } from "node:http";
 
 // Scripted responses exercise the real workspace loop and storage, not an LLM quality benchmark.
-test("Mari Decision authoring waits for the setup answer and preserves it across turns", async ({ request }) => {
+test("YunYun Decision authoring waits for the setup answer and preserves it across turns", async ({ request }) => {
   const suffix = Date.now().toString(36);
   const name = `Decision authoring ${suffix}`;
   const initial = "Create a character with Decision guidance.";
@@ -44,7 +44,7 @@ test("Mari Decision authoring waits for the setup answer and preserves it across
     if (!address || typeof address === "string") throw new Error("Missing fixture provider address");
     const connection = await request.post("/api/connections", {
       data: {
-        name: `Mari fixture ${suffix}`,
+        name: `YunYun fixture ${suffix}`,
         provider: "custom",
         baseUrl: `http://127.0.0.1:${address.port}/v1`,
         apiKey: "fixture",

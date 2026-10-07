@@ -403,7 +403,7 @@ export interface MariDbMutationReadBack {
    * "verified"/"mismatch" status into an engine-written sentinel at position
    * zero of the command output, which is the only thing verification trusts
    * (later output bytes can contain model-authored text). This object is what
-   * Mari herself reads for the detail.
+   * YunYun herself reads for the detail.
    */
   status: "verified" | "mismatch" | "unavailable";
   /** Applied plan changes the read-back checked (all of them, not a preview cap). */
@@ -510,7 +510,7 @@ export interface MariDbHistoryEntry {
 }
 
 /**
- * #5740: the request/permission phrase Professor Mari reported acting on in
+ * #5740: the request/permission phrase Professor YunYun reported acting on in
  * her most recent round that carried mutating commands. DIAGNOSTIC ONLY -
  * never validated, never gates anything (#5721's lesson stands). Retention is
  * deliberately the latest round only: one in-memory record, overwritten each
@@ -527,7 +527,7 @@ export interface MariDbHistoryEntry {
 export type MariUnderstoodRequestOutcome = "held" | "applied" | "failed" | "interrupted";
 
 export interface MariUnderstoodRequest {
-  /** Mari's quoted trigger phrase (user words or memory/instruction), or null when she reported none. */
+  /** YunYun's quoted trigger phrase (user words or memory/instruction), or null when she reported none. */
   text: string | null;
   chatId: string;
   /** The persisted assistant message the round produced, once known. */

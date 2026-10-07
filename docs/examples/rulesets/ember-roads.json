@@ -7,7 +7,7 @@
   "edition": "Example ruleset, first draft",
   "license": {
     "spdx": "CC0-1.0",
-    "attribution": "Written for the Marinara Engine docs. Do what you like with it."
+    "attribution": "Written for the YunYun Engine docs. Do what you like with it."
   },
   "coverage": {
     "checks": true,
@@ -1293,7 +1293,7 @@
     }
   ],
   "battle": {
-    "$comment": "Optional. It does not make battles follow these rules: it lends Marinara's own combat the numbers on the sheet. Grit is what a fight damages, Luck is what a knack spends, there are no slots here, and the knacks a player picked from the catalog become the skills they can use.",
+    "$comment": "Optional. It does not make battles follow these rules: it lends YunYun's own combat the numbers on the sheet. Grit is what a fight damages, Luck is what a knack spends, there are no slots here, and the knacks a player picked from the catalog become the skills they can use.",
     "health": {
       "pool": "grit"
     },

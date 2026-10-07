@@ -91,7 +91,7 @@ for (const size of [1, 2, 3, 4, 6]) {
 for (const untouched of [
   "Nothing bracketed at all.",
   "A [dice: 2d6] tag streams as it always did.",
-  'A [roll: character="Mari" notation="1d20"] command is not this filter\'s business.',
+  'A [roll: character="YunYun" notation="1d20"] command is not this filter\'s business.',
   "A [[ of brackets and a stray ] too.",
   "A [bracketed] word.",
 ]) {

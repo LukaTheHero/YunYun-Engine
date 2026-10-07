@@ -60,7 +60,7 @@ async function withRenameFailure<T>(sourcePath: string, action: () => Promise<T>
 }
 
 try {
-  // ── Professor Mari can create a persona with every required storage default ──
+  // ── Professor YunYun can create a persona with every required storage default ──
   {
     const previousBlockStorageDir = process.env.FILE_STORAGE_DIR;
     const dir = tempStorageDir();
@@ -74,7 +74,7 @@ try {
         data: { name: "Created Persona", description: "A durable identity." },
         apply: true,
       });
-      assert.equal(created.ok, true, "Professor Mari's persona.create action passes storage validation");
+      assert.equal(created.ok, true, "Professor YunYun's persona.create action passes storage validation");
       assert.equal(created.mode, "apply");
       assert.equal(created.approval?.status, "pending", "the applied persona still receives a review card");
       const reviewId = created.approval?.id;

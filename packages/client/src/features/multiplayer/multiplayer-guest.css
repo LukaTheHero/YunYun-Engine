@@ -2,7 +2,7 @@
 @source "./MultiplayerGuestView.tsx";
 @source "../../components/chat/chat-input-styles.ts";
 
-/* Bundled Marinara defaults, never peer-supplied CSS or remote assets. */
+/* Bundled YunYun defaults, never peer-supplied CSS or remote assets. */
 :root {
   color-scheme: dark;
   --background: #050312;

@@ -1,13 +1,13 @@
 # UI localization
 
-Marinara Engine localizes application interface text while leaving model prompts, user content, generated chat
+YunYun Engine localizes application interface text while leaving model prompts, user content, generated chat
 content, identifiers, protocol values, file paths, and persisted machine values unchanged.
 
 English is the canonical locale and the runtime fallback. A missing community translation therefore displays the
 English text instead of a translation key or an empty control.
 
 Users select their interface language in **Settings > General > App Behavior > Language**. The selection changes
-Marinara's controls and guidance, not model prompts, authored content, or chat messages. Selecting a non-English
+YunYun's controls and guidance, not model prompts, authored content, or chat messages. Selecting a non-English
 language downloads its pack if needed; **Refresh language pack** fetches updated translations. Downloaded packs
 are kept in `DATA_DIR/ui-packs` and work offline. Failed downloads leave the current language and installed pack
 unchanged. Packs are never downloaded automatically on startup or update.
@@ -69,7 +69,7 @@ editing would then invalidate every translation.
 - Translate values only. Do not rename semantic keys.
 - Preserve interpolation tokens such as `{{name}}` and rich-text tags such as `<strong>`.
 - Keep translation keys alphabetically sorted.
-- Keep product names such as Marinara Engine unchanged unless the project adopts an official localized name.
+- Keep product names such as YunYun Engine unchanged unless the project adopts an official localized name.
 - Match the meaning and tone of `en.json`; avoid adding behavior or promises that the English source does not make.
 - Check that translated labels fit on desktop and mobile.
 

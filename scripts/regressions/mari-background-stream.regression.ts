@@ -1,17 +1,17 @@
-// #5719: Professor Mari must survive backgrounding the way regular chats do.
+// #5719: Professor YunYun must survive backgrounding the way regular chats do.
 //
-// The server always ran Mari's whole agent loop to completion and persisted it
+// The server always ran YunYun's whole agent loop to completion and persisted it
 // (the /prompt route deliberately ignores passive disconnects). What died was
 // the CLIENT: its stream-death handling recovered from exactly one error class
 // (StreamResumeDisconnectError, the visible-tab watchdog), while regular chat
 // recovers from ANY plain transport error after the page was hidden. Android
-// browsers tear down a hidden tab's connection with a bare TypeError, so Mari
+// browsers tear down a hidden tab's connection with a bare TypeError, so YunYun
 // toasted "could not answer right now" and never reloaded the reply the server
 // went on to persist. A cleanly closed socket (no error, no events) was worse:
 // an immediate false "did not receive a reply" with no recovery at all.
 //
 // The fix: one shared passive-disconnect classifier in api-client used by both
-// paths, hidden-page tracking inside Mari's send closure, a settle-and-confirm
+// paths, hidden-page tracking inside YunYun's send closure, a settle-and-confirm
 // pass when the stream closes cleanly without a reply, and a status-poll
 // recovery effect that reloads the persisted reply when a run this client is
 // no longer attached to finishes.
@@ -36,13 +36,13 @@ assert.doesNotMatch(
   "use-generate must not keep a private copy of the classifier",
 );
 
-// ── Mari's send closure uses it, with hidden-page tracking ──────────────────
+// ── YunYun's send closure uses it, with hidden-page tracking ──────────────────
 const mariChat = readSource("packages/client/src/components/chat/HomeProfessorMariChat.tsx");
 assert.match(mariChat, /isPassiveStreamDisconnect\(error, pageWasHiddenDuringStream, controller\.signal\)/u);
 assert.doesNotMatch(
   mariChat,
   /error instanceof StreamResumeDisconnectError/u,
-  "Mari must not special-case only the watchdog error class",
+  "YunYun must not special-case only the watchdog error class",
 );
 assert.match(mariChat, /let pageWasHiddenDuringStream = /u);
 assert.match(
@@ -98,4 +98,4 @@ assert.match(
   "the prompt route must keep finishing runs after a passive disconnect",
 );
 
-console.log("Mari background-stream regression passed.");
+console.log("YunYun background-stream regression passed.");

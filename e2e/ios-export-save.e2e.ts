@@ -23,7 +23,7 @@ const setShareMode = (page: Page, mode: ShareMode | "unavailable") =>
   }, mode);
 
 for (const owner of ["character", "persona"] as const) {
-  test(`${owner} Marinara native export reaches the device`, async ({ page, request }, testInfo) => {
+  test(`${owner} YunYun native export reaches the device`, async ({ page, request }, testInfo) => {
     const ios = testInfo.project.name === "mobile-webkit";
     test.skip(testInfo.project.name === "mobile-chromium", "Android browsers use the desktop download path.");
     const name = `Export ${owner} ${Date.now().toString(36)}`;
@@ -75,7 +75,7 @@ for (const owner of ["character", "persona"] as const) {
       );
       const exportNative = async () => {
         await page.getByTitle(owner === "character" ? "Export character" : "Export persona", { exact: true }).click();
-        await page.getByRole("button", { name: /^Marinara Native/u }).click();
+        await page.getByRole("button", { name: /^YunYun Native/u }).click();
       };
       const readyToast = page.locator("[data-sonner-toast]").filter({ hasText: "Your file is ready." });
       const saveFile = readyToast.getByRole("button", { name: "Save file", exact: true });

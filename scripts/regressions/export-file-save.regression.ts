@@ -106,10 +106,10 @@ function install({ device, share, picker, bridgeFails }: Scenario) {
     revokeDelays.push(0);
   };
   globalThis.fetch = (async () =>
-    new Response('{"name":"Marinara"}', {
+    new Response('{"name":"YunYun"}', {
       headers: {
         "Content-Type": "application/json",
-        "Content-Disposition": 'attachment; filename="Marinara.marinara.json"',
+        "Content-Disposition": 'attachment; filename="YunYun.marinara.json"',
       },
     })) as typeof fetch;
 }
@@ -135,7 +135,7 @@ const exportErrors = () =>
 
 async function tapSaveFile(entry: SaveToast | undefined) {
   assert.ok(entry?.action, "a Save file toast is offered");
-  assert.equal(entry.description, "Marinara.marinara.json");
+  assert.equal(entry.description, "YunYun.marinara.json");
   assert.equal(entry.action.label, "Save file");
   entry.action.onClick({});
   for (let turn = 0; turn < 20; turn += 1) await nextTurn();
@@ -148,14 +148,14 @@ install({ device: "iphone", share: ["success"] });
 assert.equal(await exportCharacter(), "saved");
 assert.deepEqual(
   shares.map((file) => [file.name, file.type]),
-  [["Marinara.marinara.json", "application/json"]],
+  [["YunYun.marinara.json", "application/json"]],
 );
 assert.equal(await saveToast(), undefined);
 assert.deepEqual(anchors, []);
 
 // Exports built in the tap (JSON and ZIP helpers) share the same way.
 install({ device: "iphone", share: ["success"] });
-assert.equal(await downloadJsonFile({ name: "Marinara" }, "schedule.json"), "saved");
+assert.equal(await downloadJsonFile({ name: "YunYun" }, "schedule.json"), "saved");
 assert.deepEqual(
   shares.map((file) => file.name),
   ["schedule.json"],
@@ -167,7 +167,7 @@ assert.equal(await exportCharacter(), "prompted", "only offering Save file is no
 await tapSaveFile(await saveToast());
 assert.deepEqual(
   shares.map((file) => file.name),
-  ["Marinara.marinara.json", "Marinara.marinara.json"],
+  ["YunYun.marinara.json", "YunYun.marinara.json"],
 );
 assert.deepEqual(anchors, []);
 
@@ -186,7 +186,7 @@ install({ device: "iphone" });
 assert.equal(await exportCharacter(), "prompted");
 assert.deepEqual(anchors, [], "iOS does not start a download outside a tap");
 await tapSaveFile(await saveToast());
-assert.deepEqual(anchors, [{ download: "Marinara.marinara.json", target: "_blank" }]);
+assert.deepEqual(anchors, [{ download: "YunYun.marinara.json", target: "_blank" }]);
 assert.deepEqual(revokeDelays, [60_000], "the download URL outlives the tap");
 
 // Cancelling the share sheet stays silent.
@@ -199,17 +199,17 @@ assert.deepEqual(anchors, []);
 // Desktop: the save dialog when the browser has one, otherwise a download kept alive for 60 s.
 install({ device: "desktop", picker: "saves" });
 assert.equal(await exportCharacter(), "saved");
-assert.deepEqual(pickerNames, ["Marinara.marinara.json"]);
+assert.deepEqual(pickerNames, ["YunYun.marinara.json"]);
 assert.deepEqual(anchors, []);
 install({ device: "desktop" });
 assert.equal(await exportCharacter(), "saved", "a started download counts as saved");
 assert.deepEqual(
   anchors.map((anchor) => anchor.download),
-  ["Marinara.marinara.json"],
+  ["YunYun.marinara.json"],
 );
 assert.deepEqual(revokeDelays, [60_000]);
 install({ device: "desktop" });
-assert.equal(await downloadJsonFile({ name: "Marinara" }, "schedule.json"), "saved");
+assert.equal(await downloadJsonFile({ name: "YunYun" }, "schedule.json"), "saved");
 assert.deepEqual(
   anchors.map((anchor) => anchor.download),
   ["schedule.json"],
@@ -221,7 +221,7 @@ assert.equal(await saveToast(), undefined);
 install({ device: "android" });
 assert.equal(await exportCharacter(), "saved");
 assert.deepEqual(bridgeFiles, [
-  [Buffer.from('{"name":"Marinara"}').toString("base64"), "application/json", "Marinara.marinara.json"],
+  [Buffer.from('{"name":"YunYun"}').toString("base64"), "application/json", "YunYun.marinara.json"],
 ]);
 assert.deepEqual(anchors, []);
 
@@ -234,7 +234,7 @@ install({ device: "desktop", picker: "blocked" });
 assert.equal(await exportCharacter(), "saved");
 assert.deepEqual(
   anchors.map((anchor) => anchor.download),
-  ["Marinara.marinara.json"],
+  ["YunYun.marinara.json"],
 );
 for (let turn = 0; turn < 20; turn += 1) await nextTurn();
 assert.equal(exportErrors().length, 0);
@@ -269,7 +269,7 @@ for (const failure of [
           controller.error(new TypeError("network connection was lost"));
         },
       }),
-      { headers: { "Content-Disposition": 'attachment; filename="Marinara.marinara.json"' } },
+      { headers: { "Content-Disposition": 'attachment; filename="YunYun.marinara.json"' } },
     ),
 ]) {
   install({ device: "desktop" });

@@ -45,7 +45,7 @@ export type StoredVerbosityLevel = "low" | "medium" | "high";
 
 /** What a model accepts, as reported live by its provider. Every field is optional: absent means not reported. */
 export interface ModelParameterCapabilities {
-  /** Effort levels the model accepts, in Marinara's stored names. */
+  /** Effort levels the model accepts, in YunYun's stored names. */
   effortLevels?: StoredEffortLevel[];
   /** The provider's own name for each accepted level, shown as reported. */
   effortLabels?: Partial<Record<StoredEffortLevel, string>>;

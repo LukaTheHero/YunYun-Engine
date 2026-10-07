@@ -467,8 +467,8 @@ const capabilityPackageManifestBaseSchema = z
 //        `holds: "items"`, whose entries carry an `item`. Not a soft seam, for the same reason as 1.20
 //        through 1.48: an Engine that cannot read these refuses the whole ruleset or catalog file, so
 //        a package that ships any of them declares 1.49. No permission.
-// 1.50: Professor Mari actions. A package holding the `mari-actions` permission may register
-//        `api.registerService("mari-actions:<package-id>", { list, run })`, and Professor Mari's
+// 1.50: Professor YunYun actions. A package holding the `mari-actions` permission may register
+//        `api.registerService("mari-actions:<package-id>", { list, run })`, and Professor YunYun's
 //        `package_service` tool can list and run those actions. Requires the `mari-actions` permission.
 // 1.51: items the Game Master invents. A ruleset's `items` block may carry `rarityCaps` (the largest
 //        value of each number stat an invented item of a rarity may give) and `propose` (false forbids

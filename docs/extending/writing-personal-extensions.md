@@ -1,6 +1,6 @@
 # Writing Personal Extensions
 
-This guide is for people writing their own Marinara Engine extensions. For installing, reviewing, and safely running an extension, start with [Personal Extensions](personal-extensions.md).
+This guide is for people writing their own YunYun Engine extensions. For installing, reviewing, and safely running an extension, start with [Personal Extensions](personal-extensions.md).
 
 Code you write and import yourself is treated as an **External Extension**. It starts disabled and cannot run until you inspect it and approve its exact SHA-256 hash.
 
@@ -8,18 +8,18 @@ Code you write and import yourself is treated as an **External Extension**. It s
 
 External Extensions are hidden until both safety gates are open:
 
-1. Set `ENABLE_EXTERNAL_EXTENSIONS=true` in the Marinara host's `.env` file.
+1. Set `ENABLE_EXTERNAL_EXTENSIONS=true` in the YunYun host's `.env` file.
 2. Open **Settings** > **Advanced** > **Danger Zone** and enable **Allow third-party extension imports**.
 
-Importing and managing extensions also requires localhost access or configured **Admin Access**. If you use Marinara from a phone, LAN address, or remote browser, set `ADMIN_SECRET` on the server and enter the same value under **Settings** > **Advanced** > **Admin Access**.
+Importing and managing extensions also requires localhost access or configured **Admin Access**. If you use YunYun from a phone, LAN address, or remote browser, set `ADMIN_SECRET` on the server and enter the same value under **Settings** > **Advanced** > **Admin Access**.
 
 Choose the least-powerful runtime that can do the job:
 
 | Runtime                      | Use it for                                                                              | Important boundary                                                                           |
 | ---------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Sandboxed Browser Extension  | Private state, active-chat context, buttons, menu actions, and Marinara-rendered panels | No Marinara DOM, cookies, browser storage, network, or arbitrary HTML                        |
-| Server Extension             | Background logic that needs managed timers and private extension storage                | Separate OS sandbox; no Marinara files, secrets, network, child processes, or native modules |
-| Full-page External Extension | Legacy code that genuinely needs Marinara's page or same-origin APIs                    | Not sandboxed; use only for exact code you fully trust                                       |
+| Sandboxed Browser Extension  | Private state, active-chat context, buttons, menu actions, and Marinara-rendered panels | No YunYun DOM, cookies, browser storage, network, or arbitrary HTML                        |
+| Server Extension             | Background logic that needs managed timers and private extension storage                | Separate OS sandbox; no YunYun files, secrets, network, child processes, or native modules |
+| Full-page External Extension | Legacy code that genuinely needs YunYun's page or same-origin APIs                    | Not sandboxed; use only for exact code you fully trust                                       |
 
 Browser Extensions work on every supported platform. Server Extensions require macOS Seatbelt or Linux Bubblewrap. See the [platform table](personal-extensions.md#platform-support) before choosing a Server Extension.
 
@@ -126,7 +126,7 @@ Sandboxed Browser Extensions receive one frozen global named `marinara`:
 
 Use [Marinara-rendered panels](personal-extensions.md#add-a-marinara-rendered-panel) for normal UI and [active chat context](personal-extensions.md#use-active-chat-context) for chat-aware behavior. Extension state belongs in `marinara.storage`, not browser storage.
 
-`showWindow({ title, elements, onEvent, onClose })` returns a handle with `update({ title?, elements? })` and `close()`. Package CSS styles these sandboxed iframe windows; host-rendered contributions always use Marinara's own theme and controls.
+`showWindow({ title, elements, onEvent, onClose })` returns a handle with `update({ title?, elements? })` and `close()`. Package CSS styles these sandboxed iframe windows; host-rendered contributions always use YunYun's own theme and controls.
 
 The safe Browser runtime has no DOM or network API. Do not work around that boundary. If a useful capability is missing, request a narrow host capability rather than switching to full-page access by default.
 
@@ -191,7 +191,7 @@ marinara.onCleanup(() => marinara.clearInterval(timer));
 
 The same runnable package is available at `docs/examples/personal-extensions/server-minimal/`.
 
-Server code receives `marinara.runtime`, `marinara.version`, extension identity, `log`, `storage`, managed timers, and `onCleanup`. It does not receive filesystem, process, network, module-loading, or Marinara database access.
+Server code receives `marinara.runtime`, `marinara.version`, extension identity, `log`, `storage`, managed timers, and `onCleanup`. It does not receive filesystem, process, network, module-loading, or YunYun database access.
 
 Server Extensions remain disabled when the host cannot establish Seatbelt or Bubblewrap. This is a platform restriction, not an extension error.
 
@@ -210,7 +210,7 @@ Server Extensions remain disabled when the host cannot establish Seatbelt or Bub
 | `config.cssPath`                             | Optional CSS file path or ordered array; safe-runtime CSS stays in the sandboxed iframe        |
 | `config.js`, `config.serverJs`, `config.css` | Inline alternatives when separate files are unnecessary                                        |
 
-Use plain JavaScript. Marinara does not compile TypeScript or install extension dependencies. Bundle dependencies into your JavaScript before importing when necessary.
+Use plain JavaScript. YunYun does not compile TypeScript or install extension dependencies. Bundle dependencies into your JavaScript before importing when necessary.
 
 Loose `.js`, `.mjs`, `.cjs`, `.server.js`, `.server.mjs`, `.server.cjs`, and `.css` files can also be imported directly. A manifest is preferred because it records identity, runtime, version, capabilities, and file order explicitly.
 
@@ -230,7 +230,7 @@ The ZIP, request, sandbox-message, and storage limits protect separate transport
 
 - Every new import starts disabled and unapproved.
 - Editing code, CSS, runtime, or capabilities clears approval and disables the extension.
-- Re-importing the same name updates the existing record after confirmation. A byte-identical re-import keeps its current hash and approval; changed executable content clears approval. Marinara warns when numeric versions indicate a downgrade.
+- Re-importing the same name updates the existing record after confirmation. A byte-identical re-import keeps its current hash and approval; changed executable content clears approval. YunYun warns when numeric versions indicate a downgrade.
 - **Export** writes the current manifest and source files to a portable package. Approval is never exported.
 - Restoring a revision, importing a profile, or restoring a backup leaves the extension disabled until reviewed again.
 - **Disable** stops the runtime and registered cleanup. Full-page code may require a page reload if it created unregistered side effects.
@@ -247,9 +247,9 @@ The ZIP, request, sandbox-message, and storage limits protect separate transport
 | Browser code cannot use `document`, `window`, `fetch`, or local storage | Expected in the safe sandbox; use the documented broker APIs                                       |
 | Server Extension is unavailable                                         | Use macOS Seatbelt or Linux with Bubblewrap, or switch to a Browser Extension                      |
 | Browser Extension throws                                                | Open browser developer tools; `marinara.log` and startup errors are tagged with the extension name |
-| Server Extension throws                                                 | Check its status in **Settings** > **Addons** and the Marinara server log                          |
+| Server Extension throws                                                 | Check its status in **Settings** > **Addons** and the YunYun server log                          |
 
-CSS, private storage, import archives, and runtime messages retain separate safety limits. Marinara should report the boundary that rejected a package instead of presenting it as an execution failure.
+CSS, private storage, import archives, and runtime messages retain separate safety limits. YunYun should report the boundary that rejected a package instead of presenting it as an execution failure.
 
 ## Related guides
 

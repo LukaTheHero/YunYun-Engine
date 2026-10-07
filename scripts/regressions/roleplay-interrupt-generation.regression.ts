@@ -155,8 +155,8 @@ try {
     assert.equal(outputs.length, 0);
     return response;
   };
-  const original = 'Mari cries. "And I really hate myself! I want to just finish myself already!"';
-  const cut = 'Mari cries. "And I really hate myself—"';
+  const original = 'YunYun cries. "And I really hate myself! I want to just finish myself already!"';
+  const cut = 'YunYun cries. "And I really hate myself—"';
   const interruption = '[interrupt: part="I really hate myself!"] Dottore interrupts her.';
   const chat = await createChat();
   const older = await chats.createMessage({

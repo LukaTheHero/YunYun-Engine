@@ -67,7 +67,7 @@ try {
   );
   const [alice, bob, narrator] = participants;
   assert(alice && bob && narrator);
-  const persona = await characters.createPersona("Mari", "The player.");
+  const persona = await characters.createPersona("YunYun", "The player.");
   assert(persona);
   const presets = createPromptsStorage(db);
   const preset = await presets.create({
@@ -131,7 +131,7 @@ try {
     return JSON.stringify(response.json().prompt.messages);
   };
   const first = await generate(
-    'Before. [whisper: character="Bob" text="BOB_ONLY_SECRET"] After. [whisper: character="Mari" text="PERSONA_ONLY_SECRET"]',
+    'Before. [whisper: character="Bob" text="BOB_ONLY_SECRET"] After. [whisper: character="YunYun" text="PERSONA_ONLY_SECRET"]',
   );
   const tokens = first.body
     .split("\n")
@@ -293,7 +293,7 @@ try {
   await chats.patchMetadata(chat.id, { roleplayWhisperAudience: "all", groupResponseOrder: "sequential" });
   outputs = [
     'Alice speaks. [whisper: character="Bob" text="SAME_TURN_SECRET"]',
-    'Bob answers. [whisper: character="Mari" text="SAME_TURN_PERSONA_SECRET"]',
+    'Bob answers. [whisper: character="YunYun" text="SAME_TURN_PERSONA_SECRET"]',
     "The narrator continues.",
   ];
   const turnStart = prompts.length;

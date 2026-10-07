@@ -185,7 +185,7 @@ export function workspacePathAccessPolicy(
   return "normal";
 }
 
-/** #6984: what Professor Mari is told, to pass on, when a change would land in build output. */
+/** #6984: what Professor YunYun is told, to pass on, when a change would land in build output. */
 export const BUILD_OUTPUT_WRITE_REFUSAL =
   "Build files are generated and must not be edited; change the source and rebuild instead.";
 
@@ -203,7 +203,7 @@ const fileSystemName = (segment = "") =>
 
 /**
  * #6984: build output is every package's dist folder and the private server builds beside it, such as
- * dist-sandbox. A build writes those files, so Professor Mari may read them but never change them. Every write
+ * dist-sandbox. A build writes those files, so Professor YunYun may read them but never change them. Every write
  * path asks this about each path it would really touch: the requested one and, through links, the real one.
  */
 export function isBuildOutputPath(workspaceRoot: string, absolutePath: string): boolean {
@@ -635,7 +635,7 @@ export class WorkspaceChangeReviewService {
     if (!packageNameIsValid(packageName)) throw new Error("Use a valid public npm package name.");
     if (requestedVersion !== "latest" && !exactVersionIsValid(requestedVersion)) {
       throw new Error(
-        "Dependency versions must be exact semver values or latest so Marinara can resolve an exact version.",
+        "Dependency versions must be exact semver values or latest so YunYun can resolve an exact version.",
       );
     }
     if (!(input.target in TARGET_MANIFESTS))
@@ -778,7 +778,7 @@ export class WorkspaceChangeReviewService {
         approval,
         completed: true,
         outcome: "state_changed",
-        error: "The file changed after Professor Mari staged it. Review a fresh proposal instead.",
+        error: "The file changed after Professor YunYun staged it. Review a fresh proposal instead.",
       };
     }
     try {
@@ -822,7 +822,7 @@ export class WorkspaceChangeReviewService {
         completed: true,
         outcome: "state_changed",
         error:
-          "The dependency manifest or lockfile changed after this request. Ask Professor Mari to resolve it again.",
+          "The dependency manifest or lockfile changed after this request. Ask Professor YunYun to resolve it again.",
       };
     }
 

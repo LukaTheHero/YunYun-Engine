@@ -139,10 +139,10 @@ async function registersAndPersists() {
     const afterReregister = await db.select().from(packageNotes);
     assert.equal(afterReregister.length, 1, "re-registration must not reset a live table");
 
-    // Mari's DB service snapshots table metadata at module load, before any
+    // YunYun's DB service snapshots table metadata at module load, before any
     // package registers; it must still resolve a registered package table.
     const listed = await getMariDbService(db).executeCli({ argv: ["db", "list", "package_demo_notes", "--json"] });
-    assert.match(JSON.stringify(listed), /note-1/, "Professor Mari can read a registered package table");
+    assert.match(JSON.stringify(listed), /note-1/, "Professor YunYun can read a registered package table");
 
     await db._fileStore.flush();
     const shardDir = join(dir, "tables", "package_demo_notes");

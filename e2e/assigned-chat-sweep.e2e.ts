@@ -66,7 +66,7 @@ test("mobile character reordering keeps Settings still and restores scrolling", 
   const data = await fixture(request, "roleplay");
   const cards = [data.character];
   try {
-    for (const name of ["Narrator", "Mari", "Collei"]) {
+    for (const name of ["Narrator", "YunYun", "Collei"]) {
       cards.push(await (await request.post("/api/characters", { data: { data: { name, first_mes: "" } } })).json());
     }
     await request.patch(`/api/chats/${data.chat.id}`, { data: { characterIds: cards.map((card) => card.id) } });

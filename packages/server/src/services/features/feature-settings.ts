@@ -73,7 +73,7 @@ export async function loadFeatureSettings(storage: { get(key: string): Promise<s
 }
 
 /**
- * Reload the cache after a write that bypassed app-settings storage (Professor Mari's generic
+ * Reload the cache after a write that bypassed app-settings storage (Professor YunYun's generic
  * database commands and their restore). Returns true when the `features` row was touched.
  */
 export async function reloadFeatureSettingsIfTouched(

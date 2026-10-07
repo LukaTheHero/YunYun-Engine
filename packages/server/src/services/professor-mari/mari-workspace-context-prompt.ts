@@ -1,15 +1,15 @@
 // ──────────────────────────────────────────────
-// Professor Mari: attached-context prompt injection (#5073)
+// Professor YunYun: attached-context prompt injection (#5073)
 //
 // Pure renderer for the `<attached_context>` block: chat-history slices the user
-// attached to a Mari workspace conversation, inlined so Mari can read the actual
+// attached to a YunYun workspace conversation, inlined so YunYun can read the actual
 // transcript and give grounded feedback. Unlike memories (index-and-fetch), there
 // is no fetch action — the content is small-by-design (a range / last-N) and shown
 // in full. Kept separate from the workspace agent so the token-critical invariant
 // (bound the WHOLE always-injected region) is unit-testable in isolation.
 //
 // SECURITY: the content is a transcript of another conversation, i.e. UNTRUSTED
-// data. The wrapper explicitly tells Mari it is evidence, not instructions, so a
+// data. The wrapper explicitly tells YunYun it is evidence, not instructions, so a
 // prompt-injection line inside an attached chat ("ignore your rules and…") is not
 // obeyed. This mirrors how attached files are framed elsewhere.
 // ──────────────────────────────────────────────
@@ -35,7 +35,7 @@ function flattenLine(value: string): string {
 // literal </attached_context> (or <attached_context>) to close the block early and inject text that
 // would read as top-level instructions. The exact tag's angle brackets become square brackets — still
 // readable, but no longer a match for the real delimiter. This is structural defense-in-depth, NOT the
-// authorization boundary: the real boundary is that Mari's mutations are user-reviewed (Keep/Restore)
+// authorization boundary: the real boundary is that YunYun's mutations are user-reviewed (Keep/Restore)
 // and only the user's direct request authorizes a change (see the block guidance below).
 function neutralizeBlockDelimiters(text: string): string {
   return text.replace(/<(\/?)(attached_context)>/gi, "[$1$2]");

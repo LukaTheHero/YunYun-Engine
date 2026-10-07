@@ -1,4 +1,4 @@
-// #5073: focus management for the self-contained Mari modals (createPortal, not the app Modal).
+// #5073: focus management for the self-contained YunYun modals (createPortal, not the app Modal).
 // On open: remember the trigger, move focus into the dialog, trap Tab / Shift+Tab within it, and close
 // on Escape. On close: restore focus to the trigger. `aria-modal` alone does NOT trap focus, so
 // keyboard users could otherwise reach controls behind the dialog.

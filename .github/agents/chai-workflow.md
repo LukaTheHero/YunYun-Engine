@@ -1,12 +1,12 @@
-# Marinara Agent Workflow Overlay
+# YunYun Agent Workflow Overlay
 
-This is Marinara Engine's adapted workflow overlay for AI coding agents.
+This is YunYun Engine's adapted workflow overlay for AI coding agents.
 
 Source inspiration: `cha1latte/chai-agent-workflow-pack`
 <https://github.com/cha1latte/chai-agent-workflow-pack>
 
 The upstream pack was reviewed as an external workflow reference. This file is
-not a verbatim vendor copy; it adapts the workflow for Marinara's existing
+not a verbatim vendor copy; it adapts the workflow for YunYun's existing
 `AGENTS.md`, `CONTRIBUTING.md`, PR template, issue templates, and validation
 commands.
 

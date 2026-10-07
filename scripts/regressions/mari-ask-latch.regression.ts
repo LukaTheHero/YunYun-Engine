@@ -1,4 +1,4 @@
-// #5748: once Professor Mari asks the user whether to apply, the question is
+// #5748: once Professor YunYun asks the user whether to apply, the question is
 // binding for the rest of the run - she must never answer it herself. The
 // reported shape: an ask-frame whose only command was an apply:false preview
 // could not be held (previews are non-mutating), so the run continued and she
@@ -48,7 +48,7 @@ assert.equal(
   visibleTextAsksApplyPermission("Quick check before I finish: should I update the greeting too, or leave it as-is?"),
   true,
 );
-// Mari's routine RESTATEMENT of a request must NOT arm the latch. This is the
+// YunYun's routine RESTATEMENT of a request must NOT arm the latch. This is the
 // #5721 lesson: pre-latch these strings were inert on read-only rounds, and a
 // latch armed by them would force an Accept on a plainly requested edit -
 // exactly the double-generation the #5727 revert removed.
@@ -169,7 +169,7 @@ assert.match(workspaceAgent, /only their reply or Accept can answer it/u);
 assert.doesNotMatch(
   workspaceAgent,
   /Use apply:true only if the user asked you to make the change/u,
-  "the old dry-run text re-posed the apply decision to Mari every round",
+  "the old dry-run text re-posed the apply decision to YunYun every round",
 );
 assert.doesNotMatch(
   workspaceAgent,
@@ -191,12 +191,12 @@ assert.match(workspaceAgent, /One response, one proposal, no duplicate work\./u)
 assert.match(workspaceAgent, /the question is binding for the rest of the run/u);
 assert.match(
   workspaceAgent,
-  /outside Plan and Bypass, Marinara holds the commands and shows the user an Accept action/u,
+  /outside Plan and Bypass, YunYun holds the commands and shows the user an Accept action/u,
   "the hold promise must be scoped to the modes that implement it",
 );
 assert.match(
   workspaceAgent,
-  /Outside Plan and Bypass, Marinara enforces this by holding anything you stage after asking\./u,
+  /Outside Plan and Bypass, YunYun enforces this by holding anything you stage after asking\./u,
 );
 assert.match(
   workspaceAgent,
@@ -237,4 +237,4 @@ assert.ok(flat.includes("action.suggestions = [ MARI_AUTHORIZATION_ACCEPT_CHIP,"
 const sharedTypes = readSource("packages/shared/src/types/professor-mari-workspace.ts");
 assert.match(sharedTypes, /export const MARI_AUTHORIZATION_ACCEPT_CHIP: MariSuggestionChip = \{/u);
 
-console.log("Mari ask-latch regression passed.");
+console.log("YunYun ask-latch regression passed.");

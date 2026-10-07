@@ -57,7 +57,7 @@
     ],
     "advantage": true,
     "naturals": {
-      "$comment": "2014 rules: a natural 20 or 1 decides attack rolls only. Checks and saves are pure arithmetic, unlike Marinara's own rules.",
+      "$comment": "2014 rules: a natural 20 or 1 decides attack rolls only. Checks and saves are pure arithmetic, unlike YunYun's own rules.",
       "check": "none",
       "save": "none"
     },
@@ -1762,7 +1762,7 @@
     }
   ],
   "battle": {
-    "$comment": "What a battle may read from this sheet. It is not a 5e combat adapter: there are no attack rolls, no saving throws and no concentration in a fight, and the damage arithmetic stays Marinara's. Hit points, slots and the spells and attacks a player picked from a catalog are simply lent to Marinara's own combat. Pact Magic slots are left out, because their level follows the character's own level and a fixed list of levels cannot say that.",
+    "$comment": "What a battle may read from this sheet. It is not a 5e combat adapter: there are no attack rolls, no saving throws and no concentration in a fight, and the damage arithmetic stays YunYun's. Hit points, slots and the spells and attacks a player picked from a catalog are simply lent to YunYun's own combat. Pact Magic slots are left out, because their level follows the character's own level and a fixed list of levels cannot say that.",
     "health": {
       "pool": "hp"
     },

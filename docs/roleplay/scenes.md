@@ -26,7 +26,7 @@ Follow these steps:
 ```
 
 3. Press Enter. The **Scene Prompt Setup** window opens.
-4. Choose a **Prompt preset** for the new scene, or leave it at **None**. Marinara remembers this choice for the next scene. The scene's own setup instructions still apply alongside the selected preset.
+4. Choose a **Prompt preset** for the new scene, or leave it at **None**. YunYun remembers this choice for the next scene. The scene's own setup instructions still apply alongside the selected preset.
 5. Under **POV**, pick how the writing is framed: **First Person**, **Second Person**, or **Third Person**.
 6. Under **Tense**, pick **Past**, **Present**, or **Future**.
 7. Optionally, type notes in the **Extra instructions** box to steer the scene.

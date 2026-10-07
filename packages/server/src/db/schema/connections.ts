@@ -110,17 +110,17 @@ export const apiConnections = fileTable("api_connections", {
   promptPresetId: text("prompt_preset_id"),
   /** Optional hard cap on max_tokens for the API response (for providers like DeepSeek that have lower limits). */
   maxTokensOverride: integer("max_tokens_override"),
-  /** Maximum number of agent LLM jobs Marinara may run at once for this connection. */
+  /** Maximum number of agent LLM jobs YunYun may run at once for this connection. */
   maxParallelJobs: integer("max_parallel_jobs").notNull().default(1),
   /** Optional cap on outbound requests per minute to this connection (null = unlimited). */
   maxRequestsPerMinute: integer("max_requests_per_minute"),
-  /** Treat as a local/custom endpoint for Professor Mari JSON tool fallback behavior. */
+  /** Treat as a local/custom endpoint for Professor YunYun JSON tool fallback behavior. */
   treatAsLocalEndpoint: text("treat_as_local_endpoint").notNull().default("false"),
   /**
-   * Claude (Subscription) only. When "true", Marinara passes `settings.fastMode = true`
+   * Claude (Subscription) only. When "true", YunYun passes `settings.fastMode = true`
    * to the Claude Agent SDK, asking the SDK to use its faster, cheaper routing tier
    * (response speed up, but lower-quality model behind the scenes). When "false"
-   * (default), Marinara explicitly forces fast mode off for every request so the
+   * (default), YunYun explicitly forces fast mode off for every request so the
    * exact model chosen on the connection is what runs.
    */
   claudeFastMode: text("claude_fast_mode").notNull().default("false"),

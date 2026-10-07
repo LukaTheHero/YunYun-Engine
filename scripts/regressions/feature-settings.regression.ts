@@ -161,7 +161,7 @@ try {
   await storage.set(FEATURE_SETTINGS_KEY, "{}");
   for (const name of FEATURE_SWITCH_NAMES) assert.equal(isFeatureEnabled(name), false, `${name}: empty object is off`);
 
-  // A raw row write that bypasses app-settings storage (Professor Mari's generic DB commands) is
+  // A raw row write that bypasses app-settings storage (Professor YunYun's generic DB commands) is
   // picked up by reloadFeatureSettingsIfTouched; unrelated rows leave the cache alone.
   const { appSettings } = await import("../../packages/server/src/db/schema/index.js");
   const raw = JSON.stringify({ stableLorebookGroupPicks: true });
@@ -176,7 +176,7 @@ try {
     await features.reloadFeatureSettingsIfTouched([{ table: "app_settings", id: FEATURE_SETTINGS_KEY }], storage),
     true,
   );
-  assert.equal(isFeatureEnabled("stableLorebookGroupPicks"), true, "Mari-style writes refresh the cache");
+  assert.equal(isFeatureEnabled("stableLorebookGroupPicks"), true, "YunYun-style writes refresh the cache");
   await storage.remove(FEATURE_SETTINGS_KEY);
 
   // A profile restore writes the row raw too; the restored switches apply at once, and a later

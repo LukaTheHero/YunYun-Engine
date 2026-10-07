@@ -169,7 +169,7 @@ export async function decisionRoutes(app: FastifyInstance) {
     return write;
   };
 
-  // Start with Marinara only when the user asked for that. `installedDecisionModel`
+  // Start with YunYun only when the user asked for that. `installedDecisionModel`
   // returns null unless the sidecar is enabled, so a disabled install cannot start
   // here. Fire and forget: a model that cannot load must never hold up boot, and the
   // failure is already recorded in the process status for the panel to show.
@@ -178,7 +178,7 @@ export async function decisionRoutes(app: FastifyInstance) {
     if (model)
       void decisionProcessService
         .ensureRunning(model)
-        .catch((error) => logger.warn(error, "[decision-sidecar] Start-with-Marinara failed"));
+        .catch((error) => logger.warn(error, "[decision-sidecar] Start-with-YunYun failed"));
   }
 
   /** What the panel needs: the catalog, each entry's verdict, and what is installed. */

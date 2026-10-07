@@ -27,7 +27,7 @@ async function rebuildChangedServer() {
   if (stopping) return false;
   if (code === 0) return true;
   process.stderr.write(
-    "\n  [ERROR] Could not rebuild the server. See the error above, then reinstall Marinara Engine or run: pnpm build\n\n",
+    "\n  [ERROR] Could not rebuild the server. See the error above, then reinstall YunYun Engine or run: pnpm build\n\n",
   );
   return false;
 }
@@ -35,7 +35,7 @@ async function rebuildChangedServer() {
 function exitCode(proc) {
   return new Promise((resolve) => {
     proc.once("error", (error) => {
-      process.stderr.write(`Could not start Marinara Engine: ${error.message}\n`);
+      process.stderr.write(`Could not start YunYun Engine: ${error.message}\n`);
       resolve(1);
     });
     proc.once("close", (status, signal) => resolve(status ?? 128 + (constants.signals[signal] ?? 0)));

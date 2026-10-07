@@ -7,7 +7,7 @@
   "edition": "Example ruleset, first draft",
   "license": {
     "spdx": "CC0-1.0",
-    "attribution": "Written for the Marinara Engine docs. Do what you like with it."
+    "attribution": "Written for the YunYun Engine docs. Do what you like with it."
   },
   "coverage": {
     "checks": true,

@@ -110,7 +110,7 @@ try {
     participants: [
       {
         id: "host_fixture",
-        displayName: "Mari",
+        displayName: "YunYun",
         persona: { name: "Reviewed Host", description: "Verbatim <host> & {{user}}." },
         isHost: true,
       },

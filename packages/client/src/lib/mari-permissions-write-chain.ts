@@ -1,7 +1,7 @@
 // #5725: ONE serialization point for every Permissions Mode write, shared by
-// the Mari panel's per-chat picker and Settings -> Application's global
+// the YunYun panel's per-chat picker and Settings -> Application's global
 // default selector. All writes append to a single chain (click order =
-// persist order, so the last selection wins server-side), and a Mari run
+// persist order, so the last selection wins server-side), and a YunYun run
 // awaits the WHOLE chain before POSTing /prompt - the server resolves the
 // mode per run, so a pending write from EITHER surface must land first.
 // Module-level state is deliberate: the two writers live in unrelated

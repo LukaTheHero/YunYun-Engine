@@ -12,4 +12,4 @@ Screenshots and recordings supplied by SpicyMarinara for the in-app What’s New
 | `scrollable-editors.mp4` | https://i.imgur.com/h9jdXlI.mp4 |
 | `slurp.png` | https://i.imgur.com/IfAJDne.png |
 
-`mari-memory-wheel.mp4` is a fresh browser recording of the corrected sprite and existing CSS animation, replacing the earlier clip at https://i.imgur.com/9G0JanG.mp4. Its generation prompt and provenance are in `../../sprites/mari/generated/professor-mari-memory-wheel-v2.prompt.md`.
+`mari-memory-wheel.mp4` is a fresh browser recording of the corrected sprite and existing CSS animation, replacing the earlier clip at https://i.imgur.com/9G0JanG.mp4. Its generation prompt and provenance are in `../../sprites/yunyun/chibi-yunyun.png`.

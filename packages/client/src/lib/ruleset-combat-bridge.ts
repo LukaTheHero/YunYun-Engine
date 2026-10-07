@@ -39,7 +39,7 @@ export type RulesetCombatSeeds = Record<string, RulesetCombatSeed>;
  * All three have to hold: the combat director is on for this game, the ruleset the game resolved
  * declares a `combat` block, and there is a message for the fight to hang off. Without the director
  * there is no server session to resolve anything; without `combat` the ruleset never said how a
- * fight goes; without an anchor no directed screen mounts at all and the fight is Marinara's own.
+ * fight goes; without an anchor no directed screen mounts at all and the fight is YunYun's own.
  *
  * The decision is read off the BLOCKS, never off `coverage.combat`: that flag is what the author
  * says the file covers, and a fight has to be decided by what the file actually declares.

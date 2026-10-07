@@ -17,7 +17,7 @@ export const LOCAL_SIDECAR_CONNECTION_ID = "__local_sidecar__";
  */
 export const UTILITY_SIDECAR_CONNECTION_ID = "__utility_sidecar__";
 
-/** Stable ID for the built-in Professor Mari assistant character. */
+/** Stable ID for the built-in Professor YunYun assistant character. */
 export const PROFESSOR_MARI_ID = "__professor_mari__";
 
 /** Stable ID for the default OpenRouter free‑tier connection. */

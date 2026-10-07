@@ -49,11 +49,11 @@ const ATLAS_CLOUD_SCHEMA_MISS_TTL_MS = 10 * 60 * 1000;
 /** The editor endpoint accepts any well-formed model ID, so the cache is bounded. */
 const ATLAS_CLOUD_SCHEMA_CACHE_MAX_ENTRIES = 200;
 const ATLAS_CLOUD_MODEL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)+$/i;
-/** Schema keys that carry the first-frame or reference image, in the order Marinara prefers them. */
+/** Schema keys that carry the first-frame or reference image, in the order YunYun prefers them. */
 const ATLAS_CLOUD_STRING_IMAGE_KEYS = ["image", "image_url"] as const;
 const ATLAS_CLOUD_ARRAY_IMAGE_KEYS = ["images", "reference_images"] as const;
 
-/** Inputs Marinara fills from the prompt, the source illustration, and the common connection defaults. */
+/** Inputs YunYun fills from the prompt, the source illustration, and the common connection defaults. */
 const ATLAS_CLOUD_MANAGED_KEYS: ReadonlySet<string> = new Set([
   "model",
   "prompt",
@@ -240,7 +240,7 @@ function describeModelOptionProblem(
 ): string | null {
   const property = Object.hasOwn(schema.properties, name) ? schema.properties[name] : undefined;
   if (!property) return "the model has no such input";
-  if (isManagedKey(name, schema) || name in body) return "Marinara sets this input itself";
+  if (isManagedKey(name, schema) || name in body) return "YunYun sets this input itself";
   if (property.enum && !property.enum.includes(value as string | number)) return "not one of the model's choices";
   if (property.type === "boolean" && typeof value !== "boolean") return "expected true or false";
   if (property.type === "string" && typeof value !== "string") return "expected text";
@@ -255,7 +255,7 @@ function describeModelOptionProblem(
   return null;
 }
 
-/** The model's inputs that Marinara does not fill itself, in schema order, for the connection editor. */
+/** The model's inputs that YunYun does not fill itself, in schema order, for the connection editor. */
 export function listAtlasCloudModelOptionFields(schema: AtlasCloudModelInputSchema): AtlasCloudModelOptionField[] {
   const fields: AtlasCloudModelOptionField[] = [];
   for (const [name, property] of Object.entries(schema.properties)) {
@@ -304,7 +304,7 @@ export function describeAtlasCloudModelLimits(schema: AtlasCloudModelInputSchema
 }
 
 /**
- * Shapes Marinara's common scene-video controls into the body one Atlas Cloud model accepts.
+ * Shapes YunYun's common scene-video controls into the body one Atlas Cloud model accepts.
  * Fields the model does not declare are left out so the provider's own defaults apply.
  */
 export function adaptAtlasCloudVideoRequest(

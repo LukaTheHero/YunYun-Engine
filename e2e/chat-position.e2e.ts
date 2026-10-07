@@ -24,7 +24,7 @@ async function createChat(request: APIRequestContext, metadata: Record<string, u
     for (const path of created) await request.delete(path).catch(() => undefined);
   };
   try {
-    const character = await post("/api/characters", { data: { name: "Mari", first_mes: "" } });
+    const character = await post("/api/characters", { data: { name: "YunYun", first_mes: "" } });
     created.unshift(`/api/characters/${character.id}`);
     const chat = await post("/api/chats", {
       name: "Chat position proof",
@@ -40,7 +40,7 @@ async function createChat(request: APIRequestContext, metadata: Record<string, u
       { role: "assistant", characterId: character.id, content: "The archive lamps flicker as you step inside." },
       { role: "user", content: "I set the lantern down by the map table." },
       { role: "narrator", content: "Rain taps against the tall windows." },
-      { role: "assistant", characterId: character.id, content: '"Over here," Mari says. "Bring the lantern."' },
+      { role: "assistant", characterId: character.id, content: '"Over here," YunYun says. "Bring the lantern."' },
     ]) {
       await post(`/api/chats/${chat.id}/messages`, message);
     }

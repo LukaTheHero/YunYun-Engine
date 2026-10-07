@@ -275,7 +275,7 @@ try {
   const { assertRoomPersonaName } = await import("../../packages/server/src/services/multiplayer/room-store.js");
   const named = {
     participants: [
-      { id: "host_fixture", persona: { name: "Mari", description: "" }, isHost: true },
+      { id: "host_fixture", persona: { name: "YunYun", description: "" }, isHost: true },
       { id: "guest_fixture", persona: { name: "Rowan", description: "" }, isHost: false },
     ],
     characters: [{ id: "guide_fixture", name: "Guide", role: "character" }],

@@ -97,7 +97,7 @@ export function parseNvidiaSmi(output: string): GpuDevice[] {
  *
  * Returns a negative number when `version` is older than `minimum`. A string with a
  * segment that is not a number is indeterminate and compares equal, because a driver
- * string Marinara cannot parse is not a reason to tell the user their driver is too
+ * string YunYun cannot parse is not a reason to tell the user their driver is too
  * old and block an install. A missing trailing segment is a real zero: 580.95 is
  * 580.95.0.
  */

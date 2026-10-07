@@ -2,10 +2,10 @@
 // Rate-limit-aware provider decorator
 // ──────────────────────────────────────────────
 // Three behaviours, all keyed by connection id so they cover every caller of a connection
-// (Professor Mari's rapid tool-call loop, normal chat generation, embeddings, …):
+// (Professor YunYun's rapid tool-call loop, normal chat generation, embeddings, …):
 //
 //   • Proactive throttle — when the connection has a `maxRequestsPerMinute` cap, requests are
-//     paced so a burst (e.g. Mari's up-to-13 back-to-back rounds) cannot exceed it. Off by
+//     paced so a burst (e.g. YunYun's up-to-13 back-to-back rounds) cannot exceed it. Off by
 //     default (no cap configured → no pacing).
 //   • Reactive pause/resume — always on. A provider 429 / 529 is caught, the request pauses
 //     (honouring `Retry-After` when present, else capped exponential backoff), then the SAME

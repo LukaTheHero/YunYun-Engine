@@ -181,7 +181,7 @@ try {
       wrapFormat: "xml",
       defaultChoices: "{}",
       isDefault: "false",
-      author: "Marinara",
+      author: "YunYun",
       systemKey: "marinara-universal-preset",
       embedding: null,
       createdAt: timestamp,

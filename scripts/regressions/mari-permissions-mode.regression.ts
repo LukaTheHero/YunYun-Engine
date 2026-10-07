@@ -1,4 +1,4 @@
-// #5725: Professor Mari's Permissions Mode (Auto / Manual / Accept edits /
+// #5725: Professor YunYun's Permissions Mode (Auto / Manual / Accept edits /
 // Plan / Bypass). Functional checks on the pure pieces plus source pins on the
 // enforcement seams.
 import assert from "node:assert/strict";
@@ -164,7 +164,7 @@ assert.match(
   /\} finally \{[\s\S]{0,300}this\.activeReviewPolicy = "standard";/u,
   "executeAction must reset the review policy on exit",
 );
-// Mari can never rewrite her own mode row - a change-level planMutation floor
+// YunYun can never rewrite her own mode row - a change-level planMutation floor
 // blocks every raw-db path (insert/patch/replace/delete/transform).
 assert.match(mariDb, /change\.table === "app_settings" && change\.id === MARI_PERMISSIONS_MODE_SETTINGS_KEY/u);
 assert.match(mariDb, /can only be changed by the user/u);
@@ -192,7 +192,7 @@ assert.match(routes, /app\.put\("\/permissions-mode"/u);
 assert.doesNotMatch(
   routes.slice(routes.indexOf('app.put("/permissions-mode"'), routes.indexOf('app.put("/permissions-mode"') + 600),
   /reset\(\)/u,
-  "a mode switch must not abort an in-flight Mari turn",
+  "a mode switch must not abort an in-flight YunYun turn",
 );
 // The setting is NOT writable through the generic app-settings passthrough.
 const appSettingsRoutes = readSource("packages/server/src/routes/app-settings.routes.ts");
@@ -334,4 +334,4 @@ for (const [name, source] of [
   assert.equal(control, undefined, `${name} must not contain raw control characters`);
 }
 
-console.log("Mari permissions-mode regression passed.");
+console.log("YunYun permissions-mode regression passed.");

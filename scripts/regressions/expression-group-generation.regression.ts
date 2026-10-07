@@ -206,7 +206,7 @@ try {
   await chats.update(chat.id, { characterIds: [alice.id] });
   await chats.patchMetadata(chat.id, { groupChatMode: "merged" });
   await run([alice.id]);
-  const persona = await characters.createPersona("Mari", "The player.");
+  const persona = await characters.createPersona("YunYun", "The player.");
   assert(persona);
   const personaSprites = join(dir, "sprites", persona.id);
   mkdirSync(personaSprites, { recursive: true });

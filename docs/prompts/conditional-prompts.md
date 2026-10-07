@@ -375,10 +375,10 @@ The recommended wordings scored 31 of 32 on Open-Jev 2B, 31 of 32 on Open-Jev 9B
 
 #### Statement allowance
 
-**Decision statements per turn**, under **Decision model**, defaults to 32. Despite its name, it is not one global cap on every Decision request or on spending. Marinara applies it in stages:
+**Decision statements per turn**, under **Decision model**, defaults to 32. Despite its name, it is not one global cap on every Decision request or on spending. YunYun applies it in stages:
 
 1. Statements for the main chat prompt are planned within the allowance. Lorebook decisions then use what that plan leaves available.
-2. For agents that run before or alongside the reply, Marinara makes a combined plan of the main prompt's statements and those agents' prompt statements, using the configured allowance again. This stage does not subtract the lorebook's earlier use, so the total can exceed the setting.
+2. For agents that run before or alongside the reply, YunYun makes a combined plan of the main prompt's statements and those agents' prompt statements, using the configured allowance again. This stage does not subtract the lorebook's earlier use, so the total can exceed the setting.
 3. Post-processing agents get a separate allowance after the reply. Their statements read the completed reply.
 
 Agent **activation questions** and **Smart response order** are separate from this setting.
@@ -405,11 +405,11 @@ Agent prompt statements follow the same reuse rules. Before/parallel agents read
 
 #### Prompt caching
 
-The provider's **prompt cache** is separate from Marinara's Decision answer cache. It can reuse an unchanged prefix of the prompt sent to your chat model. Changing a decision branch can prevent reuse from that part onward; an earlier unchanged prefix may still qualify. The exact reusable portion and billing depend on the provider, cache boundaries, minimum length and cache lifetime.
+The provider's **prompt cache** is separate from YunYun's Decision answer cache. It can reuse an unchanged prefix of the prompt sent to your chat model. Changing a decision branch can prevent reuse from that part onward; an earlier unchanged prefix may still qualify. The exact reusable portion and billing depend on the provider, cache boundaries, minimum length and cache lifetime.
 
 **Put changing decision blocks late in the prompt**, such as post-history instructions or a shallow author's note. An early change can lose most cache savings. Keep a decision near the top only when its answer rarely changes and its instructions belong there. The same applies to preset variable options: their text lands wherever `{{name}}` appears.
 
-On a direct Anthropic connection with **Enable prompt caching** on, Marinara marks the end of the system prompt and a chat message **Cache depth** messages back from the newest one (5 by default). A change before history can invalidate the system boundary and later history, though an earlier matching prefix may remain reusable. A change after the marked history boundary can preserve that cached prefix. A change between the two boundaries can preserve the system prefix while losing some cached history. Cache reads and cache writes have different prices.
+On a direct Anthropic connection with **Enable prompt caching** on, YunYun marks the end of the system prompt and a chat message **Cache depth** messages back from the newest one (5 by default). A change before history can invalidate the system boundary and later history, though an earlier matching prefix may remain reusable. A change after the marked history boundary can preserve that cached prefix. A change between the two boundaries can preserve the system prefix while losing some cached history. Cache reads and cache writes have different prices.
 
 Minimum cache lengths and supported boundaries vary by model and can change. Check the provider's current [Anthropic prompt-caching guide](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) or [OpenAI prompt-caching guide](https://developers.openai.com/api/docs/guides/prompt-caching) for those details and billing rules.
 

@@ -1510,7 +1510,7 @@
  * a chip sliced in half with no hint that more existed. MariSuggestionChips now translates a
  * mouse drag into scrollLeft and sets data-fade-left / data-fade-right from the live scroll
  * position, and the fade is applied as a mask rather than a solid gradient overlay: the row
- * renders over the chat background image, the floating Mari panel, and the conversation input
+ * renders over the chat background image, the floating YunYun panel, and the conversation input
  * alike, so there is no single base color an overlay could blend into. Both stops stay 0 and
  * the mask rule below does not match at all while nothing is clipped, which leaves the
  * wrapping desktop layout untouched.
@@ -3710,7 +3710,7 @@ body {
   width: 68%;
 }
 
-/* Mari stands about 1.04 scene-widths tall. Rather than crop her head, she may rise past the
+/* YunYun stands about 1.04 scene-widths tall. Rather than crop her head, she may rise past the
    card's top border (#7032): the height cap lets her pass the art column's top by at most
    1.125rem, so she clears the card's padding by under 0.5rem and stays inside the 0.65rem
    minimum grid gap instead of covering a neighbour. */

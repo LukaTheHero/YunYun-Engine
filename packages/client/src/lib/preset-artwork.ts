@@ -1,4 +1,4 @@
-export const MARINARA_UNIVERSAL_PRESET_ARTWORK = "/illustrations/marinara-universal-preset.webp";
+export const MARINARA_UNIVERSAL_PRESET_ARTWORK = "/sprites/yunyun/chibi-yunyun.png";
 
 const MARINARA_UNIVERSAL_PRESET_NAME = "Marinara's Universal Preset";
 const MARINARA_UNIVERSAL_PRESET_AUTHOR = "Marinara";

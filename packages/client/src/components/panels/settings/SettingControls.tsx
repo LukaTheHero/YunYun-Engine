@@ -111,9 +111,9 @@ export function SettingsSection({
   );
 }
 
-// #5725: Professor Mari's server-authoritative Permissions Mode. Fetched on
+// #5725: Professor YunYun's server-authoritative Permissions Mode. Fetched on
 // mount and written through the dedicated validated PUT; a change applies to
-// Mari's next run (an in-flight turn is never aborted by a mode switch).
+// YunYun's next run (an in-flight turn is never aborted by a mode switch).
 export function MariPermissionsModeSetting({ anchorId }: { anchorId?: string }) {
   const { t: localizeUi } = useUiTranslation();
   const localize = useLocalizedUiText();
@@ -122,7 +122,7 @@ export function MariPermissionsModeSetting({ anchorId }: { anchorId?: string }) 
   // Sequence local writes so a stale GET (or a stale failure rollback) can
   // never clobber a newer selection.
   const writeSeqRef = useRef(0);
-  // Refetch on focus/visibility too: the Mari panel's header picker writes the
+  // Refetch on focus/visibility too: the YunYun panel's header picker writes the
   // same server setting, and a stale one-shot read would drift from it.
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +157,7 @@ export function MariPermissionsModeSetting({ anchorId }: { anchorId?: string }) 
     const writeSeq = ++writeSeqRef.current;
     setMode(next);
     try {
-      // The shared chain serializes this against the Mari panel's per-chat
+      // The shared chain serializes this against the YunYun panel's per-chat
       // writes AND against runs - sendWorkspaceMessage awaits the whole chain,
       // so a default change here can never race a prompt on an
       // un-overridden chat.

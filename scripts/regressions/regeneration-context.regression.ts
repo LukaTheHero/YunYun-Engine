@@ -85,7 +85,7 @@ const semanticSummaryEntries = [
   {
     id: "manual-anchor",
     origin: "manual",
-    content: "Mari wrote down an unrelated relationship anchor.",
+    content: "YunYun wrote down an unrelated relationship anchor.",
     enabled: true,
     createdAt: "2026-07-01T08:00:00.000Z",
     updatedAt: "2026-07-01T08:00:00.000Z",

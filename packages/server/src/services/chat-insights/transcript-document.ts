@@ -201,7 +201,7 @@ export function renderTranscriptHtml(input: TranscriptDocumentInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="Marinara Engine">
+<meta name="generator" content="YunYun Engine">
 <title>${escapeHtml(title)}</title>
 <style>${STORY_CSS}${avatarCss}</style>
 </head>
@@ -209,7 +209,7 @@ export function renderTranscriptHtml(input: TranscriptDocumentInput): string {
 <main>
 <header><h1>${escapeHtml(title)}</h1>${range ? `<p class="range">${escapeHtml(range)}</p>` : ""}</header>
 ${turns}
-<footer>Exported from Marinara Engine${input.generatedAt ? ` on ${escapeHtml(formatDay(input.generatedAt))}` : ""}</footer>
+<footer>Exported from YunYun Engine${input.generatedAt ? ` on ${escapeHtml(formatDay(input.generatedAt))}` : ""}</footer>
 </main>
 </body>
 </html>

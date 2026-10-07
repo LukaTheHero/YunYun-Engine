@@ -97,10 +97,10 @@ check_launch_port() {
   node scripts/check-port-available.mjs || port_check_status=$?
   if [ "$port_check_status" = "2" ]; then
     if [ "$AUTO_OPEN_BROWSER_ENABLED" = "1" ]; then
-      echo "  [OK] Reopening the running Marinara Engine instance..."
+      echo "  [OK] Reopening the running YunYun Engine instance..."
       (open "${PROTOCOL}://${BROWSER_HOST}:$PORT" 2>/dev/null || xdg-open "${PROTOCOL}://${BROWSER_HOST}:$PORT" 2>/dev/null) &
     else
-      echo "  [OK] Marinara Engine is already running. Auto-open is disabled (AUTO_OPEN_BROWSER=${AUTO_OPEN_BROWSER_VALUE})"
+      echo "  [OK] YunYun Engine is already running. Auto-open is disabled (AUTO_OPEN_BROWSER=${AUTO_OPEN_BROWSER_VALUE})"
     fi
     exit 0
   fi

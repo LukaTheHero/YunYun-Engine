@@ -102,7 +102,7 @@ To load Grok models, use the **Fetch Models from Grok CLI** button in the **Mode
 
 ## Claude prompt-cache duration
 
-In the Claude connection editor, **Prompt Caching → Extended token caching (1 hour)** requests a one-hour cache for longer pauses between messages. It requires Claude Code **2.1.242 or later**. Marinara passes the setting for that request without changing your saved Claude settings.
+In the Claude connection editor, **Prompt Caching → Extended token caching (1 hour)** requests a one-hour cache for longer pauses between messages. It requires Claude Code **2.1.242 or later**. YunYun passes the setting for that request without changing your saved Claude settings.
 
 Off leaves Claude's default for main conversations and Agent SDK requests in place: currently one hour for subscription usage within plan limits and five minutes for extra usage, credits, or API billing. Claude Code's own subagents use five minutes unless configured separately; selected server-controlled helper requests may use one hour. Existing CLI environment overrides still take precedence. See [Claude Code prompt caching](https://code.claude.com/docs/en/prompt-caching).
 

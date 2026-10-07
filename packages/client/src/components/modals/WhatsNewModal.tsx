@@ -88,7 +88,7 @@ const RELEASE_ANNOUNCEMENTS: Record<string, ReleaseAnnouncement> = {
             altKey: "ui.modals.whatsnewmodal.release250.media.widgetStyleDottore",
           },
           {
-            url: "/releases/2.5.0/chat-ui-mari.jpg",
+            url: "/sprites/yunyun/chibi-yunyun.png",
             altKey: "ui.modals.whatsnewmodal.release250.media.widgetStyleMari",
           },
         ],
@@ -427,7 +427,7 @@ const RELEASE_ANNOUNCEMENTS: Record<string, ReleaseAnnouncement> = {
         copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.professorMariMemories",
         media: [
           {
-            url: "/releases/2.4.2/professor-mari-memories.png",
+            url: "/sprites/yunyun/chibi-yunyun.png",
             altKey: "ui.modals.whatsnewmodal.release242.media.professorMariMemories",
           },
         ],

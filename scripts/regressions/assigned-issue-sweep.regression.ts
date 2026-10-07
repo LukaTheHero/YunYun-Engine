@@ -44,7 +44,7 @@ const gameFormatContext = {
   gameTime: "Day 1, 09:00",
   map: null,
   partyNames: [],
-  playerName: "Mari",
+  playerName: "YunYun",
   characterSprites: [],
   playerInventory: [],
   language: "English",
@@ -627,7 +627,7 @@ assert.equal(
 );
 
 const liveMacroContext = {
-  user: "Mari",
+  user: "YunYun",
   char: "Dottore",
   characters: ["Dottore"],
   variables: {},

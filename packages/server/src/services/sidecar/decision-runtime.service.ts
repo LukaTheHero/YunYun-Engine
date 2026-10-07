@@ -120,7 +120,7 @@ function verifyRequirementsLock(): void {
   const actual = createHash("sha256").update(readFileSync(REQUIREMENTS_LOCK_PATH)).digest("hex");
   if (actual !== DECISION_RUNTIME_MANIFEST.openJev.requirementsLockSha256) {
     throw new Error(
-      "The bundled decision runtime dependency lock failed integrity verification. Reinstall Marinara Engine before retrying; do not bypass the runtime integrity check.",
+      "The bundled decision runtime dependency lock failed integrity verification. Reinstall YunYun Engine before retrying; do not bypass the runtime integrity check.",
     );
   }
 }

@@ -6656,7 +6656,7 @@ export async function gameRoutes(app: FastifyInstance, options: GameRouteOptions
       // Chosen at creation and fixed for the game's lifetime (see GameSetupConfig).
       gameExperienceId: setupConfig.gameExperienceId || null,
       // Likewise fixed for the game's lifetime. Written only when a ruleset was chosen, so a game
-      // on Marinara's own rules carries exactly the metadata it always has.
+      // on YunYun's own rules carries exactly the metadata it always has.
       ...(gameRuleset ? { gameRuleset } : {}),
       gameNpcs: [],
       enableAgents: setupConfig.enableAgents === true,
@@ -6892,7 +6892,7 @@ export async function gameRoutes(app: FastifyInstance, options: GameRouteOptions
     // The pinned ruleset's world guidance, its active layers included. World generation is the one
     // place a ruleset gets to shape the setting rather than the turn, and nothing else in this
     // route loads the ruleset, so the pin is resolved here. A pin the install cannot honour simply
-    // contributes nothing: the world is still generated, on Marinara's own terms.
+    // contributes nothing: the world is still generated, on YunYun's own terms.
     let rulesetWorldGuidance: string | null = null;
     if (meta.gameRuleset != null) {
       const pinnedForWorld = resolveGameRuleset(meta, await loadRulesetRegistry(app.db));
