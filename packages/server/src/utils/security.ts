@@ -7,6 +7,7 @@ import { isLoopbackIp, isPrivateNetworkIp } from "../middleware/ip-allowlist.js"
 import { logger } from "../lib/logger.js";
 import { CSRF_HEADER, CSRF_HEADER_VALUE } from "@marinara-engine/shared";
 import { requestHeadersWithOpenRouterAttribution } from "./openrouter-attribution.js";
+import { getOpenCodeSessionId, isOpenCodeApiUrl, requestHeadersWithOpenCodeSession } from "./opencode-session.js";
 
 export { CSRF_HEADER, CSRF_HEADER_VALUE };
 
@@ -92,7 +93,7 @@ export function safeBasename(value: string, fallback = "file"): string {
   return name || fallback;
 }
 
-export function isAllowedImageBuffer(buffer: Buffer, expectedExt?: string): { ext: string; mimeType: string } | null {
+export function isAllowedImageBuffer(buffer: Buffer, _expectedExt?: string): { ext: string; mimeType: string } | null {
   if (
     buffer.length >= 8 &&
     buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
@@ -113,11 +114,7 @@ export function isAllowedImageBuffer(buffer: Buffer, expectedExt?: string): { ex
     const sig = buffer.subarray(0, 6).toString("ascii");
     if (sig === "GIF87a" || sig === "GIF89a") return { ext: "gif", mimeType: "image/gif" };
   }
-  if (
-    expectedExt?.toLowerCase() === ".avif" &&
-    buffer.length >= 16 &&
-    buffer.subarray(4, 8).toString("ascii") === "ftyp"
-  ) {
+  if (buffer.length >= 16 && buffer.subarray(4, 8).toString("ascii") === "ftyp") {
     const boxSize = buffer.readUInt32BE(0);
     const brandEnd = Math.min(buffer.length, boxSize > 0 ? boxSize : buffer.length);
     const acceptedBrands = new Set(["avif", "avis"]);
@@ -605,6 +602,7 @@ const CROSS_ORIGIN_REDIRECT_STRIPPED_HEADERS = [
   "xi-api-key",
   "x-api-key",
   "api-key",
+  "x-opencode-session",
   "content-type",
   "content-length",
 ];
@@ -652,12 +650,17 @@ export async function safeFetch(url: string | URL, options: SafeFetchOptions = {
     dispatcher ? undefined : keepAliveInitialDelayMs,
   );
   const redirects = policy?.maxRedirects ?? MAX_REDIRECTS;
+  const sessionId = getOpenCodeSessionId();
   let currentHeaders = headers;
   let currentInit = { ...init };
 
   for (let i = 0; i <= redirects; i += 1) {
     const internalDispatcher = dispatcher ? undefined : current.dispatcher;
-    const attributedHeaders = requestHeadersWithOpenRouterAttribution(current.url, currentHeaders);
+    const attributedHeaders = requestHeadersWithOpenCodeSession(
+      current.url,
+      requestHeadersWithOpenRouterAttribution(current.url, currentHeaders),
+      sessionId,
+    );
     const requestHeaders = decodeCompressedResponse
       ? requestHeadersWithIdentityEncoding(attributedHeaders)
       : attributedHeaders;
@@ -676,6 +679,9 @@ export async function safeFetch(url: string | URL, options: SafeFetchOptions = {
         currentHeaders = stripCrossOriginRedirectHeaders(currentHeaders);
         currentInit = { ...currentInit };
         delete (currentInit as { body?: unknown }).body;
+      } else if (isOpenCodeApiUrl(previousUrl) && !isOpenCodeApiUrl(nextUrl)) {
+        currentHeaders = new Headers(currentHeaders);
+        currentHeaders.delete("x-opencode-session");
       }
       current = await validateOutboundUrlForFetch(nextUrl, policy, agentOptions, keepAliveInitialDelayMs);
       continue;

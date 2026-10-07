@@ -28,10 +28,8 @@ From a phone, tablet, or any other device, backup and restore need the **Admin A
 3. Find the **Backup & Export** section.
 4. Click **Download Backup**.
 5. The button shows **Creating backup…** while it works.
-6. On desktop Chrome or Edge, a **Save As** dialog opens so you pick where the file goes. Choose a folder and save.
-7. You should see **Backup saved!** or **Backup downloaded!** when it finishes.
-
-On some browsers the **Save As** dialog is not available. In that case the file goes to your normal Downloads folder instead.
+6. When the archive is ready, Marinara streams it straight to your browser without holding the whole file in page memory.
+7. Your browser either opens its normal **Save As** dialog or puts the file in your Downloads folder, depending on your download settings.
 
 This step matters most on Android and iOS. On those devices the app's own data folder is usually not reachable. That makes **Download Backup** the only easy way to get a copy off the device. Save it somewhere safe and private, like your own cloud storage.
 
@@ -50,6 +48,10 @@ Automatic backups are stored inside `backups/` in YunYun's data folder. The newe
 restorable, streamed archive format as **Download Backup**, including uploaded media and the encryption-key file when
 one exists. Keep a separate copy outside YunYun's data folder if you need protection from a lost disk, erased app
 storage, or a device reset.
+
+Each run needs free space for one more full archive on the disk that holds `backups/`, because the previous archive
+is kept until the new one is complete. If there is not enough room, Marinara skips that run and shows the reason next
+to the Automatic Backups control; it tries again on the next check once space is freed.
 
 ## Export Profile
 

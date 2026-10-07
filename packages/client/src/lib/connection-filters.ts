@@ -22,14 +22,51 @@ export type LocalSidecarConnectionOption = {
   useForRandom?: "false";
 };
 
+/** Storage returns connection flags as "true"/"false" strings; client payloads use booleans. */
+export function isConnectionFlagTrue(value: unknown): boolean {
+  return value === true || value === "true";
+}
+
+/** The active connection with its NanoGPT usage meter, or null when it should not show. */
+export function resolveNanoGptUsageConnection<
+  T extends { id?: string | null; provider?: string | null; showUsageWidget?: unknown },
+>(connections: readonly T[] | null | undefined, connectionId: string | null | undefined): T | null {
+  // A random pick has no single quota to read.
+  if (!connectionId || connectionId === "random") return null;
+  const connection = (connections ?? []).find((candidate) => candidate.id === connectionId);
+  if (!connection || connection.provider !== "nanogpt") return null;
+  // The stored flag is a "true"/"false" string, so a strict boolean check
+  // would always be false and silently hide the meter.
+  return isConnectionFlagTrue(connection.showUsageWidget) ? connection : null;
+}
+
 export function isLanguageGenerationConnection(connection: ConnectionProviderLike): boolean {
-  return connection.provider !== "image_generation" && connection.provider !== "video_generation";
+  return (
+    connection.provider !== "image_generation" &&
+    connection.provider !== "video_generation" &&
+    connection.provider !== "audio" &&
+    connection.provider !== "decision"
+  );
 }
 
 export function filterLanguageGenerationConnections<T extends ConnectionProviderLike>(
   connections: readonly T[] | null | undefined,
 ): T[] {
   return (connections ?? []).filter(isLanguageGenerationConnection);
+}
+
+/**
+ * Audio connections eligible for selection. Quarantined (review-required)
+ * imports are excluded to mirror the server's resolution, which refuses them.
+ * The loose structural constraint lets both typed rows and raw `/connections`
+ * records flow through without casts.
+ */
+export function filterAudioGenerationConnections<
+  T extends { provider?: unknown; profileImportReviewRequired?: unknown },
+>(connections: readonly T[] | null | undefined): T[] {
+  return (connections ?? []).filter(
+    (connection) => connection.provider === "audio" && !isConnectionFlagTrue(connection.profileImportReviewRequired),
+  );
 }
 
 export function createLocalSidecarConnectionOption(modelDisplayName?: string | null): LocalSidecarConnectionOption {

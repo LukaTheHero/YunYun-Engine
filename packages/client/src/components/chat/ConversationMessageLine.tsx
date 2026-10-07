@@ -15,8 +15,8 @@ import {
   ConversationMessageEditForm,
   ConversationMessageAttachments,
   ConversationMessageTranslation,
-  ConversationMessageSwipes,
   ConversationMessageName,
+  diceRollReplacesMessageContent,
   formatTimestamp,
   type MessageRenderContext,
 } from "./ConversationMessageShared";
@@ -52,17 +52,11 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
     isHiddenCollapsed,
     hiddenFromAIHeader,
     onExpandHidden,
-    hideActions,
     hideTimestamp,
     showActions,
     forceShowActions,
     showMessageNumbers,
     messageIndex,
-    hasSwipes,
-    swipeCount,
-    onSetActiveSwipe,
-    canRegenerate,
-    onRegenerate,
     onImageOpen,
     onRemoveAttachment,
     translatedText,
@@ -83,17 +77,22 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
             type="button"
             role="checkbox"
             aria-checked={isSelected}
-            aria-label={isSelected ?localizeUi("ui.chat.chatmessage.deselectMessage") :localizeUi("ui.chat.chatmessage.selectMessage")}
-            onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
+            aria-label={
+              isSelected
+                ? localizeUi("ui.chat.chatmessage.deselectMessage")
+                : localizeUi("ui.chat.chatmessage.selectMessage")
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.();
+            }}
             className={cn(
               MESSAGE_SELECTION_CHECKBOX_CLASS,
               "flex items-center justify-center",
               isSelected && MESSAGE_SELECTION_CHECKBOX_SELECTED_CLASS,
             )}
           >
-              {isSelected && (
-                <span className="text-xs font-bold text-[var(--marinara-chat-chrome-panel-bg)]">✓</span>
-              )}
+            {isSelected && <span className="text-xs font-bold text-[var(--marinara-chat-chrome-panel-bg)]">✓</span>}
           </button>
         </div>
       )}
@@ -117,7 +116,13 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
                 )}
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={displayName} loading="lazy" className="h-full w-full object-cover" style={avatarCropStyle} />
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                    style={avatarCropStyle}
+                  />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-sm font-bold text-[var(--muted-foreground)]">
                     {isUser ? <User size="1.125rem" /> : displayName[0]?.toUpperCase()}
@@ -127,7 +132,13 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
             ) : (
               <div className={cn("relative h-10 w-10 overflow-hidden bg-[var(--accent)]", avatarCornerClass)}>
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={displayName} loading="lazy" className="h-full w-full object-cover" style={avatarCropStyle} />
+                  <img
+                    src={avatarUrl}
+                    alt={displayName}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                    style={avatarCropStyle}
+                  />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-sm font-bold text-[var(--muted-foreground)]">
                     {isUser ? <User size="1.125rem" /> : displayName[0]?.toUpperCase()}
@@ -136,7 +147,7 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
               </div>
             )}
             {(showActions || forceShowActions || showMessageNumbers) && messageIndex != null && (
-              <span className="mt-0.5 block text-center text-[0.5rem] font-medium text-[var(--muted-foreground)] select-none">
+              <span className="mari-conversation-transcript-chrome-text mt-0.5 block text-center text-[0.5rem] font-medium select-none">
                 #{messageIndex}
               </span>
             )}
@@ -150,9 +161,13 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
         {!isGrouped && (
           <div className="mari-message-meta mb-0.5 flex items-baseline gap-2">
             {hiddenFromAIHeader}
-            <ConversationMessageName displayName={displayName} nameColor={nameColor} onOpenAboutMe={ctx.onOpenAboutMe} />
+            <ConversationMessageName
+              displayName={displayName}
+              nameColor={nameColor}
+              onOpenAboutMe={ctx.onOpenAboutMe}
+            />
             {!hideTimestamp && (
-              <span className="mari-message-timestamp text-[0.6875rem] text-[var(--muted-foreground)]/60">
+              <span className="mari-message-timestamp mari-conversation-transcript-chrome-text text-[0.6875rem]">
                 {formatTimestamp(message.createdAt)}
               </span>
             )}
@@ -175,7 +190,7 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
         ) : (
           <div
             className={cn(
-              "mari-message-content text-[0.9375rem] leading-relaxed break-words whitespace-pre-wrap",
+              "mari-message-content mari-chat-style-text text-[0.9375rem] leading-relaxed break-words whitespace-pre-wrap",
               isStreaming && !renderedContent && "py-1",
             )}
             style={messageTextStyle}
@@ -184,18 +199,41 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
               <PendingTypingDots dotClassName="bg-[var(--muted-foreground)]/60" />
             ) : (
               <>
-                {renderedContentParts ? (
-                  <div className="space-y-1.5">
-                    {renderedContentParts.map((part, i) => (
-                      <div key={i} className="animate-[fadeSlideIn_0.4s_ease-out]">
-                        <MessageContent content={part} mentionNames={mentionNames} emojiMap={emojiMap} stickerMap={stickerMap} onImageOpen={(url) => onImageOpen(url)} selfCharacterId={selfCharacterId} galleryIndex={galleryIndex} />
-                      </div>
-                    ))}
-                  </div>
-                ) : extra.diceRollResult ? (
+                {diceRollReplacesMessageContent(message.role, extra.diceRollResult) ? (
                   <DiceMessageContent diceRollResult={extra.diceRollResult} createdAt={message.createdAt} />
                 ) : (
-                  <MessageContent content={renderedContent} mentionNames={mentionNames} emojiMap={emojiMap} stickerMap={stickerMap} onImageOpen={(url) => onImageOpen(url)} selfCharacterId={selfCharacterId} galleryIndex={galleryIndex} />
+                  <>
+                    {extra.diceRollResult ? (
+                      <DiceMessageContent diceRollResult={extra.diceRollResult} createdAt={message.createdAt} />
+                    ) : null}
+                    {renderedContentParts ? (
+                      <div className="space-y-1.5">
+                        {renderedContentParts.map((part, i) => (
+                          <div key={i} className="animate-[fadeSlideIn_0.4s_ease-out]">
+                            <MessageContent
+                              content={part}
+                              mentionNames={mentionNames}
+                              emojiMap={emojiMap}
+                              stickerMap={stickerMap}
+                              onImageOpen={(url) => onImageOpen(url)}
+                              selfCharacterId={selfCharacterId}
+                              galleryIndex={galleryIndex}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <MessageContent
+                        content={renderedContent}
+                        mentionNames={mentionNames}
+                        emojiMap={emojiMap}
+                        stickerMap={stickerMap}
+                        onImageOpen={(url) => onImageOpen(url)}
+                        selfCharacterId={selfCharacterId}
+                        galleryIndex={galleryIndex}
+                      />
+                    )}
+                  </>
                 )}
                 {isStreaming && (
                   <span className="ml-0.5 inline-block h-4 w-[0.125rem] animate-pulse rounded-full bg-[var(--foreground)]/50" />
@@ -217,20 +255,6 @@ export function ConversationMessageLine({ ctx }: { ctx: MessageRenderContext }) 
               onImageOpen={onImageOpen}
               onRemove={onRemoveAttachment}
             />
-
-            {!hideActions && (hasSwipes || (canRegenerate && onRegenerate)) && (
-              <div className="mt-1.5">
-                <ConversationMessageSwipes
-                  messageId={message.id}
-                  activeSwipeIndex={message.activeSwipeIndex}
-                  swipeCount={swipeCount}
-                  onSetActiveSwipe={(idx) => onSetActiveSwipe?.(message.id, idx)}
-                  onCreateNextSwipe={
-                    canRegenerate && onRegenerate ? () => onRegenerate(message.id) : undefined
-                  }
-                />
-              </div>
-            )}
           </>
         )}
       </div>

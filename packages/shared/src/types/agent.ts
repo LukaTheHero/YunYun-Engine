@@ -7,6 +7,7 @@ import type { BuiltInAgentManifest } from "../features/agents/agent-manifest.typ
 import type { AgentToolConfig, ToolDefinition } from "../features/function-calls/tool-definitions.js";
 import type { ChatMode } from "./chat.js";
 import type { WrapFormat } from "./prompt.js";
+import type { MacroDecisionAnswers } from "../utils/macro-engine.js";
 
 /** When in the generation pipeline an agent runs. */
 export type AgentPhase =
@@ -47,10 +48,12 @@ export const AGENT_RESULT_TYPE_VALUES = [
   "director_event",
   "lorebook_update",
   "character_card_update",
+  "character_card_create",
   "background_change",
   "character_tracker_update",
   "persona_stats_update",
   "custom_tracker_update",
+  "inventory_tracker_update",
   "spotify_control",
   "youtube_control",
   "local_music_control",
@@ -62,8 +65,10 @@ export const AGENT_RESULT_TYPE_VALUES = [
   "game_map_update",
   "game_state_transition",
   "prompt_patch",
+  "character_activity_update",
   "frontend_theme_update",
   "about_me_update",
+  "memory_nag",
 ] as const;
 
 /** The result type an agent can produce. */
@@ -272,7 +277,7 @@ export interface AgentResult {
   error: string | null;
 }
 
-export type AgentWriteApprovalKind = "lorebook_update" | "summary_update";
+export type AgentWriteApprovalKind = "character_card_create" | "lorebook_update" | "summary_update";
 
 export interface AgentWriteApprovalProposal {
   kind: AgentWriteApprovalKind;
@@ -326,8 +331,38 @@ export interface AgentCallDebugEvent {
   batchedAgentTypes?: string[];
 }
 
+/** Content-free progress for the normal Agents menu, independent of prompt/debug logging. */
+export interface AgentTaskProgress {
+  callId: string;
+  agents: Array<{ id: string; type: string; name: string; phase: string }>;
+  stage: "waiting" | "streaming" | "received" | "error" | "stopped";
+  receivedChunks: number;
+  receivedCharacters: number;
+  /** First received text or reasoning chunk; unavailable for non-streaming calls. */
+  ttftMs?: number;
+  elapsedMs: number;
+  promptTokens?: number;
+  completionTokens?: number;
+}
+
 /** Shared context passed to every agent. */
 export interface AgentContext {
+  /** Serialize model calls for Game chats sharing limited GPU memory. */
+  sequentialExecution?: boolean;
+  /**
+   * This turn's answers for `decision:` and `decision_choice:` conditions in the
+   * agent's prompt template (#6569). Absent means none were asked, which reads as no.
+   */
+  decisions?: MacroDecisionAnswers;
+  /**
+   * Prose to read instead of the recent messages.
+   *
+   * Set when the operator types a correction directly — "her sword is broken" — rather
+   * than waiting for the story to say it. The extractor runs on that sentence with the
+   * current state as context, so an unnamed subject still attaches to whoever is
+   * actually holding the sword.
+   */
+  narrationOverride?: string;
   chatId: string;
   chatMode: string;
   /** Prompt wrapper format selected for this generation. */
@@ -338,6 +373,8 @@ export interface AgentContext {
     role: string;
     content: string;
     characterId?: string;
+    /** Speaker label for agent history; set only when the message has exactly one speaker. */
+    speakerName?: string;
     /** Tracker state snapshot for this message (if any). */
     gameState?: import("./game-state.js").GameState | null;
   }>;
@@ -360,6 +397,8 @@ export interface AgentContext {
   characters: Array<{
     id: string;
     name: string;
+    /** Persisted character-card world name, when configured. */
+    world?: string;
     description: string;
     personality?: string;
     scenario?: string;
@@ -373,6 +412,12 @@ export interface AgentContext {
     avatarPath?: string | null;
     avatarCrop?: unknown;
     rpgStats?: import("./character.js").RPGStatsConfig;
+  }>;
+  /** Every character attached to the chat, with only the data needed for activity routing. */
+  chatCharacters?: Array<{
+    id: string;
+    name: string;
+    active: boolean;
   }>;
   /** Latest known tracker entries, including recurring characters that are currently absent. */
   characterTrackerHistory?: import("./game-state.js").PresentCharacter[];
@@ -394,6 +439,9 @@ export interface AgentContext {
   } | null;
   /** The agent's own persistent memory (key-value) */
   memory: Record<string, unknown>;
+  /** Host resolves only this agent's output on the visible message history. */
+  loadPreviousOutput?: (agentConfigId: string) => Promise<unknown>;
+  previousOutput?: { agentType: string; text: string };
   /** All lorebook IDs the agent can write to */
   writableLorebookIds: string[] | null;
   /** Chat summary text (if any) — helps agents avoid duplicating summarized info */
@@ -403,8 +451,11 @@ export interface AgentContext {
   /** Lorebook entries activated for the main generation on this turn. */
   activatedLorebookEntries?: Array<{
     id: string;
+    name?: string;
     content: string;
   }>;
+  /** Per-lorebook total entry counts (for {{lorebooksize::ID}} macro in agent prompts). */
+  lorebookEntryCounts?: Record<string, number>;
   /**
    * Semantic source material resolved for custom agents that opt into vector access.
    * The runtime keeps this out of ordinary agent prompts and injects it only for
@@ -438,6 +489,15 @@ export interface AgentContext {
   streaming?: boolean;
   /** Emits full agent call diagnostics for the client debug console. */
   agentDebug?: (event: AgentCallDebugEvent) => void;
+  /** Lightweight provider progress; never includes prompts, reasoning, or response content. */
+  agentProgress?: (event: AgentTaskProgress) => void;
+  /** Request-local scene check shared by tracker calls; only the first eligible call claims it. */
+  sceneCheck?: {
+    trackerAgentIds: string[];
+    prompt: string;
+    claimed: boolean;
+    result?: unknown;
+  };
   /** Abort signal — when triggered, agent execution should stop. Typed as `any` to avoid DOM/Node lib dependency. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   signal?: any;
@@ -532,6 +592,7 @@ export const MIN_AGENT_MAX_TOKENS = 128;
 export const MAX_AGENT_MAX_TOKENS = 32768;
 
 export const CUSTOM_AGENT_CAPABILITY_IDS = [
+  "create_characters",
   "create_lorebooks",
   "edit_lorebooks",
   "edit_messages",
@@ -545,6 +606,7 @@ export const CUSTOM_AGENT_CAPABILITY_IDS = [
   "trigger_image_generation",
   "access_vectors",
   "edit_main_prompt",
+  "manage_chat_characters",
 ] as const;
 
 export type CustomAgentCapability = (typeof CUSTOM_AGENT_CAPABILITY_IDS)[number];
@@ -559,6 +621,7 @@ export const CUSTOM_AGENT_CONTEXT_SOURCE_IDS = [
   "authorNotes",
   "trackerData",
   "recalledMemories",
+  "previousOutput",
 ] as const;
 
 export type CustomAgentContextSource = (typeof CUSTOM_AGENT_CONTEXT_SOURCE_IDS)[number];
@@ -573,6 +636,7 @@ export const DEFAULT_CUSTOM_AGENT_CONTEXT_SOURCES: CustomAgentContextSources = {
   authorNotes: false,
   trackerData: false,
   recalledMemories: false,
+  previousOutput: false,
 };
 
 export function normalizeCustomAgentContextSources(settings: unknown): CustomAgentContextSources {
@@ -584,6 +648,26 @@ export function normalizeCustomAgentContextSources(settings: unknown): CustomAge
     if (typeof stored[source] === "boolean") normalized[source] = stored[source];
   }
   return normalized;
+}
+
+/** Built-in agents retain their existing context unless the user explicitly configures sources. */
+export function getAgentContextSources(config: {
+  isCustomAgent?: boolean;
+  settings: unknown;
+}): CustomAgentContextSources {
+  const settings = parseAgentSettingsRecord(config.settings);
+  if (config.isCustomAgent || isRecord(settings.contextSources)) return normalizeCustomAgentContextSources(settings);
+  return {
+    chatHistory: true,
+    characters: true,
+    persona: true,
+    activatedLorebookEntries: true,
+    chatSummary: true,
+    authorNotes: true,
+    trackerData: true,
+    recalledMemories: true,
+    previousOutput: false,
+  };
 }
 
 export interface CustomAgentImportPolicy {
@@ -611,15 +695,18 @@ export function createImportedAgentType(sourceType: string): string {
 const CUSTOM_AGENT_CAPABILITY_SET = new Set<string>(CUSTOM_AGENT_CAPABILITY_IDS);
 
 const CUSTOM_AGENT_RESULT_CAPABILITY: Partial<Record<AgentResultType, CustomAgentCapability>> = {
+  character_card_create: "create_characters",
   text_rewrite: "edit_messages",
   lorebook_update: "edit_lorebooks",
   character_tracker_update: "edit_trackers",
   persona_stats_update: "edit_trackers",
   custom_tracker_update: "edit_trackers",
+  inventory_tracker_update: "edit_trackers",
   quest_update: "edit_trackers",
   game_state_update: "edit_trackers",
   image_prompt: "trigger_image_generation",
   prompt_patch: "edit_main_prompt",
+  character_activity_update: "manage_chat_characters",
   frontend_theme_update: "change_frontend_styling",
   background_change: "change_backgrounds",
   sprite_change: "change_sprites",
@@ -722,6 +809,18 @@ const OBSOLETE_BUILT_IN_PROMPT_TEMPLATE_IDS: Record<string, ReadonlySet<string>>
   illustrator: new Set(["illustration", "sketch"]),
 };
 
+const ADDITIONAL_BUILT_IN_PROMPT_TEMPLATE_COLLECTION_KEYS: Record<string, readonly string[]> = {
+  storyboard: [
+    "illustrationTemplates",
+    "videoTemplates",
+    "animationRefinementTemplates",
+    "roleplayEpisodeTemplates",
+    "roleplayStyleTemplates",
+    "roleplayAnimationTemplates",
+    "roleplayOutputTemplates",
+  ],
+};
+
 const RETIRED_BUILT_IN_AGENT_TOOLS: Record<string, ReadonlySet<string>> = {
   expression: new Set(["set_expression"]),
 };
@@ -731,6 +830,30 @@ export function normalizeBuiltInAgentEnabledTools(agentType: string, value: unkn
   const enabledTools = value.filter((tool): tool is string => typeof tool === "string");
   const retiredTools = RETIRED_BUILT_IN_AGENT_TOOLS[agentType];
   return retiredTools ? enabledTools.filter((tool) => !retiredTools.has(tool)) : enabledTools;
+}
+
+function mergeBuiltInPromptTemplateCollection(
+  defaultValue: unknown,
+  savedValue: unknown,
+  obsoleteIds: ReadonlySet<string> = new Set(),
+): AgentPromptTemplateOption[] {
+  const defaultOptions = normalizeAgentPromptTemplateOptions(defaultValue);
+  const savedOptions = normalizeAgentPromptTemplateOptions(savedValue);
+  const savedOptionsById = new Map(
+    savedOptions.filter((entry) => !obsoleteIds.has(entry.id)).map((entry) => [entry.id, entry]),
+  );
+  const usedIds = new Set<string>();
+  const mergedDefaultOptions = defaultOptions.map((defaultOption) => {
+    usedIds.add(defaultOption.id);
+    const savedOption = savedOptionsById.get(defaultOption.id);
+    return savedOption ? { ...defaultOption, ...savedOption } : defaultOption;
+  });
+  const customOptions = savedOptions.filter((entry) => {
+    if (obsoleteIds.has(entry.id) || usedIds.has(entry.id)) return false;
+    usedIds.add(entry.id);
+    return true;
+  });
+  return [...mergedDefaultOptions, ...customOptions];
 }
 
 export function mergeBuiltInAgentSettings(agentType: string, settings: unknown): Record<string, unknown> {
@@ -747,29 +870,19 @@ export function mergeBuiltInAgentSettings(agentType: string, settings: unknown):
     ...normalizedSettings,
   };
 
-  const defaultPromptTemplates = normalizeAgentPromptTemplateOptions(defaults.promptTemplates);
-  const savedPromptTemplates = normalizeAgentPromptTemplateOptions(normalizedSettings.promptTemplates);
-  const obsoleteIds = OBSOLETE_BUILT_IN_PROMPT_TEMPLATE_IDS[agentType] ?? new Set<string>();
-  const savedPromptTemplatesById = new Map(
-    savedPromptTemplates.filter((entry) => !obsoleteIds.has(entry.id)).map((entry) => [entry.id, entry]),
-  );
-  const usedIds = new Set<string>();
-  const mergedDefaultPromptTemplates = defaultPromptTemplates.map((defaultOption) => {
-    usedIds.add(defaultOption.id);
-    const savedOption = savedPromptTemplatesById.get(defaultOption.id);
-    return savedOption ? { ...defaultOption, ...savedOption } : defaultOption;
-  });
-  const customPromptTemplates = savedPromptTemplates.filter((entry) => {
-    if (obsoleteIds.has(entry.id) || usedIds.has(entry.id)) return false;
-    usedIds.add(entry.id);
-    return true;
-  });
-  const promptTemplates = [...mergedDefaultPromptTemplates, ...customPromptTemplates];
-
-  if (promptTemplates.length) {
-    merged.promptTemplates = promptTemplates;
-  } else {
-    delete merged.promptTemplates;
+  const promptTemplateCollectionKeys = [
+    "promptTemplates",
+    ...(ADDITIONAL_BUILT_IN_PROMPT_TEMPLATE_COLLECTION_KEYS[agentType] ?? []),
+  ];
+  for (const key of promptTemplateCollectionKeys) {
+    const obsoleteIds =
+      key === "promptTemplates" ? (OBSOLETE_BUILT_IN_PROMPT_TEMPLATE_IDS[agentType] ?? new Set<string>()) : undefined;
+    const promptTemplates = mergeBuiltInPromptTemplateCollection(defaults[key], normalizedSettings[key], obsoleteIds);
+    if (promptTemplates.length) {
+      merged[key] = promptTemplates;
+    } else {
+      delete merged[key];
+    }
   }
 
   return merged;
@@ -801,6 +914,8 @@ export interface LorebookUpdateResult {
     content: string;
     keys: string[];
     tag?: string;
+    /** Optional lorebook injection priority. Omission preserves the existing/default order. */
+    order?: number;
   };
 }
 

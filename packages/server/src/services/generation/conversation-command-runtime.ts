@@ -1,3 +1,4 @@
+import { currentRoomGeneration, roomConversationCommandAllowed } from "../multiplayer/generation-policy.js";
 import {
   BUILT_IN_AGENTS,
   CONVERSATION_COMMAND_AGENT_IDS,
@@ -12,7 +13,7 @@ import type { CharacterCommand } from "../conversation/character-commands.js";
 import { wrapContent } from "../prompt/format-engine.js";
 import { resolveSpotifyCredentials, spotifyHasScope } from "../spotify/spotify.service.js";
 import { getActiveTurnGame } from "../turn-games/turn-game-runner.service.js";
-import { getChatHapticIntifaceUrl } from "./haptic-runtime.js";
+import { describeHapticDeviceType, getChatHapticIntifaceUrl } from "./haptic-runtime.js";
 import { listCapabilityConversationCommandInstructions } from "../capability-packages/capability-command-registry.service.js";
 
 type ChatRowForCommands = {
@@ -48,7 +49,7 @@ export function readConversationCommandToggles(
 }
 
 export function isConversationCommandEnabled(metadata: Record<string, unknown>, key: ConversationCommandKey): boolean {
-  return readConversationCommandToggles(metadata)[key] !== false;
+  return roomConversationCommandAllowed(key) && readConversationCommandToggles(metadata)[key] !== false;
 }
 
 function getConversationCommandKey(command: CharacterCommand): ConversationCommandKey | null {
@@ -103,6 +104,7 @@ export function filterEnabledConversationCommands(
   metadata: Record<string, unknown>,
 ): CharacterCommand[] {
   return commands.filter((command) => {
+    if (!roomConversationCommandAllowed(command.type)) return false;
     const key = getConversationCommandKey(command);
     return key === null || (isConversationCommandAvailable(key) && isConversationCommandEnabled(metadata, key));
   });
@@ -154,8 +156,7 @@ export async function buildConversationCommandsReminder(args: {
   const memoryCommandEnabled = isConversationCommandEnabled(chatMeta, "memory");
   const sceneCommandEnabled = isConversationCommandEnabled(chatMeta, "scene");
   const reactCommandEnabled = isConversationCommandEnabled(chatMeta, "react");
-  const callCommandEnabled =
-    isConversationCommandAvailable("call") && isConversationCommandEnabled(chatMeta, "call");
+  const callCommandEnabled = isConversationCommandAvailable("call") && isConversationCommandEnabled(chatMeta, "call");
   const musicCommandEnabled =
     isConversationCommandAvailable("music") && isConversationCommandEnabled(chatMeta, "music");
   const hapticCommandEnabled =
@@ -168,7 +169,7 @@ export async function buildConversationCommandsReminder(args: {
         : "spotify";
 
   // Discover other chats this character is in (for cross_post targets + memory targets)
-  const allChatsForCrossPost = await args.chats.list();
+  const allChatsForCrossPost = currentRoomGeneration() ? [] : await args.chats.list();
   const crossPostTargets: string[] = [];
   const memoryTargetCharIds = new Set<string>();
   for (const c of allChatsForCrossPost) {
@@ -277,8 +278,7 @@ export async function buildConversationCommandsReminder(args: {
       `   - {{user}} says "I'm coming over" or "Let's go to the park" → trigger a scene for arriving/being at that location.`,
       `   - You invite {{user}} somewhere and they accept → trigger a scene for that activity.`,
       `   - A plan is made (date, trip, hangout, confrontation) and the moment arrives → trigger a scene.`,
-      `   Do NOT wait for {{user}} to explicitly ask for a scene. If the conversation implies you and {{user}} are about to DO something together, initiate the scene yourself.`,
-      `   EXCEPTION: Do NOT start a scene for playing UNO, chess, poker, 8-ball pool, tic-tac-toe, rock-paper-scissors, cards, or other board/table games — those have their own commands. Use [uno] for UNO, [chess] for chess, [poker] for poker, [eightball] for 8-ball pool, [tic_tac_toe] for tic-tac-toe, and [rock_paper_scissors] for rock-paper-scissors, not [scene].`,
+      `   - Do NOT wait for {{user}} to explicitly ask for a scene. If the conversation implies you and {{user}} are about to DO something together, initiate the scene yourself.`,
     );
   }
 
@@ -320,7 +320,12 @@ export async function buildConversationCommandsReminder(args: {
     isConversationCommandEnabled(chatMeta, "rock_paper_scissors") &&
     characterIds.length >= 1;
   const noActiveTurnGame =
-    (unoAdvertisable || chessAdvertisable || pokerAdvertisable || eightballAdvertisable || ticTacToeAdvertisable || rpsAdvertisable) &&
+    (unoAdvertisable ||
+      chessAdvertisable ||
+      pokerAdvertisable ||
+      eightballAdvertisable ||
+      ticTacToeAdvertisable ||
+      rpsAdvertisable) &&
     !(await getActiveTurnGame(args.db, args.chatId));
   if (unoAdvertisable && noActiveTurnGame) {
     addCommandLines(
@@ -393,11 +398,16 @@ export async function buildConversationCommandsReminder(args: {
       }
     }
     if (hapticService.connected && hapticService.devices.length > 0) {
-      const deviceNames = hapticService.devices.map((d) => d.name).join(", ");
+      const deviceDescriptions = hapticService.devices
+        .map(
+          (device) =>
+            `${device.name} (index ${device.index}; ${device.type ?? describeHapticDeviceType(device.capabilities)}; actions: ${device.capabilities.join("|")})`,
+        )
+        .join(", ");
       addCommandLines(
-        `- [haptic: action="vibrate|oscillate|rotate|position|stop", intensity=0.0-1.0, duration=seconds (0 = loop until next command)] or [haptic: action="stop"] - control or stop the user's connected intimate device(s) (${deviceNames}). Use this during physical/intimate/sensual moments to provide haptic feedback that matches the narrative. Vary intensity based on the scene.`,
-        `   You can include multiple [haptic] commands in one message for patterns (e.g., escalating: 0.2 → 0.5 → 0.8).`,
-        `   Example: *trails a finger slowly down your arm* [haptic: action="vibrate", intensity=0.3, duration=2]`,
+        `- [haptic: action="supported action", intensity=0.0-1.0, duration=seconds, pattern="steady|tap|pulse|wave|ramp|impact"] or [haptic: action="stop"] - control or stop the user's connected intimate device(s): ${deviceDescriptions}.`,
+        `   Match the action to the device and scene. Position controls linear stroking, thrusting, or pumping; inflate controls air-pressure pumping; constrict controls squeezing. Every named pattern works with scalar and position actions. Use the full intensity range when appropriate.`,
+        `   Example: *sets a firm, rhythmic pace* [haptic: action="position", intensity=1, duration=3, pattern="pulse"]`,
       );
     }
   }

@@ -4,6 +4,7 @@ import type {
   ChatSummaryEntryOrigin,
   ChatSummaryEntrySource,
 } from "../types/chat.js";
+import { estimateTextTokens } from "./token-estimator.js";
 
 const VALID_KINDS = new Set<ChatSummaryEntryKind>(["rolling"]);
 const VALID_ORIGINS = new Set<ChatSummaryEntryOrigin>(["manual", "automated", "legacy"]);
@@ -61,13 +62,11 @@ function sourceFromOrigin(origin: ChatSummaryEntryOrigin): ChatSummaryEntrySourc
 export function estimateChatSummaryTokens(content: string): number {
   const normalized = content.trim();
   if (!normalized) return 0;
-  return Math.max(1, Math.ceil(normalized.length / 4));
+  return estimateTextTokens(normalized);
 }
 
 /** Generate a concise default title from an entry's origin and source metadata. */
-export function generateChatSummaryEntryTitle(
-  entry: Pick<ChatSummaryEntry, "origin">,
-): string {
+export function generateChatSummaryEntryTitle(entry: Pick<ChatSummaryEntry, "origin">): string {
   if (entry.origin === "legacy") return "Legacy summary";
   if (entry.origin === "automated") return "Automated summary";
   return "Manual summary";
@@ -176,9 +175,7 @@ function pruneAutomatedChatSummaryEntries(entries: ChatSummaryEntry[]): ChatSumm
   const prunable = entries
     .filter(
       (entry) =>
-        entry.origin === "automated" &&
-        entry.enabled &&
-        !(entry.hiddenMessageIds && entry.hiddenMessageIds.length > 0),
+        entry.origin === "automated" && entry.enabled && !(entry.hiddenMessageIds && entry.hiddenMessageIds.length > 0),
     )
     .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
   const removeCount = prunable.length - MAX_AUTOMATED_CHAT_SUMMARY_ENTRIES;
@@ -222,6 +219,24 @@ export function compileChatSummaryEntries(entries: ChatSummaryEntry[]): string |
     .trim();
   if (!compiled) return null;
   return compiled;
+}
+
+/** Message IDs that are no longer covered by an enabled summary after deleting entries. */
+export function getChatSummaryMessageIdsToUnhideAfterDelete(
+  entries: ChatSummaryEntry[],
+  deletedEntryIds: ReadonlySet<string>,
+): string[] {
+  const deletedCoverage = new Set<string>();
+  const retainedCoverage = new Set<string>();
+
+  for (const entry of entries) {
+    const coverage = entry.hiddenMessageIds ?? entry.messageIds ?? [];
+    const target = deletedEntryIds.has(entry.id) ? deletedCoverage : entry.enabled ? retainedCoverage : null;
+    if (!target) continue;
+    for (const messageId of coverage) target.add(messageId);
+  }
+
+  return [...deletedCoverage].filter((messageId) => !retainedCoverage.has(messageId));
 }
 
 export function combineChatSummaryEntryHistory(

@@ -17,6 +17,7 @@ import {
 } from "@marinara-engine/shared";
 import type { DB } from "../../db/connection.js";
 import { and, desc, eq, inArray, ne, or } from "../../db/file-query.js";
+import { IMPORTED_GAME_ENGINE_ANCHOR_PREFIX } from "../../db/file-backed-store.js";
 import { FileUniqueConstraintError } from "../../db/file-schema.js";
 import { engineEventOwner } from "./capability-roleplay-events.service.js";
 import { ensureTimestampAfter } from "../import/import-timestamps.js";
@@ -89,16 +90,17 @@ function mapBranchMetadata(value: unknown): CapabilityChatRecord["branch"] {
 }
 
 function mapChat(row: typeof chats.$inferSelect): CapabilityChatRecord {
+  const branch = mapBranchMetadata(row.metadata);
   return {
     id: row.id,
-    name: row.name,
+    name: branch?.title ?? row.name,
     mode: row.mode,
     characterIds: parseStringArray(row.characterIds),
     groupId: row.groupId,
     personaId: row.personaId,
     connectionId: row.connectionId,
     metadata: row.metadata,
-    branch: mapBranchMetadata(row.metadata),
+    branch,
     lastMessageAt: row.lastMessageAt,
     updatedAt: row.updatedAt,
   };
@@ -266,13 +268,23 @@ function createDocumentStore(db: DB): CapabilityDocumentStore {
   };
 }
 
-function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
+type PersistencePermissionCheck = (permission: "chat-read" | "chat-write") => void;
+
+function createSpatialSnapshotStore(
+  db: DB,
+  assertPermission: PersistencePermissionCheck,
+): CapabilitySpatialSnapshotStore {
   const store: CapabilitySpatialSnapshotStore = {
-    async getById(id) {
-      const rows = await db.select().from(spatialContextSnapshots).where(eq(spatialContextSnapshots.id, id)).limit(1);
+    async getById(id, chatId) {
+      assertPermission("chat-read");
+      const condition = chatId
+        ? and(eq(spatialContextSnapshots.chatId, chatId), eq(spatialContextSnapshots.id, id))
+        : eq(spatialContextSnapshots.id, id);
+      const rows = await db.select().from(spatialContextSnapshots).where(condition).limit(1);
       return rows[0] ? mapSnapshot(rows[0]) : null;
     },
     async getByAnchor(chatId, messageId, swipeIndex) {
+      assertPermission("chat-read");
       const rows = await db
         .select()
         .from(spatialContextSnapshots)
@@ -287,6 +299,7 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
       return rows[0] ? mapSnapshot(rows[0]) : null;
     },
     async getByCommand(chatId, commandId) {
+      assertPermission("chat-read");
       const rows = await db
         .select()
         .from(spatialContextSnapshots)
@@ -297,6 +310,7 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
       return rows[0] ? mapSnapshot(rows[0]) : null;
     },
     async listByAnchors(chatId, anchors) {
+      assertPermission("chat-read");
       if (anchors.length === 0) return [];
       const rows = await db
         .select()
@@ -317,10 +331,12 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
       return rows.map(mapSnapshot);
     },
     async listForChat(chatId) {
+      assertPermission("chat-read");
       const rows = await db.select().from(spatialContextSnapshots).where(eq(spatialContextSnapshots.chatId, chatId));
       return rows.map(mapSnapshot);
     },
     async hasMessageSnapshots(chatId) {
+      assertPermission("chat-read");
       const rows = await db
         .select({ id: spatialContextSnapshots.id })
         .from(spatialContextSnapshots)
@@ -329,6 +345,7 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
       return rows.length > 0;
     },
     async getLatest(chatId) {
+      assertPermission("chat-read");
       const rows = await db
         .select()
         .from(spatialContextSnapshots)
@@ -338,6 +355,7 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
       return rows[0] ? mapSnapshot(rows[0]) : null;
     },
     async getBootstrap(chatId) {
+      assertPermission("chat-read");
       const rows = await db
         .select()
         .from(spatialContextSnapshots)
@@ -347,10 +365,12 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
       return rows[0] ? mapSnapshot(rows[0]) : null;
     },
     async create(input) {
+      assertPermission("chat-write");
       await db.insert(spatialContextSnapshots).values(input);
       return mapSnapshot(input as typeof spatialContextSnapshots.$inferSelect);
     },
     async replaceBootstrap(input) {
+      assertPermission("chat-write");
       return db.transaction(async (tx) => {
         await tx
           .delete(spatialContextSnapshots)
@@ -360,6 +380,7 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
       });
     },
     async replaceAtAnchor(input) {
+      assertPermission("chat-write");
       return db.transaction(async (tx) => {
         await tx
           .delete(spatialContextSnapshots)
@@ -378,16 +399,19 @@ function createSpatialSnapshotStore(db: DB): CapabilitySpatialSnapshotStore {
   return store;
 }
 
-function createPersistenceSession(db: DB): CapabilityPersistenceSession {
+function createPersistenceSession(db: DB, assertPermission: PersistencePermissionCheck): CapabilityPersistenceSession {
   return {
     async listChats() {
+      assertPermission("chat-read");
       return (await db.select().from(chats).orderBy(desc(chats.updatedAt))).map(mapChat);
     },
     async getChat(chatId) {
+      assertPermission("chat-read");
       const rows = await db.select().from(chats).where(eq(chats.id, chatId)).limit(1);
       return rows[0] ? mapChat(rows[0]) : null;
     },
     async listMessages(chatId) {
+      assertPermission("chat-read");
       const rows = await db
         .select()
         .from(messages)
@@ -396,6 +420,7 @@ function createPersistenceSession(db: DB): CapabilityPersistenceSession {
       return rows.map(mapMessage);
     },
     async getGameState(chatId) {
+      assertPermission("chat-read");
       const rows = await db
         .select()
         .from(gameStateSnapshots)
@@ -405,6 +430,7 @@ function createPersistenceSession(db: DB): CapabilityPersistenceSession {
       return rows[0] ? mapGameState(rows[0]) : null;
     },
     async appendRoleplayEvent(input: CapabilityRoleplayEventInput): Promise<CapabilityRoleplayEventRecord | null> {
+      assertPermission("chat-write");
       const scopedOwner = engineEventOwner(input.chatId);
       const text = input.text.trim().slice(0, MAX_ROLEPLAY_EVENT_TEXT_CHARS);
       if (!text || input.idempotencyKey.length === 0) return null;
@@ -442,6 +468,21 @@ function createPersistenceSession(db: DB): CapabilityPersistenceSession {
       return requestedIds.filter((entryId) => existingIds.has(entryId));
     },
     async createMessageWithSwipe(input: CapabilityCreateMessageWithSwipeInput) {
+      assertPermission("chat-write");
+      // `imported:` is RESERVED for synthetic experience-state anchors (#5405), and this is the
+      // only message writer that takes a caller-supplied id — every other path builds one with
+      // newId() (nanoid, whose alphabet has no colon). The reservation is load-bearing: the
+      // messages -> game_engine_state cascade matches messageId ALONE and is never scoped by
+      // chatId, so a real message minted at "imported:X" would let ITS deletion destroy an
+      // imported campaign in a DIFFERENT chat — the exact cross-chat damage the synthetic anchor
+      // exists to prevent — and would also fall under the validate() dangling-ref exemption that
+      // assumes no such message can exist. Refuse before the transaction so nothing is written.
+      if (input.id.startsWith(IMPORTED_GAME_ENGINE_ANCHOR_PREFIX)) {
+        throw new Error(
+          `Message id ${JSON.stringify(input.id)} uses the reserved ` +
+            `"${IMPORTED_GAME_ENGINE_ANCHOR_PREFIX}" prefix, which belongs to imported experience-state anchors`,
+        );
+      }
       return db.transaction(async (tx) => {
         const chatRows = await tx
           .select({ lastMessageAt: chats.lastMessageAt })
@@ -468,16 +509,26 @@ function createPersistenceSession(db: DB): CapabilityPersistenceSession {
           extra: JSON.stringify({}),
           createdAt,
         });
+        await tx
+          .update(chats)
+          .set({ lastMessageAt: createdAt, updatedAt: createdAt })
+          .where(eq(chats.id, input.chatId));
         return mapMessage(message as typeof messages.$inferSelect);
       });
     },
     async markGameStateSnapshotCommitted(chatId, snapshotId) {
+      assertPermission("chat-write");
       await db
         .update(gameStateSnapshots)
         .set({ committed: 1 })
         .where(and(eq(gameStateSnapshots.id, snapshotId), eq(gameStateSnapshots.chatId, chatId)));
     },
+    // Both metadata writers below replace the WHOLE blob and are not write-ordinal stamped
+    // (#5406) — same category as `chats.updateMetadata`: the mirror rides through untouched, so
+    // a key written here keeps a stale ordinal. Safe only while the keys packages order against
+    // are reachable solely through the chat metadata PATCH path.
     async updateChatActivity(input: CapabilityChatActivityUpdate) {
+      assertPermission("chat-write");
       await db.transaction(async (transaction) => {
         const rows = input.metadata
           ? await transaction
@@ -499,6 +550,7 @@ function createPersistenceSession(db: DB): CapabilityPersistenceSession {
       });
     },
     async updateChatMetadata(input: CapabilityChatMetadataUpdate) {
+      assertPermission("chat-write");
       await db.transaction(async (transaction) => {
         const rows = await transaction
           .select({ metadata: chats.metadata })
@@ -517,15 +569,25 @@ function createPersistenceSession(db: DB): CapabilityPersistenceSession {
       });
     },
     documents: createDocumentStore(db),
-    spatialSnapshots: createSpatialSnapshotStore(db),
+    spatialSnapshots: createSpatialSnapshotStore(db, assertPermission),
   };
 }
 
-export function createCapabilityPersistenceHost(db: DB): CapabilityPersistenceHost {
-  const session = createPersistenceSession(db);
+/** Omitted permissions are reserved for trusted Engine callers; package activation always passes its manifest. */
+export function createCapabilityPersistenceHost(db: DB, permissions?: readonly string[]): CapabilityPersistenceHost {
+  const granted = permissions ? new Set(permissions) : null;
+  const assertPermission: PersistencePermissionCheck = (permission) => {
+    if (granted && !granted.has(permission)) throw new Error(`Package persistence requires ${permission} permission.`);
+  };
+  const session = createPersistenceSession(db, assertPermission);
   return {
     ...session,
-    withChatLock: (chatId, operation) => withChatMetadataPatchQueue(chatId, operation),
-    transaction: (operation) => db.transaction((tx) => operation(createPersistenceSession(tx))),
+    withChatLock: (chatId, operation) => {
+      if (granted && !granted.has("chat-read") && !granted.has("chat-write")) {
+        return Promise.reject(new Error("Package chat locks require chat-read or chat-write permission."));
+      }
+      return withChatMetadataPatchQueue(chatId, operation);
+    },
+    transaction: (operation) => db.transaction((tx) => operation(createPersistenceSession(tx, assertPermission))),
   };
 }

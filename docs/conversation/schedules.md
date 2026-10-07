@@ -4,7 +4,7 @@ This guide explains how characters in Conversation Mode message you first, and h
 
 ## What autonomous messages and schedules do
 
-An autonomous message is a message a character sends you first, without you writing anything. YunYun Engine (YunYun for short) sends these when you have been quiet for a while, so a chat feels like a real messaging relationship.
+An autonomous message is a message a character sends you first, without you writing anything. Marinara Engine (Marinara for short) sends these when you have been quiet for a while, so a chat feels like a real messaging relationship.
 
 Two settings control this behavior:
 
@@ -18,7 +18,7 @@ Schedules are optional. With autonomous messages on but schedules off, character
 You control this from the chat, not the character card. All of these controls live in the **Autonomous Messaging** section of **Chat Settings**.
 
 1. Open a Conversation chat.
-2. Open **Chat Settings** (the gear icon).
+2. Open **Chat Settings** (the **Chat Settings** button in the chat, at the top right unless you moved it).
 3. Find the **Autonomous Messaging** section.
 4. Turn on the **Autonomous Messages** toggle.
 
@@ -45,11 +45,13 @@ The talkativeness-based default works like this:
 
 ### Turn on schedules
 
-The **Schedules** toggle sits in the same **Autonomous Messaging** section and is off by default.
+The **Schedules** toggle sits in the same **Autonomous Messaging** section. Saved routines belong to characters and are reused across Conversation chats, including existing chats when a character joins. Explicitly turning schedules off in a chat keeps them off there without removing the character’s routine.
 
 1. Turn on the **Schedules** toggle.
-2. The first time you turn it on with characters in the chat, YunYun starts writing a weekly routine for each character.
+2. Existing character routines appear immediately. Enabling schedules does not generate new ones; click **Generate** when you want them.
 3. When routines exist, an **Edit schedules** list appears with one row per character.
+
+Automatic weekly renewal is off unless you enable it for that character in **Character Schedule Manager**. A failed renewal is not retried repeatedly when you reopen the chat; use the generation controls to retry.
 
 Each row shows how many days are filled, for example **3 days scheduled**, or **Create schedule** if that character has none yet. A **Generate** button (labeled **Regenerate** once routines exist) rebuilds the routines whenever you want.
 
@@ -63,7 +65,7 @@ At the top, the **Routine profile** area shows a plain-language readout of the w
 
 Open the **Tuning** section for the main controls.
 
-- **Chat talkativeness** is a slider with five steps: **Rare**, **Quiet**, **Balanced**, **Social**, and **Very frequent**. **Balanced** is the middle default. This value overrides the character's default talkativeness for this chat only. It affects how often the character starts messages, sends follow-ups, and joins group chatter. It also sets the character's default daily limit.
+- **Chat talkativeness** is a slider with five steps: **Rare**, **Quiet**, **Balanced**, **Social**, and **Very frequent**. **Balanced** is the middle default. This value overrides the character's default talkativeness wherever its schedule is used. It affects how often the character starts messages, sends follow-ups, and joins group chatter. It also sets the character's default daily limit.
 - **Wait before checking in** is the quiet time, in minutes, before this character may start a check-in. The range is 15 to 360 minutes. The default is **120**.
 - **Check-in moments** are reasons the character can use to reach out. The chips are **Morning**, **Goodnight**, **Meal breaks**, **After busy**, and **Long absence**. All are on by default. Click one to turn it off.
 
@@ -90,7 +92,7 @@ Type optional hints in the **Week guidance** box, for example:
 make weekdays more nocturnal, keep weekends social
 ```
 
-Then click the button that names your action, such as **Rewrite week**. The result is a draft only. Nothing is saved until you click **Save schedule**.
+Then click the button that names your action, such as **Rewrite week**. The result is a draft only. Nothing is saved until you click **Save schedule**. If the model returns invalid schedule JSON, edit it in **Edit generated schedule JSON** and choose **Apply to draft**. Validated repairs and successfully generated days stay in the draft until you save. A failed call stops rather than retrying automatically. Use **Stop**, or close the editor, to cancel an active request. Closing the schedule manager or chat settings also cancels their active schedule generation.
 
 ### Daily blocks
 
@@ -112,7 +114,7 @@ When you finish, click **Save schedule**. **Cancel** closes the editor without s
 
 Use **Export schedule** at the bottom of the editor to download the current draft as a JSON file. The export includes the weekly blocks, routine summary, talkativeness, check-in moments, and advanced timing settings.
 
-Open another character's schedule editor and choose **Import schedule** to load that file. YunYun validates the file before replacing the editor draft and moves the imported routine to the current week. The import is not saved automatically: choose **Save schedule** to keep it, or **Cancel** to leave the character's existing schedule unchanged.
+Open another character's schedule editor and choose **Import schedule** to load that file. Marinara validates the file before replacing the editor draft and moves the imported routine to the current week. The import is not saved automatically: choose **Save schedule** to keep it, or **Cancel** to leave the character's existing schedule unchanged.
 
 ### Schedule generation preferences
 
@@ -148,7 +150,7 @@ If the chat has only one character, you can leave the name out. Run **/status** 
 
 ## How autonomous messages are paced
 
-YunYun paces autonomous messages so a character never spams you. The rules below use each character's own schedule.
+Marinara paces autonomous messages so a character never spams you. The rules below use each character's own schedule.
 
 - A character waits until you have been silent for its **Wait before checking in** time. The default is 120 minutes.
 - A character whose current status is **Offline** does not message first.
@@ -158,6 +160,8 @@ YunYun paces autonomous messages so a character never spams you. The rules below
 - When you reply, the count resets. The next silence starts fresh.
 
 If several characters are ready at once, the one with the highest talkativeness and best timing goes first.
+
+In a group chat set to **Individual**, the characters share one daily check-in limit, so they also share this pacing. After any character checks in, the next check-in from anyone waits like a follow-up. When it is due, any character whose own wait has passed can send it, and the one with the fewest check-ins that day goes first. After a long absence, only one character checks in.
 
 ## Your presence status
 
@@ -170,7 +174,7 @@ Click the status pill to open four choices:
 - **Do Not Disturb**: stops all autonomous messages.
 - **Invisible**: hides your status from characters.
 
-**Idle** is mostly automatic. If your status is **Active** and you do nothing for 10 minutes, YunYun sets you to **Idle**. It sets you back to **Active** when you return. You can also pick **Idle** yourself from the popup. Picking any status by hand turns off the automatic switch until you choose **Active** again.
+**Idle** is mostly automatic. If your status is **Active** and you do nothing for 10 minutes, Marinara sets you to **Idle**. It sets you back to **Active** when you return. You can also pick **Idle** yourself from the popup. Picking any status by hand turns off the automatic switch until you choose **Active** again.
 
 Set **Do Not Disturb** when you want quiet. No character will message you first while it is on. **Idle** does not block autonomous messages. Characters can still check in while you are away.
 

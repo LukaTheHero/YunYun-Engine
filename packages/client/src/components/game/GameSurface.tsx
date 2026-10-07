@@ -1,3 +1,24 @@
+import {
+  assignCombatTactics,
+  combatTacticsSchema,
+  gameInventoryBags,
+  gameInventoryBagKey,
+  gameInventoryFightEffects,
+  gameFightOffers,
+  gameInventoryNameKey,
+  gameInventoryStackLabel,
+  normalizeGameInventoryStacks,
+  swapGameInventoryStacks,
+  type GameInventoryOp,
+  type GameInventoryOpResult,
+  type GameInventoryWear,
+  type RulesetItemBookSheets,
+  type GameInventoryStack,
+  type PlayerStats,
+  type RulesetLiveStates,
+  rulesetCardItems,
+  rulesetReadsItems,
+} from "@marinara-engine/shared";
 // ──────────────────────────────────────────────
 // Game: Main Surface (rendered by ChatArea when mode === "game")
 // ──────────────────────────────────────────────
@@ -10,30 +31,34 @@ import {
   lazy,
   memo,
   Suspense,
-  type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation, useTranslation as useUiTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "sonner";
 import { useGameModeStore } from "../../stores/game-mode.store";
 import { useGameAssetStore } from "../../stores/game-asset.store";
-import { NewGameExperienceChooser } from "./NewGameExperienceChooser";
 import {
   gameAssetKeys,
   useGameAssetManifest,
   type GameAssetEntry,
   type GameAssetManifest,
 } from "../../hooks/use-game-assets";
-import { cleanNpcAvatarDisplayName, isSameNpcAvatarResource, normalizeNpcAvatarName } from "../../lib/game-npc-avatar";
+import { cleanNpcAvatarDisplayName, normalizeNpcAvatarName } from "../../lib/game-npc-avatar";
 import { useChatStore } from "../../stores/chat.store";
 import { useUIStore } from "../../stores/ui.store";
+import {
+  CHAT_SETTINGS_WINDOW_ID,
+  selectWindowRestored,
+  useFloatingWindowStore,
+} from "../../stores/floating-window.store";
+import { useProvideChatGalleryActions } from "../../hooks/use-chat-gallery-actions";
+import { CHAT_CONTROL_WINDOW_IDS, ChatConnectedChatWindow, ChatControlWindow } from "../chat/ChatControlWindow";
+import type { ChatImage } from "../../hooks/use-gallery";
 import { useGameStateStore } from "../../stores/game-state.store";
 import { useGalleryStore } from "../../stores/gallery.store";
 import { useAgentStore } from "../../stores/agent.store";
+import { invalidateTranslation } from "../../hooks/use-translate";
 import {
   useSyncGameState,
   useCreateGame,
@@ -68,6 +93,8 @@ import {
 } from "../../hooks/use-game-storyboards";
 import {
   chatKeys,
+  claimChatMetadataFields,
+  guardServerChatSnapshot,
   useBranchChat,
   useCreateMessage,
   useDeleteChat,
@@ -77,24 +104,35 @@ import {
 } from "../../hooks/use-chats";
 import { useConnections } from "../../hooks/use-connections";
 import { useAgentConfigs } from "../../hooks/use-agents";
-import { selectGameExperiencePackages, useInstalledCapabilityPackages } from "../../hooks/use-capability-packages";
+import {
+  rulesetCatalogQuery,
+  selectGameExperiencePackages,
+  useCapabilityClientModuleState,
+  useInstalledCapabilityPackages,
+} from "../../hooks/use-capability-packages";
 import { useGenerate } from "../../hooks/use-generate";
+import { isVisibleGameMessage } from "../../lib/chat-message-visibility";
 import { useBackdropDismiss } from "../../hooks/use-backdrop-dismiss";
 import { useGenerateSpatialMapDraft, useSpatialContext } from "../../hooks/use-spatial-context";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { spriteKeys, useUploadAvatar, useUploadPersonaAvatar, type SpriteInfo } from "../../hooks/use-characters";
 import { lorebookKeys } from "../../hooks/use-lorebooks";
-import { api, getJsonRepairRequest, type JsonRepairRequest } from "../../lib/api-client";
+import { api, ApiError, getJsonRepairRequest, type JsonRepairRequest } from "../../lib/api-client";
 import { useRenderTimer } from "../../lib/perf-diagnostics";
 import { isGenerationSendBlocked } from "../../lib/generation-stream-policy";
 import { showConfirmDialog } from "../../lib/app-dialogs";
 import { CHAT_FLOATING_UI_DISMISS_EVENT } from "../../lib/chat-floating-ui-events";
 import { cn, generateClientId } from "../../lib/utils";
-import { filterLanguageGenerationConnections } from "../../lib/connection-filters";
+import {
+  filterAudioGenerationConnections,
+  filterLanguageGenerationConnections,
+  isConnectionFlagTrue,
+} from "../../lib/connection-filters";
 import { gameAssetFileUrl } from "../../lib/game-asset-urls";
 import { audioManager } from "../../lib/game-audio";
 import {
   parseGmTags,
+  resolveMessageWeatherAction,
   parseSegmentInventoryUpdates,
   type CombatEncounterTag,
   type ElementAttackTag,
@@ -108,13 +146,20 @@ import { resolveCombatFullBodyPose, resolveDialogueFullBodyPose } from "../../li
 import { characterNamesMatch, findNamedEntry } from "../../lib/game-character-name-match";
 import { normalizeGameSegmentEdit, serializeGameSegmentEdit, type GameSegmentEdit } from "../../lib/game-segment-edits";
 import { findReplayStoryboardKeyframe } from "../../lib/game-storyboard-keyframes";
+import {
+  applyRulesetBattleResult,
+  isRulesetCombatFight,
+  rulesetBattleCatalogIds,
+  rulesetCombatRecapLines,
+  seedRulesetBattleParty,
+  type RulesetCombatSeeds,
+} from "../../lib/ruleset-combat-bridge";
 import { useSceneAnalysis } from "../../hooks/use-scene-analysis";
 import { useTTSConfig } from "../../hooks/use-tts";
 import { useSidecarStore } from "../../stores/sidecar.store";
 import { parsePartyDialogue } from "../../lib/party-dialogue-parser";
 import { dispatchSpotifySceneTrackChange } from "../../lib/spotify-playback-events";
 import { ttsService } from "../../lib/tts-service";
-import { ActiveLorebookEntriesButton } from "../chat/ActiveLorebookEntriesButton";
 import type {
   PartyDialogueLine,
   CombatSummary,
@@ -157,14 +202,31 @@ import {
   mergeGameSetupConfigPreservingDynamicPrompt,
   resolveGameSetupArtStylePrompt,
   scoreMusic,
+  musicAreaSlug,
+  normalizeMusicEnemyTier,
+  isContextMusicTag,
+  isEngineRollableSkillCheckTag,
+  validateTacticalBattlefieldBrief,
+  type MusicEnemyTier,
   scoreAmbient,
+  normalizeCharacterLookupName,
+  rulesetSheetEnvelopeSchema,
+  type RulesetCatalogEntriesById,
+  type RulesetCatalogPayload,
+  type RulesetLiveState,
+  type RulesetSheetEnvelope,
 } from "@marinara-engine/shared";
-import { GameNarration, formatNarration } from "./GameNarration";
+import { GameNarration } from "./GameNarration";
+import { formatNarration } from "./game-narration-format";
 import { GameInput } from "./GameInput";
 import { GameMapPanel, MobileMapButton } from "./GameMap";
 import { GamePartyBar } from "./GamePartyBar";
 import { GameCharacterSheet } from "@/components/game/GameCharacterSheet";
-import type { GameCharacterSheetGameCard } from "@/components/game/GameCharacterSheet";
+import type { GameCharacterSheetGameCard, GameCharacterSheetRuleset } from "@/components/game/GameCharacterSheet";
+import { describeRefusedSheetCommands } from "./GameRulesetSheet";
+import { useGameRuleset } from "../../hooks/use-game-ruleset";
+import { useRulesetItemBook } from "../../hooks/use-ruleset-item-book";
+import { flushGameStatePatch, useGameStatePatcher } from "../../hooks/use-game-state-patcher";
 import { GameDiceResult } from "./GameDiceResult";
 import { GameSkillCheckResult } from "./GameSkillCheckResult";
 import { GameElementReaction } from "./GameElementReaction";
@@ -180,7 +242,7 @@ import {
   type GameImagePromptOverride,
   type GameImagePromptReviewItem,
 } from "./GameImagePromptReviewModal";
-import { GameTutorial } from "./GameTutorial";
+import { CHAT_HELP_CLOSE_EVENT, CHAT_HELP_OPEN_REQUEST_EVENT, readChatHelpEventMode } from "../../lib/chat-help-events";
 import { GameStoryboardBackgroundVisual, GameStoryboardInlineViewer } from "./GameStoryboardViewer";
 import { GameVolumeMixer } from "./GameVolumeMixer";
 import {
@@ -208,25 +270,8 @@ import {
   type SceneAssetNpcAvatarCandidate,
 } from "./game-asset-generation-payload";
 import { PinnedImageOverlay } from "../chat/PinnedImageOverlay";
-import { ChatBranchSelector } from "../chat/ChatBranchSelector";
-import {
-  CHAT_FLOATING_PANEL_SELECTOR,
-  CHAT_TOOLBAR_ICON_GAP_CLASS,
-  CHAT_TOOLBAR_OVERFLOW_BUTTON_SIZE_CLASS,
-  CHAT_TOOLBAR_OVERFLOW_MENU_CLASS,
-  getChatToolbarButtonClass,
-  readChatToolbarFloatingPanelAnchor,
-  type ChatToolbarFloatingPanelAnchor,
-} from "../chat/ChatToolbarControls";
-import {
-  ROLEPLAY_POPOVER_CLOSE_BUTTON,
-  ROLEPLAY_POPOVER_CLOSE_ICON_SIZE,
-  ROLEPLAY_POPOVER_HEADER,
-  ROLEPLAY_POPOVER_SCROLL_AREA,
-  ROLEPLAY_POPOVER_SHELL,
-  ROLEPLAY_POPOVER_SUBTITLE,
-  ROLEPLAY_POPOVER_TITLE,
-} from "../chat/roleplay-popover-styles";
+import { CHAT_TOOLBAR_ICON_GAP_CLASS } from "../chat/ChatToolbarControls";
+import { NEUTRAL_PANEL_SCROLL_AREA, NEUTRAL_PANEL_SUBTITLE } from "../ui/neutral-surface-styles";
 import type { ReadableTag } from "../../lib/game-tag-parser";
 import type { DirectionCommand, GameNpc, GameStoryboardViewerDisplayMode } from "@marinara-engine/shared";
 
@@ -304,20 +349,9 @@ function persistReplayPresentationCue(
     });
 }
 
-const GAME_TOP_ICON_BUTTON = getChatToolbarButtonClass();
-const GAME_MOBILE_ROOT_BUTTON = getChatToolbarButtonClass({
-  compact: true,
-  sizeClassName: CHAT_TOOLBAR_OVERFLOW_BUTTON_SIZE_CLASS,
-});
-const GAME_MOBILE_ICON_BUTTON = getChatToolbarButtonClass({ compact: true });
-const GAME_ACTION_MENU = cn(ROLEPLAY_POPOVER_SHELL, "flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-1 p-1.5");
-const GAME_MOBILE_ACTIONS_MENU = cn(CHAT_TOOLBAR_OVERFLOW_MENU_CLASS, "absolute right-0 top-9");
 const GAME_MOBILE_CHOICE_STAGE_HEIGHT = "max-h-[clamp(8rem,30svh,14rem)] sm:max-h-[clamp(9rem,36svh,20rem)]";
-const GAME_MOBILE_ACTION_MENU = cn(ROLEPLAY_POPOVER_SHELL, "flex w-72 max-w-[calc(100vw-4rem)] flex-col gap-1 p-1.5");
-const GAME_MOBILE_FLOATING_PANEL =
-  "fixed z-[9999] h-[min(42rem,calc(100dvh-4.75rem))] w-[min(42rem,calc(100vw-4.75rem))]";
-const GAME_MOBILE_FLOATING_MENU = "fixed z-[9999] max-h-[min(32rem,calc(100dvh-4.75rem))] overflow-y-auto";
 const EXPERIENCE_UNDERLAY_LAYER = "underlay" as const;
+const EXPERIENCE_STARTUP_CONTEXT_MAX_LENGTH = 8_000;
 const EMPTY_SPEAKER_AVATARS: ReadonlyMap<string, { url: string }> = new Map();
 /** Classic chrome an experience declares it replaces; anything left undeclared stays Classic. */
 type ExperienceChromeDeclaration = {
@@ -328,28 +362,21 @@ type ExperienceChromeDeclaration = {
   /** The experience offers the turn's choices itself, so Classic choice cards stay out of its way and the
    *  in-flow anchor it portals into stays mounted even on a turn the narration emitted choices for. */
   providesChoices?: boolean;
+  /**
+   * Asks the narration box to fold down to its handle for as long as the request stands —
+   * a cutscene, a full-screen beat. This is a TRANSIENT REQUEST, not a preference: it never
+   * touches the player's stored `gameNarrationCollapsed` setting, and because it is read off
+   * `activeExperienceChrome` it clears the moment the experience stops being the live surface,
+   * which is what guarantees the box always comes back.
+   *
+   * The engine's own safety rules still win: the box force-expands whenever the player's input
+   * is on screen or the segment-advance controls are live, and the handle still raises its
+   * attention indicator. A package cannot lock the player out of their own turn with this.
+   */
+  requestsCollapsedNarration?: boolean;
 };
 const GAME_ACTION_MENU_ITEM =
   "marinara-chat-popover__item flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-[var(--marinara-chat-chrome-panel-text)] transition-colors hover:bg-[var(--marinara-chat-chrome-highlight-bg-hover)] hover:text-[var(--marinara-chat-chrome-highlight-text)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent";
-function getGameMobileFloatingPanelStyle(anchor: ChatToolbarFloatingPanelAnchor): CSSProperties {
-  if (!anchor) {
-    return {
-      right: "0.75rem",
-      top: "calc(3.75rem + env(safe-area-inset-top))",
-    };
-  }
-
-  return {
-    right: `${anchor.right}px`,
-    top: `${anchor.top}px`,
-  };
-}
-
-function renderGameMobilePortal(node: ReactNode): ReactNode {
-  if (typeof document === "undefined") return node;
-  return createPortal(node, document.body);
-}
-
 type PreparedCombatState = {
   messageId: string;
   party: Combatant[];
@@ -361,6 +388,8 @@ type PreparedCombatState = {
   environment: string;
   styleNotes: CombatStyleNotes | null;
   formation: string | null;
+  battlefield: TacticalBattlefieldBrief | null;
+  battlefieldError: string | null;
 };
 
 type GameAssetGenerationOptions = {
@@ -369,6 +398,11 @@ type GameAssetGenerationOptions = {
   /** Keep narration / queued interactions waiting for this asset job. */
   blocksScene?: boolean;
   showSuccessToast?: boolean;
+  /** #5094: called after generation resolves; if it returns false the caller's request was superseded
+   *  (chat switch, turn retry, or a newer combat request), so the result is discarded instead of being
+   *  applied. Keeps a stale combat visual job from overwriting the current chat's background/avatars or
+   *  clobbering the current asset-generation state. */
+  isCurrent?: () => boolean;
 };
 
 type ApplyGeneratedAssetsOptions = {
@@ -444,6 +478,40 @@ const GAME_ASSET_GENERATION_TIMEOUT_MS = 240_000;
 const GAME_ASSET_PREVIEW_TIMEOUT_MS = 180_000;
 const GAME_ASSET_PROMPT_REVIEW_TIMEOUT_MS = 180_000;
 const GAME_AUDIO_GENERATION_TIMEOUT_MS = 190_000;
+// Context tracks are longer compositions (server allows up to 300s of render time).
+const CONTEXT_MUSIC_GENERATION_TIMEOUT_MS = 310_000;
+
+function buildAreaMusicPrompt(
+  location: string,
+  opts: { genre?: string | null; setting?: string | null; timeOfDay?: string | null },
+): string {
+  return [
+    `Looping instrumental background theme for ${location}.`,
+    opts.genre ? `Genre: ${opts.genre}.` : "",
+    opts.setting ? `Setting: ${opts.setting}.` : "",
+    opts.timeOfDay ? `Time of day: ${opts.timeOfDay}.` : "",
+    "Seamless loop, no vocals, a consistent mood that can play for minutes without wearing out.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+const TIER_MUSIC_MOODS: Record<MusicEnemyTier, string> = {
+  common: "Driving but steady battle theme for an ordinary encounter — energetic, loopable, not overwhelming.",
+  miniboss: "Elevated-stakes battle theme for a dangerous named foe — urgent percussion, rising tension.",
+  boss: "Epic boss battle theme — full intensity, dramatic motifs, triumphant and threatening in equal measure.",
+  special: "Unusual, otherworldly encounter theme — unsettling or wondrous, memorable and distinct from normal combat.",
+};
+
+function buildTierMusicPrompt(tier: MusicEnemyTier, genre: string | null): string {
+  return [
+    `Looping instrumental combat music. ${TIER_MUSIC_MOODS[tier]}`,
+    genre ? `Genre: ${genre}.` : "",
+    "Seamless loop, no vocals.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 const SCENE_VIDEO_GENERATION_TIMEOUT_MS = 1_800_000;
 const IMAGE_PROMPT_REVIEW_TIMED_OUT = Symbol("IMAGE_PROMPT_REVIEW_TIMED_OUT");
 
@@ -554,11 +622,6 @@ type SceneAssetPresentCharacter = {
   avatarCrop?: AvatarCrop | null;
 };
 
-type SpeakingLibraryCharacter = {
-  character: GameSurfaceProps["characters"][number];
-  aliases: string[];
-};
-
 type GamePartyMemberInfo = {
   id: string;
   name: string;
@@ -649,6 +712,25 @@ type StoredNarrationProgress = {
   index: number;
   messageId: string | null;
 };
+
+type NarrationTurnMessage = {
+  id?: string | null;
+  activeSwipeIndex?: number | null;
+};
+
+function narrationTurnKey(message: NarrationTurnMessage | null | undefined): string | null {
+  return message?.id ? `${message.id}:${message.activeSwipeIndex ?? 0}` : null;
+}
+
+function narrationProgressMatchesTurn(
+  storedMessageId: string | null,
+  message: NarrationTurnMessage | null | undefined,
+): boolean {
+  if (!storedMessageId || !message?.id) return false;
+  if (storedMessageId === narrationTurnKey(message)) return true;
+  // Read old id-only progress once for the original swipe, then persist the new key.
+  return (message.activeSwipeIndex ?? 0) === 0 && storedMessageId === message.id;
+}
 
 function parseStoredNarrationProgress(raw: string | null): StoredNarrationProgress | null {
   if (!raw) return null;
@@ -748,6 +830,10 @@ function readCombatNumber(value: unknown): number | null {
   if (typeof value === "string" && !value.trim()) return null;
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function normalizeCombatMovementMode(value: unknown): Combatant["movementMode"] | undefined {
+  return value === "walk" || value === "fly" || value === "teleport" ? value : undefined;
 }
 
 function normalizeCombatStatName(value: unknown): string {
@@ -876,12 +962,22 @@ function combatSkillsFromGeneratedAttacks(
     if (!id || seen.has(id)) continue;
     seen.add(id);
     const description = attack.description || (attack.type === "AoE" ? "Area combat ability" : "Combat ability");
-    const type = inferCombatSkillType(`${name} ${description} ${attack.statusEffect ?? ""}`);
+    const type = attack.kind ?? inferCombatSkillType(`${name} ${description} ${attack.statusEffect ?? ""}`);
     skills.push({
       id,
       name,
       type,
-      mpCost: Math.max(4, Math.min(18, 5 + level)),
+      areaRadius: attack.areaRadius,
+      friendlyFire: attack.friendlyFire,
+      targetScope: attack.targetScope,
+      spell: attack.spell,
+      projectile: attack.projectile,
+      requiresSight: attack.requiresSight,
+      reaction: attack.reaction,
+      range: attack.range,
+      slotLevel: attack.slotLevel,
+      legendaryCost: attack.legendaryCost,
+      mpCost: attack.mpCost ?? Math.max(4, Math.min(18, 5 + level)),
       power:
         typeof attack.power === "number" && Number.isFinite(attack.power)
           ? Math.max(0.5, Math.min(3, attack.power))
@@ -924,7 +1020,8 @@ function isValidCombatant(value: unknown): value is Combatant {
     typeof v.defense === "number" &&
     typeof v.speed === "number" &&
     typeof v.level === "number" &&
-    (v.side === "player" || v.side === "enemy")
+    (v.side === "player" || v.side === "enemy") &&
+    (v.tactics === undefined || combatTacticsSchema.safeParse(v.tactics).success)
   );
 }
 
@@ -948,7 +1045,12 @@ export function generatedPartyMemberToCombatant(
   const mana = readGameCardPool(gameCard, "mp", "mana", "magic points", "energy");
   const element = member.attacks?.find((attack) => attack.element)?.element;
   const combatClass = typeof member.class === "string" && member.class.trim() ? member.class.trim() : undefined;
+  const movementMode = normalizeCombatMovementMode(member.movementMode);
   return {
+    aiHints: member.aiHints,
+    projectile: member.projectile,
+    requiresSight: member.requiresSight,
+    spellSlots: member.spellSlots,
     id: matchedAvatar?.id ?? `generated-party-${index}-${slugifyCombatantId(member.name)}`,
     name: member.name || `Ally ${index + 1}`,
     hp,
@@ -962,9 +1064,16 @@ export function generatedPartyMemberToCombatant(
     side: "player",
     sprite: matchedAvatar?.avatarUrl ?? undefined,
     statusEffects: combatStatusEffectsFromGenerated(member.statuses),
-    skills: combatSkillsFromSheet(gameCard?.abilities) ?? combatSkillsFromGeneratedAttacks(member.attacks, level),
+    skills:
+      combatSkillsFromSheet(gameCard?.abilities)?.map((skill) => ({
+        ...skill,
+        ...combatSkillsFromGeneratedAttacks(member.attacks, level)?.find(
+          (generated) => generated.name.trim().toLowerCase() === skill.name.trim().toLowerCase(),
+        ),
+      })) ?? combatSkillsFromGeneratedAttacks(member.attacks, level),
     element,
     combatClass,
+    movementMode,
   };
 }
 
@@ -990,7 +1099,15 @@ export function generatedEnemyToCombatant(enemy: CombatEnemy, index: number, fal
   const level = combatLevelFromHp(maxHp, fallbackLevel);
   const element = enemy.attacks?.find((attack) => attack.element)?.element;
   const combatClass = typeof enemy.class === "string" && enemy.class.trim() ? enemy.class.trim() : undefined;
+  const movementMode = normalizeCombatMovementMode(enemy.movementMode);
   return {
+    aiHints: enemy.aiHints,
+    projectile: enemy.projectile,
+    requiresSight: enemy.requiresSight,
+    boss: enemy.boss,
+    spellSlots: enemy.spellSlots,
+    mp: enemy.mp ?? enemy.maxMp ?? 20 + level * 3,
+    maxMp: enemy.maxMp ?? enemy.mp ?? 20 + level * 3,
     id: `generated-enemy-${index}-${slugifyCombatantId(enemy.name)}`,
     name: enemy.name || `Enemy ${index + 1}`,
     hp,
@@ -1005,6 +1122,13 @@ export function generatedEnemyToCombatant(enemy: CombatEnemy, index: number, fal
     skills: combatSkillsFromGeneratedAttacks(enemy.attacks, level),
     element,
     combatClass,
+    movementMode,
+    // The ruleset's own terms for this opponent, carried as the blueprint wrote them. The server is
+    // what looks a creature up, clamps a proposal onto a tier and decides which of the three it
+    // uses; a fight on any other style never reads them.
+    ...(typeof enemy.creature === "string" && enemy.creature.trim() ? { creature: enemy.creature.trim() } : {}),
+    ...(typeof enemy.tier === "string" && enemy.tier.trim() ? { tier: enemy.tier.trim() } : {}),
+    ...(enemy.proposed !== undefined ? { proposed: enemy.proposed } : {}),
   };
 }
 
@@ -1123,22 +1247,6 @@ function extractGameDialogueSpeakerNames(content: string): string[] {
     while ((match = pattern.exec(content)) !== null) {
       const name = match[1]?.trim();
       if (name && !name.includes(":")) names.add(name);
-    }
-  }
-
-  return [...names];
-}
-
-function extractRecentGameDialogueSpeakerNames(messages: Message[], maxAssistantMessages = 30): string[] {
-  const names = new Set<string>();
-  let assistantMessagesSeen = 0;
-
-  for (let i = messages.length - 1; i >= 0 && assistantMessagesSeen < maxAssistantMessages; i--) {
-    const message = messages[i];
-    if (!message || (message.role !== "assistant" && message.role !== "narrator")) continue;
-    assistantMessagesSeen++;
-    for (const name of extractGameDialogueSpeakerNames(message.content)) {
-      names.add(name);
     }
   }
 
@@ -1438,15 +1546,12 @@ const GameSessionReplay = lazy(async () => {
   return { default: module.GameSessionReplay };
 });
 
-const ChatGalleryDrawer = lazy(async () => {
-  const module = await import("../chat/ChatGalleryDrawer");
-  return { default: module.ChatGalleryDrawer };
-});
-
 const GameAssetsBrowserView = lazy(async () => {
   const module = await import("../game-assets/GameAssetsBrowserView");
   return { default: module.GameAssetsBrowserView };
 });
+
+const DirectedCombatUI = lazy(() => import("./DirectedCombatUI").then((m) => ({ default: m.DirectedCombatUI })));
 
 const GameCombatUI = lazy(async () => {
   const module = await import("./GameCombatUI");
@@ -1472,6 +1577,7 @@ import type {
   GameCombatStateSnapshot,
   GameCombatStyle,
   TacticalCombatState,
+  TacticalBattlefieldBrief,
   CombatStyleNotes,
 } from "@marinara-engine/shared";
 import type { CharacterMap, PersonaInfo } from "../chat/chat-area.types";
@@ -1509,53 +1615,6 @@ function IntroTypewriter({ text, onComplete }: { text: string; onComplete?: () =
       </p>
     </div>
   );
-}
-
-function normalizeInventoryCount(value: number | undefined): number {
-  if (!Number.isFinite(value)) return 1;
-  return Math.max(1, Math.min(9999, Math.floor(value ?? 1)));
-}
-
-function removeInventoryUnit<T extends { name: string; quantity: number }>(
-  items: T[],
-  itemName: string,
-  count = 1,
-): T[] {
-  const normalizedName = itemName.trim().toLowerCase();
-  if (!normalizedName) return items;
-  const quantityToRemove = normalizeInventoryCount(count);
-
-  let removed = false;
-  const updated: T[] = [];
-
-  for (const item of items) {
-    if (!removed && item.name.trim().toLowerCase() === normalizedName) {
-      removed = true;
-      const nextQuantity = item.quantity - quantityToRemove;
-      if (nextQuantity > 0) {
-        updated.push({ ...item, quantity: nextQuantity });
-      }
-      continue;
-    }
-    updated.push(item);
-  }
-
-  return removed ? updated : items;
-}
-
-function addInventoryUnit<T extends { name: string; quantity: number }>(items: T[], itemName: string, count = 1): T[] {
-  const name = normalizeInventoryName(itemName);
-  if (!name) return items;
-  const quantityToAdd = normalizeInventoryCount(count);
-
-  let addedToExisting = false;
-  const updated = items.map((item) => {
-    if (item.name.trim().toLowerCase() !== name.toLowerCase()) return item;
-    addedToExisting = true;
-    return { ...item, quantity: item.quantity + quantityToAdd };
-  });
-
-  return addedToExisting ? updated : [...updated, { name, quantity: quantityToAdd } as T];
 }
 
 function normalizeInventoryName(value: string): string {
@@ -1670,20 +1729,6 @@ function readPersistedGameAudioSettings(): GameAudioSettings {
   } catch {
     return defaults;
   }
-}
-
-function getNextInventoryItemName(items: Array<{ name: string }>): string {
-  const baseName = "New item";
-  const existingNames = new Set(items.map((item) => normalizeInventoryName(item.name).toLowerCase()));
-  if (!existingNames.has(baseName.toLowerCase())) {
-    return baseName;
-  }
-
-  let suffix = 2;
-  while (existingNames.has(`${baseName} ${suffix}`.toLowerCase())) {
-    suffix += 1;
-  }
-  return `${baseName} ${suffix}`;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -1957,85 +2002,26 @@ function applyElementAttackTagsToCombatants(
   return { party: nextParty, enemies: nextEnemies, appliedCount };
 }
 
-function renameInventoryItem<T extends { name: string; quantity: number }>(
-  items: T[],
-  currentName: string,
-  nextName: string,
-): { items: T[]; resolvedName: string } | null {
-  const normalizedCurrentName = normalizeInventoryName(currentName).toLowerCase();
-  const cleanedNextName = normalizeInventoryName(nextName);
-  if (!normalizedCurrentName || !cleanedNextName) return null;
-
-  const sourceIndex = items.findIndex(
-    (item) => normalizeInventoryName(item.name).toLowerCase() === normalizedCurrentName,
-  );
-  if (sourceIndex === -1) return null;
-
-  const sourceItem = items[sourceIndex]!;
-  if (normalizeInventoryName(sourceItem.name) === cleanedNextName) {
-    return { items, resolvedName: sourceItem.name };
-  }
-
-  const normalizedNextName = cleanedNextName.toLowerCase();
-  const mergeIndex = items.findIndex(
-    (item, index) => index !== sourceIndex && normalizeInventoryName(item.name).toLowerCase() === normalizedNextName,
-  );
-
-  if (mergeIndex === -1) {
-    return {
-      items: items.map((item, index) => (index === sourceIndex ? { ...item, name: cleanedNextName } : item)),
-      resolvedName: cleanedNextName,
-    };
-  }
-
-  const mergeTarget = items[mergeIndex]!;
-  const mergeTargetRecord = mergeTarget as T & Record<string, unknown>;
-  const sourceRecord = sourceItem as T & Record<string, unknown>;
-  const sourceDescription = typeof sourceRecord.description === "string" ? sourceRecord.description.trim() : "";
-  const targetDescription =
-    typeof mergeTargetRecord.description === "string" ? mergeTargetRecord.description.trim() : "";
-  const sourceLocation = typeof sourceRecord.location === "string" ? sourceRecord.location.trim() : "";
-  const targetLocation = typeof mergeTargetRecord.location === "string" ? mergeTargetRecord.location.trim() : "";
-  const mergedItem = {
-    ...mergeTarget,
-    quantity: mergeTarget.quantity + sourceItem.quantity,
-    ...(!targetDescription && sourceDescription ? { description: sourceDescription } : {}),
-    ...(!targetLocation && sourceLocation ? { location: sourceLocation } : {}),
-  } as T;
-
-  return {
-    items: items.flatMap((item, index) => {
-      if (index === sourceIndex) return [];
-      if (index === mergeIndex) return [mergedItem as T];
-      return [item];
-    }),
-    resolvedName: normalizeInventoryName(mergeTarget.name) || cleanedNextName,
-  };
-}
-
 import {
   AlertTriangle,
-  ArrowRightLeft,
   BookOpen,
-  CircleHelp,
   Feather,
   Folder,
   Film,
   Image,
   ImagePlus,
   Loader2,
-  MoreHorizontal,
   PanelsTopLeft,
   Play,
   Plug,
   RefreshCw,
   RotateCcw,
   ScrollText,
-  Settings2,
   Square,
   Volume2,
   VolumeX,
   X,
+  Gamepad2,
 } from "lucide-react";
 
 /** Randomly sample up to `max` items from an array (Fisher-Yates shuffle). */
@@ -2086,7 +2072,10 @@ function normalizeRecentMusicHistory(value: unknown): string[] {
 }
 
 function appendRecentMusic(history: string[], tag: string | null | undefined): string[] {
-  if (!tag) return history.slice(0, RECENT_MUSIC_HISTORY_LIMIT);
+  // Context tracks (#5161) are deliberately KEPT for long stretches; letting
+  // them into the anti-repeat window would fill it with one repeated tag and
+  // disable the legacy pool's rotation memory.
+  if (!tag || isContextMusicTag(tag)) return history.slice(0, RECENT_MUSIC_HISTORY_LIMIT);
   return [tag, ...history.filter((entry) => entry !== tag)].slice(0, RECENT_MUSIC_HISTORY_LIMIT);
 }
 
@@ -2184,11 +2173,7 @@ interface GameSurfaceProps {
   personaInfo?: PersonaInfo;
   chatBackground?: string | null;
   connectedChatName?: string;
-  onOpenSettings: (event?: ReactMouseEvent<HTMLElement>) => void;
   onCloseSettings: () => void;
-  externalGalleryOpen?: boolean;
-  externalGalleryAnchor?: ChatToolbarFloatingPanelAnchor;
-  onCloseExternalGallery?: () => void;
   onSwitchChat?: () => void;
   onDeleteMessage: (messageId: string) => void;
   onPeekPrompt?: (messageId: string) => void;
@@ -2203,15 +2188,11 @@ function GameSurfaceComponent({
   messages,
   isStreaming,
   characterMap,
-  characters,
+  characters: libraryCharacters,
   personaInfo,
   chatBackground,
   connectedChatName,
-  onOpenSettings,
   onCloseSettings,
-  externalGalleryOpen = false,
-  externalGalleryAnchor = null,
-  onCloseExternalGallery,
   onSwitchChat,
   onDeleteMessage,
   onPeekPrompt,
@@ -2224,10 +2205,11 @@ function GameSurfaceComponent({
   useRenderTimer("game-surface"); // [#3104 diagnostic]
   const backgroundIllustration = useChatStore((state) => state.backgroundIllustrationChatIds.has(activeChatId));
   const agentsProcessing = useAgentStore((state) => state.processingChatIds.includes(activeChatId));
+  const gameSequentialAgents = chatMeta.gameSequentialAgents === true;
   const gameInputGenerationBlocked = isGenerationSendBlocked({
     streamActive: isStreaming,
     agentsProcessing,
-    backgroundIllustration,
+    backgroundIllustration: backgroundIllustration && !gameSequentialAgents,
   });
   // Sync game metadata → store
   useSyncGameState(activeChatId, chatMeta);
@@ -2253,6 +2235,7 @@ function GameSurfaceComponent({
     return selectGameExperiencePackages(installedCapabilityPackages).find((pkg) => pkg.id === gameExperienceId) ?? null;
   }, [gameExperienceId, installedCapabilityPackages]);
   const experienceSurfaceId = experienceSurfacePackage?.id ?? null;
+  const experienceClientModule = useCapabilityClientModuleState(experienceSurfaceId ?? "");
   /** Class the manifest asks the host to stamp on the game area, so the package can restyle the shared
    *  chrome that renders outside its element. Declared rather than pushed, so it applies on first paint. */
   const experienceSurfaceClass = experienceSurfacePackage?.manifest.contributions?.gameSurface?.surfaceClass ?? null;
@@ -2309,7 +2292,7 @@ function GameSurfaceComponent({
       activeMapId: s.activeMapId,
       sessionNumber: s.sessionNumber,
       isSetupActive: s.isSetupActive,
-      diceRollResult: s.diceRollResult,
+      diceRollResult: s.diceRollResults[0] ?? null,
       npcs: s.npcs,
       hudWidgets: s.hudWidgets,
       blueprint: s.blueprint,
@@ -2320,10 +2303,8 @@ function GameSurfaceComponent({
 
   const closeCharacterSheet = useGameModeStore((s) => s.closeCharacterSheet);
   const applyWidgetUpdate = useGameModeStore((s) => s.applyWidgetUpdate);
-  const setDiceRollResult = useGameModeStore((s) => s.setDiceRollResult);
+  const dismissDiceRollResult = useGameModeStore((s) => s.dismissDiceRollResult);
   const weatherEffectsEnabled = useUIStore((s) => s.weatherEffects);
-  const gameTutorialDisabled = useUIStore((s) => s.gameTutorialDisabled);
-  const setGameTutorialDisabled = useUIStore((s) => s.setGameTutorialDisabled);
   const gameFullBodySpriteScale = useUIStore((s) => s.gameFullBodySpriteScale);
   const chatBackgroundBlur = useUIStore((s) => s.chatBackgroundBlur);
   const gameMiddleMouseNav = useUIStore((s) => s.gameMiddleMouseNav);
@@ -2336,6 +2317,17 @@ function GameSurfaceComponent({
     () => getChatCharacterIds(chat.characterIds).filter((id) => id !== PROFESSOR_MARI_ID),
     [chat.characterIds],
   );
+  const gameCharacterIds = useMemo(() => {
+    const config = chatMeta.gameSetupConfig as Record<string, unknown> | undefined;
+    const ids = new Set([...chatCharacterIds, ...getActivePartyIds(chatMeta)]);
+    if (typeof config?.gmCharacterId === "string") ids.add(config.gmCharacterId);
+    return [...ids].filter((id) => characterMap.has(id));
+  }, [characterMap, chatCharacterIds, chatMeta]);
+  // An unrelated library card with the same name is not a character in this game.
+  const characters = useMemo(
+    () => libraryCharacters.filter((character) => gameCharacterIds.includes(character.id)),
+    [gameCharacterIds, libraryCharacters],
+  );
   const gameMusicDjEnabled =
     chatMeta.gameUseMusicDj === true ||
     chatMeta.gameUseSpotifyMusic === true ||
@@ -2346,12 +2338,40 @@ function GameSurfaceComponent({
   const useJsonMusicDjGameMusic = useYoutubeGameMusic || useCustomGameMusic;
   const useMusicDjPlayerMusic = useSpotifyGameMusic || useJsonMusicDjGameMusic;
   const { data: ttsConfig } = useTTSConfig();
-  const generateGameSoundEffects = ttsConfig?.source === "elevenlabs" && ttsConfig.elevenLabsGameSoundEffects === true;
-  const generateGameMusic =
-    ttsConfig?.source === "elevenlabs" && ttsConfig.elevenLabsGameMusic === true && !useMusicDjPlayerMusic;
   const activeGameMetaId = typeof chatMeta.gameId === "string" ? chatMeta.gameId : "";
   const sceneRuntimeScopeKey = `${activeChatId}:${activeGameMetaId}`;
   const { data: connectionsList } = useConnections();
+  // Game audio capability: the game's audio connection (explicit pick, else the
+  // category default, else the fallback) wins; the legacy TTS settings blob
+  // still gates setups that predate audio connections. Mirrors the server's
+  // resolveAudioConfig order.
+  const gameAudioConnection = useMemo(() => {
+    // Quarantined (review-required) imports are refused by the server's
+    // resolution (getWithKey/getDefaultForAudio return null for them), so
+    // they must not drive capability gating here either.
+    const rows = filterAudioGenerationConnections((connectionsList ?? []) as Record<string, unknown>[]);
+    const explicitId = typeof chatMeta.gameAudioConnectionId === "string" ? chatMeta.gameAudioConnectionId : "";
+    return (
+      (explicitId ? rows.find((connection) => connection.id === explicitId) : undefined) ??
+      rows.find((connection) => isConnectionFlagTrue(connection.defaultForAgents)) ??
+      rows.find((connection) => isConnectionFlagTrue(connection.fallbackForAgents)) ??
+      null
+    );
+  }, [connectionsList, chatMeta.gameAudioConnectionId]);
+  const gameAudioConnectionIsElevenLabs =
+    gameAudioConnection != null &&
+    ((gameAudioConnection.audioSource as string | null) ?? "elevenlabs") === "elevenlabs";
+  const generateGameSoundEffects =
+    (gameAudioConnection
+      ? gameAudioConnectionIsElevenLabs && isConnectionFlagTrue(gameAudioConnection.audioSoundEffects)
+      : ttsConfig?.source === "elevenlabs" && ttsConfig.elevenLabsGameSoundEffects === true) &&
+    chatMeta.gameAudioSoundEffectsEnabled !== false;
+  const generateGameMusic =
+    (gameAudioConnection
+      ? gameAudioConnectionIsElevenLabs && isConnectionFlagTrue(gameAudioConnection.audioMusic)
+      : ttsConfig?.source === "elevenlabs" && ttsConfig.elevenLabsGameMusic === true) &&
+    chatMeta.gameAudioMusicEnabled !== false &&
+    !useMusicDjPlayerMusic;
   const sceneVideosQuery = useQuery({
     queryKey: ["game", "scene-videos", activeChatId],
     queryFn: () => api.get<{ videos: GeneratedSceneVideo[] }>(`/game/scene-videos/${activeChatId}`),
@@ -2508,15 +2528,75 @@ function GameSurfaceComponent({
   );
   const { data: assetManifest, refetch: fetchManifest } = useGameAssetManifest();
   const generatedAudioAssetsRef = useRef<Record<string, GameAssetEntry>>({});
+  // Session dedup for context-track generation requests (#5161), keyed `${axis}\0${key}`.
+  const contextMusicRequestRef = useRef<Set<string>>(new Set());
+  // Render-fresh mirrors for async music callbacks (#5161): a tier-track
+  // generation resolves minutes after the closure captured state.
+  const combatMusicTierRef = useRef<MusicEnemyTier | null>(null);
+  const musicDjSuppressedRef = useRef(false);
+  musicDjSuppressedRef.current = useMusicDjPlayerMusic;
+  // Unmount latch: audioManager and the asset store are module singletons, so
+  // a generation resolving after the surface unmounted must never play into
+  // whatever view the user is in now (review-found).
+  const gameSurfaceMountedRef = useRef(true);
+  useEffect(() => {
+    gameSurfaceMountedRef.current = true;
+    return () => {
+      gameSurfaceMountedRef.current = false;
+    };
+  }, []);
+  const experiencePreparesBeforeStart =
+    experienceSurfacePackage?.manifest.contributions?.gameSurface?.prepareBeforeStart === true;
+  const experienceStartupScope = useMemo(
+    () => ({
+      chat: sceneRuntimeScopeKey,
+      packageId: experienceSurfaceId,
+      version: experienceSurfacePackage?.version,
+      attempt: experienceClientModule.attempt,
+    }),
+    [sceneRuntimeScopeKey, experienceSurfaceId, experienceSurfacePackage?.version, experienceClientModule.attempt],
+  );
+  const experienceStartupScopeRef = useRef(experienceStartupScope);
+  experienceStartupScopeRef.current = experienceStartupScope;
+  const [experienceStartup, setExperienceStartup] = useState<{
+    scope: typeof experienceStartupScope;
+    context: string | null;
+    invalid: boolean;
+  } | null>(null);
+  const setStartupReady = useCallback(
+    (context: string | null) => {
+      if (!gameSurfaceMountedRef.current || experienceStartupScopeRef.current !== experienceStartupScope) return;
+      const invalid =
+        context !== null && (typeof context !== "string" || context.length > EXPERIENCE_STARTUP_CONTEXT_MAX_LENGTH);
+      const nextContext = invalid ? null : context;
+      setExperienceStartup((previous) =>
+        previous?.scope === experienceStartupScope && previous.context === nextContext && previous.invalid === invalid
+          ? previous
+          : { scope: experienceStartupScope, context: nextContext, invalid },
+      );
+    },
+    [experienceStartupScope],
+  );
+  const handleStartupHostError = useCallback(() => setStartupReady(null), [setStartupReady]);
+  const startupContext = experienceStartup?.scope === experienceStartupScope ? experienceStartup.context : null;
+  const experienceStartupInvalid = experienceStartup?.scope === experienceStartupScope && experienceStartup.invalid;
+  const experienceStartupBlocked =
+    (gameExperienceId !== null && installedCapabilityPackagesPending) ||
+    (experiencePreparesBeforeStart && startupContext === null);
+  const experienceStartupRef = useRef({ blocked: experienceStartupBlocked, context: startupContext });
+  experienceStartupRef.current = { blocked: experienceStartupBlocked, context: startupContext };
   const currentBackground = useGameAssetStore((s) => s.currentBackground);
   const gameAssetExcludedFolders = useMemo(
     () => parseGameAssetExcludedFolders(chatMeta.gameAssetSelection),
     [chatMeta.gameAssetSelection],
   );
+  // Session-generated entries obey the same per-chat folder exclusions as the
+  // manifest — merging them unfiltered re-injected excluded context tracks
+  // ahead of the blacklist (review-found).
   const scopedAssetMap = useMemo(
     () => ({
       ...(filterGameAssetMap(assetManifest?.assets ?? null, gameAssetExcludedFolders) ?? {}),
-      ...generatedAudioAssetsRef.current,
+      ...(filterGameAssetMap(generatedAudioAssetsRef.current, gameAssetExcludedFolders) ?? {}),
     }),
     [assetManifest?.assets, gameAssetExcludedFolders],
   );
@@ -2524,34 +2604,57 @@ function GameSurfaceComponent({
     const manifest = queryClient.getQueryData<GameAssetManifest>(gameAssetKeys.manifest());
     return {
       ...(filterGameAssetMap(manifest?.assets ?? null, gameAssetExcludedFolders) ?? {}),
-      ...generatedAudioAssetsRef.current,
+      ...(filterGameAssetMap(generatedAudioAssetsRef.current, gameAssetExcludedFolders) ?? {}),
     };
   }, [gameAssetExcludedFolders, queryClient]);
-  const generateGameAudioAsset = useCallback(async (kind: "sfx" | "music", prompt: string): Promise<string | null> => {
-    const category = kind === "sfx" ? "sfx" : "music";
-    if (prompt.startsWith(`${category}:generated:`)) return prompt;
-    try {
-      const generated = await withTimeout(
-        (signal) => api.post<{ tag: string; path: string }>("/tts/game-audio", { kind, prompt }, { signal }),
-        GAME_AUDIO_GENERATION_TIMEOUT_MS,
-      );
-      generatedAudioAssetsRef.current[generated.tag] = {
-        tag: generated.tag,
-        category,
-        subcategory: "generated",
-        name: generated.tag.split(":").at(-1) ?? generated.tag,
-        path: generated.path,
-        ext: ".mp3",
-      };
-      return generated.tag;
-    } catch (error) {
-      console.warn(`[game-audio] Failed to generate ${kind}:`, error);
-      return null;
+  // Once the served manifest carries a session-generated tag, the manifest is
+  // authoritative — dropping our shadow copy lets later renames/deletes in
+  // the Game Assets panel take effect instead of a dead tag staying
+  // selectable all session (review-found).
+  useEffect(() => {
+    const manifestAssets = assetManifest?.assets;
+    if (!manifestAssets) return;
+    for (const tag of Object.keys(generatedAudioAssetsRef.current)) {
+      if (manifestAssets[tag]) delete generatedAudioAssetsRef.current[tag];
     }
-  }, []);
+  }, [assetManifest?.assets]);
+  const gameAudioConnectionId = gameAudioConnection ? (gameAudioConnection.id as string) : undefined;
+  const generateGameAudioAsset = useCallback(
+    async (kind: "sfx" | "music", prompt: string): Promise<string | null> => {
+      const category = kind === "sfx" ? "sfx" : "music";
+      if (prompt.startsWith(`${category}:generated:`)) return prompt;
+      try {
+        const generated = await withTimeout(
+          (signal) =>
+            api.post<{ tag: string; path: string }>(
+              "/tts/game-audio",
+              { kind, prompt, ...(gameAudioConnectionId ? { audioConnectionId: gameAudioConnectionId } : {}) },
+              { signal },
+            ),
+          GAME_AUDIO_GENERATION_TIMEOUT_MS,
+        );
+        generatedAudioAssetsRef.current[generated.tag] = {
+          tag: generated.tag,
+          category,
+          subcategory: "generated",
+          name: generated.tag.split(":").at(-1) ?? generated.tag,
+          path: generated.path,
+          ext: ".mp3",
+        };
+        return generated.tag;
+      } catch (error) {
+        console.warn(`[game-audio] Failed to generate ${kind}:`, error);
+        return null;
+      }
+    },
+    [gameAudioConnectionId],
+  );
+  // SFX only since #5161: music is never a per-turn generation prompt anymore —
+  // scoring picks from the library (context tracks included), and the library
+  // fills lazily via ensureContextMusicTrack.
   const materializeGeneratedGameAudio = useCallback(
     async (input: SceneAnalysis): Promise<SceneAnalysis> => {
-      if (!generateGameSoundEffects && !generateGameMusic) return input;
+      if (!generateGameSoundEffects) return input;
       const result: SceneAnalysis = {
         ...input,
         segmentEffects: input.segmentEffects?.map((effect) => ({
@@ -2559,17 +2662,11 @@ function GameSurfaceComponent({
           sfx: effect.sfx ? [...effect.sfx] : undefined,
         })),
       };
-      if (generateGameMusic && result.music) {
-        result.music = await generateGameAudioAsset("music", result.music);
-      }
       if (result.segmentEffects?.length) {
         result.segmentEffects = await Promise.all(
           result.segmentEffects.map(async (effect) => {
             const next = { ...effect };
-            if (generateGameMusic && next.music) {
-              next.music = (await generateGameAudioAsset("music", next.music)) ?? undefined;
-            }
-            if (generateGameSoundEffects && next.sfx?.length) {
+            if (next.sfx?.length) {
               const generated = await Promise.all(next.sfx.map((prompt) => generateGameAudioAsset("sfx", prompt)));
               next.sfx = generated.filter((tag): tag is string => !!tag);
             }
@@ -2579,7 +2676,94 @@ function GameSurfaceComponent({
       }
       return result;
     },
-    [generateGameAudioAsset, generateGameMusic, generateGameSoundEffects],
+    [generateGameAudioAsset, generateGameSoundEffects],
+  );
+
+  /** Direct scoring+play for combat (#5161): no scene-analysis pass runs
+   *  while the combat overlay is up, so tier music must be applied the moment
+   *  the tier becomes known or its track lands — otherwise tier tracks are
+   *  generated but never audible (review-found). Falls back to the legacy
+   *  combat pool while the tier track is still rendering. */
+  const playContextCombatMusic = useCallback(
+    (tier: MusicEnemyTier) => {
+      if (musicDjSuppressedRef.current) return;
+      const assetMap = getScopedAssetMap();
+      const scored = scoreMusic({
+        state: "combat",
+        musicIntensity: "intense",
+        enemyTier: tier,
+        currentMusic: useGameAssetStore.getState().currentMusic,
+        recentMusic: recentMusicHistoryRef.current,
+        availableMusic: Object.keys(assetMap ?? {}).filter((tag) => tag.startsWith("music:")),
+      });
+      if (scored) {
+        audioManager.playMusic(scored, assetMap);
+        useGameAssetStore.getState().setCurrentMusic(scored);
+      }
+    },
+    [getScopedAssetMap],
+  );
+
+  /** Lazily fill the context-music library (#5161): one composition per area
+   *  slug / encounter tier, generated once server-side into the scoreable
+   *  library. A library fill first — playback stays with the deterministic
+   *  scoring pass for areas (picked up on the next transition, so music never
+   *  lurches mid-narration); tier tracks additionally crossfade in on arrival
+   *  because combat has no further scoring passes. Failures clear the dedup
+   *  key and retry on a later turn. */
+  const ensureContextMusicTrack = useCallback(
+    (axis: "area" | "tier", key: string, prompt: string) => {
+      if (!generateGameMusic || !key || !prompt) return;
+      const prefix = `music:${axis}:${key}:`;
+      if (Object.keys(getScopedAssetMap()).some((tag) => tag.startsWith(prefix))) return;
+      const requestKey = `${axis}\0${key}`;
+      if (contextMusicRequestRef.current.has(requestKey)) return;
+      contextMusicRequestRef.current.add(requestKey);
+      // Scope the continuation like generateCombatStateForMessage does: the
+      // request belongs to THIS chat on THIS mounted surface.
+      const requestChatId = activeChatIdRef.current;
+      void (async () => {
+        try {
+          const generated = await withTimeout(
+            (signal) =>
+              api.post<{ tag: string; path: string }>(
+                "/tts/game-audio",
+                {
+                  kind: "music",
+                  prompt,
+                  context: { axis, key },
+                  ...(gameAudioConnectionId ? { audioConnectionId: gameAudioConnectionId } : {}),
+                },
+                { signal },
+              ),
+            CONTEXT_MUSIC_GENERATION_TIMEOUT_MS,
+          );
+          if (!gameSurfaceMountedRef.current || activeChatIdRef.current !== requestChatId) {
+            // The file exists server-side either way; the new scope's own
+            // manifest pass will surface it. Just never PLAY into it.
+            contextMusicRequestRef.current.delete(requestKey);
+            return;
+          }
+          generatedAudioAssetsRef.current[generated.tag] = {
+            tag: generated.tag,
+            category: "music",
+            subcategory: axis,
+            name: generated.tag.split(":").at(-1) ?? generated.tag,
+            path: generated.path,
+            ext: ".mp3",
+          };
+          // Combat has no later scoring pass to adopt the track; crossfade in
+          // now if the fight this was generated for is still running.
+          if (axis === "tier" && combatMusicTierRef.current === key) {
+            playContextCombatMusic(key as MusicEnemyTier);
+          }
+        } catch (error) {
+          contextMusicRequestRef.current.delete(requestKey);
+          console.warn(`[game-audio] Failed to generate ${axis} music for "${key}":`, error);
+        }
+      })();
+    },
+    [generateGameMusic, getScopedAssetMap, gameAudioConnectionId, playContextCombatMusic],
   );
   const audioMuted = useGameAssetStore((s) => s.audioMuted);
 
@@ -2589,29 +2773,17 @@ function GameSurfaceComponent({
     useGameAssetStore.getState().setCurrentMusic(null);
   }, [useMusicDjPlayerMusic]);
 
-  const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
   const [sessionPanelTab, setSessionPanelTab] = useState<"history" | "journal">("history");
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryAnchor, setGalleryAnchor] = useState<ChatToolbarFloatingPanelAnchor>(null);
-  const resolvedGalleryOpen = galleryOpen || externalGalleryOpen;
-  const resolvedGalleryAnchor = externalGalleryOpen ? externalGalleryAnchor : galleryAnchor;
-  const resetGalleryState = useCallback(() => {
-    setGalleryOpen(false);
-    setGalleryAnchor(null);
-    onCloseExternalGallery?.();
-  }, [onCloseExternalGallery]);
-  const [mobileRetryMenuAnchor, setMobileRetryMenuAnchor] = useState<ChatToolbarFloatingPanelAnchor>(null);
-  const [mobileSessionPanelAnchor, setMobileSessionPanelAnchor] = useState<ChatToolbarFloatingPanelAnchor>(null);
-  const [mobileVolumePopoverAnchor, setMobileVolumePopoverAnchor] = useState<ChatToolbarFloatingPanelAnchor>(null);
-  const [mobileGameAssetsPanelAnchor, setMobileGameAssetsPanelAnchor] = useState<ChatToolbarFloatingPanelAnchor>(null);
+  // The Gallery drawer in an open Chat Settings window counts as an open game panel.
+  const chatSettingsOpen = useFloatingWindowStore((state) => state.open[CHAT_SETTINGS_WINDOW_ID] === true);
+  const galleryDrawerExpanded = useUIStore((state) => state.chatSettingsExpandedSections["game-gallery"] === true);
+  const galleryDrawerOpen = chatSettingsOpen && galleryDrawerExpanded;
   const [combatLogsOpen, setCombatLogsOpen] = useState(false);
   const closeCombatLogs = useCallback(() => setCombatLogsOpen(false), []);
   const combatLogsBackdropDismiss = useBackdropDismiss(closeCombatLogs);
   const [spotifyRetryPending, setSpotifyRetryPending] = useState(false);
   const [youtubeRetryPending, setYoutubeRetryPending] = useState(false);
   const combatLogScrolledRef = useRef(false);
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
-  const [mobileRetryMenuOpen, setMobileRetryMenuOpen] = useState(false);
   const [confirmEndSessionOpen, setConfirmEndSessionOpen] = useState(false);
   const [nextSessionRequest, setNextSessionRequest] = useState("");
   const [jsonRepairRequest, setJsonRepairRequest] = useState<JsonRepairRequest | null>(null);
@@ -2619,53 +2791,25 @@ function GameSurfaceComponent({
   const [prepareInitialWidgetsOpen, setPrepareInitialWidgetsOpen] = useState(false);
   const [savingSessionSummary, setSavingSessionSummary] = useState<number | null>(null);
   const [savingCurrentSessionSecrets, setSavingCurrentSessionSecrets] = useState(false);
-  const readFloatingPanelAnchor = useCallback((event?: ReactMouseEvent<HTMLElement>) => {
-    return readChatToolbarFloatingPanelAnchor(event?.currentTarget ?? null);
+  useEffect(() => {
+    const handleHelpOpen = (event: Event) => {
+      // Help opens from Chat Settings, which stays open under the overlay on a computer.
+      if (readChatHelpEventMode(event) === "game") setChatHelpOpen(true);
+    };
+    const handleHelpClose = (event: Event) => {
+      if (readChatHelpEventMode(event) === "game") setChatHelpOpen(false);
+    };
+    window.addEventListener(CHAT_HELP_OPEN_REQUEST_EVENT, handleHelpOpen);
+    window.addEventListener(CHAT_HELP_CLOSE_EVENT, handleHelpClose);
+    return () => {
+      window.removeEventListener(CHAT_HELP_OPEN_REQUEST_EVENT, handleHelpOpen);
+      window.removeEventListener(CHAT_HELP_CLOSE_EVENT, handleHelpClose);
+    };
   }, []);
-  const closeLocalFloatingWindows = useCallback(() => {
-    setSessionPanelOpen(false);
-    setMobileSessionPanelAnchor(null);
-    setGameAssetsPanelOpen(false);
-    setMobileGameAssetsPanelAnchor(null);
-    setRetryMenuOpen(false);
-    setMobileRetryMenuOpen(false);
-    setMobileRetryMenuAnchor(null);
-    setVolumePopoverOpen(false);
-    setMobileVolumePopoverAnchor(null);
-    resetGalleryState();
-  }, [resetGalleryState]);
-  const dismissOtherFloatingWindows = useCallback(() => {
-    closeLocalFloatingWindows();
-    onCloseSettings();
-  }, [closeLocalFloatingWindows, onCloseSettings]);
-  const handleOpenGalleryPanel = useCallback(
-    (event?: ReactMouseEvent<HTMLElement>) => {
-      const nextOpen = !resolvedGalleryOpen;
-      closeLocalFloatingWindows();
-      onCloseSettings();
-      setGalleryAnchor(nextOpen ? readFloatingPanelAnchor(event) : null);
-      setGalleryOpen(nextOpen);
-    },
-    [closeLocalFloatingWindows, onCloseSettings, readFloatingPanelAnchor, resolvedGalleryOpen],
-  );
-  const handleOpenSettingsPanel = useCallback(
-    (event?: ReactMouseEvent<HTMLElement>) => {
-      closeLocalFloatingWindows();
-      onOpenSettings(event);
-    },
-    [closeLocalFloatingWindows, onOpenSettings],
-  );
   const handleSwitchConnectedChat = useCallback(() => {
-    dismissOtherFloatingWindows();
-    onSwitchChat?.();
-  }, [dismissOtherFloatingWindows, onSwitchChat]);
-  const handleCloseGalleryPanel = useCallback(() => {
-    resetGalleryState();
-  }, [resetGalleryState]);
-  const closeChatDrawers = useCallback(() => {
-    resetGalleryState();
     onCloseSettings();
-  }, [onCloseSettings, resetGalleryState]);
+    onSwitchChat?.();
+  }, [onCloseSettings, onSwitchChat]);
   const [activeChoices, setActiveChoices] = useState<string[] | null>(null);
   const [experienceChoiceSlotEl, setExperienceChoiceSlotEl] = useState<HTMLDivElement | null>(null);
   const [activeQte, setActiveQte] = useState<{ actions: string[]; timer: number } | null>(null);
@@ -2678,13 +2822,23 @@ function GameSurfaceComponent({
   const [queuedEncounter, setQueuedEncounter] = useState<{ encounter: CombatEncounterTag; messageId: string } | null>(
     null,
   );
-  const [queuedCombatGeneration, setQueuedCombatGeneration] = useState<{ messageId: string } | null>(null);
+  const [queuedCombatGeneration, setQueuedCombatGeneration] = useState<{ messageId: string; notify: boolean } | null>(
+    null,
+  );
   const [preparedCombatState, setPreparedCombatState] = useState<PreparedCombatState | null>(null);
   const [combatGenerationPending, setCombatGenerationPending] = useState(false);
   const [combatGenerationError, setCombatGenerationError] = useState<string | null>(null);
+  /** Synchronous in-flight flag beside the async combatGenerationPending state: same-frame double
+   *  requests all read the stale state, the ref does not. Declared early so the turn-retry handler,
+   *  which must abandon an in-flight generation, can reach it. #5094. */
+  const combatGenerationInFlightRef = useRef(false);
+  /** Monotonic id for the CURRENT combat request; a stale completion whose id no longer matches bails.
+   *  Bumped on every new request, on chat switch, and when a turn retry abandons a generation. #5094. */
+  const combatGenerationRequestIdRef = useRef(0);
   const [combatItemEffects, setCombatItemEffects] = useState<CombatItemEffect[]>([]);
   const [combatMechanics, setCombatMechanics] = useState<CombatMechanic[]>([]);
   const [combatDialogueCues, setCombatDialogueCues] = useState<CombatDialogueCue[]>([]);
+  const [combatPinnedStyle, setCombatPinnedStyle] = useState<GameCombatStyle | null>(null);
   // Scene fields captured from the /encounter/init blueprint. Threaded into the
   // tactical combat UI (environment palette + formation) and used to auto-generate
   // a battlefield background. Set alongside combatParty; cleared with it.
@@ -2692,8 +2846,15 @@ function GameSurfaceComponent({
     environment: string;
     environmentType: string | null;
     formation: string | null;
+    battlefield: TacticalBattlefieldBrief | null;
+    battlefieldError: string | null;
     styleNotes: CombatStyleNotes | null;
   } | null>(null);
+  // Encounter tier for context-bound combat music (#5161): set from the
+  // /encounter/init blueprint (falling back from isBossFight), cleared with
+  // the rest of the combat state. Drives music:tier:<tier> selection.
+  const [combatMusicTier, setCombatMusicTier] = useState<MusicEnemyTier | null>(null);
+  combatMusicTierRef.current = combatMusicTier;
   // Guards the fire-once-per-battle auto background generation for tactical combat,
   // keyed by combatStartMessageId so a subsequent battle fires again.
   const tacticalAutoBackgroundFiredRef = useRef<string | null>(null);
@@ -2701,8 +2862,8 @@ function GameSurfaceComponent({
     statuses: CombatStatusTag[];
     messageId: string;
   } | null>(null);
-  const [pendingSkillCheck, setPendingSkillCheck] = useState<import("@marinara-engine/shared").SkillCheckResult | null>(
-    null,
+  const [pendingSkillChecks, setPendingSkillChecks] = useState<import("@marinara-engine/shared").SkillCheckResult[]>(
+    [],
   );
   const [pendingReaction, setPendingReaction] = useState<{
     reaction: string;
@@ -2723,16 +2884,16 @@ function GameSurfaceComponent({
   // still render party overlay boxes. Never set by a new-turn pipeline — the GM
   // now voices party members inline via the `[Name] [main] ...` format.
   const [partyChatMessageId, setPartyChatMessageId] = useState<string | null>(null);
-  // The active assistant message ID whose typewriter is currently complete, or null if
+  // The active assistant turn key whose typewriter is currently complete, or null if
   // either no message is finished typing or it's the *previous* turn's completion.
-  // We track the message ID rather than a boolean so a stale completion from the
+  // We track message ID and swipe rather than a boolean so a stale completion from the
   // previous turn cannot unlock interactions on the new turn — the derived
   // `narrationDone` flag below recomputes each render against the latest assistant
   // message, so encounter gates, choice rendering, map movement, inventory, etc. all
   // get the same scope-correct view of completion.
-  const [narrationDoneMsgId, setNarrationDoneMsgId] = useState<string | null>(null);
-  const handleNarrationComplete = useCallback((complete: boolean, messageId: string | null) => {
-    setNarrationDoneMsgId(complete ? messageId : null);
+  const [narrationDoneTurnKey, setNarrationDoneTurnKey] = useState<string | null>(null);
+  const handleNarrationComplete = useCallback((complete: boolean, turnKey: string | null) => {
+    setNarrationDoneTurnKey(complete ? turnKey : null);
   }, []);
   const [directionsPlaying, setDirectionsPlaying] = useState(false);
   const [pendingSegmentEffects, setPendingSegmentEffects] = useState<SceneSegmentEffect[]>([]);
@@ -2740,11 +2901,37 @@ function GameSurfaceComponent({
     Array<{ segment: number; update: InventoryTag }>
   >([]);
   const [inventoryOpen, setInventoryOpen] = useState(false);
-  const [inventoryItems, setInventoryItems] = useState<Array<{ name: string; quantity: number }>>(() => {
-    return (chatMeta.gameInventory as Array<{ name: string; quantity: number }>) ?? [];
-  });
+  const [inventoryItems, setInventoryItems] = useState<GameInventoryStack[]>(() =>
+    normalizeGameInventoryStacks(chatMeta.gameInventory),
+  );
   const inventoryItemsRef = useRef(inventoryItems);
-  const [inventoryNotifications, setInventoryNotifications] = useState<string[]>([]);
+  /** The screen's inventory saves: how many were sent, the newest whose answer is on screen, and
+   *  whether the chat changed while one was on its way (and so was not read then). */
+  const inventoryCommitSeq = useRef({ sent: 0, applied: 0, sheetApplied: 0, skippedResync: false });
+  // What a fight offers: one line per item, however the player split its stacks.
+  // What a fight lists: one line per item, each under a name no other line has, with each item's
+  // effect found under that line's name.
+  const gameRuleset = useGameRuleset(chatMeta);
+  // In a game with ruleset items, one of the ruleset's items is offered only when the fight's effects
+  // (worked out by the server from its `use`, #6905) say what it does, one that holds charges counted in
+  // uses while any is left (#6909), and the rest only while the ruleset leaves Game Mode's own items on,
+  // as the server offers them.
+  const rulesetItems = gameRuleset.status === "ok" ? gameRuleset.definition.items : undefined;
+  const fightInventoryLines = useMemo(
+    () =>
+      gameFightOffers(
+        inventoryItems,
+        combatItemEffects,
+        rulesetItems ? { native: rulesetItems.native !== false } : undefined,
+      ),
+    [inventoryItems, rulesetItems, combatItemEffects],
+  );
+  const fightItemEffects = useMemo(
+    () => gameInventoryFightEffects(fightInventoryLines, combatItemEffects),
+    [fightInventoryLines, combatItemEffects],
+  );
+  /** What the inventory just did, shown for a moment: gains in green, everything else in red. */
+  const [inventoryNotifications, setInventoryNotifications] = useState<Array<{ text: string; gain: boolean }>>([]);
   const [removingPartyMemberId, setRemovingPartyMemberId] = useState<string | null>(null);
   const [pendingMapMove, setPendingMapMove] = useState<{
     position: { x: number; y: number } | string;
@@ -2908,9 +3095,6 @@ function GameSurfaceComponent({
   const [manualStoryboardReviewActive, setManualStoryboardReviewActive] = useState(false);
   const [imagePromptReviewMediaType, setImagePromptReviewMediaType] = useState<"image" | "video">("image");
   const imagePromptReviewResolveRef = useRef<((overrides: GameImagePromptOverride[] | null) => void) | null>(null);
-  const [volumePopoverOpen, setVolumePopoverOpen] = useState(false);
-  const [gameAssetsPanelOpen, setGameAssetsPanelOpen] = useState(false);
-  const [retryMenuOpen, setRetryMenuOpen] = useState(false);
   const [persistedGameAudioSettings] = useState(readPersistedGameAudioSettings);
   const [masterVolume, setMasterVolume] = useState(persistedGameAudioSettings.masterVolume);
   const [musicVolume, setMusicVolume] = useState(persistedGameAudioSettings.musicVolume);
@@ -2918,19 +3102,24 @@ function GameSurfaceComponent({
   const [ttsVolume, setTtsVolume] = useState(persistedGameAudioSettings.ttsVolume);
   const [ambientVolume, setAmbientVolume] = useState(persistedGameAudioSettings.ambientVolume);
   const [audioSettingsHydrated, setAudioSettingsHydrated] = useState(false);
-  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [chatHelpOpen, setChatHelpOpen] = useState(false);
+  useEffect(() => {
+    setChatHelpOpen(false);
+  }, [activeChatId]);
   const [compactHudWidgets, setCompactHudWidgets] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
-  const tutorialAutoTriggeredRef = useRef(false);
-  const volumePopoverRef = useRef<HTMLDivElement>(null);
-  const mobileVolumePopoverRef = useRef<HTMLDivElement>(null);
-  const retryMenuRef = useRef<HTMLDivElement>(null);
-  const sessionPanelRef = useRef<HTMLDivElement>(null);
-  const mobileSessionPanelRef = useRef<HTMLDivElement>(null);
-  const gameAssetsPanelRef = useRef<HTMLDivElement>(null);
-  const mobileGameAssetsPanelRef = useRef<HTMLDivElement>(null);
   const hudSurfaceRef = useRef<HTMLDivElement>(null);
+  // The surface is also tracked in state so the widget-layout effect below can
+  // depend on it. GameSurface renders a messages-loading branch that mounts no
+  // surface at all, and the widget state hydrates from chat metadata while that
+  // branch is up — measuring then finds no element, attaches no ResizeObserver,
+  // and nothing re-measures once the real surface arrives.
+  const [hudSurfaceEl, setHudSurfaceEl] = useState<HTMLDivElement | null>(null);
+  const attachHudSurface = useCallback((node: HTMLDivElement | null) => {
+    hudSurfaceRef.current = node;
+    setHudSurfaceEl(node);
+  }, []);
   const compactHudWidgetsRef = useRef(compactHudWidgets);
   const compactHudReleaseWidthRef = useRef<number | null>(null);
   const lastProcessedMsgRef = useRef<string | null>(null);
@@ -2943,21 +3132,9 @@ function GameSurfaceComponent({
   const storyboardViewerResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const closeGameFloatingPanels = useCallback(() => {
-    setSessionPanelOpen(false);
-    setGameAssetsPanelOpen(false);
-    setGalleryOpen(false);
-    setGalleryAnchor(null);
     setCombatLogsOpen(false);
-    setMobileRetryMenuOpen(false);
-    setMobileRetryMenuAnchor(null);
-    setMobileSessionPanelAnchor(null);
-    setMobileVolumePopoverAnchor(null);
-    setMobileGameAssetsPanelAnchor(null);
-    setVolumePopoverOpen(false);
-    setRetryMenuOpen(false);
     setInventoryOpen(false);
-    resetGalleryState();
-  }, [resetGalleryState]);
+  }, []);
 
   useEffect(() => {
     window.addEventListener(CHAT_FLOATING_UI_DISMISS_EVENT, closeGameFloatingPanels);
@@ -2966,13 +3143,14 @@ function GameSurfaceComponent({
 
   const introPresentationStorageKey = `game-intro-presented:${activeChatId}`;
   const assistantTurnCount = useMemo(
-    () => messages.filter((m) => (m.role === "assistant" || m.role === "narrator") && !!m.content.trim()).length,
+    () => messages.filter((m) => (m.role === "assistant" || m.role === "narrator") && isVisibleGameMessage(m)).length,
     [messages],
   );
-  const latestAssistantMessageIdForIntro = useMemo(() => {
+  const latestAssistantTurnForIntro = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i]!;
-      if (message.role === "assistant" || message.role === "narrator") return message.id;
+      if ((message.role === "assistant" || message.role === "narrator") && isVisibleGameMessage(message))
+        return message;
     }
     return null;
   }, [messages]);
@@ -2981,39 +3159,51 @@ function GameSurfaceComponent({
   const [pendingNpcPortraitUploadName, setPendingNpcPortraitUploadName] = useState<string | null>(null);
   const [generatingNpcPortraitNames, setGeneratingNpcPortraitNames] = useState<Set<string>>(() => new Set());
 
+  // Visible Session or Assets content pauses narration; collapsed docked sections leave it playing.
+  const sessionSectionExpanded = useUIStore(
+    (state) => state.chatSettingsExpandedSections[CHAT_CONTROL_WINDOW_IDS.session] !== false,
+  );
+  const assetsSectionExpanded = useUIStore(
+    (state) => state.chatSettingsExpandedSections[CHAT_CONTROL_WINDOW_IDS.assets] !== false,
+  );
+  const sessionWindowRestored = useFloatingWindowStore((state) =>
+    selectWindowRestored(state, CHAT_CONTROL_WINDOW_IDS.session, sessionSectionExpanded),
+  );
+  const assetsWindowRestored = useFloatingWindowStore((state) =>
+    selectWindowRestored(state, CHAT_CONTROL_WINDOW_IDS.assets, assetsSectionExpanded),
+  );
   const narrationAutoPlayBlocked =
     !!activeReadable ||
     !!activeQte ||
-    sessionPanelOpen ||
-    gameAssetsPanelOpen ||
-    resolvedGalleryOpen ||
+    sessionWindowRestored ||
+    assetsWindowRestored ||
+    galleryDrawerOpen ||
     combatLogsOpen ||
     inventoryOpen ||
-    tutorialOpen ||
-    confirmEndSessionOpen ||
-    mobileActionsOpen;
+    chatHelpOpen ||
+    confirmEndSessionOpen;
   const narrationVoicePlaybackBlocked =
     !!activeReadable ||
-    sessionPanelOpen ||
-    gameAssetsPanelOpen ||
-    resolvedGalleryOpen ||
+    sessionWindowRestored ||
+    assetsWindowRestored ||
+    galleryDrawerOpen ||
     combatLogsOpen ||
     inventoryOpen ||
-    tutorialOpen ||
-    confirmEndSessionOpen ||
-    mobileActionsOpen;
+    chatHelpOpen ||
+    confirmEndSessionOpen;
   const effectiveGameVoiceVolume = audioMuted || masterVolume === 0 ? 0 : getEffectiveVolume(masterVolume, ttsVolume);
 
   useEffect(() => {
     let hasAdvancedNarrationProgress = false;
-    if (latestAssistantMessageIdForIntro) {
+    if (latestAssistantTurnForIntro) {
       const saved = readStoredNarrationProgress(activeChatId);
-      const savedAdvanced = !!saved && saved.messageId === latestAssistantMessageIdForIntro && saved.index > 0;
+      const savedAdvanced =
+        !!saved && narrationProgressMatchesTurn(saved.messageId, latestAssistantTurnForIntro) && saved.index > 0;
       const serverIdx = chatMeta.gameNarrationIndex;
       const serverMessageId =
         typeof chatMeta.gameNarrationMessageId === "string" ? chatMeta.gameNarrationMessageId : null;
       const serverAdvanced =
-        serverMessageId === latestAssistantMessageIdForIntro &&
+        narrationProgressMatchesTurn(serverMessageId, latestAssistantTurnForIntro) &&
         typeof serverIdx === "number" &&
         Number.isFinite(serverIdx) &&
         serverIdx > 0;
@@ -3032,7 +3222,7 @@ function GameSurfaceComponent({
     chatMeta.gameNarrationIndex,
     chatMeta.gameNarrationMessageId,
     introPresentationStorageKey,
-    latestAssistantMessageIdForIntro,
+    latestAssistantTurnForIntro,
   ]);
 
   useEffect(() => {
@@ -3047,6 +3237,22 @@ function GameSurfaceComponent({
   useEffect(() => {
     inventoryItemsRef.current = inventoryItems;
   }, [inventoryItems]);
+
+  // The stacks as the chat has them. A reply whose inventory tags the server applied, or a change
+  // made elsewhere, reaches the screen with the chat; the screen's own changes are already there.
+  const savedInventory = chatMeta.gameInventory;
+  useEffect(() => {
+    // A save of the screen's own still on its way answers with the stacks it made; a chat read in the
+    // meantime would show them as they were before it.
+    if (inventoryCommitSeq.current.sent > inventoryCommitSeq.current.applied) {
+      inventoryCommitSeq.current.skippedResync = true;
+      return;
+    }
+    const saved = normalizeGameInventoryStacks(savedInventory);
+    if (JSON.stringify(saved) === JSON.stringify(inventoryItemsRef.current)) return;
+    inventoryItemsRef.current = saved;
+    setInventoryItems(saved);
+  }, [savedInventory]);
 
   useEffect(() => {
     if (prevSceneRuntimeScopeRef.current === sceneRuntimeScopeKey) return; // skip initial mount
@@ -3065,6 +3271,11 @@ function GameSurfaceComponent({
     setQueuedQte(null);
     setQueuedEncounter(null);
     setQueuedCombatGeneration(null);
+    // #5094: abandon any in-flight combat generation here — clear the lock so a fresh request isn't
+    // blocked by it, and bump the request id so the old generation's stale completion can't re-queue
+    // combat, apply state, or set an error against the reset combat state.
+    combatGenerationInFlightRef.current = false;
+    combatGenerationRequestIdRef.current += 1;
     setCombatGenerationPending(false);
     setCombatItemEffects([]);
     setCombatMechanics([]);
@@ -3073,11 +3284,14 @@ function GameSurfaceComponent({
     setCombatParty(null);
     setCombatEnemies(null);
     setCombatSceneMeta(null);
+    setCombatPinnedStyle(null);
+    setCombatMusicTier(null);
+    contextMusicRequestRef.current.clear();
     setCombatSpriteSuggestion(null);
-    setNarrationDoneMsgId(null);
+    setNarrationDoneTurnKey(null);
     lastProcessedMsgRef.current = null;
     // Reset inventory/readables for the new chat or game.
-    setInventoryItems((chatMeta.gameInventory as Array<{ name: string; quantity: number }>) ?? []);
+    setInventoryItems(normalizeGameInventoryStacks(chatMeta.gameInventory));
     setInventoryNotifications([]);
     setPendingInventorySegmentUpdates([]);
     setActiveReadable(null);
@@ -3089,8 +3303,6 @@ function GameSurfaceComponent({
     setStartSessionRequested(false);
     setPrepareInitialWidgetsOpen(false);
     setPrepareSessionWidgetsOpen(false);
-    // Allow the auto-tutorial to re-evaluate for the new chat (guard still gates on disabled flag)
-    tutorialAutoTriggeredRef.current = false;
   }, [sceneRuntimeScopeKey, chatMeta.gameInventory, chatMeta.gameRecentMusic, chatMeta.gameRecentSpotifyTracks]);
 
   const clearPendingInteractiveCommands = useCallback(() => {
@@ -3110,102 +3322,89 @@ function GameSurfaceComponent({
     [],
   );
 
-  const applyInventoryUpdates = useCallback(
+  /** One line for a notification: the item, with how many when it is more than one. */
+  const inventoryLabel = useCallback(
+    (item: string, count: number) =>
+      count > 1 ? `${item} ${localizeUi("ui.panels.imagedimensionrow.x")}${count}` : item,
+    [localizeUi],
+  );
+
+  /**
+   * What the Game Master's inventory tags did, announced as the player reaches them. The server
+   * already applied every tag when it saved the reply, so nothing here changes the inventory: the
+   * screen picks up the new stacks with the chat, and a tag the server refused is not announced.
+   */
+  const announceInventoryUpdates = useCallback(
     (updates: InventoryTag[]) => {
-      if (updates.length === 0) return;
-
-      const notifications: string[] = [];
-      const journalEntries: Array<{ item: string; action: "acquired" | "lost"; quantity: number }> = [];
-      const previousInventory = inventoryItemsRef.current;
-      let updated = previousInventory;
-      const currentGameState = useGameStateStore.getState().current;
-      const currentPlayerStats = currentGameState?.chatId === activeChatId ? currentGameState.playerStats : null;
-      let nextPlayerStats = currentPlayerStats;
-
-      for (const invUpdate of updates) {
-        const quantity = normalizeInventoryCount(invUpdate.count);
-        for (const itemName of invUpdate.items) {
-          const normalizedItemName = normalizeInventoryName(itemName);
-          if (!normalizedItemName) continue;
-
-          let applied = false;
-          if (invUpdate.action === "add") {
-            updated = addInventoryUnit(updated, normalizedItemName, quantity);
-            if (nextPlayerStats) {
-              nextPlayerStats = {
-                ...nextPlayerStats,
-                inventory: addInventoryUnit(nextPlayerStats.inventory, normalizedItemName, quantity),
-              };
-            }
-            notifications.push(
-              quantity > 1 ? `You gained ${normalizedItemName} x${quantity}!` : `You gained ${normalizedItemName}!`,
-            );
-            applied = true;
-          } else {
-            const nextInventory = removeInventoryUnit(updated, normalizedItemName, quantity);
-            if (nextInventory !== updated) {
-              updated = nextInventory;
-              notifications.push(
-                quantity > 1 ? `You lost ${normalizedItemName} x${quantity}!` : `You lost ${normalizedItemName}!`,
-              );
-              applied = true;
-            }
-            if (nextPlayerStats) {
-              const nextDetailedInventory = removeInventoryUnit(
-                nextPlayerStats.inventory,
-                normalizedItemName,
-                quantity,
-              );
-              if (nextDetailedInventory !== nextPlayerStats.inventory) {
-                nextPlayerStats = { ...nextPlayerStats, inventory: nextDetailedInventory };
-                applied = true;
-              }
-            }
-          }
-
-          if (applied) {
-            journalEntries.push({
-              item: normalizedItemName,
-              action: invUpdate.action === "add" ? "acquired" : "lost",
-              quantity,
-            });
-          }
+      const describe = (update: InventoryTag, item: string) => {
+        if (update.action === "give") {
+          return update.who
+            ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoGave", {
+                who: update.who,
+                item,
+                to: update.to ?? "",
+              })
+            : localizeUi("ui.game.gamesurfacecomponent.inventoryYouGave", { item, to: update.to ?? "" });
         }
-      }
-
-      if (updated !== previousInventory) {
-        inventoryItemsRef.current = updated;
-        setInventoryItems(updated);
-        api.patch(`/chats/${activeChatId}/metadata`, { gameInventory: updated }).catch(() => {});
-      }
-
-      if (currentGameState?.chatId === activeChatId && currentPlayerStats && nextPlayerStats !== currentPlayerStats) {
-        const syncedGameState = { ...currentGameState, playerStats: nextPlayerStats };
-        useGameStateStore.getState().setGameState(syncedGameState);
-        api.patch(`/chats/${activeChatId}/game-state`, { playerStats: nextPlayerStats }).catch(() => {});
-      }
-
-      for (const entry of journalEntries) {
-        api
-          .post("/game/journal/entry", {
-            chatId: activeChatId,
-            type: "item",
-            data: {
-              item: entry.item,
-              action: entry.action,
-              quantity: entry.quantity,
-            },
-          })
-          .catch(() => {});
-      }
-
+        if (update.action === "remove") {
+          return update.who
+            ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoLost", { who: update.who, item })
+            : localizeUi("ui.game.gamesurfacecomponent.inventoryYouLost", { item });
+        }
+        if (update.action === "use") {
+          return update.who
+            ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoUsed", { who: update.who, item })
+            : localizeUi("ui.game.gamesurfacecomponent.inventoryYouUsed", { item });
+        }
+        if (update.action === "pay") {
+          return update.who
+            ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoPaid", { who: update.who, item })
+            : localizeUi("ui.game.gamesurfacecomponent.inventoryYouPaid", { item });
+        }
+        if (update.action === "buy") {
+          const price = update.price ?? "";
+          return update.who
+            ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoBought", { who: update.who, item, price })
+            : localizeUi("ui.game.gamesurfacecomponent.inventoryYouBought", { item, price });
+        }
+        if (
+          update.action === "equip" ||
+          update.action === "unequip" ||
+          update.action === "bind" ||
+          update.action === "unbind"
+        ) {
+          const key = { equip: "Equipped", unequip: "Unequipped", bind: "Bound", unbind: "Unbound" }[update.action];
+          return update.who
+            ? localizeUi(`ui.game.gamesurfacecomponent.inventoryWho${key}`, { who: update.who, item })
+            : localizeUi(`ui.game.gamesurfacecomponent.inventoryYou${key}`, { item });
+        }
+        return update.who
+          ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoGained", { who: update.who, item })
+          : localizeUi("ui.game.gamesurfacecomponent.inventoryYouGained", { item });
+      };
+      // Putting something on or binding it is shown like a gain; nothing is lost by either.
+      const notifications = updates.flatMap((update) =>
+        update.ok && update.count > 0
+          ? [
+              {
+                gain:
+                  update.action === "add" ||
+                  update.action === "earn" ||
+                  update.action === "buy" ||
+                  update.action === "equip" ||
+                  update.action === "bind",
+                text: describe(update, inventoryLabel(update.item, update.count)),
+              },
+            ]
+          : [],
+      );
       if (notifications.length > 0) {
         setInventoryNotifications(notifications);
         if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
         notificationTimerRef.current = setTimeout(() => setInventoryNotifications([]), 4000);
       }
     },
-    [activeChatId],
+    [inventoryLabel, localizeUi],
   );
 
   const playDirections = useCallback((directions: DirectionCommand[]) => {
@@ -3219,7 +3418,6 @@ function GameSurfaceComponent({
   const handleSegmentEnter = useCallback(
     (segmentIndex: number) => {
       setActiveStoryboardSegmentIndex(Number.isFinite(segmentIndex) ? segmentIndex : null);
-      useGameModeStore.getState().setDiceRollResult(null);
       const sceneEffectsApplied = appliedSegmentsRef.current.has(segmentIndex);
       const inventoryApplied = appliedInventorySegmentsRef.current.has(segmentIndex);
       const effects = sceneEffectsApplied ? [] : pendingSegmentEffects.filter((e) => e.segment === segmentIndex);
@@ -3244,7 +3442,7 @@ function GameSurfaceComponent({
           if (fx.sfx?.length) {
             for (const sfx of fx.sfx) {
               const resolved = resolveAssetTag(sfx, "sfx", assetMap);
-              audioManager.playSfx(resolved, assetMap);
+              audioManager.playSfx(resolved, assetMap, fx.sfxLoopCount);
             }
           }
           if (fx.ambient) {
@@ -3261,14 +3459,14 @@ function GameSurfaceComponent({
 
       if (inventoryUpdates.length > 0) {
         appliedInventorySegmentsRef.current.add(segmentIndex);
-        applyInventoryUpdates(inventoryUpdates);
+        announceInventoryUpdates(inventoryUpdates);
       }
     },
     [
       pendingSegmentEffects,
       pendingInventorySegmentUpdates,
       getScopedAssetMap,
-      applyInventoryUpdates,
+      announceInventoryUpdates,
       playDirections,
       useMusicDjPlayerMusic,
     ],
@@ -3282,16 +3480,12 @@ function GameSurfaceComponent({
     setActiveDirections([]);
   }, []);
 
-  const handleReplaySession = useCallback(
-    (sessionNumberToReplay: number) => {
-      audioManager.unlock();
-      setReplayBackgroundTag(null);
-      setReplaySessionNumber(sessionNumberToReplay);
-      setActiveSpeaker(null);
-      closeLocalFloatingWindows();
-    },
-    [closeLocalFloatingWindows],
-  );
+  const handleReplaySession = useCallback((sessionNumberToReplay: number) => {
+    audioManager.unlock();
+    setReplayBackgroundTag(null);
+    setReplaySessionNumber(sessionNumberToReplay);
+    setActiveSpeaker(null);
+  }, []);
 
   // Clean up audio + reset playback state when switching chats or replacing the game in the same chat.
   // On unmount, only dispose audio (stop sounds) but keep store state intact so that
@@ -3331,23 +3525,6 @@ function GameSurfaceComponent({
     }
   }, [assetManifest, chatMeta.gameSceneBackground, scopedAssetMap, useMusicDjPlayerMusic]);
 
-  const gameCharacterIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const id of chatCharacterIds) {
-      if (characterMap.has(id)) ids.add(id);
-    }
-
-    const config = chatMeta.gameSetupConfig as Record<string, unknown> | undefined;
-    const gmCharacterId = typeof config?.gmCharacterId === "string" ? config.gmCharacterId : null;
-    if (gmCharacterId && characterMap.has(gmCharacterId)) ids.add(gmCharacterId);
-
-    for (const id of getActivePartyIds(chatMeta)) {
-      if (characterMap.has(id)) ids.add(id);
-    }
-
-    return [...ids];
-  }, [characterMap, chatCharacterIds, chatMeta]);
-
   // Fetch sprites for active game characters only. The full library is deliberately
   // not used here because a same-named character card can masquerade as the player.
   const characterIds = gameCharacterIds;
@@ -3368,21 +3545,12 @@ function GameSurfaceComponent({
     })),
   });
 
-  const spriteSpeakerMessages = replayActive ? replaySpriteMessages : messages;
-  const recentSpriteSpeakerNames = useMemo(
-    () => extractRecentGameDialogueSpeakerNames(spriteSpeakerMessages),
-    [spriteSpeakerMessages],
-  );
-
   useEffect(() => {
     const avatarPatches: Array<{ name: string; avatarUrl: string }> = [];
     for (const npc of npcs) {
       if (!npc.name) continue;
       const libraryCharacter = findNamedEntry(characters, npc.name, (character) => character.name);
-      if (
-        libraryCharacter?.avatarUrl &&
-        (!npc.avatarUrl || !isSameNpcAvatarResource(libraryCharacter.avatarUrl, npc.avatarUrl))
-      ) {
+      if (libraryCharacter?.avatarUrl && !npc.avatarUrl) {
         avatarPatches.push({ name: npc.name, avatarUrl: libraryCharacter.avatarUrl });
       }
     }
@@ -3390,52 +3558,6 @@ function GameSurfaceComponent({
       useGameModeStore.getState().patchNpcAvatars(avatarPatches);
     }
   }, [characters, npcs]);
-
-  const speakingLibraryCharacters = useMemo(() => {
-    const speakerNames = new Set<string>();
-    if (activeSpeaker?.name) speakerNames.add(activeSpeaker.name);
-    for (const name of recentSpriteSpeakerNames) {
-      speakerNames.add(name);
-    }
-    for (const line of partyDialogue) {
-      if (line.character.trim()) speakerNames.add(line.character.trim());
-    }
-
-    const inGameCharacterIds = new Set(characterIds);
-    const matched = new Map<string, SpeakingLibraryCharacter>();
-    const playerSpeakerName = personaInfo?.name ? normalizeSceneAssetName(personaInfo.name) : "";
-    for (const speakerName of speakerNames) {
-      if (playerSpeakerName && normalizeSceneAssetName(speakerName) === playerSpeakerName) continue;
-      const character = findNamedEntry(characters, speakerName, (entry) => entry.name);
-      if (!character || inGameCharacterIds.has(character.id) || character.id === personaSpriteId) continue;
-      const existing = matched.get(character.id);
-      if (existing) {
-        if (!existing.aliases.some((alias) => characterNamesMatch(alias, speakerName))) {
-          existing.aliases.push(speakerName);
-        }
-        continue;
-      }
-      matched.set(character.id, { character, aliases: [speakerName] });
-    }
-    return [...matched.values()];
-  }, [
-    activeSpeaker?.name,
-    characterIds,
-    characters,
-    partyDialogue,
-    personaInfo?.name,
-    personaSpriteId,
-    recentSpriteSpeakerNames,
-  ]);
-
-  const librarySpriteQueries = useQueries({
-    queries: speakingLibraryCharacters.map((entry) => ({
-      queryKey: spriteKeys.list(entry.character.id),
-      queryFn: () => api.get<SpriteInfo[]>(`/sprites/${entry.character.id}`),
-      enabled: !!entry.character.id,
-      staleTime: 5 * 60 * 1000,
-    })),
-  });
 
   const personaSpriteQuery = useQuery({
     queryKey: spriteKeys.list(personaSpriteId ?? ""),
@@ -3454,29 +3576,12 @@ function GameSurfaceComponent({
         map.set(normalizeTextForMatch(charInfo.name), data);
       }
     });
-    speakingLibraryCharacters.forEach((entry, i) => {
-      const data = librarySpriteQueries[i]?.data;
-      if (data?.length) {
-        map.set(normalizeTextForMatch(entry.character.name), data);
-        for (const alias of entry.aliases) {
-          map.set(normalizeTextForMatch(alias), data);
-        }
-      }
-    });
     // Add persona sprites if available
     if (personaInfo?.name && personaSpriteQuery.data?.length) {
       map.set(normalizeTextForMatch(personaInfo.name), personaSpriteQuery.data);
     }
     return map;
-  }, [
-    characterIds,
-    characterMap,
-    librarySpriteQueries,
-    personaInfo,
-    speakingLibraryCharacters,
-    personaSpriteQuery.data,
-    spriteQueries,
-  ]);
+  }, [characterIds, characterMap, personaInfo, personaSpriteQuery.data, spriteQueries]);
 
   // Speaker-avatar seam: an experience whose cast has no engine character cards pushes a name→url map
   // here, so its speakers still get an avatar in the narration.
@@ -3521,7 +3626,11 @@ function GameSurfaceComponent({
         previous?.providesInventory === next?.providesInventory &&
         previous?.providesCombat === next?.providesCombat &&
         previous?.providesPlayerInput === next?.providesPlayerInput &&
-        previous?.providesChoices === next?.providesChoices
+        previous?.providesChoices === next?.providesChoices &&
+        // Every declared field belongs in this comparison. A package that toggles ONLY the
+        // narration-collapse request would otherwise be handed back the previous object and
+        // its cutscene would never fold the box away.
+        previous?.requestsCollapsedNarration === next?.requestsCollapsedNarration
       ) {
         return previous;
       }
@@ -3540,20 +3649,8 @@ function GameSurfaceComponent({
         dialogueColor?: string;
       }
     >();
-    for (const entry of speakingLibraryCharacters) {
-      const fromMap = characterMap.get(entry.character.id);
-      const avatarInfo = {
-        url: entry.character.avatarUrl ?? "",
-        crop: entry.character.avatarCrop,
-        nameColor: entry.character.nameColor ?? fromMap?.nameColor,
-        dialogueColor: entry.character.dialogueColor ?? fromMap?.dialogueColor,
-      };
-      map.set(normalizeTextForMatch(entry.character.name), avatarInfo);
-      for (const alias of entry.aliases) {
-        map.set(normalizeTextForMatch(alias), avatarInfo);
-      }
-    }
-    // Real library cards (added above) win; the player name is handled via personaInfo.
+    // Selected cards are resolved by characterIds; never borrow an unrelated card by name.
+    // Experiences can still supply their own cast portraits, excluding the player persona.
     const extra = activeExperienceAvatars?.speakerAvatars;
     if (extra?.size) {
       const playerKey = personaInfo?.name ? normalizeTextForMatch(personaInfo.name) : "";
@@ -3563,7 +3660,7 @@ function GameSurfaceComponent({
       }
     }
     return map;
-  }, [characterMap, speakingLibraryCharacters, activeExperienceAvatars, personaInfo?.name]);
+  }, [activeExperienceAvatars, personaInfo?.name]);
 
   // Fallback avatar for the player persona when it has none, so the player's dialogue shows one too.
   const effectivePersonaInfo = useMemo(() => {
@@ -3598,19 +3695,10 @@ function GameSurfaceComponent({
       return character ? ([[id, character]] as Array<[string, NonNullable<ReturnType<typeof characterMap.get>>]>) : [];
     });
     const entry = findNamedEntry(activeCharacterEntries, fullBodyTarget.name, ([, character]) => character.name);
-    const libraryEntry = entry
-      ? null
-      : findNamedEntry(speakingLibraryCharacters, fullBodyTarget.name, (candidate) =>
-          [candidate.character.name, ...candidate.aliases].join(" "),
-        );
-    const characterId = entry?.[0] ?? libraryEntry?.character.id;
+    const characterId = entry?.[0];
     if (!characterId) return null;
 
-    const characterIndex = entry ? characterIds.indexOf(entry[0]) : -1;
-    const libraryIndex = libraryEntry
-      ? speakingLibraryCharacters.findIndex((candidate) => candidate.character.id === libraryEntry.character.id)
-      : -1;
-    const sprites = entry ? spriteQueries[characterIndex]?.data : librarySpriteQueries[libraryIndex]?.data;
+    const sprites = spriteQueries[characterIds.indexOf(characterId)]?.data;
     const pose =
       fullBodyTarget.mode === "combat"
         ? resolveCombatFullBodyPose(fullBodyTarget.token, sprites)
@@ -3625,11 +3713,9 @@ function GameSurfaceComponent({
     characterIds,
     characterMap,
     fullBodyTarget,
-    librarySpriteQueries,
     personaInfo?.name,
     personaSpriteId,
     personaSpriteQuery.data,
-    speakingLibraryCharacters,
     spriteQueries,
   ]);
 
@@ -3674,11 +3760,14 @@ function GameSurfaceComponent({
   // Process GM tags from the latest assistant message
   const latestAssistantMsg = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i]!.role === "assistant" || messages[i]!.role === "narrator") return messages[i];
+      const message = messages[i]!;
+      if ((message.role === "assistant" || message.role === "narrator") && isVisibleGameMessage(message))
+        return message;
     }
     return null;
   }, [messages]);
   const latestAssistantSwipeIndex = latestAssistantMsg?.activeSwipeIndex ?? 0;
+  const latestAssistantTurnKey = narrationTurnKey(latestAssistantMsg);
   const turnStoryboardsQuery = useGameTurnStoryboards(
     activeChatId,
     latestAssistantMsg?.id,
@@ -3693,6 +3782,13 @@ function GameSurfaceComponent({
   const previewTurnStoryboardPrompts = usePreviewGameTurnStoryboardPrompts();
   const storyboardGenerating = generateTurnStoryboard.isPending || previewTurnStoryboardPrompts.isPending;
   const latestTurnStoryboardRendering = isGameTurnStoryboardRendering(latestTurnStoryboard);
+  const sequentialGameMediaPending =
+    gameSequentialAgents &&
+    (storyboardGenerating ||
+      latestTurnStoryboardRendering ||
+      manualBackgroundGenerating ||
+      sceneVideoGenerating ||
+      (!!pendingAssetGeneration && !assetGenerationFailed));
 
   const latestAssistantDirectAddressMode = useMemo(() => {
     if (!latestAssistantMsg) return null;
@@ -3716,9 +3812,9 @@ function GameSurfaceComponent({
   // also defeat the undefined-vs-undefined edge case where both sides could otherwise
   // compare equal (Message.id is typed as optional) and silently unlock UI gates.
   const narrationDone =
-    typeof narrationDoneMsgId === "string" &&
-    typeof latestAssistantMsg?.id === "string" &&
-    narrationDoneMsgId === latestAssistantMsg.id;
+    typeof narrationDoneTurnKey === "string" &&
+    typeof latestAssistantTurnKey === "string" &&
+    narrationDoneTurnKey === latestAssistantTurnKey;
 
   const latestNarrationText = useMemo(() => {
     return buildStoryboardVisibleNarration(latestAssistantMsg, segmentEdits, segmentDeletes);
@@ -3754,8 +3850,8 @@ function GameSurfaceComponent({
   }, [storyboardViewerWidth]);
   const handleViewStoryboardFromGallery = useCallback(() => {
     handleReopenStoryboardViewer();
-    handleCloseGalleryPanel();
-  }, [handleCloseGalleryPanel, handleReopenStoryboardViewer]);
+    onCloseSettings();
+  }, [handleReopenStoryboardViewer, onCloseSettings]);
   useEffect(() => {
     if (!activeStoryboardKeyframe?.video?.id) {
       setStoryboardViewerPlayingVideoId(null);
@@ -3891,6 +3987,7 @@ function GameSurfaceComponent({
   const combatLogEntries = useMemo(
     () =>
       messages
+        .filter(isVisibleGameMessage)
         .map((message) => ({
           id: message.id,
           role: message.role,
@@ -4204,6 +4301,7 @@ function GameSurfaceComponent({
     sceneReadyMsgIdRef.current = undefined;
     weatherMsgRef.current = null;
     lastProcessedMsgRef.current = null;
+    setPendingSkillChecks([]);
   }, [sceneRuntimeScopeKey]);
 
   if (sceneReadyMsgIdRef.current === undefined && !isMessagesLoading) {
@@ -4264,18 +4362,18 @@ function GameSurfaceComponent({
       const suppressInteractiveCommands = interruptedInteractiveCommandKeysRef.current.has(
         interactiveCommandKey(activeChatId, latestAssistantMsg.id),
       );
+      setActiveChoices(!suppressInteractiveCommands && tags.choices ? tags.choices : null);
       if (!suppressInteractiveCommands) {
-        if (tags.choices) setActiveChoices(tags.choices);
         if (tags.qte && !hasQteResponseAfterMessage(latestAssistantMsg.id)) {
           setQueuedQte({ qte: tags.qte, messageId: latestAssistantMsg.id });
         }
         if (tags.combatEncounter && !hasCombatResultAfterMessage(latestAssistantMsg.id)) {
           setQueuedEncounter({ encounter: tags.combatEncounter, messageId: latestAssistantMsg.id });
         } else if (tags.stateChange === "combat" && !hasCombatResultAfterMessage(latestAssistantMsg.id)) {
-          setQueuedCombatGeneration({ messageId: latestAssistantMsg.id });
+          setQueuedCombatGeneration({ messageId: latestAssistantMsg.id, notify: true });
         }
       }
-      lastProcessedMsgRef.current = latestAssistantMsg.id;
+      lastProcessedMsgRef.current = latestAssistantTurnKey;
       // Clear restored flag so subsequent new messages are processed normally
       // by processScene (which skips when isRestoredRef.current is true).
       isRestoredRef.current = false;
@@ -4285,6 +4383,7 @@ function GameSurfaceComponent({
     isMessagesLoading,
     latestAssistantMsg?.content,
     latestAssistantMsg?.id,
+    latestAssistantTurnKey,
     assetManifest,
     scopedAssetMap,
     chatMeta.gameSceneBackground,
@@ -4361,6 +4460,42 @@ function GameSurfaceComponent({
     };
   }, [activeChatId]);
 
+  const combatPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest snapshot stored in a ref so the cleanup path can flush it synchronously
+  // when the effect re-runs (chat switch / unmount) — without this, a refresh inside
+  // the 800 ms debounce window would silently drop the most recent state.
+  const combatPendingSnapshotRef = useRef<{ chatId: string; snapshot: GameCombatStateSnapshot } | null>(null);
+  // Shared helper used by restore validation, combat-end, and return-to-pre-combat-turn
+  // so every path clears pending persistence before wiping stored combat state.
+  const clearCombatSnapshot = useCallback((chatId: string | null) => {
+    if (!chatId) return;
+    if (combatPersistTimer.current) {
+      clearTimeout(combatPersistTimer.current);
+      combatPersistTimer.current = null;
+    }
+    combatPendingSnapshotRef.current = null;
+    api.patch(`/chats/${chatId}/metadata`, { gameCombatState: null, gameTacticalCombatSnapshot: null }).catch(() => {});
+  }, []);
+
+  const combatRestoredChatIdRef = useRef<string | null>(null);
+  // Reset before restoration: resetting afterward erased the restored encounter anchor and mechanics.
+  useEffect(() => {
+    setPendingMapMove(null);
+    setViewedMapId(null);
+    combatRestoredChatIdRef.current = null;
+    setCombatStartMessageId(null);
+    setQueuedCombatGeneration(null);
+    // #5094: abandon any in-flight combat generation here — clear the lock so a fresh request isn't
+    // blocked by it, and bump the request id so the old generation's stale completion can't re-queue
+    // combat, apply state, or set an error against the reset combat state.
+    combatGenerationInFlightRef.current = false;
+    combatGenerationRequestIdRef.current += 1;
+    setCombatGenerationPending(false);
+    setCombatItemEffects([]);
+    setCombatMechanics([]);
+    setCombatDialogueCues([]);
+  }, [activeChatId]);
+
   // ── Restore in-progress combat state from chat metadata on page load ──
   // Without this, refreshing during a fight drops the user back into prose narration even
   // though gameActiveState is still "combat", because the live party/enemy snapshot only
@@ -4368,7 +4503,6 @@ function GameSurfaceComponent({
   // Scoped per-chat so switching to another chat in the same mounted GameSurface still
   // gets a chance to restore that chat's snapshot — a single boolean would permanently
   // skip restore after the first chat opened.
-  const combatRestoredChatIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (isMessagesLoading) return;
     if (combatRestoredChatIdRef.current === activeChatId) return;
@@ -4377,7 +4511,7 @@ function GameSurfaceComponent({
     if (!snapshot || !snapshot.party?.length || !snapshot.enemies?.length) return;
     if (chatMeta.gameActiveState !== "combat") {
       // Stale snapshot — combat ended but the metadata write didn't land. Clear it.
-      api.patch(`/chats/${activeChatId}/metadata`, { gameCombatState: null }).catch(() => {});
+      clearCombatSnapshot(activeChatId);
       return;
     }
     // Runtime validation: the snapshot is JSON-deserialized from chat metadata that
@@ -4392,7 +4526,7 @@ function GameSurfaceComponent({
         "[game-surface] Discarding combat snapshot — failed Combatant schema validation. " +
           "Likely written by an older client version.",
       );
-      api.patch(`/chats/${activeChatId}/metadata`, { gameCombatState: null }).catch(() => {});
+      clearCombatSnapshot(activeChatId);
       return;
     }
     setCombatParty(rawParty);
@@ -4400,31 +4534,61 @@ function GameSurfaceComponent({
     setCombatItemEffects(Array.isArray(snapshot.itemEffects) ? snapshot.itemEffects : []);
     setCombatMechanics(Array.isArray(snapshot.mechanics) ? snapshot.mechanics : []);
     setCombatDialogueCues(Array.isArray(snapshot.dialogueCues) ? snapshot.dialogueCues : []);
+    // Older saves did not pin a style per battle. Preserve an existing tactical
+    // board before consulting the setting for the next encounter.
+    const setup = chatMeta.gameSetupConfig as GameSetupConfig | undefined;
+    const restoredCombatStyle: GameCombatStyle =
+      snapshot.combatStyle === "tactical" || snapshot.combatStyle === "classic"
+        ? snapshot.combatStyle
+        : chatMeta.gameTacticalCombatSnapshot
+          ? "tactical"
+          : (chatMeta.gameCombatStyle ?? setup?.combatStyle) === "tactical"
+            ? "tactical"
+            : "classic";
+    setCombatPinnedStyle(restoredCombatStyle);
+    const restoredEnvironmentType =
+      snapshot.sceneEnvironmentType ?? snapshot.styleNotes?.environmentType?.trim() ?? null;
+    const restoredBattlefield = validateTacticalBattlefieldBrief(snapshot.battlefield ?? undefined);
+    setCombatSceneMeta({
+      environment: snapshot.sceneEnvironment ?? "",
+      environmentType: restoredEnvironmentType || null,
+      formation: snapshot.formation ?? null,
+      battlefield: restoredBattlefield.ok ? (restoredBattlefield.brief ?? null) : null,
+      // Invalid saved terrain must stop for explicit recovery, just like a bad GM brief.
+      battlefieldError: restoredBattlefield.ok ? (snapshot.battlefieldError ?? null) : restoredBattlefield.error,
+      styleNotes: snapshot.styleNotes ?? null,
+    });
     if (snapshot.startMessageId) setCombatStartMessageId(snapshot.startMessageId);
+    // #5161: restore the encounter tier so a mid-fight refresh doesn't swap
+    // the boss theme for generic combat music. Older snapshots (no field)
+    // fall back to the tier baked into the persisted current track, else
+    // "common" — the tier branch must stay engaged during a live fight.
+    setCombatMusicTier(
+      normalizeMusicEnemyTier(snapshot.musicTier ?? null) ??
+        normalizeMusicEnemyTier(
+          typeof chatMeta.gameSceneMusic === "string"
+            ? /^music:tier:([a-z]+):/.exec(chatMeta.gameSceneMusic)?.[1]
+            : null,
+        ) ??
+        "common",
+    );
     useGameModeStore.getState().setGameState("combat");
-  }, [activeChatId, chatMeta.gameCombatState, chatMeta.gameActiveState, isMessagesLoading]);
+  }, [
+    activeChatId,
+    chatMeta.gameCombatState,
+    chatMeta.gameActiveState,
+    chatMeta.gameSceneMusic,
+    chatMeta.gameCombatStyle,
+    chatMeta.gameSetupConfig,
+    chatMeta.gameTacticalCombatSnapshot,
+    clearCombatSnapshot,
+    isMessagesLoading,
+  ]);
 
   // ── Persist live combat snapshot to chat metadata (debounced) ──
   // Mirrors the scene-asset persistence above but only fires while combat is active.
   // The snapshot doesn't include per-round transient state (animations, log entries) —
   // those reset on restore and combat resumes from the start of the round.
-  const combatPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Latest snapshot stored in a ref so the cleanup path can flush it synchronously
-  // when the effect re-runs (chat switch / unmount) — without this, a refresh inside
-  // the 800 ms debounce window would silently drop the most recent state.
-  const combatPendingSnapshotRef = useRef<{ chatId: string; snapshot: GameCombatStateSnapshot } | null>(null);
-  // Shared helper used by combat-end + return-to-pre-combat-turn so both paths reliably
-  // wipe the persisted snapshot, even if the exploration-state PATCH is still in flight
-  // when the user refreshes.
-  const clearCombatSnapshot = useCallback((chatId: string | null) => {
-    if (!chatId) return;
-    if (combatPersistTimer.current) {
-      clearTimeout(combatPersistTimer.current);
-      combatPersistTimer.current = null;
-    }
-    combatPendingSnapshotRef.current = null;
-    api.patch(`/chats/${chatId}/metadata`, { gameCombatState: null }).catch(() => {});
-  }, []);
   useEffect(() => {
     if (combatRestoredChatIdRef.current !== activeChatId) return;
     if (!combatParty || !combatEnemies || gameState !== "combat") return;
@@ -4436,6 +4600,14 @@ function GameSurfaceComponent({
       mechanics: combatMechanics,
       dialogueCues: combatDialogueCues,
       startMessageId: combatStartMessageId,
+      musicTier: combatMusicTier,
+      combatStyle: combatPinnedStyle,
+      sceneEnvironment: combatSceneMeta?.environment ?? null,
+      sceneEnvironmentType: combatSceneMeta?.environmentType ?? null,
+      formation: combatSceneMeta?.formation ?? null,
+      battlefield: combatSceneMeta?.battlefield ?? null,
+      battlefieldError: combatSceneMeta?.battlefieldError ?? null,
+      styleNotes: combatSceneMeta?.styleNotes ?? null,
     };
     combatPendingSnapshotRef.current = { chatId: activeChatId, snapshot };
     combatPersistTimer.current = setTimeout(() => {
@@ -4469,11 +4641,14 @@ function GameSurfaceComponent({
     };
   }, [
     activeChatId,
+    combatMusicTier,
+    combatPinnedStyle,
     combatParty,
     combatEnemies,
     combatItemEffects,
     combatMechanics,
     combatDialogueCues,
+    combatSceneMeta,
     combatStartMessageId,
     gameState,
   ]);
@@ -4510,7 +4685,7 @@ function GameSurfaceComponent({
   // ── Persist narration segment index (localStorage for instant reads + server for durability) ──
   const segmentStorageKey = `narration-idx:${activeChatId}`;
   const segmentPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const narrationProgressMessageId = latestAssistantMsg?.id ?? null;
+  const narrationProgressMessageId = latestAssistantTurnKey;
   const handleSegmentChange = useCallback(
     (index: number) => {
       try {
@@ -4558,10 +4733,9 @@ function GameSurfaceComponent({
   // Read the saved narration index for restore — prefer localStorage (fast, survives
   // browser restarts) for instant restore, fall back to server metadata.
   const restoredNarrationState = useMemo(() => {
-    const currentMessageId = latestAssistantMsg?.id ?? null;
     try {
       const saved = parseStoredNarrationProgress(localStorage.getItem(segmentStorageKey));
-      if (saved && saved.messageId && currentMessageId && saved.messageId === currentMessageId) {
+      if (saved && narrationProgressMatchesTurn(saved.messageId, latestAssistantMsg)) {
         return { index: saved.index, hasStoredPosition: true };
       }
     } catch {
@@ -4572,8 +4746,7 @@ function GameSurfaceComponent({
     const serverMessageId =
       typeof chatMeta.gameNarrationMessageId === "string" ? chatMeta.gameNarrationMessageId : null;
     if (
-      currentMessageId &&
-      serverMessageId === currentMessageId &&
+      narrationProgressMatchesTurn(serverMessageId, latestAssistantMsg) &&
       typeof serverIdx === "number" &&
       Number.isFinite(serverIdx) &&
       serverIdx >= 0
@@ -4581,7 +4754,7 @@ function GameSurfaceComponent({
       return { index: serverIdx, hasStoredPosition: true };
     }
     return { index: 0, hasStoredPosition: false };
-  }, [segmentStorageKey, latestAssistantMsg?.id, chatMeta.gameNarrationIndex, chatMeta.gameNarrationMessageId]);
+  }, [segmentStorageKey, latestAssistantMsg, chatMeta.gameNarrationIndex, chatMeta.gameNarrationMessageId]);
 
   const restoredSegmentIndex = restoredNarrationState.index;
   useEffect(() => {
@@ -4631,9 +4804,9 @@ function GameSurfaceComponent({
     if (!latestAssistantMsg?.content || isStreaming) return;
     if (latestAssistantDirectAddressMode) return;
     if (weatherMsgRef.current === latestAssistantMsg.id) return;
+    const action = resolveMessageWeatherAction(gameState, latestAssistantMsg.content);
+    if (!action) return;
     weatherMsgRef.current = latestAssistantMsg.id;
-    // Map game state to weather action for probabilistic change
-    const action = gameState === "travel_rest" ? "travel" : gameState === "exploration" ? "explore" : "turn";
     updateWeather.mutate({ chatId: activeChatId, action, location: gameSnapshot?.location ?? "" });
   }, [
     latestAssistantMsg?.content,
@@ -4650,6 +4823,10 @@ function GameSurfaceComponent({
   // Uses a Zustand subscription to detect isStreaming going false, which is
   // immune to React effect timing / dependency issues.
   const processSceneRef = useRef<(() => void) | null>(null);
+  // Render-fresh handle for the skip button (#5161 review-found: the memoized
+  // skipSceneAnalysis captured a first-render applyInlineTags, so context
+  // music scoring ran with null location/tier forever).
+  const applyInlineTagsRef = useRef<typeof applyInlineTags | null>(null);
 
   // Keep the processing function fresh on every render so it captures current closure values
   processSceneRef.current = () => {
@@ -4659,17 +4836,19 @@ function GameSurfaceComponent({
       console.warn("[scene-process] No message content yet, skipping");
       return;
     }
-    if (lastProcessedMsgRef.current === msg.id) return;
+    const turnKey = narrationTurnKey(msg);
+    if (lastProcessedMsgRef.current === turnKey) return;
     if (isRestoredRef.current) {
-      lastProcessedMsgRef.current = msg.id;
+      lastProcessedMsgRef.current = turnKey;
       return;
     }
 
     const assets = getScopedAssetMap();
 
     console.warn("[scene-process] FIRING for message:", msg.id, "| assets:", !!assets);
-    lastProcessedMsgRef.current = msg.id;
-    setNarrationDoneMsgId(null);
+    lastProcessedMsgRef.current = turnKey;
+    setNarrationDoneTurnKey(null);
+    setActiveChoices(null);
     setSceneAnalysisFailed(false);
     setPartyDialogue([]);
     setPartyChatMessageId(null);
@@ -4694,13 +4873,13 @@ function GameSurfaceComponent({
     try {
       localStorage.setItem(
         segmentStorageKey,
-        JSON.stringify({ index: 0, messageId: msg.id } satisfies StoredNarrationProgress),
+        JSON.stringify({ index: 0, messageId: turnKey } satisfies StoredNarrationProgress),
       );
     } catch {
       /* ignore */
     }
     api
-      .patch(`/chats/${activeChatId}/metadata`, { gameNarrationIndex: 0, gameNarrationMessageId: msg.id })
+      .patch(`/chats/${activeChatId}/metadata`, { gameNarrationIndex: 0, gameNarrationMessageId: turnKey })
       .catch(() => {});
 
     const tags = parseGmTags(msg.content);
@@ -4733,32 +4912,67 @@ function GameSurfaceComponent({
       if (tags.combatEncounter) {
         setQueuedEncounter({ encounter: tags.combatEncounter, messageId: msg.id });
       } else if (tags.stateChange === "combat") {
-        setQueuedCombatGeneration({ messageId: msg.id });
+        setQueuedCombatGeneration({ messageId: msg.id, notify: true });
       }
     }
 
-    // Skill checks from GM — prefer inline resolved results, otherwise resolve server-side
-    if (tags.skillChecks.length > 0) {
-      const sc = tags.skillChecks[0]!;
-      if (sc.resolvedResult) {
-        setPendingSkillCheck(sc.resolvedResult);
-      } else {
-        skillCheck.mutate(
-          {
-            chatId: activeChatId,
-            skill: sc.skill,
-            dc: sc.dc,
-            advantage: sc.advantage,
-            disadvantage: sc.disadvantage,
-            preRolledD20: sc.preRolledD20,
-            messageId: msg.id,
-          },
-          {
-            onSuccess: (res) => setPendingSkillCheck(res.result),
-          },
-        );
+    // Preserve reading order, including the legacy endpoint fallback. A late
+    // fallback from another chat or swipe must never append to the new queue.
+    setPendingSkillChecks([]);
+    // ── One-request dice: the sighted pool's client gate (#6215) ──
+    // This fallback rolls a fresh d20 through POST /game/skill-check for every check tag
+    // a freshly read turn still owes, with no setting guard at all. That is right for
+    // every other mode and wrong for the pool: an overflowed check would be rolled live,
+    // the pool's ordering and never-reuse properties would be bypassed, the turn notice
+    // saying the check was left unrolled would become false, and overflowing the allotment
+    // would become a deliberate way for the Game Master to obtain a roll the pool did not
+    // contain. With the sub-option on the sparse tag is left exactly as it is, and the
+    // outcome is narrated at the start of the next turn. The endpoint is untouched and
+    // keeps serving the live path and the player's own composer.
+    const poolModeActive = chatMeta.gameOneRequestDice === true && chatMeta.gameDicePoolMode === true;
+    void (async () => {
+      for (const sc of tags.skillChecks) {
+        try {
+          const result =
+            sc.resolvedResult ??
+            // A check the Engine settled as not attempted untrained is owed nothing.
+            (isEngineRollableSkillCheckTag(sc) && !sc.reason && !poolModeActive
+              ? (
+                  await skillCheck.mutateAsync({
+                    chatId: activeChatId,
+                    skill: sc.skill,
+                    dc: sc.dc,
+                    advantage: sc.advantage,
+                    disadvantage: sc.disadvantage,
+                    preRolledD20: sc.preRolledD20,
+                    who: sc.who,
+                    withAbility: sc.withAbility,
+                    // Only a whole number in the endpoint's range is worth sending: anything else
+                    // means "use the ruleset's own", which is what leaving it out says.
+                    threshold:
+                      Number.isInteger(sc.threshold) && sc.threshold! >= 1 && sc.threshold! <= 1000
+                        ? sc.threshold
+                        : undefined,
+                    bonusDice:
+                      Number.isInteger(sc.bonusDice) && Math.abs(sc.bonusDice!) <= 20 ? sc.bonusDice : undefined,
+                    // A step named in place of dc, and the faces a pool check moved, on the same terms.
+                    difficulty: sc.difficulty,
+                    explode:
+                      Number.isInteger(sc.explode) && sc.explode! >= 2 && sc.explode! <= 1000 ? sc.explode : undefined,
+                    double:
+                      Number.isInteger(sc.double) && sc.double! >= 2 && sc.double! <= 1000 ? sc.double : undefined,
+                    reroll: sc.reroll,
+                    messageId: msg.id,
+                  })
+                ).result
+              : null);
+          if (lastProcessedMsgRef.current !== turnKey || useChatStore.getState().activeChatId !== activeChatId) return;
+          if (result) setPendingSkillChecks((pending) => [...pending, result]);
+        } catch (err) {
+          console.error("[game/skill-check] Could not resolve check", err);
+        }
       }
-    }
+    })();
 
     // Element attacks — show reaction popup for first element_attack tag
     if (tags.elementAttacks.length > 0) {
@@ -4839,6 +5053,11 @@ function GameSurfaceComponent({
       }
     }
 
+    // Sheet changes the Engine refused. The narration can still read as though the spend
+    // happened, so the player is told once per turn what did not take effect.
+    const refusedSheetCommands = describeRefusedSheetCommands(msg.content, localizeUi);
+    if (refusedSheetCommands) toast.warning(refusedSheetCommands);
+
     // NPC reputation actions from inline [reputation:] tags
     if (tags.reputationActions.length > 0) {
       const repActions = tags.reputationActions.map((ra) => ({
@@ -4848,13 +5067,14 @@ function GameSurfaceComponent({
       _updateReputation.mutate({ chatId: activeChatId, actions: repActions });
     }
 
-    // Inventory updates — apply when the relevant segment is reached, not at turn start.
+    // Inventory updates — announced when the relevant segment is reached, not at turn start. The
+    // server applied them when it saved the reply.
     if (tags.inventoryUpdates.length > 0) {
       const timedInventoryUpdates = parseSegmentInventoryUpdates(msg.content);
       if (timedInventoryUpdates.length > 0) {
         setPendingInventorySegmentUpdates(timedInventoryUpdates);
       } else if (!tags.cleanContent.trim()) {
-        applyInventoryUpdates(tags.inventoryUpdates);
+        announceInventoryUpdates(tags.inventoryUpdates);
       } else {
         setPendingInventorySegmentUpdates(tags.inventoryUpdates.map((update) => ({ segment: 0, update })));
       }
@@ -4898,6 +5118,7 @@ function GameSurfaceComponent({
       recentSpotifyTracks: recentSpotifyTrackHistoryRef.current,
       currentAmbient: useGameAssetStore.getState().currentAmbient,
       currentLocation: gameSnapshot?.location ?? null,
+      enemyTier: combatMusicTier,
       currentWeather: gameSnapshot?.weather ?? null,
       currentTimeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       genre: ((chatMeta.gameSetupConfig as Record<string, unknown> | undefined)?.genre as string | undefined) ?? null,
@@ -4929,6 +5150,7 @@ function GameSurfaceComponent({
       if (useSidecar) {
         sceneAnalysis.mutate(
           {
+            ownerChatId: activeChatId,
             narration: tags.cleanContent,
             context: analysisContext,
           },
@@ -5020,6 +5242,28 @@ function GameSurfaceComponent({
       });
     }
 
+    // #5161: make sure this area has its persistent theme in the library.
+    // This sits on the path COMMON to every scene route — sidecar, scene
+    // connection, inline-only, and the error/timeout fallbacks — so lazy
+    // area generation is path-independent (review-found: it originally lived
+    // only on the inline fallback, leaving the feature inert for the default
+    // agent-enabled configuration). The next scoring pass picks the track up.
+    if (!useMusicDjPlayerMusic && gameSnapshot?.location) {
+      const areaSlug = musicAreaSlug(gameSnapshot.location);
+      if (areaSlug) {
+        const setup = chatMeta.gameSetupConfig as Record<string, unknown> | undefined;
+        ensureContextMusicTrack(
+          "area",
+          areaSlug,
+          buildAreaMusicPrompt(gameSnapshot.location, {
+            genre: (setup?.genre as string | undefined) ?? null,
+            setting: (setup?.setting as string | undefined) ?? null,
+            timeOfDay: gameSnapshot?.time ?? metaTime ?? null,
+          }),
+        );
+      }
+    }
+
     runSceneAnalysis(sceneContext);
   };
 
@@ -5044,6 +5288,8 @@ function GameSurfaceComponent({
       timeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       musicIntensity:
         sceneAnalysisState === "combat" ? "intense" : sceneAnalysisState === "travel_rest" ? "calm" : null,
+      locationSlug: musicAreaSlug(gameSnapshot?.location ?? null),
+      enemyTier: sceneAnalysisState === "combat" ? combatMusicTier : null,
       currentMusic: useGameAssetStore.getState().currentMusic,
       recentMusic: recentMusicHistoryRef.current,
       availableMusic: musicTags,
@@ -5387,7 +5633,8 @@ function GameSurfaceComponent({
             useGameAssetStore.getState().setCurrentMusic(resolved);
           }
           if (fx.sfx?.length)
-            for (const s of fx.sfx) audioManager.playSfx(resolveAssetTag(s, "sfx", assetMap), assetMap);
+            for (const s of fx.sfx)
+              audioManager.playSfx(resolveAssetTag(s, "sfx", assetMap), assetMap, fx.sfxLoopCount);
           if (fx.ambient) {
             const resolved = resolveAssetTag(fx.ambient, "ambient", assetMap);
             audioManager.playAmbient(resolved, assetMap);
@@ -5552,6 +5799,7 @@ function GameSurfaceComponent({
 
   // Keep ref up-to-date so retry button can call it
   applySceneResultRef.current = (r) => applySceneResult(r, latestAssistantMsg!);
+  applyInlineTagsRef.current = applyInlineTags;
 
   /** Retry scene analysis: re-run the full processing pipeline for the current message. */
   const retrySceneAnalysis = useCallback(() => {
@@ -5568,8 +5816,8 @@ function GameSurfaceComponent({
     if (!msg?.content) return;
     const tags = parseGmTags(msg.content);
     setSceneAnalysisFailed(false);
-    applyInlineTags(tags, getScopedAssetMap(), msg);
-  }, [getScopedAssetMap]); // eslint-disable-line react-hooks/exhaustive-deps
+    applyInlineTagsRef.current?.(tags, getScopedAssetMap(), msg);
+  }, [getScopedAssetMap]);
 
   /** Retry failed image/NPC avatar generation. */
   const requestAssetGeneration = useCallback(
@@ -5588,6 +5836,13 @@ function GameSurfaceComponent({
       try {
         const res = await runGameAssetGeneration(assetPayload, { allowPromptReview: options?.allowPromptReview });
 
+        // #5094: the caller's request may have been superseded (chat switch, turn retry, or a newer combat
+        // request) while generation was in flight. Bail before touching asset state or applying assets so a
+        // stale job can't overwrite the current chat's background/avatars or clear the live request's state.
+        if (options?.isCurrent && !options.isCurrent()) {
+          return null;
+        }
+
         setPendingAssetGeneration(null);
         setAssetGenerationBlocksScene(false);
         if (!res) return null;
@@ -5601,6 +5856,10 @@ function GameSurfaceComponent({
 
         return res;
       } catch {
+        // #5094: don't surface a superseded request's failure on the current chat's asset state.
+        if (options?.isCurrent && !options.isCurrent()) {
+          return null;
+        }
         setAssetGenerationFailed(true);
         setAssetGenerationBlocksScene(false);
         return null;
@@ -6094,6 +6353,16 @@ function GameSurfaceComponent({
       return;
     }
     if (isStreaming || storyboardGenerating || latestTurnStoryboardRendering || manualStoryboardReviewActive) return;
+    if (
+      gameSequentialAgents &&
+      (scenePreparing ||
+        sceneAnalysis.isPending ||
+        agentsProcessing ||
+        manualBackgroundGenerating ||
+        sceneVideoGenerating ||
+        (!!pendingAssetGeneration && !assetGenerationFailed))
+    )
+      return;
     if (turnStoryboardsLoading || turnStoryboardsFetching) return;
     if (latestAssistantStoryboardSections.length === 0) return;
     if ((turnStoryboardRows?.length ?? 0) > 0) return;
@@ -6145,6 +6414,14 @@ function GameSurfaceComponent({
     gameStoryboardAutoGenerationEnabled,
     gameStoryboardKeyframeCount,
     generateTurnStoryboard,
+    gameSequentialAgents,
+    scenePreparing,
+    sceneAnalysis.isPending,
+    agentsProcessing,
+    manualBackgroundGenerating,
+    sceneVideoGenerating,
+    pendingAssetGeneration,
+    assetGenerationFailed,
     isStreaming,
     latestAssistantMsg?.content,
     latestAssistantMsg?.id,
@@ -6198,7 +6475,7 @@ function GameSurfaceComponent({
       requestAnimationFrame(() => {
         const tryProcess = (attempt: number) => {
           const msg = latestAssistantMsgRef.current;
-          if (msg?.content && lastProcessedMsgRef.current !== msg.id) {
+          if (msg?.content && lastProcessedMsgRef.current !== narrationTurnKey(msg)) {
             processSceneRef.current?.();
           } else if (attempt < 10) {
             setTimeout(() => tryProcess(attempt + 1), 200);
@@ -6218,9 +6495,9 @@ function GameSurfaceComponent({
   useEffect(() => {
     if (isMessagesLoading || isStreaming) return;
     if (!latestAssistantMsg?.content) return;
-    if (lastProcessedMsgRef.current === latestAssistantMsg.id) return;
+    if (lastProcessedMsgRef.current === latestAssistantTurnKey) return;
     processSceneRef.current?.();
-  }, [isMessagesLoading, isStreaming, latestAssistantMsg?.content, latestAssistantMsg?.id]);
+  }, [isMessagesLoading, isStreaming, latestAssistantMsg?.content, latestAssistantTurnKey]);
 
   // Listen for generation-error event to show retry button.
   useEffect(() => {
@@ -6310,6 +6587,39 @@ function GameSurfaceComponent({
 
   // Message sending via generate hook
   const { generate, retryAgents } = useGenerate();
+  const handleIllustrateWithAgent = useCallback(
+    async (agentType: string) => {
+      await retryAgents(activeChatId, [agentType], { forceImageGeneration: true });
+    },
+    [activeChatId, retryAgents],
+  );
+  const handleAnimateGalleryImage = useCallback(
+    (image: ChatImage) => handleGenerateSceneVideo({ galleryImageId: image.id }),
+    [handleGenerateSceneVideo],
+  );
+  const showStoryboardViewerAction = !!latestTurnStoryboard || storyboardGenerating;
+  const galleryActions = useMemo(
+    () => ({
+      onIllustrate: handleManualSceneIllustration,
+      onIllustrateWithAgent: handleIllustrateWithAgent,
+      onGenerateStoryboard: handleGenerateTurnStoryboard,
+      onViewStoryboard: showStoryboardViewerAction ? handleViewStoryboardFromGallery : undefined,
+      onGenerateVideo: handleGenerateSceneVideo,
+      onAnimateImage: handleAnimateGalleryImage,
+      onGenerateBackground: handleManualSceneBackground,
+    }),
+    [
+      handleAnimateGalleryImage,
+      handleGenerateSceneVideo,
+      handleGenerateTurnStoryboard,
+      handleIllustrateWithAgent,
+      handleManualSceneBackground,
+      handleManualSceneIllustration,
+      handleViewStoryboardFromGallery,
+      showStoryboardViewerAction,
+    ],
+  );
+  useProvideChatGalleryActions(activeChatId, galleryActions);
 
   const retryGeneration = useCallback(() => {
     setGenerationFailed(false);
@@ -6317,19 +6627,23 @@ function GameSurfaceComponent({
   }, [activeChatId, generate]);
 
   const generateInitialGameTurn = useCallback(() => {
+    if (experienceStartupScopeRef.current !== experienceStartupScope || experienceStartupRef.current.blocked) return;
+    const context = experienceStartupRef.current.context;
     generate({
       chatId: activeChatId,
       connectionId: null,
-      generationGuide: GAME_START_GENERATION_GUIDE,
+      generationGuide:
+        experiencePreparesBeforeStart && context
+          ? `${GAME_START_GENERATION_GUIDE}\n\nGround the opening in this prepared Experience world. Keep its established places and characters consistent:\n${context}`
+          : GAME_START_GENERATION_GUIDE,
       generationGuideSource: "game_start",
     });
-  }, [activeChatId, generate]);
+  }, [activeChatId, experiencePreparesBeforeStart, experienceStartupScope, generate]);
 
   const handleRetryTurn = useCallback(async () => {
     const msg = latestAssistantMsgRef.current;
     if (!msg?.id || isStreaming) return;
 
-    setRetryMenuOpen(false);
     setGenerationFailed(false);
     setSceneAnalysisFailed(false);
     setAssetGenerationFailed(false);
@@ -6341,6 +6655,11 @@ function GameSurfaceComponent({
     setPendingEncounter(null);
     setQueuedEncounter(null);
     setQueuedCombatGeneration(null);
+    // #5094: abandon any in-flight combat generation here — clear the lock so a fresh request isn't
+    // blocked by it, and bump the request id so the old generation's stale completion can't re-queue
+    // combat, apply state, or set an error against the reset combat state.
+    combatGenerationInFlightRef.current = false;
+    combatGenerationRequestIdRef.current += 1;
     setCombatGenerationPending(false);
     setCombatItemEffects([]);
     setCombatMechanics([]);
@@ -6351,7 +6670,7 @@ function GameSurfaceComponent({
     setPendingInventorySegmentUpdates([]);
     appliedSegmentsRef.current = new Set();
     appliedInventorySegmentsRef.current = new Set();
-    setNarrationDoneMsgId(null);
+    setNarrationDoneTurnKey(null);
     interruptedInteractiveCommandKeysRef.current.delete(interactiveCommandKey(activeChatId, msg.id));
     sceneReadyMsgIdRef.current = "__retry_turn__";
     setSceneReadyTick((tick) => tick + 1);
@@ -6373,9 +6692,6 @@ function GameSurfaceComponent({
 
   const handleRetryYoutubeMusic = useCallback(async () => {
     if (!activeChatId || !useJsonMusicDjGameMusic || isStreaming || sceneAnalysis.isPending) return;
-    setRetryMenuOpen(false);
-    setMobileRetryMenuOpen(false);
-    setMobileActionsOpen(false);
     setYoutubeRetryPending(true);
     try {
       // Music DJ YouTube/Custom modes need no scene-candidate flow — re-running the agent (with the
@@ -6408,9 +6724,6 @@ function GameSurfaceComponent({
     if (!activeChatId || !useSpotifyGameMusic || isStreaming || sceneAnalysis.isPending) return;
     const msg = latestAssistantMsgRef.current;
     if (!msg?.content) return;
-    setRetryMenuOpen(false);
-    setMobileRetryMenuOpen(false);
-    setMobileActionsOpen(false);
 
     const assets = getScopedAssetMap();
     const tags = parseGmTags(msg.content);
@@ -6445,6 +6758,7 @@ function GameSurfaceComponent({
       recentSpotifyTracks: recentSpotifyTrackHistoryRef.current,
       currentAmbient: useGameAssetStore.getState().currentAmbient,
       currentLocation: gameSnapshot?.location ?? null,
+      enemyTier: combatMusicTier,
       currentWeather: gameSnapshot?.weather ?? null,
       currentTimeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       genre: (setupConfig?.genre as string | undefined) ?? null,
@@ -6467,6 +6781,7 @@ function GameSurfaceComponent({
       let selectedTrack: SceneSpotifyTrackSelection | null = null;
       if (useSidecar) {
         const result = await sceneAnalysis.mutateAsync({
+          ownerChatId: activeChatId,
           narration: tags.cleanContent,
           context: { ...sceneContext, availableSpotifyTracks },
         });
@@ -6502,6 +6817,7 @@ function GameSurfaceComponent({
   }, [
     activeChatId,
     assistantTurnCount,
+    combatMusicTier,
     chatMeta.gameImagePromptInstructions,
     chatMeta.gameSceneConnectionId,
     chatMeta.gameSetupConfig,
@@ -6582,63 +6898,8 @@ function GameSurfaceComponent({
     [clearPendingInteractiveCommands, sendMessage],
   );
 
-  // Engine state handed to the slot, recomputed per turn so the surface tracks streaming and new
-  // messages. Builds nothing unless the surface is mounted, so a Classic game never pays for it.
-  const experienceSurfaceProps = useMemo(
-    () =>
-      !experienceSurfaceActive
-        ? undefined
-        : {
-            chatId: activeChatId,
-            chatMeta,
-            messages,
-            latestAssistant: latestAssistantMsg,
-            isStreaming,
-            scopedAssetMap,
-            sendMessage: sendExperienceMessage,
-            setExperienceBackgroundTag: pushExperienceBackground,
-            setExperienceSpeakerAvatars,
-            setExperienceChrome,
-            // Who is speaking RIGHT NOW, as the narration plays. Deriving it from the turn text instead yields
-            // only the LAST speaker of the turn, which leaves a VN sprite stuck on whoever spoke last.
-            activeSpeaker: activeSpeaker
-              ? { name: activeSpeaker.name, expression: activeSpeaker.expression ?? null }
-              : null,
-            experienceChoiceSlotEl,
-            // Per-turn state, so the surface can hold its menu until the narration finishes.
-            narrationDone,
-            latestNarrationText,
-            scenePreparing,
-            directionsPlaying,
-            assetGenerationBlocksScene,
-            replayActive,
-            sessionInteractive: (chatMeta.gameSessionStatus as string) !== "concluded",
-            // The host's sprite-size setting, so the player's slider keeps working in this mode.
-            spriteScale: gameFullBodySpriteScale,
-          },
-    [
-      experienceSurfaceActive,
-      activeChatId,
-      chatMeta,
-      messages,
-      latestAssistantMsg,
-      isStreaming,
-      scopedAssetMap,
-      sendExperienceMessage,
-      pushExperienceBackground,
-      setExperienceSpeakerAvatars,
-      setExperienceChrome,
-      activeSpeaker,
-      experienceChoiceSlotEl,
-      narrationDone,
-      latestNarrationText,
-      scenePreparing,
-      directionsPlaying,
-      assetGenerationBlocksScene,
-      replayActive,
-      gameFullBodySpriteScale,
-    ],
-  );
+  // experienceSurfaceProps (the engine state handed to the surface slot) is declared further down,
+  // after the combat seam it now carries — see the memo next to classicCombatStarter.
 
   // Game mutations
   const createGame = useCreateGame();
@@ -6822,7 +7083,7 @@ function GameSurfaceComponent({
   );
 
   const handleStartGameNow = useCallback(() => {
-    if (startGame.isPending || startGameRequested || startGameGuardRef.current) return;
+    if (experienceStartupBlocked || startGame.isPending || startGameRequested || startGameGuardRef.current) return;
     startGameGuardRef.current = true;
     setStartGameRequested(true);
     startGame.mutate(
@@ -6848,7 +7109,7 @@ function GameSurfaceComponent({
         },
       },
     );
-  }, [activeChatId, generateInitialGameTurn, startGame, startGameRequested, localizeUi]);
+  }, [activeChatId, experienceStartupBlocked, generateInitialGameTurn, startGame, startGameRequested, localizeUi]);
 
   const handleJsonRepairError = useCallback((error: unknown) => {
     const request = getJsonRepairRequest(error);
@@ -6960,9 +7221,16 @@ function GameSurfaceComponent({
       const targetChatId = responseChat?.id ?? bodyChatId;
 
       if (responseChat) {
-        queryClient.setQueryData(chatKeys.detail(responseChat.id), responseChat);
+        // Version 0 = maximally conservative (#5641): this callback consumes
+        // a response whose request was issued by the shared JSON-repair flow,
+        // so there is no pre-request version snapshot to compare against.
+        // Locally-edited metadata fields keep their cached values here; the
+        // detail invalidation just below reconciles everything to server
+        // truth immediately after.
+        const guardedChat = guardServerChatSnapshot(queryClient, responseChat, 0);
+        queryClient.setQueryData(chatKeys.detail(responseChat.id), guardedChat);
         if (useChatStore.getState().activeChatId === responseChat.id) {
-          useChatStore.getState().setActiveChat(responseChat);
+          useChatStore.getState().setActiveChat(guardedChat);
         }
       }
       if (targetChatId) {
@@ -7225,365 +7493,618 @@ function GameSurfaceComponent({
     [activeChatId, chatMeta.gameJournal, updateChatMetadata, localizeUi],
   );
 
-  const handleAddInventoryItem = useCallback(async () => {
-    if (!activeChatId) return null;
+  /** The chat's cached metadata follows every saved inventory, so a sync from it reads the same stacks. */
+  const syncInventoryToChatCache = useCallback(
+    (inventory: GameInventoryStack[]) => {
+      if (!activeChatId) return;
+      const detailKey = chatKeys.detail(activeChatId);
+      const patchedChat = patchChatMetadata(queryClient.getQueryData<Chat>(detailKey), { gameInventory: inventory });
+      if (patchedChat) queryClient.setQueryData(detailKey, patchedChat);
+      const chatStore = useChatStore.getState();
+      if (chatStore.activeChatId === activeChatId) {
+        const patchedActiveChat = patchChatMetadata(chatStore.activeChat, { gameInventory: inventory });
+        if (patchedActiveChat) chatStore.setActiveChat(patchedActiveChat);
+      }
+    },
+    [activeChatId, queryClient],
+  );
 
-    const addedItemName = getNextInventoryItemName(inventoryItems);
-    const updatedInventory = [...inventoryItems, { name: addedItemName, quantity: 1 }];
-
-    const currentGameState = useGameStateStore.getState().current;
-    const currentPlayerStats = currentGameState?.chatId === activeChatId ? currentGameState.playerStats : null;
-    const nextPlayerStats = currentPlayerStats
-      ? {
-          ...currentPlayerStats,
-          inventory: [
-            ...currentPlayerStats.inventory,
-            { name: addedItemName, description: "", quantity: 1, location: "on_person" },
-          ],
+  /**
+   * Every change the player makes goes to the server, which applies it to the stacks as saved and
+   * writes the stacks, the detailed inventory and the journal together. Resolves to one result per
+   * operation; throws when the request itself fails, and then nothing changed.
+   */
+  const sendInventory = useCallback(
+    async <T extends { inventory: GameInventoryStack[]; playerStats?: PlayerStats; rulesetLive?: RulesetLiveStates }>(
+      send: (chatId: string) => Promise<T>,
+    ): Promise<T | null> => {
+      if (!activeChatId) return null;
+      // Anything read of the chat before this save holds older stacks. A metadata save already on its
+      // way would write them back into the chat when it answers, so the fields this route writes
+      // are claimed as newer, as a metadata save claims its own; a plain read still on its way is
+      // called off. The save counts as on its way only once that is done.
+      claimChatMetadataFields(activeChatId, ["gameInventory", "gameJournal"]);
+      await queryClient.cancelQueries({ queryKey: chatKeys.detail(activeChatId) });
+      const seq = ++inventoryCommitSeq.current.sent;
+      let response: T;
+      try {
+        response = await send(activeChatId);
+      } catch (error) {
+        // A save that failed changed nothing and is settled, so the chat is read again: a change the
+        // resync skipped while this save was on its way reaches the screen now.
+        inventoryCommitSeq.current.applied = Math.max(inventoryCommitSeq.current.applied, seq);
+        inventoryCommitSeq.current.skippedResync = false;
+        void queryClient.invalidateQueries({ queryKey: chatKeys.detail(activeChatId) });
+        throw error;
+      }
+      // Once the last save on its way has answered, a chat change skipped meanwhile is read again.
+      const settle = () => {
+        const state = inventoryCommitSeq.current;
+        if (state.applied >= state.sent && state.skippedResync) {
+          state.skippedResync = false;
+          void queryClient.invalidateQueries({ queryKey: chatKeys.detail(activeChatId) });
         }
-      : null;
-    const shouldPatchGameState =
-      Boolean(currentGameState?.chatId === activeChatId) && Boolean(currentPlayerStats) && Boolean(nextPlayerStats);
-    let patchedGameState = false;
-
-    try {
-      if (shouldPatchGameState && nextPlayerStats) {
-        await api.patch(`/chats/${activeChatId}/game-state`, { playerStats: nextPlayerStats });
-        patchedGameState = true;
+      };
+      // The sheet a route wrote with the bag (a use, a rest) is ordered on its own: an answer older than one
+      // whose sheet is already shown never puts that sheet back, while one overtaken only by a plain
+      // inventory save, which carries no sheet, still has the newest.
+      if (response.rulesetLive && seq > inventoryCommitSeq.current.sheetApplied) {
+        inventoryCommitSeq.current.sheetApplied = seq;
+        const shown = useGameStateStore.getState().current;
+        if (shown?.chatId === activeChatId) {
+          useGameStateStore.getState().setGameState({ ...shown, rulesetLive: response.rulesetLive });
+        }
       }
-
-      await updateChatMetadata.mutateAsync({
-        id: activeChatId,
-        gameInventory: updatedInventory,
-      });
-
-      setInventoryItems(updatedInventory);
-      if (shouldPatchGameState && currentGameState && nextPlayerStats) {
-        useGameStateStore.getState().setGameState({
-          ...currentGameState,
-          playerStats: nextPlayerStats,
-        });
+      // The server applies requests in order, so an answer to an older one that arrives after a
+      // newer one describes stacks that are already out of date: its results still count, but it
+      // must not put an older inventory back on screen.
+      if (seq < inventoryCommitSeq.current.applied) {
+        settle();
+        return response;
       }
+      inventoryCommitSeq.current.applied = seq;
+      const inventory = normalizeGameInventoryStacks(response.inventory);
+      inventoryItemsRef.current = inventory;
+      setInventoryItems(inventory);
+      await queryClient.cancelQueries({ queryKey: chatKeys.detail(activeChatId) });
+      syncInventoryToChatCache(inventory);
+      const currentGameState = useGameStateStore.getState().current;
+      if (response.playerStats && currentGameState?.chatId === activeChatId) {
+        useGameStateStore.getState().setGameState({ ...currentGameState, playerStats: response.playerStats });
+      }
+      settle();
+      return response;
+    },
+    [activeChatId, queryClient, syncInventoryToChatCache],
+  );
+  const commitInventory = useCallback(
+    async (ops: GameInventoryOp[]): Promise<GameInventoryOpResult[]> =>
+      (
+        await sendInventory((chatId) =>
+          api.post<{ inventory: GameInventoryStack[]; results: GameInventoryOpResult[]; playerStats?: PlayerStats }>(
+            "/game/inventory",
+            { chatId, ops },
+          ),
+        )
+      )?.results ?? [],
+    [sendInventory],
+  );
 
-      setInventoryNotifications([`You gained ${addedItemName}!`]);
+  const showInventoryNotification = useCallback((text: string, gain: boolean) => {
+    setInventoryNotifications([{ text, gain }]);
+    if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
+    notificationTimerRef.current = setTimeout(() => setInventoryNotifications([]), 4000);
+  }, []);
+
+  /** What a refused inventory change says, by why it was refused. `who` is the bag a weight was too
+   *  much for: a name, "" for the player's own, or absent when the whole party was asked. */
+  const inventoryRefusal = useCallback(
+    (reason: string | undefined, value1: string, fallbackKey: string, who?: string) => {
+      switch (reason) {
+        case "not-ruleset-item":
+          return localizeUi("ui.game.gamesurfacecomponent.notARulesetItemValue1", { value1 });
+        case "too-heavy":
+          return who === undefined
+            ? localizeUi("ui.game.gamesurfacecomponent.nobodyCanCarryValue1", { value1 })
+            : who
+              ? localizeUi("ui.game.gamesurfacecomponent.whoCannotCarryValue1", { who, value1 })
+              : localizeUi("ui.game.gamesurfacecomponent.youCannotCarryValue1", { value1 });
+        case "cursed":
+          return localizeUi("ui.game.gamesurfacecomponent.cursedValue1", { value1 });
+        case "service":
+          return localizeUi("ui.game.gamesurfacecomponent.serviceValue1", { value1 });
+        case "no-slot":
+          return localizeUi("ui.game.gamesurfacecomponent.noSlotValue1", { value1 });
+        case "not-wearable":
+          return localizeUi("ui.game.gamesurfacecomponent.notWearableValue1", { value1 });
+        case "not-bindable":
+          return localizeUi("ui.game.gamesurfacecomponent.notBindableValue1", { value1 });
+        case "binding-full":
+          return localizeUi("ui.game.gamesurfacecomponent.bindingFullValue1", { value1 });
+        case "missing-stack":
+          return localizeUi("ui.game.gamesurfacecomponent.thatStackIsNoLongerInYourInventory");
+        default:
+          return localizeUi(fallbackKey, { value1 });
+      }
+    },
+    [localizeUi],
+  );
+
+  /** Who additions went to, one line per bag each went into (a ruleset that says what everyone
+   *  carries may have shared them out), and in one message, what nobody could carry. */
+  const announceAdditions = useCallback(
+    (
+      additions: ReadonlyArray<{
+        name: string;
+        result: { count?: number; placed?: Array<{ holder?: string; count: number }>; left?: number };
+      }>,
+      holder?: string,
+    ) => {
+      setInventoryNotifications(
+        additions.flatMap(({ name, result }) =>
+          (result.placed ?? [{ ...(holder ? { holder } : {}), count: result.count ?? 1 }]).map((share) => {
+            const item = inventoryLabel(name, share.count);
+            return {
+              gain: true,
+              text: share.holder
+                ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoGained", { who: share.holder, item })
+                : localizeUi("ui.game.gamesurfacecomponent.inventoryYouGained", { item }),
+            };
+          }),
+        ),
+      );
       if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
       notificationTimerRef.current = setTimeout(() => setInventoryNotifications([]), 4000);
-      toast.success(localizeUi("ui.game.gamesurfacecomponent.addedValue1ToInventory", { value1: addedItemName }));
-      return addedItemName;
-    } catch (error) {
-      if (patchedGameState) {
-        api.patch(`/chats/${activeChatId}/game-state`, { playerStats: currentPlayerStats }).catch(() => {});
-      }
-      const message = error instanceof Error ? error.message : `Failed to add ${addedItemName} to inventory.`;
-      toast.error(message);
-      return null;
-    }
-  }, [activeChatId, inventoryItems, updateChatMetadata, localizeUi]);
-
-  const handleIncrementInventoryItem = useCallback(
-    async (itemName: string) => {
-      if (!activeChatId) return;
-
-      const normalizedItemName = normalizeInventoryName(itemName);
-      if (!normalizedItemName) return;
-
-      const updatedInventory = addInventoryUnit(inventoryItems, normalizedItemName);
-      if (updatedInventory === inventoryItems) {
-        toast.error(localizeUi("ui.game.gamesurfacecomponent.failedToIncreaseValue1", { value1: normalizedItemName }));
-        return;
-      }
-
-      const currentGameState = useGameStateStore.getState().current;
-      const currentPlayerStats = currentGameState?.chatId === activeChatId ? currentGameState.playerStats : null;
-      const nextPlayerStats = currentPlayerStats
-        ? {
-            ...currentPlayerStats,
-            inventory: addInventoryUnit(currentPlayerStats.inventory, normalizedItemName),
-          }
-        : null;
-      const shouldPatchGameState =
-        Boolean(currentGameState?.chatId === activeChatId) && Boolean(currentPlayerStats) && Boolean(nextPlayerStats);
-      let patchedGameState = false;
-
-      try {
-        if (shouldPatchGameState && nextPlayerStats) {
-          await api.patch(`/chats/${activeChatId}/game-state`, { playerStats: nextPlayerStats });
-          patchedGameState = true;
-        }
-
-        await updateChatMetadata.mutateAsync({
-          id: activeChatId,
-          gameInventory: updatedInventory,
-        });
-
-        setInventoryItems(updatedInventory);
-        if (shouldPatchGameState && currentGameState && nextPlayerStats) {
-          useGameStateStore.getState().setGameState({
-            ...currentGameState,
-            playerStats: nextPlayerStats,
-          });
-        }
-
-        setInventoryNotifications([`You gained ${normalizedItemName}!`]);
-        if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-        notificationTimerRef.current = setTimeout(() => setInventoryNotifications([]), 4000);
-        toast.success(localizeUi("ui.game.gamesurfacecomponent.added1Value1", { value1: normalizedItemName }));
-      } catch (error) {
-        if (patchedGameState) {
-          api.patch(`/chats/${activeChatId}/game-state`, { playerStats: currentPlayerStats }).catch(() => {});
-        }
-        const message = error instanceof Error ? error.message : `Failed to increase ${normalizedItemName}.`;
-        toast.error(message);
+      const left = additions.flatMap(({ name, result }) => (result.left ? [inventoryLabel(name, result.left)] : []));
+      if (left.length > 0) {
+        toast.error(localizeUi("ui.game.gamesurfacecomponent.leftBehindValue1", { value1: left.join(", ") }));
       }
     },
-    [activeChatId, inventoryItems, updateChatMetadata, localizeUi],
+    [inventoryLabel, localizeUi],
   );
 
-  const handleRemoveInventoryItem = useCallback(
-    async (itemName: string) => {
-      if (!activeChatId) return;
-
-      const updatedInventory = removeInventoryUnit(inventoryItems, itemName);
-      if (updatedInventory === inventoryItems) {
-        toast.error(localizeUi("ui.game.gamesurfacecomponent.value1IsNoLongerInYourInventory", { value1: itemName }));
-        return;
-      }
-
-      const currentGameState = useGameStateStore.getState().current;
-      const currentPlayerStats = currentGameState?.chatId === activeChatId ? currentGameState.playerStats : null;
-      const nextPlayerStats = currentPlayerStats
-        ? (() => {
-            const updatedDetailedInventory = removeInventoryUnit(currentPlayerStats.inventory, itemName);
-            return updatedDetailedInventory === currentPlayerStats.inventory
-              ? currentPlayerStats
-              : { ...currentPlayerStats, inventory: updatedDetailedInventory };
-          })()
-        : null;
-      const shouldPatchGameState =
-        Boolean(currentGameState?.chatId === activeChatId) &&
-        Boolean(currentPlayerStats) &&
-        nextPlayerStats !== currentPlayerStats;
-      let patchedGameState = false;
-
+  /** An item added by name into one party member's bag (the player's without `holder`): onto that
+   *  bag's stack of it, or a new stack. Resolves to the stack's id, so the screen can select it. */
+  const handleAddInventoryItem = useCallback(
+    async (addedItemName: string, holder?: string, among?: readonly string[]) => {
+      if (!activeChatId) return null;
       try {
-        if (shouldPatchGameState && nextPlayerStats) {
-          await api.patch(`/chats/${activeChatId}/game-state`, { playerStats: nextPlayerStats });
-          patchedGameState = true;
-        }
-
-        await updateChatMetadata.mutateAsync({
-          id: activeChatId,
-          gameInventory: updatedInventory,
-        });
-
-        setInventoryItems(updatedInventory);
-        if (shouldPatchGameState && currentGameState && nextPlayerStats) {
-          useGameStateStore.getState().setGameState({
-            ...currentGameState,
-            playerStats: nextPlayerStats,
-          });
-        }
-
-        api
-          .post("/game/journal/entry", {
-            chatId: activeChatId,
-            type: "item",
-            data: { item: itemName, action: "removed", quantity: 1 },
-          })
-          .catch(() => {});
-
-        setInventoryNotifications([`You removed ${itemName}.`]);
-        if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-        notificationTimerRef.current = setTimeout(() => setInventoryNotifications([]), 4000);
-        toast.success(localizeUi("ui.game.gamesurfacecomponent.removedValue1FromInventory", { value1: itemName }));
+        const [result] = await commitInventory([
+          among
+            ? { op: "add", name: addedItemName, count: 1, among: [...among] }
+            : { op: "add", name: addedItemName, count: 1, holder },
+        ]);
+        if (!result?.ok)
+          throw new Error(
+            inventoryRefusal(
+              result?.reason,
+              addedItemName,
+              "ui.game.gamesurfacecomponent.failedToAddValue1ToInventory",
+              among ? undefined : (holder ?? ""),
+            ),
+          );
+        // Said by the name the stack it went onto is shown by, which may be a nickname.
+        const landed = result.id ? inventoryItemsRef.current.find((stack) => stack.id === result.id) : undefined;
+        const shownName = landed ? gameInventoryStackLabel(landed) : addedItemName;
+        announceAdditions([{ name: shownName, result }], holder);
+        toast.success(localizeUi("ui.game.gamesurfacecomponent.addedValue1ToInventory", { value1: shownName }));
+        return result.id ?? null;
       } catch (error) {
-        if (patchedGameState) {
-          api.patch(`/chats/${activeChatId}/game-state`, { playerStats: currentPlayerStats }).catch(() => {});
-        }
-        const message = error instanceof Error ? error.message : `Failed to remove ${itemName} from inventory.`;
-        toast.error(message);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToAddValue1ToInventory", { value1: addedItemName }),
+        );
+        return null;
       }
     },
-    [activeChatId, inventoryItems, updateChatMetadata, localizeUi],
+    [activeChatId, announceAdditions, commitInventory, inventoryRefusal, localizeUi],
   );
 
+  /** Items picked from the ruleset, one of each, into one party member's bag (the player's without
+   *  `holder`), in one change. Resolves to the stack the last one went onto, so the screen can select
+   *  it. */
+  const handleAddRulesetItems = useCallback(
+    async (picks: ReadonlyArray<{ item: string; name: string }>, holder?: string, among?: readonly string[]) => {
+      if (!activeChatId || picks.length === 0) return null;
+      const names = picks.map((pick) => pick.name).join(", ");
+      try {
+        const results = await commitInventory(
+          picks.map((pick) =>
+            among
+              ? { op: "add" as const, name: pick.name, item: pick.item, count: 1, among: [...among] }
+              : { op: "add" as const, name: pick.name, item: pick.item, count: 1, holder },
+          ),
+        );
+        const added = picks.filter((_, index) => results[index]?.ok);
+        // A pick the ruleset no longer offers (a layer hides it, or its catalog changed since the
+        // picker loaded) says so; anything else failed for another reason.
+        const failedFor = (unoffered: boolean) =>
+          picks
+            .filter((_, index) => {
+              const result = results[index];
+              return !result?.ok && (result?.reason === "not-ruleset-item") === unoffered;
+            })
+            .map((pick) => pick.name)
+            .join(", ");
+        const unoffered = failedFor(true);
+        const failed = failedFor(false);
+        if (unoffered)
+          toast.error(localizeUi("ui.game.gamesurfacecomponent.noLongerRulesetItemValue1", { value1: unoffered }));
+        if (failed) {
+          // One refusal says why when every other pick went in; several are named together.
+          const refusedAt = results.findIndex((result) => result && !result.ok && result.reason !== "not-ruleset-item");
+          const only = results.filter((result) => result && !result.ok && result.reason !== "not-ruleset-item");
+          const refused = results[refusedAt];
+          toast.error(
+            only.length === 1 && refused && !refused.ok
+              ? inventoryRefusal(
+                  refused.reason,
+                  failed,
+                  "ui.game.gamesurfacecomponent.failedToAddValue1ToInventory",
+                  among ? undefined : (holder ?? ""),
+                )
+              : localizeUi("ui.game.gamesurfacecomponent.failedToAddValue1ToInventory", { value1: failed }),
+          );
+        }
+        if (added.length === 0) return null;
+        const shown = added.map((pick) => pick.name).join(", ");
+        // Each pick said where it went, when the party shared them out.
+        const landed = picks.flatMap((pick, index) => {
+          const result = results[index];
+          return result?.ok ? [{ pick, result }] : [];
+        });
+        if (
+          landed.some(
+            ({ result }) =>
+              result.placed &&
+              result.placed.some((share) => gameInventoryBagKey(share.holder) !== gameInventoryBagKey(holder)),
+          )
+        ) {
+          announceAdditions(
+            landed.map(({ pick, result }) => ({ name: pick.name, result })),
+            holder,
+          );
+        } else {
+          showInventoryNotification(
+            holder
+              ? localizeUi("ui.game.gamesurfacecomponent.inventoryWhoGained", { who: holder, item: shown })
+              : localizeUi("ui.game.gamesurfacecomponent.inventoryYouGained", { item: shown }),
+            true,
+          );
+        }
+        toast.success(localizeUi("ui.game.gamesurfacecomponent.addedValue1ToInventory", { value1: shown }));
+        const last = [...results].reverse().find((result) => result?.ok);
+        return last?.ok ? (last.id ?? null) : null;
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToAddValue1ToInventory", { value1: names }),
+        );
+        return null;
+      }
+    },
+    [activeChatId, announceAdditions, commitInventory, inventoryRefusal, showInventoryNotification, localizeUi],
+  );
+
+  /** One stack put on or taken off, bound or unbound, by whoever carries it. Resolves to the stack it
+   *  is in afterwards, which is a new one when one item of a larger stack was taken into its own. */
+  const handleWearInventoryStack = useCallback(
+    async (stackId: string, wear: GameInventoryWear) => {
+      if (!activeChatId) return null;
+      const stack = inventoryItemsRef.current.find((entry) => entry.id === stackId);
+      if (!stack) {
+        toast.error(localizeUi("ui.game.gamesurfacecomponent.thatStackIsNoLongerInYourInventory"));
+        return null;
+      }
+      try {
+        const [result] = await commitInventory([{ op: wear, id: stackId }]);
+        if (!result?.ok) {
+          toast.error(
+            inventoryRefusal(
+              result?.reason,
+              gameInventoryStackLabel(stack),
+              "ui.game.gamesurfacecomponent.failedToChangeValue1",
+            ),
+          );
+          return null;
+        }
+        return result.id ?? stackId;
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToChangeValue1", {
+                value1: gameInventoryStackLabel(stack),
+              }),
+        );
+        return null;
+      }
+    },
+    [activeChatId, commitInventory, inventoryRefusal, localizeUi],
+  );
+
+  /** One stack set to a count: the +1 and -1 buttons, and whatever the player typed. Zero removes it. */
+  const handleSetInventoryStackQuantity = useCallback(
+    async (stackId: string, quantity: number) => {
+      if (!activeChatId) return;
+      // The latest saved inventory, not this render's: a second quick action builds on the first.
+      const stack = inventoryItemsRef.current.find((entry) => entry.id === stackId);
+      if (!stack) {
+        toast.error(localizeUi("ui.game.gamesurfacecomponent.thatStackIsNoLongerInYourInventory"));
+        return;
+      }
+      if (quantity === stack.quantity) return;
+      try {
+        const [result] = await commitInventory([{ op: "set", id: stackId, quantity }]);
+        if (!result?.ok) {
+          toast.error(
+            inventoryRefusal(
+              result?.reason,
+              gameInventoryStackLabel(stack),
+              "ui.game.gamesurfacecomponent.failedToChangeValue1",
+              stack.holder ?? "",
+            ),
+          );
+          return;
+        }
+        const after = result.now ?? 0;
+        // What moved, which is more than this stack's own change when a count past one stack's worth
+        // started new stacks after it.
+        const moved = result.count ?? Math.abs(after - stack.quantity);
+        const difference = quantity > stack.quantity ? moved : -moved;
+        if (difference === 0) return;
+        const item = inventoryLabel(gameInventoryStackLabel(stack), Math.abs(difference));
+        if (difference > 0) {
+          showInventoryNotification(localizeUi("ui.game.gamesurfacecomponent.inventoryYouGained", { item }), true);
+          toast.success(
+            localizeUi("ui.game.gamesurfacecomponent.addedCountValue1", {
+              count: difference,
+              value1: gameInventoryStackLabel(stack),
+            }),
+          );
+          return;
+        }
+        showInventoryNotification(localizeUi("ui.game.gamesurfacecomponent.inventoryYouRemoved", { item }), false);
+        toast.success(
+          after === 0
+            ? localizeUi("ui.game.gamesurfacecomponent.removedValue1FromInventory", {
+                value1: gameInventoryStackLabel(stack),
+              })
+            : localizeUi("ui.game.gamesurfacecomponent.removedCountValue1", {
+                count: -difference,
+                value1: gameInventoryStackLabel(stack),
+              }),
+        );
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToChangeValue1", {
+                value1: gameInventoryStackLabel(stack),
+              }),
+        );
+      }
+    },
+    [activeChatId, commitInventory, showInventoryNotification, inventoryLabel, inventoryRefusal, localizeUi],
+  );
+
+  /** Part of a stack into a new stack beside it. Nothing about the item changes, only how it is piled. */
+  const handleSplitInventoryStack = useCallback(
+    async (stackId: string, size: number) => {
+      if (!activeChatId) return null;
+      const stack = inventoryItemsRef.current.find((entry) => entry.id === stackId);
+      if (!stack) return null;
+      try {
+        const [result] = await commitInventory([{ op: "split", id: stackId, size }]);
+        if (!result?.ok) return null;
+        toast.success(
+          localizeUi("ui.game.gamesurfacecomponent.splitCountValue1", {
+            count: size,
+            value1: gameInventoryStackLabel(stack),
+          }),
+        );
+        return result.id ?? null;
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToSplitValue1", {
+                value1: gameInventoryStackLabel(stack),
+              }),
+        );
+        return null;
+      }
+    },
+    [activeChatId, commitInventory, localizeUi],
+  );
+
+  /** One stack poured into another stack of the same item, which keeps its place and its bag. */
+  const handleMergeInventoryStacks = useCallback(
+    async (fromId: string, intoId: string) => {
+      if (!activeChatId) return;
+      const into = inventoryItemsRef.current.find((entry) => entry.id === intoId);
+      if (!into) return;
+      try {
+        const [result] = await commitInventory([{ op: "merge", from: fromId, into: intoId }]);
+        if (result?.ok) toast.success(localizeUi("ui.game.gamesurfacecomponent.mergedValue1", { value1: into.name }));
+        else {
+          toast.error(
+            inventoryRefusal(
+              result?.reason,
+              into.name,
+              "ui.game.gamesurfacecomponent.failedToMergeValue1",
+              into.holder ?? "",
+            ),
+          );
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToMergeValue1", { value1: into.name }),
+        );
+      }
+    },
+    [activeChatId, commitInventory, inventoryRefusal, localizeUi],
+  );
+
+  /** Some or all of one stack handed to another party member (the player without `to`). Resolves to
+   *  the stack that received it. */
+  const handleGiveInventoryStack = useCallback(
+    async (stackId: string, to: string | undefined, count?: number) => {
+      if (!activeChatId) return null;
+      const stack = inventoryItemsRef.current.find((entry) => entry.id === stackId);
+      if (!stack) {
+        toast.error(localizeUi("ui.game.gamesurfacecomponent.thatStackIsNoLongerInYourInventory"));
+        return null;
+      }
+      try {
+        const [result] = await commitInventory([
+          { op: "give", id: stackId, ...(to ? { to } : {}), ...(count ? { count } : {}) },
+        ]);
+        if (!result?.ok) {
+          toast.error(
+            inventoryRefusal(
+              result?.reason,
+              gameInventoryStackLabel(stack),
+              "ui.game.gamesurfacecomponent.failedToGiveValue1",
+              to ?? "",
+            ),
+          );
+          return null;
+        }
+        const given = inventoryLabel(gameInventoryStackLabel(stack), result.count ?? stack.quantity);
+        toast.success(
+          to
+            ? localizeUi("ui.game.gamesurfacecomponent.gaveValue1ToValue2", { value1: given, value2: to })
+            : localizeUi("ui.game.gamesurfacecomponent.gaveValue1ToYou", { value1: given }),
+        );
+        return result.id ?? null;
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToGiveValue1", { value1: gameInventoryStackLabel(stack) }),
+        );
+        return null;
+      }
+    },
+    [activeChatId, commitInventory, inventoryLabel, inventoryRefusal, localizeUi],
+  );
+
+  /** A fight used one of an item: taken by name, the player's own bag first, since a fight sees one
+   *  total per item. A line shown by a nickname is taken by the item's own name, which only ever finds
+   *  that item. */
   const handleUseCombatInventoryItem = useCallback(
     async (itemName: string) => {
       if (!activeChatId) return;
-
-      const normalizedItemName = normalizeInventoryName(itemName);
-      const updatedInventory = removeInventoryUnit(inventoryItems, normalizedItemName);
-      if (updatedInventory === inventoryItems) {
-        toast.error(
-          localizeUi("ui.game.gamesurfacecomponent.value1IsNoLongerInYourInventory", {
-            value1: normalizedItemName || itemName,
-          }),
-        );
-        return;
-      }
-
-      const currentGameState = useGameStateStore.getState().current;
-      const currentPlayerStats = currentGameState?.chatId === activeChatId ? currentGameState.playerStats : null;
-      const nextPlayerStats = currentPlayerStats
-        ? (() => {
-            const updatedDetailedInventory = removeInventoryUnit(currentPlayerStats.inventory, normalizedItemName);
-            return updatedDetailedInventory === currentPlayerStats.inventory
-              ? currentPlayerStats
-              : { ...currentPlayerStats, inventory: updatedDetailedInventory };
-          })()
-        : null;
-      const shouldPatchGameState =
-        Boolean(currentGameState?.chatId === activeChatId) &&
-        Boolean(currentPlayerStats) &&
-        nextPlayerStats !== currentPlayerStats;
-      let patchedGameState = false;
-
+      const normalizedItemName = normalizeInventoryName(itemName) || itemName;
+      const spentName =
+        fightInventoryLines.find((line) => gameInventoryNameKey(line.name) === gameInventoryNameKey(itemName))
+          ?.ownName ?? normalizedItemName;
+      // One of the ruleset's items that holds charges spends a use of them, not the item (#6909).
+      const charged = combatItemEffects.some(
+        (effect) => effect.charges && gameInventoryNameKey(effect.name) === gameInventoryNameKey(itemName),
+      );
       try {
-        if (shouldPatchGameState && nextPlayerStats) {
-          await api.patch(`/chats/${activeChatId}/game-state`, { playerStats: nextPlayerStats });
-          patchedGameState = true;
+        const [result] = await commitInventory([
+          charged
+            ? { op: "charge", name: spentName, count: 1 }
+            : { op: "take", name: spentName, count: 1, as: "used", worn: true },
+        ]);
+        if (!result?.ok) {
+          toast.error(
+            localizeUi("ui.game.gamesurfacecomponent.value1IsNoLongerInYourInventory", {
+              value1: normalizedItemName,
+            }),
+          );
+          return;
         }
-
-        await updateChatMetadata.mutateAsync({
-          id: activeChatId,
-          gameInventory: updatedInventory,
-        });
-
-        setInventoryItems(updatedInventory);
-        if (shouldPatchGameState && currentGameState && nextPlayerStats) {
-          useGameStateStore.getState().setGameState({
-            ...currentGameState,
-            playerStats: nextPlayerStats,
-          });
-        }
-
-        api
-          .post("/game/journal/entry", {
-            chatId: activeChatId,
-            type: "item",
-            data: { item: normalizedItemName, action: "used", quantity: 1 },
-          })
-          .catch(() => {});
-
-        setInventoryNotifications([`You used ${normalizedItemName}.`]);
-        if (notificationTimerRef.current) clearTimeout(notificationTimerRef.current);
-        notificationTimerRef.current = setTimeout(() => setInventoryNotifications([]), 4000);
+        showInventoryNotification(
+          localizeUi("ui.game.gamesurfacecomponent.inventoryYouUsed", { item: normalizedItemName }),
+          false,
+        );
         toast.success(localizeUi("ui.game.gamesurfacecomponent.usedValue1", { value1: normalizedItemName }));
       } catch (error) {
-        if (patchedGameState) {
-          api.patch(`/chats/${activeChatId}/game-state`, { playerStats: currentPlayerStats }).catch(() => {});
-        }
-        const message = error instanceof Error ? error.message : `Failed to use ${normalizedItemName}.`;
-        toast.error(message);
-      }
-    },
-    [activeChatId, inventoryItems, updateChatMetadata, localizeUi],
-  );
-
-  const handleRenameInventoryItem = useCallback(
-    async (currentName: string, nextName: string) => {
-      if (!activeChatId) return null;
-
-      const renamedInventory = renameInventoryItem(inventoryItems, currentName, nextName);
-      if (!renamedInventory) {
         toast.error(
-          localizeUi("ui.game.gamesurfacecomponent.value1IsNoLongerInYourInventory", { value1: currentName }),
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToUseValue1", { value1: normalizedItemName }),
         );
-        return null;
-      }
-
-      const { items: updatedInventory, resolvedName } = renamedInventory;
-      if (updatedInventory === inventoryItems) {
-        return resolvedName;
-      }
-
-      const currentGameState = useGameStateStore.getState().current;
-      const currentPlayerStats = currentGameState?.chatId === activeChatId ? currentGameState.playerStats : null;
-      const nextPlayerStats = currentPlayerStats
-        ? (() => {
-            const renamedDetailedInventory = renameInventoryItem(currentPlayerStats.inventory, currentName, nextName);
-            return renamedDetailedInventory
-              ? { ...currentPlayerStats, inventory: renamedDetailedInventory.items }
-              : currentPlayerStats;
-          })()
-        : null;
-      const shouldPatchGameState =
-        Boolean(currentGameState?.chatId === activeChatId) &&
-        Boolean(currentPlayerStats) &&
-        nextPlayerStats !== currentPlayerStats;
-      let patchedGameState = false;
-
-      try {
-        if (shouldPatchGameState && nextPlayerStats) {
-          await api.patch(`/chats/${activeChatId}/game-state`, { playerStats: nextPlayerStats });
-          patchedGameState = true;
-        }
-
-        await updateChatMetadata.mutateAsync({
-          id: activeChatId,
-          gameInventory: updatedInventory,
-        });
-
-        setInventoryItems(updatedInventory);
-        if (shouldPatchGameState && currentGameState && nextPlayerStats) {
-          useGameStateStore.getState().setGameState({
-            ...currentGameState,
-            playerStats: nextPlayerStats,
-          });
-        }
-
-        toast.success(
-          localizeUi("ui.game.gamesurfacecomponent.renamedValue1ToValue2", {
-            value1: currentName,
-            value2: resolvedName,
-          }),
-        );
-        return resolvedName;
-      } catch (error) {
-        if (patchedGameState) {
-          api.patch(`/chats/${activeChatId}/game-state`, { playerStats: currentPlayerStats }).catch(() => {});
-        }
-        const message = error instanceof Error ? error.message : `Failed to rename ${currentName} to ${resolvedName}.`;
-        toast.error(message);
-        return null;
       }
     },
-    [activeChatId, inventoryItems, updateChatMetadata, localizeUi],
+    [activeChatId, commitInventory, fightInventoryLines, combatItemEffects, showInventoryNotification, localizeUi],
   );
 
-  const handleReorderInventoryItem = useCallback(
-    async (fromIndex: number, toIndex: number) => {
-      if (!activeChatId) return;
-      if (fromIndex === toIndex) return;
-      if (fromIndex < 0 || toIndex < 0) return;
-      if (fromIndex >= inventoryItems.length || toIndex >= inventoryItems.length) return;
-
-      const previousInventory = inventoryItems;
-      const updatedInventory = inventoryItems.slice();
-      [updatedInventory[fromIndex], updatedInventory[toIndex]] = [
-        updatedInventory[toIndex],
-        updatedInventory[fromIndex],
-      ];
-
-      // Optimistic local update so the swap feels instant; rollback on error.
-      // Only the visible gameInventory order is persisted — playerStats.inventory
-      // is name-indexed by the agent, so its array order is not observable.
-      setInventoryItems(updatedInventory);
-
+  /**
+   * One stack given a nickname, or its own name back. It stays the same item, so it never merges into
+   * anything; the detailed inventory follows on the server.
+   */
+  const handleRenameInventoryItem = useCallback(
+    async (stackId: string, nextName: string) => {
+      if (!activeChatId) return null;
+      const stack = inventoryItemsRef.current.find((entry) => entry.id === stackId);
+      if (!stack) {
+        toast.error(localizeUi("ui.game.gamesurfacecomponent.thatStackIsNoLongerInYourInventory"));
+        return null;
+      }
       try {
-        await updateChatMetadata.mutateAsync({
-          id: activeChatId,
-          gameInventory: updatedInventory,
-        });
+        const [result] = await commitInventory([{ op: "rename", id: stackId, name: nextName }]);
+        if (!result?.ok || !result.id) {
+          toast.error(localizeUi("ui.game.gamesurfacecomponent.thatStackIsNoLongerInYourInventory"));
+          return null;
+        }
+        const renamed = inventoryItemsRef.current.find((entry) => entry.id === result.id);
+        const resolvedName = renamed ? gameInventoryStackLabel(renamed) : nextName;
+        if (resolvedName !== gameInventoryStackLabel(stack)) {
+          toast.success(
+            localizeUi("ui.game.gamesurfacecomponent.renamedValue1ToValue2", {
+              value1: gameInventoryStackLabel(stack),
+              value2: resolvedName,
+            }),
+          );
+        }
+        return result.id;
       } catch (error) {
-        // Rollback only if no newer reorder superseded this one — otherwise
-        // a late failure from an older request would clobber newer state.
-        setInventoryItems((current) => (current === updatedInventory ? previousInventory : current));
-        const message = error instanceof Error ? error.message : "Failed to reorder inventory.";
-        toast.error(message);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : localizeUi("ui.game.gamesurfacecomponent.failedToRenameValue1ToValue2", {
+                value1: gameInventoryStackLabel(stack),
+                value2: nextName,
+              }),
+        );
+        return null;
       }
     },
-    [activeChatId, inventoryItems, updateChatMetadata],
+    [activeChatId, commitInventory, localizeUi],
+  );
+
+  /** Two stacks trade places. Swapped on screen at once and rolled back if the save fails. */
+  const handleSwapInventoryStacks = useCallback(
+    async (firstId: string, secondId: string) => {
+      if (!activeChatId || firstId === secondId) return;
+      const previousInventory = inventoryItemsRef.current;
+      const swapped = swapGameInventoryStacks(previousInventory, firstId, secondId);
+      if (swapped === previousInventory) return;
+      inventoryItemsRef.current = swapped;
+      setInventoryItems(swapped);
+      try {
+        await commitInventory([{ op: "swap", first: firstId, second: secondId }]);
+      } catch (error) {
+        // Rolled back only if no newer change superseded this one.
+        if (inventoryItemsRef.current === swapped) {
+          inventoryItemsRef.current = previousInventory;
+          setInventoryItems(previousInventory);
+        }
+        toast.error(
+          error instanceof Error ? error.message : localizeUi("ui.game.gamesurfacecomponent.failedToReorderInventory"),
+        );
+      }
+    },
+    [activeChatId, commitInventory, localizeUi],
   );
 
   const handleEditSegment = useCallback(
@@ -7591,6 +8112,7 @@ function GameSurfaceComponent({
       if (!messageId) return;
       const payload = serializeGameSegmentEdit(edit);
       if (!payload) return;
+      invalidateTranslation(messageId);
       const key = `segmentEdit:${messageId}:${segmentIndex}`;
       setSegmentEdits((prev) => {
         const next = new Map(prev);
@@ -7614,6 +8136,7 @@ function GameSurfaceComponent({
   const handleDeleteSegment = useCallback(
     (messageId: string, segmentIndex: number) => {
       if (!messageId) return;
+      invalidateTranslation(messageId);
       const key = `segmentDelete:${messageId}:${segmentIndex}`;
       setSegmentDeletes((prev) => {
         const next = new Set(prev);
@@ -7627,6 +8150,7 @@ function GameSurfaceComponent({
 
   const handleEditMessage = useCallback(
     (messageId: string, content: string) => {
+      invalidateTranslation(messageId);
       updateMessage.mutate({ messageId, content });
     },
     [updateMessage],
@@ -7897,6 +8421,25 @@ function GameSurfaceComponent({
     return baseMembers;
   }, [chatCharacterIds, chatMeta, characters, characterMap, npcs, personaInfo]);
 
+  /** Whose bags the inventory screen shows: the player first (no holder), then the party in order,
+   *  then anybody who has left the party but still carries something. */
+  const inventoryBags = useMemo(() => {
+    const player = partyMembers.find((member) => member.id.startsWith("persona:"));
+    const bags: Array<{ holder?: string; name: string }> = [
+      { name: player?.name ?? localizeUi("ui.game.gameinventory.you") },
+    ];
+    const seen = new Set<string>([""]);
+    const addBag = (name: string) => {
+      const key = gameInventoryBagKey(name);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      bags.push({ holder: name, name });
+    };
+    for (const member of partyMembers) if (!member.id.startsWith("persona:")) addBag(member.name);
+    for (const stack of inventoryItems) if (stack.holder) addBag(stack.holder);
+    return bags;
+  }, [partyMembers, inventoryItems, localizeUi]);
+
   const combatAvatarCandidates = useMemo(() => {
     const candidatesByName = new Map<string, GamePartyMemberInfo>();
     const addCandidate = (candidate: GamePartyMemberInfo) => {
@@ -8004,30 +8547,6 @@ function GameSurfaceComponent({
     if (hydratedParty !== combatParty) setCombatParty(hydratedParty);
   }, [combatAvatarCandidates, combatParty]);
 
-  // Auto-open the in-game tutorial on the user's first game.
-  // Guard: only when setup is complete, party is loaded, and the user
-  // hasn't permanently disabled it. Fires once per chat mount.
-  useEffect(() => {
-    if (tutorialAutoTriggeredRef.current) return;
-    if (gameTutorialDisabled) return;
-    if (isSetupActive) return;
-    if (partyMembers.length === 0) return;
-    // This tour spotlights built-in chrome an experience replaces. Suppressed, NOT consumed:
-    // `gameTutorialDisabled` is untouched, so a later Classic game still gets the tour on its first turn.
-    if (experienceOwnsGame) return;
-    tutorialAutoTriggeredRef.current = true;
-    // Small delay so the UI has time to mount/layout before the tooltip measures rects
-    const t = window.setTimeout(() => setTutorialOpen(true), 600);
-    return () => window.clearTimeout(t);
-  }, [gameTutorialDisabled, isSetupActive, partyMembers.length, experienceOwnsGame]);
-
-  const handleCloseTutorial = useCallback(() => {
-    setTutorialOpen(false);
-    // Mark as dismissed so it doesn't auto-open for future games.
-    // The (?) help button will still re-open it on demand.
-    setGameTutorialDisabled(true);
-  }, [setGameTutorialDisabled]);
-
   const handleRemovePartyMemberFromBar = useCallback(
     async (member: { id: string; name: string; canRemove?: boolean }) => {
       if (!activeChatId || !member.canRemove) return;
@@ -8053,15 +8572,39 @@ function GameSurfaceComponent({
   );
 
   const combatUiActive = gameState === "combat" && !!combatParty && !!combatEnemies;
-  // Effective combat style: runtime metadata override (settings drawer) ??
-  // wizard setup choice ?? legacy default "classic".
+  // Effective combat style: active encounter pin ?? runtime metadata override
+  // (settings drawer) ?? wizard setup choice ?? legacy default "classic".
   const combatSetupConfig = chatMeta.gameSetupConfig as Record<string, unknown> | undefined;
   const effectiveCombatStyle: GameCombatStyle =
+    combatPinnedStyle ??
     (chatMeta.gameCombatStyle as GameCombatStyle | undefined) ??
     (combatSetupConfig?.combatStyle as GameCombatStyle | undefined) ??
     "classic";
+  // Live snapshot for the identity-stable combat seam (#5094): a package may
+  // cache requestCombat at mount, so the callback must read CURRENT values, not
+  // its creation render's closure. messageId rides latestAssistantMsgRef.
+  const combatSeamRef = useRef({ combatUiActive: false, concluded: false, replayActive: false });
+  useEffect(() => {
+    combatSeamRef.current.combatUiActive = combatUiActive;
+    combatSeamRef.current.concluded = (chatMeta.gameSessionStatus as string) === "concluded";
+    combatSeamRef.current.replayActive = replayActive;
+  });
+  // #5094: on chat switch, clear the in-flight lock AND the error (the [activeChatId] reset above only
+  // clears the pending state) and invalidate any in-flight request (bump the request id), so a
+  // generation left in flight by the previous chat can't keep the new chat stuck as "pending", leak its
+  // error, or have a stale completion touch the new chat. (Both refs are declared with the combat state
+  // above so the turn-retry handler can reach them too.) The requestId check is why a same-chat retry
+  // is also covered; the requestChatId check is a synchronous belt (activeChatIdRef updates during
+  // render, ahead of this effect's bump), so a chat switch is caught even before the bump lands.
+  useEffect(() => {
+    combatGenerationInFlightRef.current = false;
+    combatGenerationRequestIdRef.current += 1;
+    setCombatGenerationError(null);
+  }, [activeChatId]);
   const tacticalCombatActive = combatUiActive && effectiveCombatStyle === "tactical";
   const topOverlayOffsetClass = "top-3";
+  // Tactical combat's bar takes the top of the chat (top-14 against top-3): the control bubbles start below it.
+  const controlRowOffset = tacticalCombatActive ? 44 : 0;
   const queuedCombatMatchesLatest =
     !!queuedCombatGeneration?.messageId &&
     !!latestAssistantMsg?.id &&
@@ -8087,6 +8630,263 @@ function GameSurfaceComponent({
     ];
   }, [combatEnemies, combatParty]);
 
+  // ── Battles on a ruleset sheet ──
+  // A ruleset that opted in with a `battle` block lends the fight the sheet's own health, energy
+  // and slots, and turns the catalog rows the sheet carries into skills. Health travels as a share
+  // of the maximum, because the damage is still Marinara's and the two scales are nothing alike,
+  // which is what the notice says out loud. A game with no ruleset, or one whose ruleset has no
+  // block, never reaches any of this. (`gameRuleset` is read further up, where the fight's items are.)
+  // The ruleset's items, which the inventory shows and offers; undefined without an items block.
+  // The party's sheets, which what each character carries and binds is read off, as the server reads
+  // them: the player's is the card named for who the chat plays as (the first card when no card has
+  // that name), the rest by the name their bag has, and a card with no readable sheet reads a blank one.
+  const inventoryPlayerName = partyMembers.find((member) => member.id.startsWith("persona:"))?.name;
+  const inventorySheets = useMemo<RulesetItemBookSheets | undefined>(() => {
+    if (gameRuleset.status !== "ok" || !gameRuleset.definition.items) return undefined;
+    const cards = (Array.isArray(chatMeta.gameCharacterCards) ? chatMeta.gameCharacterCards : []) as Array<
+      Record<string, unknown>
+    >;
+    const named = cards.flatMap((card) => {
+      const name = typeof card.name === "string" ? card.name.trim() : "";
+      return name ? [{ name, card }] : [];
+    });
+    const playerKey = inventoryPlayerName ? gameInventoryBagKey(inventoryPlayerName) : "";
+    const player =
+      (playerKey ? named.find((entry) => gameInventoryBagKey(entry.name) === playerKey) : undefined) ?? named[0];
+    const buildOf = (card: Record<string, unknown>) => {
+      const parsed = rulesetSheetEnvelopeSchema.safeParse(card.rulesetSheet);
+      return parsed.success ? parsed.data.build : undefined;
+    };
+    const playerBuild = player ? buildOf(player.card) : undefined;
+    return {
+      ...(playerBuild ? { player: playerBuild } : {}),
+      // Every card by its name, as the server keeps them: the first card read for the player may also
+      // be a companion's own.
+      members: named.flatMap((entry) => {
+        const build = buildOf(entry.card);
+        return build ? [{ name: entry.name, build }] : [];
+      }),
+    };
+  }, [chatMeta.gameCharacterCards, gameRuleset, inventoryPlayerName]);
+  const inventoryItemBook = useRulesetItemBook(gameRuleset, inventorySheets, chatMeta.gameInventedItems);
+  /** The Use button. One of the ruleset's items with a `use` is used by the Engine first: what it does
+   *  to whoever carries it lands on their sheet, it is spent, and the Game Master is told what happened
+   *  in an `[item_used]` block. Anything else is simply said, and the Game Master decides. */
+  const handleUseInventoryStack = useCallback(
+    async (stackId: string, label: string) => {
+      setInventoryOpen(false);
+      const stack = inventoryItemsRef.current.find((entry) => entry.id === stackId);
+      const said = () => sendMessage(`I use my ${label}.`);
+      // Only an item the screen already knows has no use is simply said. One it cannot tell about yet
+      // (the ruleset or its catalogs still loading) goes to the Engine, which always knows.
+      const known = stack?.item ? inventoryItemBook?.itemOf(stack.item) : undefined;
+      if (!stack?.item || gameRuleset.status === "none" || (known && !known.entry.item?.use)) {
+        said();
+        return;
+      }
+      const usedIn = activeChatId;
+      let used: { rulesetLive: RulesetLiveStates; line: string } | null;
+      try {
+        // A sheet edit still waiting to be saved lands first, so the use starts from it and is not
+        // written over by it afterwards.
+        if (usedIn) await flushGameStatePatch(usedIn);
+        used = await sendInventory((chatId) =>
+          api.post<{
+            inventory: GameInventoryStack[];
+            rulesetLive: RulesetLiveStates;
+            line: string;
+            playerStats?: PlayerStats;
+          }>("/game/inventory/use", { chatId, stackId }),
+        );
+      } catch (error) {
+        const reason =
+          error instanceof ApiError && error.payload && typeof error.payload === "object"
+            ? (error.payload as { reason?: unknown }).reason
+            : undefined;
+        // Nothing the Engine uses: it is said as any other item is.
+        if (reason === "no-use" || reason === "not-ruleset-item" || reason === "no-ruleset") {
+          if (useChatStore.getState().activeChatId === usedIn) said();
+          return;
+        }
+        toast.error(
+          localizeUi(
+            reason === "none-left"
+              ? "ui.game.gamesurfacecomponent.itemUseNoneLeft"
+              : reason === "not-worn"
+                ? "ui.game.gamesurfacecomponent.itemUseNotWorn"
+                : "ui.game.gamesurfacecomponent.itemUseFailed",
+            { item: label },
+          ),
+        );
+        return;
+      }
+      if (!used) return;
+      // The item is used either way. When the Game Master cannot be told (the player moved to another
+      // chat meanwhile, or the message did not go), the player is, so it is never spent in silence.
+      const sent =
+        useChatStore.getState().activeChatId === usedIn &&
+        (await sendMessage(`I use my ${label}.\n\n[item_used]\n${used.line}\n[/item_used]`).catch(() => false)) !==
+          false;
+      if (!sent) toast.error(localizeUi("ui.game.gamesurfacecomponent.itemUsedNotSent", { item: label }));
+    },
+    [activeChatId, gameRuleset.status, inventoryItemBook, localizeUi, sendInventory, sendMessage],
+  );
+
+  // Who an item added in the shared view may go to, in order: the player, then the party.
+  const inventoryPlaceAmong = useMemo(
+    () => ["", ...partyMembers.filter((member) => !member.id.startsWith("persona:")).map((member) => member.name)],
+    [partyMembers],
+  );
+  /** What each seeded member started this battle with, keyed the way live state is. Null while this
+   *  session has not seeded a battle, which is what a battle restored after a reload looks like. */
+  const rulesetBattleSeedsRef = useRef<RulesetCombatSeeds | null>(null);
+  // A battle restored in another chat must never be measured against the seeds of the one left
+  // behind: two games can field characters with the same name.
+  useEffect(() => {
+    rulesetBattleSeedsRef.current = null;
+  }, [activeChatId]);
+
+  /** The rules THIS fight is resolved by, or null when it is one of Marinara's own. Read from the
+   *  blocks the ruleset declares rather than from what its coverage flag claims, because what
+   *  resolves a fight has to be what the file really says. */
+  const rulesetFightDefinition =
+    gameRuleset.status === "ok" &&
+    isRulesetCombatFight({
+      combatDirector: combatSetupConfig?.combatDirector === true,
+      definition: gameRuleset.definition,
+      anchor: combatStartMessageId,
+    })
+      ? gameRuleset.definition
+      : null;
+  // A fight the ruleset resolves is fought on a board when the player asked for the Tactical
+  // presentation AND the ruleset says what one cell of one is worth. The server still decides: it
+  // draws no board for a ruleset with no `distance`, and the screen follows the view it sends.
+  const rulesetFightPositioned = !!rulesetFightDefinition?.combat?.distance && effectiveCombatStyle === "tactical";
+
+  // The catalogs a bridged battle reads are fetched as soon as the game is open, so that starting a
+  // battle finds them in the cache and seeds the party in the same tick a game without a ruleset
+  // sets it. Nothing is fetched for a game whose ruleset has no `battle` block.
+  const battleDefinition = gameRuleset.status === "ok" && gameRuleset.definition.battle ? gameRuleset.definition : null;
+  useEffect(() => {
+    if (!battleDefinition) return;
+    for (const catalogId of rulesetBattleCatalogIds(battleDefinition)) {
+      void queryClient.prefetchQuery(rulesetCatalogQuery(battleDefinition.id, catalogId, battleDefinition.version));
+    }
+  }, [battleDefinition, queryClient]);
+
+  const startBattleParty = useCallback(
+    (party: Combatant[], apply: (party: Combatant[]) => void, anchor: string | null) => {
+      const definition = gameRuleset.status === "ok" ? gameRuleset.definition : null;
+      // A fight the ruleset resolves reads the sheets on the server and writes every accepted step
+      // to them as it goes, so lending it a share of the Engine's hit points would be a second,
+      // disagreeing copy of the same numbers. The bridge stands aside for exactly that fight, and
+      // for nothing else: a ruleset with only a `battle` block still seeds here.
+      if (
+        !definition?.battle ||
+        isRulesetCombatFight({
+          combatDirector: combatSetupConfig?.combatDirector === true,
+          definition,
+          anchor,
+        })
+      ) {
+        apply(party);
+        return;
+      }
+      const cards = chatMeta.gameCharacterCards;
+      const chatId = activeChatIdRef.current;
+      // Read at battle time, not at render time: a turn's own sheet commands may have landed since
+      // this callback was built, and the fight has to start from what they left behind. A snapshot
+      // that belongs to another chat is not this game's live state, and seeding from nothing would
+      // start everybody at full, so the bridge simply stands aside for this fight.
+      const snapshot = useGameStateStore.getState().current;
+      if (snapshot?.chatId !== chatId) {
+        console.warn("[game-ruleset] Game state was not ready, so this battle does not use the sheets");
+        // An EMPTY record, not null: nobody was seeded, so nobody is written back. Null would send
+        // the write-back down its reload path, which measures the end of the fight against the
+        // sheet's share, and these fighters started at full instead.
+        rulesetBattleSeedsRef.current = {};
+        apply(party);
+        return;
+      }
+      const live = snapshot.rulesetLive;
+      const playerName = personaInfo?.name;
+      const start = (catalogs: RulesetCatalogEntriesById) => {
+        const seeded = seedRulesetBattleParty(definition, cards, live, catalogs, party, playerName);
+        rulesetBattleSeedsRef.current = seeded.seeds;
+        if (Object.keys(seeded.seeds).length > 0) {
+          toast.info(localizeUi("game.ruleset.battle.sheetNotice", { ruleset: definition.name }));
+        }
+        apply(seeded.party);
+      };
+      // The usual case: the catalogs were fetched when the game opened, so the party is seeded and
+      // set right here, in the same tick as the enemies and the scene around it.
+      const catalogIds = rulesetBattleCatalogIds(definition);
+      const cached: RulesetCatalogEntriesById = {};
+      for (const catalogId of catalogIds) {
+        const payload = queryClient.getQueryData<RulesetCatalogPayload>(
+          rulesetCatalogQuery(definition.id, catalogId, definition.version).queryKey,
+        );
+        if (payload) cached[catalogId] = payload.entries;
+      }
+      if (Object.keys(cached).length === catalogIds.length) {
+        start(cached);
+        return;
+      }
+      // The slow path, for a battle that starts before the catalogs have arrived. The empty record
+      // marks this battle as started by this session; every place that ends or abandons a battle
+      // replaces it, which is how a late answer knows it has been overtaken.
+      const pending: RulesetCombatSeeds = {};
+      rulesetBattleSeedsRef.current = pending;
+      // The wait is shown and gated the way a battle still being generated is: the same "starting"
+      // state holds the narration and the input until the party is in place.
+      setCombatGenerationPending(true);
+      let applied = false;
+      void (async () => {
+        const catalogs: RulesetCatalogEntriesById = {};
+        const missing: string[] = [];
+        await Promise.all(
+          rulesetBattleCatalogIds(definition).map(async (catalogId) => {
+            try {
+              const payload = await queryClient.fetchQuery(
+                rulesetCatalogQuery(definition.id, catalogId, definition.version),
+              );
+              catalogs[catalogId] = payload.entries;
+            } catch {
+              missing.push(catalogId);
+            }
+          }),
+        );
+        // A catalog that will not load costs the skills it holds and nothing else: the fight still
+        // starts on the sheet's own hit points and slots rather than not starting at all.
+        if (missing.length > 0) {
+          console.warn("[game-ruleset] Battle skills were skipped: these catalogs did not load", missing);
+        }
+        // A chat switch while the catalogs were in flight abandons this battle with them, and so
+        // does a battle the player already backed out of: the party must not be set on a game
+        // that is no longer fighting. The combat screen only mounts once the party is set, so
+        // nothing was playable in the meantime.
+        if (activeChatIdRef.current !== chatId) return;
+        if (rulesetBattleSeedsRef.current !== pending) return;
+        start(catalogs);
+        applied = true;
+      })().finally(() => {
+        // Only the battle that raised the gate lowers it, and only while it is still that battle's:
+        // a chat switch resets the gate by its own means, and a battle that replaced this one owns
+        // the gate it raised.
+        if (activeChatIdRef.current !== chatId) return;
+        if (applied || rulesetBattleSeedsRef.current === pending) setCombatGenerationPending(false);
+      });
+    },
+    [
+      chatMeta.gameCharacterCards,
+      combatSetupConfig?.combatDirector,
+      gameRuleset,
+      localizeUi,
+      personaInfo?.name,
+      queryClient,
+    ],
+  );
+
   const hydrateGeneratedCombatState = useCallback(
     (combatState: CombatInitState): { party: Combatant[]; enemies: Combatant[] } | null => {
       const fallbackLevel = sessionNumber ?? 5;
@@ -8109,7 +8909,11 @@ function GameSurfaceComponent({
         : [];
 
       if (partyCombatants.length === 0 || enemyCombatants.length === 0) return null;
-      return { party: partyCombatants, enemies: enemyCombatants };
+      const seed = Math.floor(Math.random() * 0x100000000);
+      return {
+        party: partyCombatants.map((c) => ({ ...c, tactics: assignCombatTactics(c, seed) })),
+        enemies: enemyCombatants.map((c) => ({ ...c, tactics: assignCombatTactics(c, seed) })),
+      };
     },
     [chatMeta.gameCharacterCards, combatAvatarCandidates, sessionNumber],
   );
@@ -8173,14 +8977,25 @@ function GameSurfaceComponent({
   ]);
 
   const generateCombatStateForMessage = useCallback(
-    (messageId: string) => {
-      if (combatGenerationPending) return;
+    (messageId: string, notify: boolean) => {
+      // Both guards: the state flag drives rendering, but it is stale within a
+      // frame — same-frame double calls (a package spamming requestCombat, #5094)
+      // all read false. The ref flips synchronously and clears with the request.
+      if (combatGenerationPending || combatGenerationInFlightRef.current) return;
       const debugMode = useUIStore.getState().debugMode;
       if (debugMode) {
         console.warn("[game-combat] Starting combat state generation", { chatId: activeChatId, messageId });
       }
+      combatGenerationInFlightRef.current = true;
       setCombatGenerationError(null);
       setCombatGenerationPending(true);
+      // #5094: scope the async completion to THIS request. requestId is bumped by any newer request, a
+      // chat switch, or a turn retry that abandons this one; requestChatId is the synchronous belt for a
+      // chat switch (activeChatIdRef updates during render, ahead of the effect that bumps requestId).
+      // Every handler below bails unless BOTH still match, so a stale completion can't apply combat
+      // state, set an error, or clear the lock for a different request, turn, or chat.
+      const requestChatId = activeChatId;
+      const requestId = ++combatGenerationRequestIdRef.current;
       api
         .post<EncounterInitResponse>("/encounter/init", {
           chatId: activeChatId,
@@ -8190,12 +9005,34 @@ function GameSurfaceComponent({
           debugMode,
         })
         .then(async (response) => {
+          if (combatGenerationRequestIdRef.current !== requestId || activeChatIdRef.current !== requestChatId) return; // superseded
           const combatants = hydrateGeneratedCombatState(response.combatState);
           if (!combatants) {
             throw new Error("Combat generator returned an empty party or enemy list.");
           }
 
           const visuals = response.combatState.visuals;
+          // #5161: classify the encounter for context-bound combat music and
+          // make sure the tier's persistent track exists in the library.
+          const encounterTier =
+            normalizeMusicEnemyTier(visuals?.encounterTier ?? null) ?? (visuals?.isBossFight ? "boss" : "common");
+          setCombatMusicTier(encounterTier);
+          // Sync the mirror NOW: the generation below may resolve before the
+          // state commit re-renders, and its still-in-this-fight check reads
+          // the ref.
+          combatMusicTierRef.current = encounterTier;
+          ensureContextMusicTrack(
+            "tier",
+            encounterTier,
+            buildTierMusicPrompt(
+              encounterTier,
+              ((chatMeta.gameSetupConfig as Record<string, unknown> | undefined)?.genre as string | undefined) ?? null,
+            ),
+          );
+          // Apply combat music immediately: no scene-analysis pass runs while
+          // the overlay is up. Plays the tier track when it already exists,
+          // else the legacy combat pool until the composition lands.
+          playContextCombatMusic(encounterTier);
           const enemyAvatarRequests = (
             Array.isArray(visuals?.enemyImagePrompts) && visuals.enemyImagePrompts.length > 0
               ? visuals.enemyImagePrompts
@@ -8246,8 +9083,16 @@ function GameSurfaceComponent({
               npcsNeedingAvatars: shouldGenerateEnemyAvatars ? enemyAvatarRequests : undefined,
               debugMode: useUIStore.getState().debugMode,
             };
-            void requestAssetGeneration(assetPayload, { allowPromptReview: false })
+            void requestAssetGeneration(assetPayload, {
+              allowPromptReview: false,
+              // #5094: gate the internal asset apply (background + avatars + asset state) on this combat
+              // request still being current, since requestAssetGeneration applies before the .then below runs.
+              isCurrent: () =>
+                combatGenerationRequestIdRef.current === requestId && activeChatIdRef.current === requestChatId,
+            })
               .then((assetResult) => {
+                if (combatGenerationRequestIdRef.current !== requestId || activeChatIdRef.current !== requestChatId)
+                  return; // superseded; don't apply avatars to a different request/turn/chat
                 if (!assetResult?.generatedNpcAvatars?.length) return;
                 const avatarByName = new Map(
                   assetResult.generatedNpcAvatars.map(
@@ -8283,6 +9128,13 @@ function GameSurfaceComponent({
           // may add for tactical combat; read defensively in case the type lags the schema.
           const blueprintFormation = (response.combatState as { battlefield?: { formation?: unknown } }).battlefield
             ?.formation;
+          const blueprintTerrain = validateTacticalBattlefieldBrief(
+            (response.combatState as { battlefield?: { terrainBrief?: unknown } }).battlefield?.terrainBrief ??
+              undefined,
+          );
+          const blueprintTerrainBrief = blueprintTerrain.ok ? (blueprintTerrain.brief ?? null) : null;
+          const blueprintTerrainBriefError = (response.combatState as { battlefield?: { terrainBriefError?: unknown } })
+            .battlefield?.terrainBriefError;
 
           setPreparedCombatState({
             messageId,
@@ -8295,15 +9147,33 @@ function GameSurfaceComponent({
             styleNotes,
             formation:
               typeof blueprintFormation === "string" && blueprintFormation.trim() ? blueprintFormation.trim() : null,
+            battlefield: blueprintTerrainBrief,
+            battlefieldError: !blueprintTerrain.ok
+              ? blueprintTerrain.error
+              : !blueprintTerrainBrief && typeof blueprintTerrainBriefError === "string"
+                ? blueprintTerrainBriefError.trim() || null
+                : null,
           });
         })
         .catch((err) => {
+          if (combatGenerationRequestIdRef.current !== requestId || activeChatIdRef.current !== requestChatId) return; // superseded; don't set stale error
           const message = err instanceof Error ? err.message : "Combat generation failed.";
           console.warn("[game-combat] Failed to generate combat state", err);
           setCombatGenerationError(message);
-          toast.error(localizeUi("ui.game.gamesurfacecomponent.value1UseTheCombatButtonToRetry", { value1: message }));
+          // Only the Engine paths (manual button, retry, auto-queue) toast. An Experience/package
+          // request passes notify=false and renders its own feedback from combatError, so a failed
+          // package request must not surface an Engine toast over the package's UI. #5094.
+          if (notify) {
+            toast.error(
+              localizeUi("ui.game.gamesurfacecomponent.value1UseTheCombatButtonToRetry", { value1: message }),
+            );
+          }
         })
-        .finally(() => setCombatGenerationPending(false));
+        .finally(() => {
+          if (combatGenerationRequestIdRef.current !== requestId || activeChatIdRef.current !== requestChatId) return; // superseded; don't clear another request's lock
+          combatGenerationInFlightRef.current = false;
+          setCombatGenerationPending(false);
+        });
     },
     [
       activeChatId,
@@ -8312,6 +9182,9 @@ function GameSurfaceComponent({
       gameImageAutoGenerationEnabled,
       hydrateGeneratedCombatState,
       requestAssetGeneration,
+      ensureContextMusicTrack,
+      playContextCombatMusic,
+      chatMeta.gameSetupConfig,
       localizeUi,
     ],
   );
@@ -8333,7 +9206,7 @@ function GameSurfaceComponent({
     if (preparedCombatState?.messageId === queuedCombatGeneration.messageId) return;
     if (isStreaming || scenePreparing || assetGenerationBlocksScene) return;
 
-    generateCombatStateForMessage(queuedCombatGeneration.messageId);
+    generateCombatStateForMessage(queuedCombatGeneration.messageId, queuedCombatGeneration.notify);
   }, [
     activeChatId,
     combatGenerationPending,
@@ -8357,15 +9230,20 @@ function GameSurfaceComponent({
     if (isStreaming || scenePreparing || assetGenerationBlocksScene || directionsPlaying) return;
     if (latestNarrationText && !narrationDone) return;
 
-    setCombatParty(preparedCombatState.party);
+    // The anchor this fight is about to hang off, set a few lines below: it is what decides whether
+    // the fight is the ruleset's own, so the seeding has to be told it before the state catches up.
+    startBattleParty(preparedCombatState.party, setCombatParty, preparedCombatState.messageId);
     setCombatEnemies(preparedCombatState.enemies);
     setCombatItemEffects(preparedCombatState.itemEffects);
     setCombatMechanics(preparedCombatState.mechanics);
     setCombatDialogueCues(preparedCombatState.dialogueCues);
+    setCombatPinnedStyle(effectiveCombatStyle);
     setCombatSceneMeta({
       environment: preparedCombatState.environment,
       environmentType: preparedCombatState.styleNotes?.environmentType?.trim() || null,
       formation: preparedCombatState.formation,
+      battlefield: preparedCombatState.battlefield,
+      battlefieldError: preparedCombatState.battlefieldError,
       styleNotes: preparedCombatState.styleNotes,
     });
     setCombatStartMessageId(preparedCombatState.messageId);
@@ -8379,6 +9257,7 @@ function GameSurfaceComponent({
     assetGenerationBlocksScene,
     combatUiActive,
     directionsPlaying,
+    effectiveCombatStyle,
     isStreaming,
     latestAssistantMsg?.id,
     latestNarrationText,
@@ -8387,6 +9266,7 @@ function GameSurfaceComponent({
     preparedCombatState,
     queuedCombatGeneration,
     scenePreparing,
+    startBattleParty,
     transitionGameState,
   ]);
 
@@ -8397,11 +9277,6 @@ function GameSurfaceComponent({
   useEffect(() => {
     if (!combatUiActive || !activeChatId || !combatStartMessageId) return;
 
-    const combatSetupConfig = chatMeta.gameSetupConfig as Record<string, unknown> | undefined;
-    const effectiveCombatStyle: GameCombatStyle =
-      (chatMeta.gameCombatStyle as GameCombatStyle | undefined) ??
-      (combatSetupConfig?.combatStyle as GameCombatStyle | undefined) ??
-      "classic";
     if (effectiveCombatStyle !== "tactical") return;
 
     // Only for a FRESH battle — a restored in-progress snapshot keeps its background.
@@ -8463,8 +9338,9 @@ function GameSurfaceComponent({
     activeChatId,
     combatStartMessageId,
     combatSceneMeta,
-    chatMeta.gameCombatStyle,
-    chatMeta.gameSetupConfig,
+    effectiveCombatStyle,
+    combatSetupConfig?.genre,
+    combatSetupConfig?.setting,
     chatMeta.gameTacticalCombatSnapshot,
     chatMeta.gameWorldOverview,
     chat.name,
@@ -8484,13 +9360,55 @@ function GameSurfaceComponent({
       toast.error(localizeUi("ui.game.gamesurfacecomponent.noCurrentTurnIsAvailableForCombatGeneration"));
       return;
     }
-    setQueuedCombatGeneration({ messageId });
+    setQueuedCombatGeneration({ messageId, notify: true });
     setPreparedCombatState(null);
     setCombatGenerationError(null);
-    generateCombatStateForMessage(messageId);
+    generateCombatStateForMessage(messageId, true);
   }, [generateCombatStateForMessage, latestAssistantMsg?.id, queuedCombatGeneration?.messageId, localizeUi]);
 
+  /** Keeps the identity-stable combat seam pointing at the CURRENT generator
+   *  (whose own identity tracks its render-state deps). */
+  const generateCombatRef = useRef(generateCombatStateForMessage);
+  useEffect(() => {
+    generateCombatRef.current = generateCombatStateForMessage;
+  });
+
+  /** Shared combat-start core (#5094): the manual button (after its confirm dialog) and an
+   *  Experience's requestCombat both funnel through here — ONE path into the vanilla
+   *  generation pass, so a package can never trigger side effects the button would not.
+   *  The vanilla LLM pass still decides what the encounter is. Reads everything through
+   *  refs so the identity-stable package callback can never act on a stale closure;
+   *  `notify` keeps Engine toasts off the package path (the Experience renders its own
+   *  feedback from the returned refusal code). */
+  const startCombatGeneration = useCallback(
+    (notify: boolean): "started" | "combat-active" | "pending" | "no-turn" | "unavailable" => {
+      const seam = combatSeamRef.current;
+      if (seam.concluded || seam.replayActive) return "unavailable";
+      if (seam.combatUiActive) {
+        if (notify) toast("Combat is already active.");
+        return "combat-active";
+      }
+      if (combatGenerationInFlightRef.current) {
+        if (notify) toast("Combat is already being prepared.");
+        return "pending";
+      }
+      const messageId = latestAssistantMsgRef.current?.id;
+      if (!messageId) {
+        if (notify) toast.error(localizeUi("ui.game.gamesurfacecomponent.theGmNeedsToWriteAtLeastOneTurn"));
+        return "no-turn";
+      }
+      setQueuedCombatGeneration({ messageId, notify });
+      setPreparedCombatState(null);
+      setCombatGenerationError(null);
+      generateCombatRef.current(messageId, notify);
+      return "started";
+    },
+    [localizeUi],
+  );
+
   const handleRequestManualCombatStart = useCallback(async () => {
+    // Pre-dialog guards so the player is never asked to confirm a request that
+    // must fail — the core re-checks all of them (fresh, via refs) afterwards.
     if (combatUiActive) {
       toast("Combat is already active.");
       return;
@@ -8499,8 +9417,7 @@ function GameSurfaceComponent({
       toast("Combat is already being prepared.");
       return;
     }
-    const messageId = latestAssistantMsg?.id;
-    if (!messageId) {
+    if (!latestAssistantMsg?.id) {
       toast.error(localizeUi("ui.game.gamesurfacecomponent.theGmNeedsToWriteAtLeastOneTurn"));
       return;
     }
@@ -8511,16 +9428,100 @@ function GameSurfaceComponent({
       cancelLabel: "No",
     });
     if (!confirmed) return;
-    setQueuedCombatGeneration({ messageId });
-    setPreparedCombatState(null);
-    setCombatGenerationError(null);
-    generateCombatStateForMessage(messageId);
-  }, [combatGenerationPending, combatUiActive, generateCombatStateForMessage, latestAssistantMsg?.id, localizeUi]);
+    startCombatGeneration(true);
+  }, [combatGenerationPending, combatUiActive, latestAssistantMsg?.id, startCombatGeneration, localizeUi]);
+
+  /** Handed to Experience surfaces as requestCombat (#5094). Identity-stable (matching
+   *  every other function in the surface props), silent (returns the refusal code
+   *  instead of Engine toasts over the package's UI), and confirm-free — the
+   *  Experience's own interface already expressed the intent. Deliberately takes no
+   *  combatant data: startCombat(party, enemies) would let a package construct combat
+   *  outside the vanilla generation path, and combat stays vanilla. */
+  const requestExperienceCombat = useCallback(() => startCombatGeneration(false), [startCombatGeneration]);
 
   // The narration renders these buttons only when the props are supplied, so withholding them beats
   // hiding: no dead button, and no way to reach the Classic flow underneath the surface.
   const classicInventoryOpener = activeExperienceChrome?.providesInventory ? undefined : () => setInventoryOpen(true);
   const classicCombatStarter = activeExperienceChrome?.providesCombat ? undefined : handleRequestManualCombatStart;
+
+  // Engine state handed to the surface slot, recomputed per turn so the surface tracks streaming and
+  // new messages. Builds nothing unless the surface is mounted, so a Classic game never pays for it.
+  // Declared here (not with the other seams) because it carries the combat seam computed above.
+  const experienceSurfaceProps = useMemo(
+    () =>
+      !experienceSurfaceActive
+        ? undefined
+        : {
+            chatId: activeChatId,
+            chatMeta,
+            startup: experiencePreparesBeforeStart && !introPresented,
+            setStartupReady: experiencePreparesBeforeStart ? setStartupReady : undefined,
+            messages,
+            latestAssistant: latestAssistantMsg,
+            isStreaming,
+            scopedAssetMap,
+            sendMessage: sendExperienceMessage,
+            setExperienceBackgroundTag: pushExperienceBackground,
+            setExperienceSpeakerAvatars,
+            setExperienceChrome,
+            // Who is speaking RIGHT NOW, as the narration plays. Deriving it from the turn text instead yields
+            // only the LAST speaker of the turn, which leaves a VN sprite stuck on whoever spoke last.
+            activeSpeaker: activeSpeaker
+              ? { name: activeSpeaker.name, expression: activeSpeaker.expression ?? null }
+              : null,
+            experienceChoiceSlotEl,
+            // Per-turn state, so the surface can hold its menu until the narration finishes.
+            narrationDone,
+            latestNarrationText,
+            scenePreparing,
+            directionsPlaying,
+            assetGenerationBlocksScene,
+            replayActive,
+            sessionInteractive: (chatMeta.gameSessionStatus as string) !== "concluded",
+            // The host's sprite-size setting, so the player's slider keeps working in this mode.
+            spriteScale: gameFullBodySpriteScale,
+            // Combat seam (#5094): the instant the combat UI actually mounts — unlike
+            // chatMeta.gameActiveState, the GM's narrative scene state, which lags the
+            // flip and can say "combat" without any combat UI existing.
+            combatActive: combatUiActive,
+            combatStyle: effectiveCombatStyle,
+            requestCombat: requestExperienceCombat,
+            // Generation progress/outcome mirrors, so a package that requested combat can
+            // show its own feedback instead of waiting on combatActive forever.
+            combatPending: combatGenerationPending,
+            combatError: combatGenerationError,
+          },
+    [
+      experienceSurfaceActive,
+      experiencePreparesBeforeStart,
+      introPresented,
+      setStartupReady,
+      activeChatId,
+      chatMeta,
+      messages,
+      latestAssistantMsg,
+      isStreaming,
+      scopedAssetMap,
+      sendExperienceMessage,
+      pushExperienceBackground,
+      setExperienceSpeakerAvatars,
+      setExperienceChrome,
+      activeSpeaker,
+      experienceChoiceSlotEl,
+      narrationDone,
+      latestNarrationText,
+      scenePreparing,
+      directionsPlaying,
+      assetGenerationBlocksScene,
+      replayActive,
+      gameFullBodySpriteScale,
+      combatUiActive,
+      effectiveCombatStyle,
+      requestExperienceCombat,
+      combatGenerationPending,
+      combatGenerationError,
+    ],
+  );
 
   useEffect(() => {
     if (!queuedQte || !latestAssistantMsg?.id) return;
@@ -8598,7 +9599,9 @@ function GameSurfaceComponent({
       side: "enemy" as const,
       element: e.element,
     }));
-    setCombatEnemies(enemyCombatants);
+    setCombatEnemies(
+      enemyCombatants.map((c) => ({ ...c, tactics: assignCombatTactics(c, Math.floor(Math.random() * 0x100000000)) })),
+    );
 
     const playerMembers = partyMembers.filter((member) => member.id.startsWith("persona:"));
     const npcByPartyId = buildPartyNpcLookup(npcs, chatMeta.gameNpcs);
@@ -8751,7 +9754,13 @@ function GameSurfaceComponent({
       return;
     }
 
-    setCombatParty(partyCombatants);
+    // The `[combat:]` tag path set the anchor before it queued this encounter, so it is already in
+    // hand here.
+    startBattleParty(
+      partyCombatants.map((c) => ({ ...c, tactics: assignCombatTactics(c, Math.floor(Math.random() * 0x100000000)) })),
+      setCombatParty,
+      combatStartMessageId,
+    );
   }, [
     pendingEncounter,
     partyMembers,
@@ -8761,7 +9770,9 @@ function GameSurfaceComponent({
     chatMeta.gameNpcs,
     characters,
     characterMap,
+    combatStartMessageId,
     npcs,
+    startBattleParty,
     transitionGameState,
     sessionNumber,
   ]);
@@ -8802,6 +9813,12 @@ function GameSurfaceComponent({
       : [];
     const findGameCard = (name: string) =>
       findNamedEntry(gameCharCards, name, (card) => (typeof card.name === "string" ? card.name : null));
+    // What each member carries, read off their own bag: the player's is every stack with no holder.
+    const bags = gameInventoryBags(inventoryItems);
+    const bagInventory = (holder: string | undefined) =>
+      (bags.find((bag) => gameInventoryBagKey(bag.holder) === gameInventoryBagKey(holder))?.items ?? []).map(
+        (item) => ({ name: item.name, quantity: item.quantity }),
+      );
 
     // Build base cards from character data — name and avatar only.
     // Subtitle, status, stats, etc. come exclusively from the game snapshot.
@@ -8814,8 +9831,10 @@ function GameSurfaceComponent({
       const name = c?.name ?? npc?.name ?? "";
       if (!name) continue;
       const gc = findGameCard(name);
+      const carried = bagInventory(name);
       cards[charId] = {
         title: name,
+        ...(carried.length > 0 ? { inventory: carried } : {}),
         subtitle: npc?.location || undefined,
         status: npc?.description || undefined,
         avatarUrl: c?.avatarUrl ?? npc?.avatarUrl ?? null,
@@ -8863,6 +9882,7 @@ function GameSurfaceComponent({
             ? (pc.stats ?? []).map((s) => ({ name: s.name, value: s.value, max: s.max, color: s.color }))
             : existing?.stats,
         customFields: pc.customFields || existing?.customFields,
+        inventory: existing?.inventory,
         gameCard: existing?.gameCard,
       };
     }
@@ -8898,11 +9918,7 @@ function GameSurfaceComponent({
             color: s.color,
           })),
         ],
-        inventory: (gameSnapshot?.playerStats?.inventory ?? []).map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          location: item.location,
-        })),
+        inventory: bagInventory(undefined),
         gameCard: gc
           ? {
               shortDescription: (gc.shortDescription as string) || "",
@@ -8912,8 +9928,7 @@ function GameSurfaceComponent({
               weaknesses: (gc.weaknesses as string[]) || [],
               extra: (gc.extra as Record<string, string>) || {},
               rpgStats: gc.rpgStats as
-                | { attributes: Array<{ name: string; value: number }>; hp: { value: number; max: number } }
-                | undefined,
+                { attributes: Array<{ name: string; value: number }>; hp: { value: number; max: number } } | undefined,
             }
           : undefined,
       };
@@ -8939,16 +9954,12 @@ function GameSurfaceComponent({
             color: s.color,
           })),
         ],
-        inventory: (gameSnapshot?.playerStats?.inventory ?? []).map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          location: item.location,
-        })),
+        inventory: bagInventory(undefined),
       };
     }
 
     return cards;
-  }, [chatCharacterIds, chatMeta, gameSnapshot, personaInfo, characters, npcs, sessionNumber]);
+  }, [chatCharacterIds, chatMeta, gameSnapshot, personaInfo, characters, npcs, sessionNumber, inventoryItems]);
 
   const handleSaveCharacterSheet = useCallback(
     async (cardTitle: string, gameCard: GameCharacterSheetGameCard | undefined) => {
@@ -9000,7 +10011,10 @@ function GameSurfaceComponent({
       const updatedCards = [...currentCards];
       if (sanitizedGameCard) {
         if (currentIndex >= 0) {
-          updatedCards[currentIndex] = sanitizedGameCard;
+          // This editor only knows the fields above. The game's copy of the ruleset sheet lives on
+          // the same card and is edited elsewhere, so it rides along instead of being dropped.
+          const rulesetSheet = currentCards[currentIndex]?.rulesetSheet;
+          updatedCards[currentIndex] = rulesetSheet ? { ...sanitizedGameCard, rulesetSheet } : sanitizedGameCard;
         } else {
           updatedCards.push(sanitizedGameCard);
         }
@@ -9025,14 +10039,193 @@ function GameSurfaceComponent({
     [activeChatId, chatMeta.gameCharacterCards, updateChatMetadata, localizeUi],
   );
 
+  // ── Ruleset sheets ──
+  // A game that pinned a ruleset carries a per-card BUILD on `gameCharacterCards[].rulesetSheet`
+  // and LIVE state in the game-state snapshot, so a swipe rewinds what was spent. The resolution
+  // itself (`gameRuleset`) is read further up, where battles start.
+  const { patchField: patchGameStateField } = useGameStatePatcher(activeChatId, "game-ruleset-sheet");
+
+  /** The stored card for a party card's title, matched exactly as `handleSaveCharacterSheet` does. */
+  const findStoredGameCard = useCallback(
+    (cardTitle: string) => {
+      const cards = Array.isArray(chatMeta.gameCharacterCards)
+        ? (chatMeta.gameCharacterCards as Array<Record<string, unknown>>)
+        : [];
+      const wanted = cardTitle.trim().toLowerCase();
+      return {
+        cards,
+        index: cards.findIndex((entry) => typeof entry.name === "string" && entry.name.toLowerCase() === wanted),
+      };
+    },
+    [chatMeta.gameCharacterCards],
+  );
+
+  const handleSaveRulesetSheet = useCallback(
+    async (cardTitle: string, envelope: RulesetSheetEnvelope) => {
+      // Every path that does not save REJECTS, so the sheet keeps the draft instead of closing the
+      // editor on edits that went nowhere.
+      if (!activeChatId) {
+        const message = localizeUi("game.ruleset.sheet.saveFailed", { name: cardTitle });
+        toast.error(message);
+        throw new Error(message);
+      }
+      const { cards, index } = findStoredGameCard(cardTitle);
+      // Sheets belong to cards the game already made. Creating one here would invent a party
+      // member, so an unmatched name is reported instead.
+      if (index < 0) {
+        const message = localizeUi("game.ruleset.sheet.noCard", { name: cardTitle });
+        toast.error(message);
+        throw new Error(message);
+      }
+      // Only `rulesetSheet` is touched: every other field on the card is the legacy editor's.
+      const updatedCards = cards.map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, rulesetSheet: envelope } : entry,
+      );
+      try {
+        await updateChatMetadata.mutateAsync({ id: activeChatId, gameCharacterCards: updatedCards });
+        toast.success(localizeUi("game.ruleset.sheet.saved", { name: cardTitle }));
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : localizeUi("game.ruleset.sheet.saveFailed", { name: cardTitle }),
+        );
+        throw error;
+      }
+    },
+    [activeChatId, findStoredGameCard, localizeUi, updateChatMetadata],
+  );
+
+  const handleRulesetLiveChange = useCallback(
+    (cardTitle: string, next: RulesetLiveState) => {
+      if (!activeChatId) return;
+      const key = normalizeCharacterLookupName(cardTitle);
+      if (!key) return;
+      // Read the snapshot at click time, not at render time: a turn's own sheet commands may have
+      // landed since this sheet was rendered, and they must not be written back out.
+      const current = useGameStateStore.getState().current;
+      // The patch replaces the WHOLE live object. Built from a snapshot that is missing, or that
+      // belongs to another chat, it would wipe every other character's state, so the edit is
+      // refused and said out loud instead.
+      if (current?.chatId !== activeChatId) {
+        toast.error(localizeUi("game.ruleset.sheet.stateNotReady"));
+        return;
+      }
+      const { [key]: _previous, ...others } = current.rulesetLive ?? {};
+      // The shared op normalises an untouched sheet back to `{}`; storing that would keep an empty
+      // entry per character forever.
+      patchGameStateField("rulesetLive", Object.keys(next).length > 0 ? { ...others, [key]: next } : others);
+    },
+    [activeChatId, localizeUi, patchGameStateField],
+  );
+
+  /** A rest from the in-game sheet, in a game whose ruleset has items: the server takes it, so the
+   *  charges it brings back to what the character carries are written with the sheet. Answers with
+   *  what the sheet shows after it, or null when it was not taken. */
+  const handleRulesetRest = useCallback(
+    async (cardTitle: string, rest: string): Promise<string | null> => {
+      if (!activeChatId) return null;
+      try {
+        // A sheet edit still waiting to be saved lands first, so the rest starts from it.
+        await flushGameStatePatch(activeChatId);
+        const rested = await sendInventory((chatId) =>
+          api.post<{
+            inventory: GameInventoryStack[];
+            rulesetLive: RulesetLiveStates;
+            now: string;
+            recharged: Array<{ item: string; now: number; max: number }>;
+            playerStats?: PlayerStats;
+          }>("/game/inventory/rest", { chatId, character: cardTitle, rest }),
+        );
+        if (!rested) return null;
+        return [
+          rested.now,
+          ...rested.recharged.map((entry) =>
+            localizeUi("game.ruleset.sheet.restRecharged", { item: entry.item, now: entry.now, max: entry.max }),
+          ),
+        ].join("; ");
+      } catch {
+        toast.error(localizeUi("game.ruleset.sheet.restFailed"));
+        return null;
+      }
+    },
+    [activeChatId, localizeUi, sendInventory],
+  );
+
+  const characterSheetRuleset = useMemo<GameCharacterSheetRuleset | undefined>(() => {
+    if (gameRuleset.status === "none" || gameRuleset.status === "loading") return undefined;
+    if (gameRuleset.status === "unavailable") return { status: "unavailable" };
+    const cardTitle = characterSheetCharId ? partyCards[characterSheetCharId]?.title : undefined;
+    if (!cardTitle) return undefined;
+    const { cards, index } = findStoredGameCard(cardTitle);
+    // A stored sheet this version cannot read is kept as it is. Showing the ruleset's defaults in
+    // its place would invite a Save that overwrites it, so the block says so and offers nothing.
+    const parsed = index >= 0 ? rulesetSheetEnvelopeSchema.safeParse(cards[index]?.rulesetSheet) : null;
+    if (parsed && !parsed.success && cards[index]?.rulesetSheet != null) return { status: "unreadable" };
+    // What this card holds, as the server reads it for checks and fights: the player's card the
+    // player's bag, every other card its own.
+    const items =
+      inventoryItemBook && rulesetReadsItems(gameRuleset.definition)
+        ? rulesetCardItems(
+            inventoryItemBook,
+            inventoryItems,
+            cards.flatMap((card) => (typeof card.name === "string" && card.name.trim() ? [card.name.trim()] : [])),
+            inventoryPlayerName,
+          )(cardTitle)
+        : undefined;
+    return {
+      status: "ok",
+      definition: gameRuleset.definition,
+      // What the pin turned on: the names the sheet heads itself with, and the record the catalog
+      // picker leaves hidden entries out by.
+      layers: gameRuleset.layers,
+      layerOptions: gameRuleset.layerOptions,
+      envelope: parsed?.success ? parsed.data : undefined,
+      live: gameSnapshot?.rulesetLive?.[normalizeCharacterLookupName(cardTitle)],
+      onLiveChange: (next) => handleRulesetLiveChange(cardTitle, next),
+      // Where the ruleset has items, a rest may bring charges back to what is carried.
+      ...(inventoryItemBook ? { onRest: (rest: string) => handleRulesetRest(cardTitle, rest) } : {}),
+      onEnvelopeSave: (next) => handleSaveRulesetSheet(cardTitle, next),
+      ...(items ? { items } : {}),
+    };
+  }, [
+    characterSheetCharId,
+    findStoredGameCard,
+    gameRuleset,
+    gameSnapshot?.rulesetLive,
+    handleRulesetLiveChange,
+    handleRulesetRest,
+    handleSaveRulesetSheet,
+    inventoryItemBook,
+    inventoryItems,
+    inventoryPlayerName,
+    partyCards,
+  ]);
+
+  // Keep the last settled transcript visible until generation and its scene/agent
+  // pipeline are finished. Query refreshes may expose the durable assistant row
+  // before those later stages settle, which otherwise previews the next segment.
+  const narrationUpdatesBlocked =
+    gameInputGenerationBlocked ||
+    sequentialGameMediaPending ||
+    scenePreparing ||
+    sceneAnalysis.isPending ||
+    assetGenerationBlocksScene;
+  const [settledNarrationSource, setSettledNarrationSource] = useState({ chatId: activeChatId, messages });
+  useEffect(() => {
+    if (narrationUpdatesBlocked) return;
+    const timer = window.setTimeout(() => setSettledNarrationSource({ chatId: activeChatId, messages }), 0);
+    return () => window.clearTimeout(timer);
+  }, [activeChatId, messages, narrationUpdatesBlocked]);
+  const visibleNarrationMessages =
+    settledNarrationSource.chatId === activeChatId ? settledNarrationSource.messages : messages;
+
   // Map narration messages with character names
   const narrationMessages = useMemo(
     () =>
-      messages.map((m) => ({
+      visibleNarrationMessages.map((m) => ({
         ...m,
         characterName: m.characterId ? characterMap.get(m.characterId)?.name : undefined,
       })),
-    [messages, characterMap],
+    [visibleNarrationMessages, characterMap],
   );
 
   const sessionStatus = (chatMeta.gameSessionStatus as string) || "active";
@@ -9249,8 +10442,8 @@ function GameSurfaceComponent({
   );
 
   const handleDismissDice = useCallback(() => {
-    setDiceRollResult(null);
-  }, [setDiceRollResult]);
+    dismissDiceRollResult();
+  }, [dismissDiceRollResult]);
 
   const handleChoiceSelect = useCallback(
     (choice: string) => {
@@ -9462,7 +10655,6 @@ function GameSurfaceComponent({
         }
       }
       setActiveChoices(null);
-      setDiceRollResult(null);
       const succeeded = await sendMessage(message, attachments, options?.pendingSpatialTransition);
       if (succeeded !== false && options?.commitPendingMove && pendingMapMove) {
         setPendingMapMove(null);
@@ -9479,22 +10671,10 @@ function GameSurfaceComponent({
       pendingMapMove,
       sendMessage,
       sessionInteractive,
-      setDiceRollResult,
       updateMessage,
       localizeUi,
     ],
   );
-
-  useEffect(() => {
-    setPendingMapMove(null);
-    setViewedMapId(null);
-    setCombatStartMessageId(null);
-    setQueuedCombatGeneration(null);
-    setCombatGenerationPending(false);
-    setCombatItemEffects([]);
-    setCombatMechanics([]);
-    setCombatDialogueCues([]);
-  }, [activeChatId]);
 
   useEffect(() => {
     if (!viewedMapId) return;
@@ -9615,9 +10795,16 @@ function GameSurfaceComponent({
     setCombatParty(null);
     setCombatEnemies(null);
     setCombatSceneMeta(null);
+    setCombatPinnedStyle(null);
+    setCombatMusicTier(null);
     setPendingEncounter(null);
     setQueuedEncounter(null);
     setQueuedCombatGeneration(null);
+    // #5094: abandon any in-flight combat generation here — clear the lock so a fresh request isn't
+    // blocked by it, and bump the request id so the old generation's stale completion can't re-queue
+    // combat, apply state, or set an error against the reset combat state.
+    combatGenerationInFlightRef.current = false;
+    combatGenerationRequestIdRef.current += 1;
     setCombatGenerationPending(false);
     setCombatItemEffects([]);
     setCombatMechanics([]);
@@ -9626,6 +10813,8 @@ function GameSurfaceComponent({
     setCombatStartMessageId(null);
     appliedCombatStatusMessageIdsRef.current.clear();
     appliedCombatElementMessageIdsRef.current.clear();
+    // The fight is being undone, so nothing is written to the sheets and nothing is remembered.
+    rulesetBattleSeedsRef.current = null;
     useGameModeStore.getState().setGameState("exploration");
     if (activeChatId) {
       transitionGameState.mutate({ chatId: activeChatId, newState: "exploration" });
@@ -9639,12 +10828,27 @@ function GameSurfaceComponent({
     setCombatEnemies(nextEnemies);
   }, []);
 
+  const handleTacticalBattlefieldReady = useCallback((accepted: TacticalCombatState) => {
+    setCombatSceneMeta((current) => ({
+      environment: current?.environment ?? "",
+      environmentType: accepted.environment ?? null,
+      formation: accepted.formation ?? null,
+      battlefield: accepted.battlefield?.brief ?? null,
+      battlefieldError: null,
+      styleNotes: current?.styleNotes ?? null,
+    }));
+  }, []);
+
   // Combat end handler — clear combat state and notify GM
   const handleCombatEnd = useCallback(
     (outcome: "victory" | "defeat" | "flee", summary: CombatSummary) => {
+      // The message that started the fight names it, so a win reported twice drops its loot once.
+      const fightKey = combatStartMessageId;
       setCombatParty(null);
       setCombatEnemies(null);
       setCombatSceneMeta(null);
+      setCombatPinnedStyle(null);
+      setCombatMusicTier(null);
       setQueuedCombatGeneration(null);
       setCombatGenerationPending(false);
       setCombatItemEffects([]);
@@ -9666,75 +10870,178 @@ function GameSurfaceComponent({
         clearCombatSnapshot(activeChatId);
       }
 
-      // Build a compact, model-friendly recap so the GM can narrate the aftermath.
-      const defeatedEnemies = summary.enemies.filter((e) => e.defeated).map((e) => e.name);
-      const survivingEnemies = summary.enemies.filter((e) => !e.defeated);
-      const partyStatus = summary.party.map((p) => {
-        const hpPct = p.maxHp > 0 ? Math.round((p.hp / p.maxHp) * 100) : 0;
-        const effects = p.statusEffects.length > 0 ? ` [${p.statusEffects.join(", ")}]` : "";
-        const ko = p.ko ? " KO" : "";
-        return `${p.name}: ${p.hp}/${p.maxHp} HP (${hpPct}%)${effects}${ko}`;
-      });
-      const lootText =
-        summary.loot && summary.loot.length > 0
-          ? summary.loot.map((l) => (l.quantity && l.quantity > 1 ? `${l.name} ×${l.quantity}` : l.name)).join(", ")
-          : "";
-
-      // Flee on round 1 means no round actually resolved — phrase it accordingly.
-      const roundsPhrase =
-        outcome === "flee" && summary.rounds <= 1
-          ? "before combat began"
-          : `after ${summary.rounds} round${summary.rounds === 1 ? "" : "s"}`;
-
-      const recapLines: string[] = [];
-      recapLines.push(`OUTCOME: ${outcome.toUpperCase()} (${roundsPhrase})`);
-      if (defeatedEnemies.length > 0) recapLines.push(`Defeated: ${defeatedEnemies.join(", ")}`);
-      if (survivingEnemies.length > 0) {
-        recapLines.push(`Survived: ${survivingEnemies.map((e) => `${e.name} (${e.hp}/${e.maxHp} HP)`).join(", ")}`);
+      // Tell the sheets what the fight cost, before the recap goes out, so the Game Master's next
+      // turn and the sheet on screen agree about what is left. A battle abandoned without ending
+      // (the empty-party guard, deleting the turn that started it) never reaches here and writes
+      // nothing back, because that fight did not happen.
+      const rulesetDefinition = gameRuleset.status === "ok" ? gameRuleset.definition : null;
+      // A fight the ruleset resolved already wrote every accepted step to the sheets as it happened,
+      // so there is nothing to write back here and nothing to measure against a seed: its own lines
+      // below say what it ended on, in its own pool and its own condition names.
+      const fought =
+        rulesetDefinition && summary.ruleset ? { definition: rulesetDefinition, ruleset: summary.ruleset } : null;
+      // Plain English, like every other line of the recap: it is a prompt, not UI copy.
+      let sheetRecapLine: string | null = null;
+      if (rulesetDefinition?.battle && !fought) {
+        const current = useGameStateStore.getState().current;
+        // The patch replaces the WHOLE live object, so a snapshot that is missing or belongs to
+        // another chat would wipe every character's state. `handleRulesetLiveChange` refuses on
+        // exactly the same test; here the fight is already over, so it is said to the console.
+        if (current?.chatId !== activeChatId) {
+          console.warn("[game-ruleset] Game state was not ready, so the battle was not written to the sheets");
+        } else {
+          const written = applyRulesetBattleResult(
+            rulesetDefinition,
+            chatMeta.gameCharacterCards,
+            current.rulesetLive,
+            rulesetBattleSeedsRef.current,
+            summary.party,
+            personaInfo?.name,
+          );
+          for (const refusal of written.refused) {
+            console.warn("[game-ruleset] A sheet refused part of the battle result", refusal);
+          }
+          // The battle already showed the change, so a sheet that did not take it has to be said
+          // out loud, the way a refused sheet command from the Game Master is.
+          if (written.refused.length > 0) {
+            const names = [...new Set(written.refused.map((refusal) => refusal.name))];
+            toast.warning(localizeUi("game.ruleset.battle.writeBackRefused", { names: names.join(", ") }));
+          }
+          if (written.live) patchGameStateField("rulesetLive", written.live);
+          if (written.updated.length > 0) {
+            sheetRecapLine = `Sheets: the ${rulesetDefinition.name} sheets for ${written.updated.join(", ")} were updated with what this battle cost. Do not change those numbers again.`;
+          }
+        }
       }
-      recapLines.push(`Party: ${partyStatus.join("; ")}`);
-      if (lootText) recapLines.push(`Loot: ${lootText}`);
-      else
-        recapLines.push(
-          'Rewards: If a reward is narratively appropriate, decide it now and add it with [inventory: action="add" item="..."].',
-        );
+      rulesetBattleSeedsRef.current = null;
 
-      const recap = recapLines.join("\n");
-      let prefix: string;
-      if (outcome === "victory") prefix = "*The battle is won.*";
-      else if (outcome === "defeat") prefix = "*The party has been defeated...*";
-      else prefix = "*The party flees from battle!*";
+      // A won fight drops its loot into the bags before the recap goes out, so the Game Master is told
+      // what is already there. A directed fight dropped its own on the step that won it, and its
+      // summary says so even when that was nothing; one played on the screen alone asks for it now,
+      // known by the message that started it. Without that message it cannot be dropped only once, so
+      // it is not asked for, and the Game Master decides the reward as before.
+      const endedIn = activeChatId;
+      const fallen = summary.enemies.filter((enemy) => enemy.defeated).length;
+      const looted: Promise<CombatSummary["loot"]> =
+        outcome !== "victory" || summary.loot !== undefined || fallen === 0 || !endedIn || !fightKey
+          ? Promise.resolve(summary.loot)
+          : sendInventory((chatId) =>
+              api.post<{ loot: NonNullable<CombatSummary["loot"]>; inventory: GameInventoryStack[] }>(
+                "/game/inventory/loot",
+                { chatId, fight: fightKey, defeated: Math.min(20, fallen) },
+              ),
+            )
+              .then((answer) => answer?.loot)
+              .catch(() => undefined);
+      const tellCombatEnd = (loot: CombatSummary["loot"]) => {
+        // Build a compact, model-friendly recap so the GM can narrate the aftermath.
+        const defeatedEnemies = summary.enemies.filter((e) => e.defeated).map((e) => e.name);
+        const survivingEnemies = summary.enemies.filter((e) => !e.defeated);
+        const partyStatus = summary.party.map((p) => {
+          const hpPct = p.maxHp > 0 ? Math.round((p.hp / p.maxHp) * 100) : 0;
+          const effects = p.statusEffects.length > 0 ? ` [${p.statusEffects.join(", ")}]` : "";
+          const ko = p.ko ? " KO" : "";
+          const resources = [
+            p.mp !== undefined ? `${p.mp}/${p.maxMp ?? p.mp} MP` : "",
+            p.spellSlots ? `remaining spell slots ${JSON.stringify(p.spellSlots)}` : "",
+          ]
+            .filter(Boolean)
+            .join(", ");
+          return `${p.name}: ${p.hp}/${p.maxHp} HP (${hpPct}%)${resources ? `; ${resources}` : ""}${effects}${ko}`;
+        });
+        const count = (name: string, quantity?: number) => (quantity && quantity > 1 ? `${name} ×${quantity}` : name);
+        const lootText = (loot ?? [])
+          .filter((drop) => (drop.quantity ?? 1) > 0)
+          .map((drop) => count(drop.name, drop.quantity))
+          .join(", ");
+        const leftText = (loot ?? [])
+          .filter((drop) => (drop.left ?? 0) > 0)
+          .map((drop) => count(drop.name, drop.left))
+          .join(", ");
+        // Only a player still looking at this chat is shown what dropped.
+        if (lootText && useChatStore.getState().activeChatId === endedIn) {
+          showInventoryNotification(localizeUi("ui.game.gamesurfacecomponent.lootDropped", { items: lootText }), true);
+        }
 
-      // Wrap the recap in a clearly-labelled block so the GM treats it as canonical combat
-      // context (the core prompt rule teaches how to narrate it). The block is stripped from
-      // the user-visible bubble by stripGmTags / stripGmTagsKeepReadables, leaving only the
-      // cosmetic italic prefix. State is flipped above via transitionGameState so no
-      // [state:] tag is needed here.
-      sendMessage(`${prefix}\n\n[combat_result]\n${recap}\n[/combat_result]`);
+        // Flee on round 1 means no round actually resolved — phrase it accordingly.
+        const rounds = fought ? fought.ruleset.rounds : summary.rounds;
+        const roundsPhrase =
+          outcome === "flee" && rounds <= 1 ? "before combat began" : `after ${rounds} round${rounds === 1 ? "" : "s"}`;
 
-      // Journal: record combat outcome. The server's addCombatEntry only persists
-      // (description, outcome) into JournalEntry.content, so fold the structured recap
-      // into the description itself to preserve rounds / party status for players.
-      const journalDescLines: string[] = [];
-      if (outcome === "victory") journalDescLines.push(`Victory (${roundsPhrase})`);
-      else if (outcome === "defeat") journalDescLines.push(`The party was defeated (${roundsPhrase})`);
-      else journalDescLines.push(`The party fled from battle (${roundsPhrase})`);
-      if (defeatedEnemies.length > 0) journalDescLines.push(`Defeated: ${defeatedEnemies.join(", ")}`);
-      journalDescLines.push(`Party status: ${partyStatus.join("; ")}`);
-      if (lootText) journalDescLines.push(`Loot: ${lootText}`);
+        const recapLines: string[] = [];
+        recapLines.push(`OUTCOME: ${outcome.toUpperCase()} (${roundsPhrase})`);
+        if (defeatedEnemies.length > 0) recapLines.push(`Defeated: ${defeatedEnemies.join(", ")}`);
+        if (survivingEnemies.length > 0 && !fought) {
+          recapLines.push(`Survived: ${survivingEnemies.map((e) => `${e.name} (${e.hp}/${e.maxHp} HP)`).join(", ")}`);
+        }
+        // The ruleset's own numbers in place of the percentage lines: the fight was not fought on a
+        // share of a maximum, so the Game Master is never shown one.
+        if (fought) recapLines.push(...rulesetCombatRecapLines(fought.definition, fought.ruleset));
+        else recapLines.push(`Party: ${partyStatus.join("; ")}`);
+        if (sheetRecapLine) recapLines.push(sheetRecapLine);
+        if (summary.battlefieldSummary?.trim()) recapLines.push(`Battlefield: ${summary.battlefieldSummary.trim()}`);
+        // What dropped is already in the bags, so the Game Master narrates it and never adds it again.
+        if (lootText) recapLines.push(`Loot (already in the party's bags): ${lootText}`);
+        if (leftText) recapLines.push(`Left behind (nobody could carry it): ${leftText}`);
+        if (!lootText && !leftText)
+          recapLines.push(
+            'Rewards: If a reward is narratively appropriate, decide it now and add it with [inventory: action="add" item="..."].',
+          );
 
-      api
-        .post("/game/journal/entry", {
-          chatId: activeChatId,
-          type: "combat",
-          data: {
-            description: journalDescLines.join(" — "),
-            outcome: outcome === "flee" ? "fled" : outcome,
-          },
-        })
-        .catch(() => {});
+        const recap = recapLines.join("\n");
+        let prefix: string;
+        if (outcome === "victory") prefix = "*The battle is won.*";
+        else if (outcome === "defeat") prefix = "*The party has been defeated...*";
+        else prefix = "*The party flees from battle!*";
+
+        // Wrap the recap in a clearly-labelled block so the GM treats it as canonical combat
+        // context (the core prompt rule teaches how to narrate it). The block is stripped from
+        // the user-visible bubble by stripGmTags / stripGmTagsKeepReadables, leaving only the
+        // cosmetic italic prefix. State is flipped above via transitionGameState so no
+        // [state:] tag is needed here.
+        sendMessage(`${prefix}\n\n[combat_result]\n${recap}\n[/combat_result]`);
+
+        // Journal: record combat outcome. The server's addCombatEntry only persists
+        // (description, outcome) into JournalEntry.content, so fold the structured recap
+        // into the description itself to preserve rounds / party status for players.
+        const journalDescLines: string[] = [];
+        if (outcome === "victory") journalDescLines.push(`Victory (${roundsPhrase})`);
+        else if (outcome === "defeat") journalDescLines.push(`The party was defeated (${roundsPhrase})`);
+        else journalDescLines.push(`The party fled from battle (${roundsPhrase})`);
+        if (defeatedEnemies.length > 0) journalDescLines.push(`Defeated: ${defeatedEnemies.join(", ")}`);
+        journalDescLines.push(`Party status: ${partyStatus.join("; ")}`);
+        if (lootText) journalDescLines.push(`Loot: ${lootText}`);
+
+        api
+          .post("/game/journal/entry", {
+            chatId: activeChatId,
+            type: "combat",
+            data: {
+              description: journalDescLines.join(" — "),
+              outcome: outcome === "flee" ? "fled" : outcome,
+            },
+          })
+          .catch(() => {});
+      };
+      // The recap belongs to the chat the fight ended in, whichever one is open by then (`sendMessage`
+      // keeps that chat): without it the Game Master never learns the outcome, and reopening the chat
+      // would start the same fight again.
+      void looted.then(tellCombatEnd);
     },
-    [sendMessage, activeChatId, clearCombatSnapshot, transitionGameState],
+    [
+      sendMessage,
+      activeChatId,
+      combatStartMessageId,
+      sendInventory,
+      showInventoryNotification,
+      chatMeta.gameCharacterCards,
+      clearCombatSnapshot,
+      gameRuleset,
+      localizeUi,
+      patchGameStateField,
+      personaInfo?.name,
+      transitionGameState,
+    ],
   );
 
   // Toggle audio mute
@@ -9790,94 +11097,6 @@ function GameSurfaceComponent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close volume popover on outside click
-  useEffect(() => {
-    if (!volumePopoverOpen) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (target instanceof Element && target.closest(CHAT_FLOATING_PANEL_SELECTOR)) return;
-      const inDesktopPopover = volumePopoverRef.current?.contains(target) ?? false;
-      const inMobilePopover = mobileVolumePopoverRef.current?.contains(target) ?? false;
-      if (!inDesktopPopover && !inMobilePopover) {
-        setVolumePopoverOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", handler);
-    return () => document.removeEventListener("pointerdown", handler);
-  }, [volumePopoverOpen]);
-
-  useEffect(() => {
-    if (!retryMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (target instanceof Element && target.closest(CHAT_FLOATING_PANEL_SELECTOR)) return;
-      if (retryMenuRef.current && !retryMenuRef.current.contains(target)) {
-        setRetryMenuOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", handler);
-    return () => document.removeEventListener("pointerdown", handler);
-  }, [retryMenuOpen]);
-
-  useEffect(() => {
-    if (!sessionPanelOpen && !gameAssetsPanelOpen) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (target instanceof Element && target.closest(CHAT_FLOATING_PANEL_SELECTOR)) return;
-      const inSessionPanel =
-        (sessionPanelRef.current?.contains(target) ?? false) ||
-        (mobileSessionPanelRef.current?.contains(target) ?? false);
-      const inAssetsPanel =
-        (gameAssetsPanelRef.current?.contains(target) ?? false) ||
-        (mobileGameAssetsPanelRef.current?.contains(target) ?? false);
-      if (sessionPanelOpen && !inSessionPanel) {
-        setSessionPanelOpen(false);
-      }
-      if (gameAssetsPanelOpen && !inAssetsPanel) {
-        setGameAssetsPanelOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", handler);
-    return () => document.removeEventListener("pointerdown", handler);
-  }, [gameAssetsPanelOpen, sessionPanelOpen]);
-
-  const handleOpenSessionPanel = useCallback(
-    (tab: "history" | "journal" = "history", event?: ReactMouseEvent<HTMLElement>) => {
-      const nextOpen = tab === sessionPanelTab ? !sessionPanelOpen : true;
-      if (nextOpen) dismissOtherFloatingWindows();
-      closeChatDrawers();
-      setSessionPanelTab(tab);
-      setSessionPanelOpen(nextOpen);
-      setMobileSessionPanelAnchor(nextOpen ? readFloatingPanelAnchor(event) : null);
-      setGameAssetsPanelOpen(false);
-      setMobileGameAssetsPanelAnchor(null);
-      setRetryMenuOpen(false);
-      setMobileRetryMenuOpen(false);
-      setMobileRetryMenuAnchor(null);
-      setVolumePopoverOpen(false);
-      setMobileVolumePopoverAnchor(null);
-    },
-    [closeChatDrawers, dismissOtherFloatingWindows, readFloatingPanelAnchor, sessionPanelOpen, sessionPanelTab],
-  );
-
-  const handleOpenGameAssetsPanel = useCallback(
-    (event?: ReactMouseEvent<HTMLElement>) => {
-      const nextOpen = !gameAssetsPanelOpen;
-      if (nextOpen) dismissOtherFloatingWindows();
-      closeChatDrawers();
-      setGameAssetsPanelOpen(nextOpen);
-      setMobileGameAssetsPanelAnchor(nextOpen ? readFloatingPanelAnchor(event) : null);
-      setSessionPanelOpen(false);
-      setMobileSessionPanelAnchor(null);
-      setRetryMenuOpen(false);
-      setMobileRetryMenuOpen(false);
-      setMobileRetryMenuAnchor(null);
-      setVolumePopoverOpen(false);
-      setMobileVolumePopoverAnchor(null);
-    },
-    [closeChatDrawers, dismissOtherFloatingWindows, gameAssetsPanelOpen, readFloatingPanelAnchor],
-  );
-
   const handleBranchMessage = useCallback(
     (messageId: string) => {
       if (!activeChatId || branchChat.isPending) return;
@@ -9908,7 +11127,6 @@ function GameSurfaceComponent({
   // Retry scene analysis for the latest message
   const handleRetryScene = useCallback(() => {
     if (!sceneAnalysisEnabled || !latestAssistantMsg?.content) return;
-    setRetryMenuOpen(false);
     const onSuccess = applySceneResultRef.current;
     if (!onSuccess) return;
 
@@ -9945,6 +11163,7 @@ function GameSurfaceComponent({
       recentMusic: recentMusicHistoryRef.current,
       currentAmbient: useGameAssetStore.getState().currentAmbient,
       currentLocation: gameSnapshot?.location ?? null,
+      enemyTier: combatMusicTier,
       currentWeather: gameSnapshot?.weather ?? null,
       currentTimeOfDay: gameSnapshot?.time ?? metaTime ?? null,
       genre: (setupConfig?.genre as string | undefined) ?? null,
@@ -9970,7 +11189,7 @@ function GameSurfaceComponent({
       );
     } else {
       sceneAnalysis.mutate(
-        { narration: tags.cleanContent, context },
+        { ownerChatId: activeChatId, narration: tags.cleanContent, context },
         {
           onSuccess: (result) => {
             onSuccess(result);
@@ -9982,6 +11201,7 @@ function GameSurfaceComponent({
     }
   }, [
     assistantTurnCount,
+    combatMusicTier,
     latestAssistantMsg,
     scopedAssetMap,
     gameState,
@@ -10016,19 +11236,26 @@ function GameSurfaceComponent({
   }, [hudWidgets]);
 
   const handleStartGameRequest = useCallback(() => {
-    if (startGame.isPending || startGameRequested || startGameGuardRef.current) return;
+    if (experienceStartupBlocked || startGame.isPending || startGameRequested || startGameGuardRef.current) return;
     if (normalizedWidgets.length > 0) {
       setPrepareInitialWidgetsOpen(true);
       return;
     }
     handleStartGameNow();
-  }, [handleStartGameNow, normalizedWidgets.length, startGame.isPending, startGameRequested]);
+  }, [experienceStartupBlocked, handleStartGameNow, normalizedWidgets.length, startGame.isPending, startGameRequested]);
 
   useEffect(() => {
     if (combatUiActive || normalizedWidgets.length === 0) {
-      compactHudWidgetsRef.current = false;
+      // Reset to the same width heuristic the state initializes with, NOT a
+      // flat false: widgets arrive after the queries resolve, and a false
+      // reset here mounts the (CSS-hidden) desktop widget rail on mobile for
+      // the frames until updateWidgetLayout measures — long enough on a slow
+      // device for both the mobile and desktop copies of a widget to coexist
+      // in the DOM (#5618).
+      const compactByWidth = typeof window !== "undefined" && window.innerWidth < 768;
+      compactHudWidgetsRef.current = compactByWidth;
       compactHudReleaseWidthRef.current = null;
-      setCompactHudWidgets(false);
+      setCompactHudWidgets(compactByWidth);
       return;
     }
 
@@ -10102,7 +11329,13 @@ function GameSurfaceComponent({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", scheduleWidgetLayoutUpdate);
     };
-  }, [combatUiActive, normalizedWidgets.length]);
+    // hudSurfaceEl is a dependency so the measurement and the ResizeObserver are
+    // re-established when the surface mounts. Without it, widgets that hydrate
+    // while the messages-loading branch is showing leave the layout unmeasured
+    // with no observer attached, so every compact decision that depends on the
+    // overlap estimate rather than the width shortcut above stays wrong until a
+    // window resize happens to run the measurement again (#5654).
+  }, [combatUiActive, hudSurfaceEl, normalizedWidgets.length]);
 
   const effectiveBackgroundTag = replayActive ? replayBackgroundTag : currentBackground;
 
@@ -10227,7 +11460,10 @@ function GameSurfaceComponent({
   if (isMessagesLoading && !needsCreation && sessionStatus !== "setup" && !isSetupActive) {
     return (
       <>
-        <div className="flex h-full items-center justify-center bg-[var(--background)] dark:bg-black/80">
+        <div
+          data-component="GameSurface.MessagesLoading"
+          className="flex h-full items-center justify-center bg-[var(--background)] dark:bg-black/80"
+        >
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--muted)]/40 border-t-[var(--foreground)]/70 dark:border-white/20 dark:border-t-white/70" />
         </div>
         {imagePromptReviewModal}
@@ -10262,8 +11498,7 @@ function GameSurfaceComponent({
       }
     };
 
-    /** Renders the built-in wizard with the given Experiences block injected into its first step. */
-    const classicSetup = (experiencesSlot: ReactNode) => (
+    const classicSetup = (
       <>
         <Suspense
           fallback={
@@ -10273,7 +11508,10 @@ function GameSurfaceComponent({
           }
         >
           <GameSetupWizard
-            experiencesSlot={experiencesSlot}
+            activeChatId={activeChatId}
+            isNewGame={needsCreation}
+            chatMetadata={chatMeta}
+            onSetupError={handleJsonRepairError}
             onComplete={(config, preferences, conns, wizardGameName, mapPlan) => {
               const queueSetupMapPlan = (chatId: string) => {
                 if (activeChatIdRef.current !== chatId) return false;
@@ -10386,7 +11624,7 @@ function GameSurfaceComponent({
             }
             isDraftingMap={generateSetupMapDraft.isPending}
             isLinkingSharedWorld={Boolean(activePendingSharedWorldSetupApply)}
-            characters={characters}
+            characters={libraryCharacters}
             initialPartyCharacterIds={initialSetupPartyCharacterIds}
           />
           {activePendingSharedWorldSetupApply ? (
@@ -10440,17 +11678,10 @@ function GameSurfaceComponent({
         {imagePromptReviewModal}
       </>
     );
-    // The chooser renders the built-in wizard until an experience is activated, then hands it the body.
     return (
       <>
-        <NewGameExperienceChooser
-          activeChatId={activeChatId}
-          onCancelSetup={dismissSetupWizard}
-          onSetupError={handleJsonRepairError}
-          renderClassicWizard={(experiencesSlot) => classicSetup(experiencesSlot)}
-        />
-        {/* Mounted OUTSIDE the chooser so it is reachable from both setup paths — an experience draws its
-            own wizard body, and a malformed-JSON opening has to stay repairable there too. */}
+        {classicSetup}
+        {/* Shared by the normal wizard and legacy Experience setup. */}
         <GameJsonRepairModal
           request={jsonRepairRequest}
           onClose={() => setJsonRepairRequest(null)}
@@ -10488,7 +11719,30 @@ function GameSurfaceComponent({
       "flex items-center gap-2 rounded-lg bg-[var(--muted)]/30 px-4 py-2 text-xs text-[var(--foreground)]/70 transition-colors hover:bg-[var(--muted)]/50 hover:text-[var(--foreground)] dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20 dark:hover:text-white";
     return (
       <>
-        <div className="flex h-full items-center justify-center overflow-hidden bg-[var(--background)] dark:bg-black/80 p-6">
+        <div className="relative flex h-full items-center justify-center overflow-hidden bg-[var(--background)] dark:bg-black/80 p-6">
+          {experiencePreparesBeforeStart && experienceSurfaceId && (
+            // ponytail: reuse the package's idempotent mount when Continue opens the normal surface;
+            // a shared persistent slot is only needed if an Experience cannot retain its prepared world.
+            <div className={cn("absolute inset-0 z-30", !experienceStartupBlocked && "hidden")}>
+              <CapabilityElement
+                packageId={experienceSurfaceId}
+                view="surface"
+                capabilityProps={experienceSurfaceProps}
+                className={cn("block h-full w-full", experienceSurfaceClass)}
+                onHostError={handleStartupHostError}
+              />
+              {experienceStartupInvalid && (
+                <p
+                  role="alert"
+                  className="absolute inset-x-3 bottom-3 z-50 rounded-lg border border-[var(--destructive)] bg-[var(--card)] p-3 text-sm text-[var(--card-foreground)]"
+                >
+                  {localizeUi("game.experienceStartup.invalidContext", {
+                    count: EXPERIENCE_STARTUP_CONTEXT_MAX_LENGTH,
+                  })}
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex max-h-full max-w-lg flex-col items-center gap-6 text-center">
             {/* Genre / Setting tag */}
             {setupConfig && (
@@ -10510,6 +11764,11 @@ function GameSurfaceComponent({
 
             {/* Start button or generating indicator */}
             <div className="flex w-full flex-shrink-0 flex-col items-center gap-4">
+              {experienceStartupBlocked && (
+                <p role="status" className="text-sm text-[var(--foreground)]">
+                  {localizeUi("game.experienceStartup.preparing")}
+                </p>
+              )}
               <label className="flex w-full max-w-sm flex-col gap-1.5 text-left">
                 <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--muted-foreground)] dark:text-white/50">
                   <Plug size={12} />
@@ -10601,7 +11860,11 @@ function GameSurfaceComponent({
                   )}
                   {/* Show retry when generation stopped but no content arrived. */}
                   {!isStreaming && !hasEverHadPlayableContent && !startGame.isPending && (
-                    <button onClick={generateInitialGameTurn} className={SURFACE_BTN}>
+                    <button
+                      onClick={generateInitialGameTurn}
+                      disabled={experienceStartupBlocked}
+                      className={SURFACE_BTN}
+                    >
                       <RefreshCw size={14} />
                       {localizeUi("ui.game.gamesurfacecomponent.retry")}
                     </button>
@@ -10613,7 +11876,7 @@ function GameSurfaceComponent({
                     audioManager.unlock();
                     handleStartGameRequest();
                   }}
-                  disabled={startGame.isPending || startGameRequested}
+                  disabled={experienceStartupBlocked || startGame.isPending || startGameRequested}
                   className="group flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-semibold text-zinc-100 ring-1 ring-zinc-700/80 transition-all hover:scale-105 hover:bg-zinc-800 hover:shadow-lg hover:shadow-black/25 disabled:opacity-50 disabled:hover:scale-100"
                 >
                   <Play size={18} className="transition-transform group-hover:scale-110" />
@@ -10633,7 +11896,7 @@ function GameSurfaceComponent({
             setPrepareInitialWidgetsOpen(false);
             handleStartGameNow();
           }}
-          isStartingSession={startGame.isPending || startGameRequested}
+          isStartingSession={experienceStartupBlocked || startGame.isPending || startGameRequested}
         />
         {imagePromptReviewModal}
         {widgetSessionPrepModal}
@@ -10659,51 +11922,18 @@ function GameSurfaceComponent({
     handleStartNewSession();
   };
 
-  const renderSessionPanel = (mobile = false) => {
-    const panel = (
-      <div
-        data-chat-floating-panel
-        className={cn(
-          ROLEPLAY_POPOVER_SHELL,
-          "flex min-h-0 flex-col overflow-hidden",
-          mobile
-            ? GAME_MOBILE_FLOATING_PANEL
-            : "absolute right-0 top-9 z-50 h-[min(42rem,calc(100dvh-6rem))] w-[min(42rem,calc(100vw-1.5rem))]",
-        )}
-        style={mobile ? getGameMobileFloatingPanelStyle(mobileSessionPanelAnchor) : undefined}
-      >
-        <div className={cn(ROLEPLAY_POPOVER_HEADER, "flex items-start gap-3")}>
-          <div className="min-w-0 flex-1">
-            <div className={ROLEPLAY_POPOVER_TITLE}>
-              <Feather size="0.8rem" className="shrink-0 text-[var(--muted-foreground)]" />
-              {localizeUi("game.toolbar.session")}
-            </div>
-            <div className={ROLEPLAY_POPOVER_SUBTITLE}>
-              {localizeUi("game.toolbar.session")} {displaySessionNumber} · {sessionStatus}
-            </div>
-          </div>
-          <div className="ml-auto flex shrink-0 items-center gap-1 pt-0.5">
-            {/* Hidden for an experience game: it opens a tour of chrome that isn't on screen. */}
-            {!experienceOwnsGame ? (
-              <button
-                type="button"
-                onClick={() => setTutorialOpen(true)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--marinara-chat-chrome-button-border)] bg-[var(--marinara-chat-chrome-button-bg)] text-[var(--marinara-chat-chrome-button-text)] transition-colors hover:border-[var(--marinara-chat-chrome-button-border-hover)] hover:bg-[var(--marinara-chat-chrome-highlight-bg-hover)] hover:text-[var(--marinara-chat-chrome-highlight-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--marinara-chat-chrome-focus-ring)]"
-                title={localizeUi("ui.game.gamesurfacecomponent.gameTutorial")}
-                aria-label={localizeUi("ui.game.gamesurfacecomponent.gameTutorial")}
-              >
-                <CircleHelp size={14} />
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setSessionPanelOpen(false)}
-              className={ROLEPLAY_POPOVER_CLOSE_BUTTON}
-              aria-label={localizeUi("ui.game.gamesurfacecomponent.closeSession")}
-            >
-              <X size={ROLEPLAY_POPOVER_CLOSE_ICON_SIZE} />
-            </button>
-          </div>
+  /** Session history and journal: the Session window's content. */
+  const renderSessionPanel = () => {
+    const closeSessionPanel = () => useFloatingWindowStore.getState().minimizeWindow(CHAT_CONTROL_WINDOW_IDS.session);
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          className={cn(
+            NEUTRAL_PANEL_SUBTITLE,
+            "border-b border-[var(--marinara-chat-chrome-panel-divider)] px-3 py-2",
+          )}
+        >
+          {localizeUi("game.toolbar.session")} {displaySessionNumber} · {sessionStatus}
         </div>
 
         <div className="flex gap-1 border-b border-[var(--marinara-chat-chrome-panel-divider)] p-2">
@@ -10713,7 +11943,7 @@ function GameSurfaceComponent({
               type="button"
               onClick={() => setSessionPanelTab(tab)}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[0.6875rem] font-medium transition-colors",
+                "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[0.6875rem] font-medium transition-colors",
                 sessionPanelTab === tab
                   ? "bg-[var(--marinara-chat-chrome-highlight-bg)] text-[var(--marinara-chat-chrome-highlight-text)]"
                   : "text-[var(--marinara-chat-chrome-panel-muted)] hover:bg-[var(--marinara-chat-chrome-highlight-bg-hover)] hover:text-[var(--marinara-chat-chrome-highlight-text)]",
@@ -10730,7 +11960,7 @@ function GameSurfaceComponent({
         {sessionPanelTab === "history" ? (
           <div
             className={cn(
-              ROLEPLAY_POPOVER_SCROLL_AREA,
+              NEUTRAL_PANEL_SCROLL_AREA,
               "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-2 [-webkit-overflow-scrolling:touch]",
             )}
           >
@@ -10787,7 +12017,7 @@ function GameSurfaceComponent({
                 initialSetupSnapshot={
                   (chatMeta.gameInitialSetup as GameInitialSetupSnapshot | null | undefined) ?? null
                 }
-                onClose={() => setSessionPanelOpen(false)}
+                onClose={closeSessionPanel}
                 embedded
               />
             </Suspense>
@@ -10798,7 +12028,7 @@ function GameSurfaceComponent({
               <GameJournal
                 chatId={activeChatId}
                 npcs={npcs}
-                onClose={() => setSessionPanelOpen(false)}
+                onClose={closeSessionPanel}
                 onNpcPortraitClick={handleNpcPortraitClick}
                 onNpcPortraitGenerate={handleNpcPortraitGenerate}
                 npcPortraitGenerationEnabled={gameImageGenerationEnabled}
@@ -10811,8 +12041,6 @@ function GameSurfaceComponent({
         )}
       </div>
     );
-
-    return mobile ? renderGameMobilePortal(panel) : panel;
   };
 
   const handleStoryboardViewerSizeChange = () => {
@@ -10867,20 +12095,72 @@ function GameSurfaceComponent({
     );
   };
 
-  const renderStoryboardBackgroundControls = (mobile = false) => {
+  /** The Retry actions: in the Game controls window on a computer, the Retry menu on phones. */
+  const renderRetryItems = (onDone?: () => void) => (
+    <>
+      <button
+        onClick={() => {
+          onDone?.();
+          void handleRetryTurn();
+        }}
+        disabled={!canRetryTurn}
+        className={GAME_ACTION_MENU_ITEM}
+      >
+        <RotateCcw size={13} />
+        <span>{t("game.toolbar.retryTurn")}</span>
+      </button>
+      <button
+        onClick={() => {
+          handleRetryScene();
+          onDone?.();
+        }}
+        disabled={!canRetryScene}
+        className={GAME_ACTION_MENU_ITEM}
+      >
+        <RefreshCw size={13} className={sceneAnalysis.isPending ? "animate-spin" : ""} />
+        <span>{t("game.toolbar.retrySceneAnalysis")}</span>
+      </button>
+      {useSpotifyGameMusic && (
+        <button onClick={handleRetrySpotifyMusic} disabled={!canRetrySpotifyMusic} className={GAME_ACTION_MENU_ITEM}>
+          {spotifyRetryPending ? <RefreshCw size={13} className="animate-spin" /> : <Volume2 size={13} />}
+          <span>{t("game.toolbar.retryMusicDj")}</span>
+        </button>
+      )}
+      {useJsonMusicDjGameMusic && (
+        <button onClick={handleRetryYoutubeMusic} disabled={!canRetryYoutubeMusic} className={GAME_ACTION_MENU_ITEM}>
+          {youtubeRetryPending ? <RefreshCw size={13} className="animate-spin" /> : <Volume2 size={13} />}
+          <span>{t("game.toolbar.retryMusicDj")}</span>
+        </button>
+      )}
+      <button
+        onClick={() => {
+          onDone?.();
+          retryAssetGeneration({ showSuccessToast: true });
+        }}
+        disabled={!canRetryAssets}
+        className={GAME_ACTION_MENU_ITEM}
+      >
+        <Image size={13} />
+        <span>{t("game.toolbar.retryAssets")}</span>
+      </button>
+    </>
+  );
+
+  const renderStoryboardBackgroundControls = () => {
     if (gameStoryboardViewerDisplayMode !== "background" || !activeStoryboardKeyframe?.video) return null;
 
     return (
-      <Suspense fallback={null}>
-        <StoryboardBackgroundControls
-          mobile={mobile}
-          playing={storyboardViewerPlaying}
-          muted={storyboardViewerMuted}
-          onReplay={handleStoryboardViewerReplay}
-          onTogglePlayback={handleStoryboardViewerPlaybackToggle}
-          onToggleMute={() => setStoryboardViewerMuted((muted) => !muted)}
-        />
-      </Suspense>
+      <span data-chat-help="scene-media" className="contents">
+        <Suspense fallback={null}>
+          <StoryboardBackgroundControls
+            playing={storyboardViewerPlaying}
+            muted={storyboardViewerMuted}
+            onReplay={handleStoryboardViewerReplay}
+            onTogglePlayback={handleStoryboardViewerPlaybackToggle}
+            onToggleMute={() => setStoryboardViewerMuted((muted) => !muted)}
+          />
+        </Suspense>
+      </span>
     );
   };
 
@@ -10902,19 +12182,10 @@ function GameSurfaceComponent({
     );
   };
 
-  const renderGameAssetsPanel = (mobile = false) => {
-    const panel = (
-      <div
-        data-chat-floating-panel
-        className={cn(
-          ROLEPLAY_POPOVER_SHELL,
-          "flex min-h-0 flex-col overflow-hidden",
-          mobile
-            ? GAME_MOBILE_FLOATING_PANEL
-            : "absolute right-0 top-9 z-50 h-[min(42rem,calc(100vh-6rem))] w-[min(54rem,calc(100vw-1.5rem))]",
-        )}
-        style={mobile ? getGameMobileFloatingPanelStyle(mobileGameAssetsPanelAnchor) : undefined}
-      >
+  /** Scene media and the game's asset browser: the Assets window's content. */
+  const renderGameAssetsPanel = () => {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--marinara-chat-chrome-panel-divider)] p-2">
           <button
             type="button"
@@ -11042,13 +12313,11 @@ function GameSurfaceComponent({
             </div>
           )}
           <Suspense fallback={null}>
-            <GameAssetsBrowserView embedded onClose={() => setGameAssetsPanelOpen(false)} />
+            <GameAssetsBrowserView embedded />
           </Suspense>
         </div>
       </div>
     );
-
-    return mobile ? renderGameMobilePortal(panel) : panel;
   };
 
   return (
@@ -11120,512 +12389,7 @@ function GameSurfaceComponent({
                   replayActive && "hidden",
                 )}
               >
-                {/* Desktop controls */}
-                <div className={cn("pointer-events-auto hidden items-center md:flex", CHAT_TOOLBAR_ICON_GAP_CLASS)}>
-                  {renderStoryboardBackgroundControls()}
-                  <ChatBranchSelector
-                    activeChatId={activeChatId}
-                    activeChatName={chat.name}
-                    groupId={chat.groupId ?? null}
-                    variant="roleplay"
-                    onOpen={dismissOtherFloatingWindows}
-                  />
-                  <div className="relative" ref={retryMenuRef}>
-                    <button
-                      onClick={() => {
-                        const nextOpen = !retryMenuOpen;
-                        if (nextOpen) dismissOtherFloatingWindows();
-                        setRetryMenuOpen(nextOpen);
-                      }}
-                      className={GAME_TOP_ICON_BUTTON}
-                      title={t("game.toolbar.retry")}
-                      aria-label={t("game.toolbar.retry")}
-                    >
-                      <RotateCcw
-                        size={14}
-                        className={sceneAnalysis.isPending || spotifyRetryPending ? "animate-spin" : ""}
-                      />
-                    </button>
-                    {retryMenuOpen && (
-                      <div className={cn(GAME_ACTION_MENU, "absolute right-0 top-9 z-50")}>
-                        <div className="mb-1 flex items-center justify-between gap-2 border-b border-[var(--marinara-chat-chrome-panel-divider)] px-2 pb-1.5 pt-0.5">
-                          <div className={ROLEPLAY_POPOVER_TITLE}>
-                            <RotateCcw size="0.75rem" className="shrink-0 text-[var(--muted-foreground)]" />
-                            <span>{t("game.toolbar.retry")}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setRetryMenuOpen(false)}
-                            className={ROLEPLAY_POPOVER_CLOSE_BUTTON}
-                            aria-label={t("game.toolbar.closeRetry")}
-                          >
-                            <X size={ROLEPLAY_POPOVER_CLOSE_ICON_SIZE} />
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => {
-                            void handleRetryTurn();
-                          }}
-                          disabled={!canRetryTurn}
-                          className={GAME_ACTION_MENU_ITEM}
-                        >
-                          <RotateCcw size={13} />
-                          <span>{t("game.toolbar.retryTurn")}</span>
-                        </button>
-                        <button onClick={handleRetryScene} disabled={!canRetryScene} className={GAME_ACTION_MENU_ITEM}>
-                          <RefreshCw size={13} className={sceneAnalysis.isPending ? "animate-spin" : ""} />
-                          <span>{t("game.toolbar.retrySceneAnalysis")}</span>
-                        </button>
-                        {useSpotifyGameMusic && (
-                          <button
-                            onClick={handleRetrySpotifyMusic}
-                            disabled={!canRetrySpotifyMusic}
-                            className={GAME_ACTION_MENU_ITEM}
-                          >
-                            {spotifyRetryPending ? (
-                              <RefreshCw size={13} className="animate-spin" />
-                            ) : (
-                              <Volume2 size={13} />
-                            )}
-                            <span>{t("game.toolbar.retryMusicDj")}</span>
-                          </button>
-                        )}
-                        {useJsonMusicDjGameMusic && (
-                          <button
-                            onClick={handleRetryYoutubeMusic}
-                            disabled={!canRetryYoutubeMusic}
-                            className={GAME_ACTION_MENU_ITEM}
-                          >
-                            {youtubeRetryPending ? (
-                              <RefreshCw size={13} className="animate-spin" />
-                            ) : (
-                              <Volume2 size={13} />
-                            )}
-                            <span>{t("game.toolbar.retryMusicDj")}</span>
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setRetryMenuOpen(false);
-                            retryAssetGeneration({ showSuccessToast: true });
-                          }}
-                          disabled={!canRetryAssets}
-                          className={GAME_ACTION_MENU_ITEM}
-                        >
-                          <Image size={13} />
-                          <span>{t("game.toolbar.retryAssets")}</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="relative" ref={sessionPanelRef}>
-                    <button
-                      onClick={(event) => handleOpenSessionPanel("history", event)}
-                      className={getChatToolbarButtonClass({
-                        open: sessionPanelOpen,
-                      })}
-                      title={t("game.toolbar.session")}
-                      aria-label={t("game.toolbar.session")}
-                    >
-                      <Feather size={14} />
-                    </button>
-                    {sessionPanelOpen && renderSessionPanel(false)}
-                  </div>
-                  <div className="relative" ref={volumePopoverRef}>
-                    <button
-                      onClick={() => {
-                        const nextOpen = !volumePopoverOpen;
-                        if (nextOpen) dismissOtherFloatingWindows();
-                        setMobileVolumePopoverAnchor(null);
-                        setVolumePopoverOpen(nextOpen);
-                        setSessionPanelOpen(false);
-                        setMobileSessionPanelAnchor(null);
-                        setGameAssetsPanelOpen(false);
-                        setMobileGameAssetsPanelAnchor(null);
-                        setRetryMenuOpen(false);
-                        setMobileRetryMenuOpen(false);
-                        setMobileRetryMenuAnchor(null);
-                      }}
-                      className={GAME_TOP_ICON_BUTTON}
-                      title={t("game.toolbar.volume")}
-                      aria-label={t("game.toolbar.volume")}
-                    >
-                      {audioMuted || masterVolume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                    </button>
-                    {volumePopoverOpen && (
-                      <GameVolumeMixer
-                        className="absolute right-0 top-9 z-50"
-                        audioMuted={audioMuted || masterVolume === 0}
-                        masterVolume={masterVolume}
-                        musicVolume={musicVolume}
-                        sfxVolume={sfxVolume}
-                        ttsVolume={ttsVolume}
-                        ambientVolume={ambientVolume}
-                        onMasterVolumeChange={handleMasterVolumeChange}
-                        onMusicVolumeChange={(value) => handleChannelVolumeChange("musicVolume", setMusicVolume, value)}
-                        onSfxVolumeChange={(value) => handleChannelVolumeChange("sfxVolume", setSfxVolume, value)}
-                        onTtsVolumeChange={(value) => handleChannelVolumeChange("ttsVolume", setTtsVolume, value)}
-                        onAmbientVolumeChange={(value) =>
-                          handleChannelVolumeChange("ambientVolume", setAmbientVolume, value)
-                        }
-                        onToggleMute={handleToggleMute}
-                        onClose={() => setVolumePopoverOpen(false)}
-                        onAudioInteract={handleAudioInteract}
-                      />
-                    )}
-                  </div>
-                  <div className="relative" ref={gameAssetsPanelRef}>
-                    <button
-                      onClick={(event) => handleOpenGameAssetsPanel(event)}
-                      className={getChatToolbarButtonClass({
-                        open: gameAssetsPanelOpen,
-                      })}
-                      title={t("game.toolbar.assets")}
-                      aria-label={t("game.toolbar.assets")}
-                    >
-                      <Folder size={14} />
-                    </button>
-                    {gameAssetsPanelOpen && renderGameAssetsPanel(false)}
-                  </div>
-                  <ActiveLorebookEntriesButton
-                    chatId={activeChatId}
-                    iconSize={14}
-                    buttonClassName={GAME_TOP_ICON_BUTTON}
-                    onOpen={dismissOtherFloatingWindows}
-                  />
-                  <button
-                    data-chat-toolbar-panel-action="gallery"
-                    onClick={handleOpenGalleryPanel}
-                    className={GAME_TOP_ICON_BUTTON}
-                    title={t("chat.toolbar.gallery")}
-                    aria-label={t("chat.toolbar.gallery")}
-                  >
-                    <Image size={14} />
-                  </button>
-                  {onSwitchChat ? (
-                    <button
-                      onClick={handleSwitchConnectedChat}
-                      className={GAME_TOP_ICON_BUTTON}
-                      title={
-                        connectedChatName
-                          ? t("chat.toolbar.switchTo", { name: connectedChatName })
-                          : t("chat.toolbar.switchToConnected")
-                      }
-                      aria-label={
-                        connectedChatName
-                          ? t("chat.toolbar.switchTo", { name: connectedChatName })
-                          : t("chat.toolbar.switchToConnected")
-                      }
-                    >
-                      <ArrowRightLeft size={14} />
-                    </button>
-                  ) : null}
-                  <button
-                    data-chat-toolbar-panel-action="settings"
-                    onClick={handleOpenSettingsPanel}
-                    className={GAME_TOP_ICON_BUTTON}
-                    title={t("chat.toolbar.settings")}
-                    aria-label={t("chat.toolbar.settings")}
-                  >
-                    <Settings2 size={14} />
-                  </button>
-                </div>
-
-                {/* Mobile controls */}
-                <div className="pointer-events-auto md:hidden">
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setMobileActionsOpen((open) => {
-                          const nextOpen = !open;
-                          if (!nextOpen) {
-                            setVolumePopoverOpen(false);
-                            setMobileVolumePopoverAnchor(null);
-                            setMobileRetryMenuOpen(false);
-                            setMobileRetryMenuAnchor(null);
-                            setSessionPanelOpen(false);
-                            setMobileSessionPanelAnchor(null);
-                            setGameAssetsPanelOpen(false);
-                            setMobileGameAssetsPanelAnchor(null);
-                          }
-                          return nextOpen;
-                        });
-                        setMobileRetryMenuOpen(false);
-                      }}
-                      className={GAME_MOBILE_ROOT_BUTTON}
-                      title={t("game.toolbar.actions")}
-                      aria-label={t("game.toolbar.actions")}
-                    >
-                      <MoreHorizontal size={15} />
-                    </button>
-
-                    {mobileActionsOpen && (
-                      <div data-chat-toolbar-overflow-menu className={GAME_MOBILE_ACTIONS_MENU}>
-                        {renderStoryboardBackgroundControls(true)}
-                        <ChatBranchSelector
-                          activeChatId={activeChatId}
-                          activeChatName={chat.name}
-                          groupId={chat.groupId ?? null}
-                          variant="roleplay"
-                          compact
-                          onOpen={dismissOtherFloatingWindows}
-                        />
-                        <div>
-                          <button
-                            onClick={(event) => {
-                              const nextOpen = !mobileRetryMenuOpen;
-                              if (nextOpen) dismissOtherFloatingWindows();
-                              setMobileRetryMenuAnchor(nextOpen ? readFloatingPanelAnchor(event) : null);
-                              setMobileRetryMenuOpen(nextOpen);
-                              setSessionPanelOpen(false);
-                              setMobileSessionPanelAnchor(null);
-                              setGameAssetsPanelOpen(false);
-                              setMobileGameAssetsPanelAnchor(null);
-                              setVolumePopoverOpen(false);
-                              setMobileVolumePopoverAnchor(null);
-                            }}
-                            className={GAME_MOBILE_ICON_BUTTON}
-                            title={t("game.toolbar.retry")}
-                            aria-label={t("game.toolbar.retry")}
-                          >
-                            <RotateCcw
-                              size={14}
-                              className={sceneAnalysis.isPending || spotifyRetryPending ? "animate-spin" : ""}
-                            />
-                          </button>
-                          {mobileRetryMenuOpen &&
-                            renderGameMobilePortal(
-                              <div
-                                data-chat-floating-panel
-                                className={cn(GAME_MOBILE_ACTION_MENU, GAME_MOBILE_FLOATING_MENU)}
-                                style={getGameMobileFloatingPanelStyle(mobileRetryMenuAnchor)}
-                              >
-                                <div className="mb-1 flex items-center justify-between gap-2 border-b border-[var(--marinara-chat-chrome-panel-divider)] px-2 pb-1.5 pt-0.5">
-                                  <div className={ROLEPLAY_POPOVER_TITLE}>
-                                    <RotateCcw size="0.75rem" className="shrink-0 text-[var(--muted-foreground)]" />
-                                    <span>{t("game.toolbar.retry")}</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setMobileRetryMenuOpen(false)}
-                                    className={ROLEPLAY_POPOVER_CLOSE_BUTTON}
-                                    aria-label={t("game.toolbar.closeRetry")}
-                                  >
-                                    <X size={ROLEPLAY_POPOVER_CLOSE_ICON_SIZE} />
-                                  </button>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setMobileRetryMenuOpen(false);
-                                    setMobileActionsOpen(false);
-                                    void handleRetryTurn();
-                                  }}
-                                  disabled={!canRetryTurn}
-                                  className={GAME_ACTION_MENU_ITEM}
-                                >
-                                  <RotateCcw size={13} />
-                                  <span>{t("game.toolbar.retryTurn")}</span>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    handleRetryScene();
-                                    setMobileRetryMenuOpen(false);
-                                    setMobileActionsOpen(false);
-                                  }}
-                                  disabled={!canRetryScene}
-                                  className={GAME_ACTION_MENU_ITEM}
-                                >
-                                  <RefreshCw size={13} className={sceneAnalysis.isPending ? "animate-spin" : ""} />
-                                  <span>{t("game.toolbar.retrySceneAnalysis")}</span>
-                                </button>
-                                {useSpotifyGameMusic && (
-                                  <button
-                                    onClick={handleRetrySpotifyMusic}
-                                    disabled={!canRetrySpotifyMusic}
-                                    className={GAME_ACTION_MENU_ITEM}
-                                  >
-                                    {spotifyRetryPending ? (
-                                      <RefreshCw size={13} className="animate-spin" />
-                                    ) : (
-                                      <Volume2 size={13} />
-                                    )}
-                                    <span>{t("game.toolbar.retryMusicDj")}</span>
-                                  </button>
-                                )}
-                                {useJsonMusicDjGameMusic && (
-                                  <button
-                                    onClick={handleRetryYoutubeMusic}
-                                    disabled={!canRetryYoutubeMusic}
-                                    className={GAME_ACTION_MENU_ITEM}
-                                  >
-                                    {youtubeRetryPending ? (
-                                      <RefreshCw size={13} className="animate-spin" />
-                                    ) : (
-                                      <Volume2 size={13} />
-                                    )}
-                                    <span>{t("game.toolbar.retryMusicDj")}</span>
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    setMobileRetryMenuOpen(false);
-                                    setMobileActionsOpen(false);
-                                    retryAssetGeneration({ showSuccessToast: true });
-                                  }}
-                                  disabled={!canRetryAssets}
-                                  className={GAME_ACTION_MENU_ITEM}
-                                >
-                                  <Image size={13} />
-                                  <span>{t("game.toolbar.retryAssets")}</span>
-                                </button>
-                              </div>,
-                            )}
-                        </div>
-                        <div ref={mobileSessionPanelRef}>
-                          <button
-                            onClick={(event) => {
-                              handleOpenSessionPanel("history", event);
-                              setMobileRetryMenuOpen(false);
-                              setMobileRetryMenuAnchor(null);
-                            }}
-                            className={getChatToolbarButtonClass({
-                              compact: true,
-                              open: sessionPanelOpen,
-                            })}
-                            title={t("game.toolbar.session")}
-                            aria-label={t("game.toolbar.session")}
-                          >
-                            <Feather size={14} />
-                          </button>
-                          {sessionPanelOpen && renderSessionPanel(true)}
-                        </div>
-                        <div ref={mobileVolumePopoverRef}>
-                          <button
-                            onClick={(event) => {
-                              const nextOpen = !volumePopoverOpen;
-                              if (nextOpen) dismissOtherFloatingWindows();
-                              setMobileVolumePopoverAnchor(nextOpen ? readFloatingPanelAnchor(event) : null);
-                              setVolumePopoverOpen(nextOpen);
-                              setMobileRetryMenuOpen(false);
-                              setMobileRetryMenuAnchor(null);
-                              setSessionPanelOpen(false);
-                              setMobileSessionPanelAnchor(null);
-                              setGameAssetsPanelOpen(false);
-                              setMobileGameAssetsPanelAnchor(null);
-                            }}
-                            className={GAME_MOBILE_ICON_BUTTON}
-                            title={t("game.toolbar.volume")}
-                            aria-label={t("game.toolbar.volume")}
-                          >
-                            {audioMuted || masterVolume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                          </button>
-                          {volumePopoverOpen &&
-                            renderGameMobilePortal(
-                              <GameVolumeMixer
-                                className="fixed z-[9999] max-w-[calc(100vw-4rem)]"
-                                style={getGameMobileFloatingPanelStyle(mobileVolumePopoverAnchor)}
-                                audioMuted={audioMuted || masterVolume === 0}
-                                masterVolume={masterVolume}
-                                musicVolume={musicVolume}
-                                sfxVolume={sfxVolume}
-                                ttsVolume={ttsVolume}
-                                ambientVolume={ambientVolume}
-                                onMasterVolumeChange={handleMasterVolumeChange}
-                                onMusicVolumeChange={(value) =>
-                                  handleChannelVolumeChange("musicVolume", setMusicVolume, value)
-                                }
-                                onSfxVolumeChange={(value) =>
-                                  handleChannelVolumeChange("sfxVolume", setSfxVolume, value)
-                                }
-                                onTtsVolumeChange={(value) =>
-                                  handleChannelVolumeChange("ttsVolume", setTtsVolume, value)
-                                }
-                                onAmbientVolumeChange={(value) =>
-                                  handleChannelVolumeChange("ambientVolume", setAmbientVolume, value)
-                                }
-                                onToggleMute={handleToggleMute}
-                                onClose={() => setVolumePopoverOpen(false)}
-                                onAudioInteract={handleAudioInteract}
-                              />,
-                            )}
-                        </div>
-                        <div ref={mobileGameAssetsPanelRef}>
-                          <button
-                            onClick={(event) => {
-                              handleOpenGameAssetsPanel(event);
-                              setMobileRetryMenuOpen(false);
-                              setMobileRetryMenuAnchor(null);
-                            }}
-                            className={getChatToolbarButtonClass({
-                              compact: true,
-                              open: gameAssetsPanelOpen,
-                            })}
-                            title={t("game.toolbar.assets")}
-                            aria-label={t("game.toolbar.assets")}
-                          >
-                            <Folder size={14} />
-                          </button>
-                          {gameAssetsPanelOpen && renderGameAssetsPanel(true)}
-                        </div>
-                        <ActiveLorebookEntriesButton
-                          chatId={activeChatId}
-                          iconSize={14}
-                          buttonClassName={({ open }) =>
-                            getChatToolbarButtonClass({
-                              compact: true,
-                              open,
-                            })
-                          }
-                          title={t("chat.toolbar.activeContext")}
-                          onOpen={dismissOtherFloatingWindows}
-                        />
-                        <button
-                          data-chat-toolbar-panel-action="gallery"
-                          onClick={(event) => {
-                            handleOpenGalleryPanel(event);
-                          }}
-                          className={GAME_MOBILE_ICON_BUTTON}
-                          title={t("chat.toolbar.gallery")}
-                          aria-label={t("chat.toolbar.gallery")}
-                        >
-                          <Image size={14} />
-                        </button>
-                        {onSwitchChat ? (
-                          <button
-                            onClick={() => {
-                              setMobileActionsOpen(false);
-                              handleSwitchConnectedChat();
-                            }}
-                            className={GAME_MOBILE_ICON_BUTTON}
-                            title={
-                              connectedChatName
-                                ? t("chat.toolbar.switchTo", { name: connectedChatName })
-                                : t("chat.toolbar.switchToConnected")
-                            }
-                            aria-label={
-                              connectedChatName
-                                ? t("chat.toolbar.switchTo", { name: connectedChatName })
-                                : t("chat.toolbar.switchToConnected")
-                            }
-                          >
-                            <ArrowRightLeft size={14} />
-                          </button>
-                        ) : null}
-                        <button
-                          data-chat-toolbar-panel-action="settings"
-                          onClick={(event) => {
-                            handleOpenSettingsPanel(event);
-                          }}
-                          className={GAME_MOBILE_ICON_BUTTON}
-                          title={t("chat.toolbar.settings")}
-                          aria-label={t("chat.toolbar.settings")}
-                        >
-                          <Settings2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {/* These controls are windows that minimize to bubbles (rendered below). */}
               </div>
 
               {!replayActive && pendingReaction && (
@@ -11634,7 +12398,7 @@ function GameSurfaceComponent({
 
               {/* Main content area */}
               <div
-                ref={hudSurfaceRef}
+                ref={attachHudSurface}
                 data-chat-resource-drop-surface
                 className={cn("relative flex min-h-0 flex-1 flex-col overflow-hidden", experienceSurfaceClass)}
               >
@@ -11649,10 +12413,11 @@ function GameSurfaceComponent({
                   />
                 ) : null}
 
-                {/* Top-left: Map + Party portraits side by side */}
+                {/* Top-left: Map + Party portraits side by side, clear of a phone's row of control bubbles */}
                 <div
                   className={cn(
-                    "pointer-events-auto absolute left-3 right-14 z-20 flex min-w-0 items-start gap-2 md:right-auto",
+                    // On a phone it stops short of the control-button rows in the right half of the chat.
+                    "pointer-events-auto absolute left-3 right-[calc(50%+1.625rem)] z-20 flex min-w-0 items-start gap-2 md:right-auto",
                     tacticalCombatActive ? "top-14" : topOverlayOffsetClass,
                     replayActive && "hidden",
                     // The package draws its own header and party bar, so the built-in ones would collide.
@@ -11661,29 +12426,6 @@ function GameSurfaceComponent({
                     experienceOwnsGame && "hidden",
                   )}
                 >
-                  {/* Mobile: map icon button that opens modal */}
-                  <div data-tour="game-map" className="md:hidden">
-                    <MobileMapButton
-                      chatId={activeChatId}
-                      map={viewedMap}
-                      maps={availableMaps}
-                      activeMapId={activeMapId}
-                      viewedMapId={effectiveViewedMapId}
-                      onViewedMapChange={handleViewedMapChange}
-                      onMove={handleMapMove}
-                      selectedPosition={viewedMapIsActive ? (pendingMapMove?.position ?? null) : null}
-                      onGenerateMap={handleGenerateMap}
-                      generateMapDisabled={isStreaming || !sessionInteractive}
-                      disabled={isStreaming || !narrationDone || !sessionInteractive}
-                      gameState={gameState}
-                      timeOfDay={gameSnapshot?.time ?? metaTime ?? null}
-                      day={currentGameDay}
-                      onDayChange={handleGameDayChange}
-                      onTimeChange={handleGameTimeChange}
-                      spatialContext={activeSpatialContext}
-                      spatialContextLoading={activeSpatialContextLoading}
-                    />
-                  </div>
                   {/* Desktop: inline minimap */}
                   <div className="hidden md:block">
                     <GameMapPanel
@@ -11708,18 +12450,6 @@ function GameSurfaceComponent({
                       constraintsRef={hudSurfaceRef}
                     />
                   </div>
-
-                  {/* Party portraits — right of map */}
-                  {partyMembers.length > 0 && (
-                    <div data-tour="game-party" className="min-w-0 flex-1 md:flex-none">
-                      <GamePartyBar
-                        partyMembers={partyMembers}
-                        partyCards={partyCards}
-                        onRemovePartyMember={handleRemovePartyMemberFromBar}
-                        removingPartyMemberId={removingPartyMemberId}
-                      />
-                    </div>
-                  )}
                 </div>
 
                 {/* Dynamic weather effects from tracked game state */}
@@ -11916,9 +12646,13 @@ function GameSurfaceComponent({
                       />
                     ) : undefined;
 
-                  const skillCheckSlot = pendingSkillCheck ? (
-                    <GameSkillCheckResult result={pendingSkillCheck} onDismiss={() => setPendingSkillCheck(null)} />
-                  ) : undefined;
+                  const skillCheckSlot =
+                    !diceRollResult && pendingSkillChecks[0] ? (
+                      <GameSkillCheckResult
+                        result={pendingSkillChecks[0]}
+                        onDismiss={() => setPendingSkillChecks((pending) => pending.slice(1))}
+                      />
+                    ) : undefined;
 
                   const diceResultSlot = diceRollResult ? (
                     <GameDiceResult result={diceRollResult} onDismiss={handleDismissDice} />
@@ -11990,8 +12724,29 @@ function GameSurfaceComponent({
                             </div>
                           }
                         >
-                          {effectiveCombatStyle === "tactical" ? (
+                          {combatSetupConfig?.combatDirector && combatStartMessageId ? (
+                            <DirectedCombatUI
+                              key={`${activeChatId}:${combatStartMessageId}`}
+                              chatId={activeChatId}
+                              anchor={combatStartMessageId}
+                              style={rulesetFightDefinition ? "ruleset" : effectiveCombatStyle}
+                              rulesetDefinition={rulesetFightDefinition ?? undefined}
+                              positioned={rulesetFightPositioned}
+                              battlefield={combatSceneMeta?.battlefield ?? undefined}
+                              party={combatParty}
+                              enemies={combatEnemies}
+                              inventoryItems={fightInventoryLines}
+                              combatItemEffects={fightItemEffects}
+                              combatMechanics={combatMechanics}
+                              environment={combatSceneMeta?.environmentType ?? undefined}
+                              formation={combatSceneMeta?.formation ?? undefined}
+                              onCombatEnd={handleCombatEnd}
+                              onInventoryItemUsed={handleUseCombatInventoryItem}
+                              onCombatantsChange={handleCombatantsChange}
+                            />
+                          ) : effectiveCombatStyle === "tactical" ? (
                             <TacticalCombatUI
+                              key={activeChatId}
                               chatId={activeChatId}
                               party={combatParty}
                               enemies={combatEnemies}
@@ -12001,6 +12756,9 @@ function GameSurfaceComponent({
                               }
                               environment={combatSceneMeta?.environmentType ?? null}
                               formation={combatSceneMeta?.formation ?? null}
+                              battlefield={combatSceneMeta?.battlefield ?? null}
+                              battlefieldError={combatSceneMeta?.battlefieldError ?? null}
+                              onBattlefieldReady={handleTacticalBattlefieldReady}
                               playerCombatantId={combatParty[0]?.id ?? null}
                               onCombatEnd={handleCombatEnd}
                               onCustomInstruction={handleCombatCustomInstruction}
@@ -12010,7 +12768,7 @@ function GameSurfaceComponent({
                               chatId={activeChatId}
                               party={combatParty}
                               enemies={combatEnemies}
-                              inventoryItems={inventoryItems}
+                              inventoryItems={fightInventoryLines}
                               onCombatEnd={handleCombatEnd}
                               onInventoryItemUsed={handleUseCombatInventoryItem}
                               onCombatantsChange={handleCombatantsChange}
@@ -12021,7 +12779,7 @@ function GameSurfaceComponent({
                               narration="Battle starts."
                               combatDialogue={combatDialogueLines}
                               combatDialogueCues={combatDialogueCues}
-                              combatItemEffects={combatItemEffects}
+                              combatItemEffects={fightItemEffects}
                               combatMechanics={combatMechanics}
                               voicedCombatSpeakerNames={voicedCombatSpeakerNames}
                               gameVoiceVolume={effectiveGameVoiceVolume}
@@ -12055,6 +12813,7 @@ function GameSurfaceComponent({
                           onSkipScene={skipSceneAnalysis}
                           generationFailed={generationFailed}
                           onRetryGeneration={retryGeneration}
+                          onRetryTurn={handleRetryTurn}
                           hasStoredNarrationPosition={restoredNarrationState.hasStoredPosition}
                           restoredSegmentIndex={restoredSegmentIndex}
                           onSegmentChange={handleSegmentChange}
@@ -12099,6 +12858,9 @@ function GameSurfaceComponent({
                           onSetReviewOffset={setMessageOffset}
                           nextActionToken={nextActionToken}
                           onMaxNavOffsetChange={handleMaxNavOffsetChange}
+                          // Read off activeExperienceChrome, never raw experienceChrome: the request
+                          // has to evaporate when the experience is no longer the live surface.
+                          requestsCollapsedNarration={activeExperienceChrome?.requestsCollapsedNarration}
                           inputSlot={
                             activeExperienceChrome?.providesPlayerInput ? undefined : (
                               <GameInput
@@ -12107,7 +12869,9 @@ function GameSurfaceComponent({
                                 hasPartyMembers={partyMembers.length > 0}
                                 pendingMoveLabel={pendingMapMove?.label ?? null}
                                 onClearPendingMove={() => setPendingMapMove(null)}
-                                disabled={gameInputGenerationBlocked || !sessionInteractive}
+                                disabled={
+                                  gameInputGenerationBlocked || sequentialGameMediaPending || !sessionInteractive
+                                }
                                 draftDisabled={!sessionInteractive}
                                 isStreaming={gameInputGenerationBlocked}
                                 inline
@@ -12116,6 +12880,9 @@ function GameSurfaceComponent({
                                 onIllustrate={handleManualSceneIllustration}
                                 spatialCapabilityEnabled={hierarchicalMapsActive}
                                 interruptMode={pendingInterruptMode}
+                                sessionConcluded={!sessionInteractive}
+                                onStartNewSession={handleStartNewSession}
+                                startNewSessionPending={startSessionLocked}
                               />
                             )
                           }
@@ -12144,6 +12911,7 @@ function GameSurfaceComponent({
                       onSkipScene={skipSceneAnalysis}
                       generationFailed={generationFailed}
                       onRetryGeneration={retryGeneration}
+                      onRetryTurn={handleRetryTurn}
                       hasStoredNarrationPosition={restoredNarrationState.hasStoredPosition}
                       restoredSegmentIndex={restoredSegmentIndex}
                       onSegmentChange={handleSegmentChange}
@@ -12188,6 +12956,9 @@ function GameSurfaceComponent({
                       onSetReviewOffset={setMessageOffset}
                       nextActionToken={nextActionToken}
                       onMaxNavOffsetChange={handleMaxNavOffsetChange}
+                      // Read off activeExperienceChrome, never raw experienceChrome: the request
+                      // has to evaporate when the experience is no longer the live surface.
+                      requestsCollapsedNarration={activeExperienceChrome?.requestsCollapsedNarration}
                       // Withheld while the experience drives the turn through its own menus. The
                       // declaration is dynamic, so the input returns when it has no action to offer.
                       inputSlot={
@@ -12198,7 +12969,7 @@ function GameSurfaceComponent({
                             hasPartyMembers={partyMembers.length > 0}
                             pendingMoveLabel={pendingMapMove?.label ?? null}
                             onClearPendingMove={() => setPendingMapMove(null)}
-                            disabled={gameInputGenerationBlocked || !sessionInteractive}
+                            disabled={gameInputGenerationBlocked || sequentialGameMediaPending || !sessionInteractive}
                             draftDisabled={!sessionInteractive}
                             isStreaming={gameInputGenerationBlocked}
                             inline
@@ -12207,6 +12978,9 @@ function GameSurfaceComponent({
                             onIllustrate={handleManualSceneIllustration}
                             spatialCapabilityEnabled={hierarchicalMapsActive}
                             interruptMode={pendingInterruptMode}
+                            sessionConcluded={!sessionInteractive}
+                            onStartNewSession={handleStartNewSession}
+                            startNewSessionPending={startSessionLocked}
                           />
                         )
                       }
@@ -12281,7 +13055,7 @@ function GameSurfaceComponent({
                                       Math.min(combatLogEntries.length, current + combatLogPageSize),
                                     );
                                   }}
-                                  className="rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-xs font-medium text-white/70 shadow-lg transition-colors hover:bg-white/10 hover:text-white"
+                                  className="rounded-md border border-white/10 bg-black/55 px-3 py-1.5 text-xs font-medium text-white/70 shadow-lg transition-colors hover:bg-white/10 hover:text-white"
                                 >
                                   {localizeUi("ui.game.gamesurfacecomponent.showMoreOlderLogs")}
                                   {hiddenCombatLogCount})
@@ -12331,43 +13105,28 @@ function GameSurfaceComponent({
                 }}
               />
 
-              {/* Gallery drawer */}
-              <Suspense fallback={null}>
-                <ChatGalleryDrawer
-                  chat={chat}
-                  open={resolvedGalleryOpen}
-                  onClose={handleCloseGalleryPanel}
-                  anchor={resolvedGalleryAnchor}
-                  onIllustrate={handleManualSceneIllustration}
-                  onIllustrateWithAgent={async (agentType) => {
-                    await retryAgents(activeChatId, [agentType], { forceImageGeneration: true });
-                  }}
-                  onGenerateStoryboard={handleGenerateTurnStoryboard}
-                  onViewStoryboard={
-                    latestTurnStoryboard || storyboardGenerating ? handleViewStoryboardFromGallery : undefined
-                  }
-                  onGenerateVideo={handleGenerateSceneVideo}
-                  onAnimateImage={(image) => handleGenerateSceneVideo({ galleryImageId: image.id })}
-                  onGenerateBackground={handleManualSceneBackground}
-                />
-              </Suspense>
               <PinnedImageOverlay activeChatId={activeChatId} includeSceneVideos />
 
               {/* Inventory overlay */}
               <GameInventory
                 items={inventoryItems}
+                bags={inventoryBags}
                 open={inventoryOpen}
                 onClose={() => setInventoryOpen(false)}
                 onAddItem={handleAddInventoryItem}
+                itemBook={inventoryItemBook}
+                rulesetDefinition={gameRuleset.status === "ok" ? gameRuleset.definition : undefined}
+                onAddRulesetItems={handleAddRulesetItems}
+                placeAmong={inventoryPlaceAmong}
+                onWearItem={handleWearInventoryStack}
                 onRenameItem={handleRenameInventoryItem}
-                onRemoveItem={handleRemoveInventoryItem}
-                onIncrementItem={handleIncrementInventoryItem}
-                onReorderItem={handleReorderInventoryItem}
+                onSetItemQuantity={handleSetInventoryStackQuantity}
+                onSplitItem={handleSplitInventoryStack}
+                onMergeItems={handleMergeInventoryStacks}
+                onGiveItem={handleGiveInventoryStack}
+                onSwapItems={handleSwapInventoryStacks}
                 canInteract={sessionInteractive && narrationDone && !isStreaming}
-                onUseItem={(itemName) => {
-                  setInventoryOpen(false);
-                  sendMessage(`I use my ${itemName}.`);
-                }}
+                onUseItem={handleUseInventoryStack}
               />
 
               {/* Readable document display (Notes / Books) */}
@@ -12382,11 +13141,6 @@ function GameSurfaceComponent({
                 />
               )}
 
-              {/* First-game spotlight tutorial (auto-opens once; (?) button re-opens). The experience
-                  check is repeated here because the effect guard only stops it from being SCHEDULED,
-                  and could never close one that had already opened. */}
-              <GameTutorial open={tutorialOpen && !experienceOwnsGame} onClose={handleCloseTutorial} />
-
               {/* Inventory notifications */}
               {inventoryNotifications.length > 0 && (
                 <div className="pointer-events-none absolute left-1/2 top-20 z-40 -translate-x-1/2 flex flex-col gap-1">
@@ -12395,12 +13149,12 @@ function GameSurfaceComponent({
                       key={i}
                       className={cn(
                         "animate-in fade-in-0 slide-in-from-bottom-2 rounded-lg border px-4 py-2 text-sm font-semibold shadow-lg backdrop-blur-sm",
-                        n.startsWith("You gained")
+                        n.gain
                           ? "border-emerald-400/30 bg-emerald-900/80 text-emerald-200"
                           : "border-red-400/30 bg-red-900/80 text-red-200",
                       )}
                     >
-                      {n}
+                      {n.text}
                     </div>
                   ))}
                 </div>
@@ -12443,6 +13197,7 @@ function GameSurfaceComponent({
       {/* Character sheet modal */}
       {characterSheetOpen && characterSheetCharId && partyCards[characterSheetCharId] && (
         <GameCharacterSheet
+          key={`${activeChatId}:${characterSheetCharId}`}
           card={partyCards[characterSheetCharId]}
           onClose={closeCharacterSheet}
           onRegenerate={async () => {
@@ -12461,6 +13216,7 @@ function GameSurfaceComponent({
           onAvatarSelect={(file) =>
             handlePartyPortraitUpload(characterSheetCharId, partyCards[characterSheetCharId].title, file)
           }
+          ruleset={characterSheetRuleset}
         />
       )}
 
@@ -12585,6 +13341,128 @@ function GameSurfaceComponent({
         onClose={() => setJsonRepairRequest(null)}
         onApplied={handleJsonRepairApplied}
       />
+
+      {!introCinematicActive && !replayActive && !experienceOwnsGame && (
+        <MobileMapButton
+          rowOffset={controlRowOffset}
+          chatId={activeChatId}
+          map={viewedMap}
+          maps={availableMaps}
+          activeMapId={activeMapId}
+          viewedMapId={effectiveViewedMapId}
+          onViewedMapChange={handleViewedMapChange}
+          onMove={handleMapMove}
+          selectedPosition={viewedMapIsActive ? (pendingMapMove?.position ?? null) : null}
+          onGenerateMap={handleGenerateMap}
+          generateMapDisabled={isStreaming || !sessionInteractive}
+          disabled={isStreaming || !narrationDone || !sessionInteractive}
+          gameState={gameState}
+          timeOfDay={gameSnapshot?.time ?? metaTime ?? null}
+          day={currentGameDay}
+          onDayChange={handleGameDayChange}
+          onTimeChange={handleGameTimeChange}
+          spatialContext={activeSpatialContext}
+          spatialContextLoading={activeSpatialContextLoading}
+        />
+      )}
+
+      {!introCinematicActive && !replayActive && !experienceOwnsGame && (
+        <GamePartyBar
+          key={activeChatId}
+          rowOffset={controlRowOffset}
+          partyMembers={partyMembers}
+          partyCards={partyCards}
+          onRemovePartyMember={handleRemovePartyMemberFromBar}
+          removingPartyMemberId={removingPartyMemberId}
+        />
+      )}
+
+      {/* The top controls are windows that minimize to bubbles in a row at the top right (below the tactical
+          combat bar while it shows, as the old buttons moved down). */}
+      {!introCinematicActive && !replayActive && (
+        <>
+          <ChatControlWindow
+            rowOffset={controlRowOffset}
+            id={CHAT_CONTROL_WINDOW_IDS.gameControls}
+            title={t("chat.controls.gameControls")}
+            icon={
+              <Gamepad2 size={14} className={sceneAnalysis.isPending || spotifyRetryPending ? "animate-pulse" : ""} />
+            }
+            slot={4}
+            width={288}
+            height={220}
+            helpTarget="game-controls"
+          >
+            <div className="flex flex-col gap-1 p-1.5">
+              {renderStoryboardBackgroundControls() && (
+                <div className={cn("flex items-center gap-0.5 px-1 pb-1", CHAT_TOOLBAR_ICON_GAP_CLASS)}>
+                  {renderStoryboardBackgroundControls()}
+                </div>
+              )}
+              {renderRetryItems()}
+            </div>
+          </ChatControlWindow>
+          <ChatControlWindow
+            rowOffset={controlRowOffset}
+            id={CHAT_CONTROL_WINDOW_IDS.session}
+            title={t("game.toolbar.session")}
+            icon={<Feather size={14} />}
+            slot={3}
+            width={672}
+            height={640}
+            helpTarget="session"
+            scroll={false}
+          >
+            {renderSessionPanel()}
+          </ChatControlWindow>
+          <ChatControlWindow
+            rowOffset={controlRowOffset}
+            id={CHAT_CONTROL_WINDOW_IDS.volume}
+            title={t("game.toolbar.volume")}
+            icon={audioMuted || masterVolume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            slot={2}
+            width={280}
+            height={270}
+            helpTarget="volume"
+          >
+            <GameVolumeMixer
+              audioMuted={audioMuted || masterVolume === 0}
+              masterVolume={masterVolume}
+              musicVolume={musicVolume}
+              sfxVolume={sfxVolume}
+              ttsVolume={ttsVolume}
+              ambientVolume={ambientVolume}
+              onMasterVolumeChange={handleMasterVolumeChange}
+              onMusicVolumeChange={(value) => handleChannelVolumeChange("musicVolume", setMusicVolume, value)}
+              onSfxVolumeChange={(value) => handleChannelVolumeChange("sfxVolume", setSfxVolume, value)}
+              onTtsVolumeChange={(value) => handleChannelVolumeChange("ttsVolume", setTtsVolume, value)}
+              onAmbientVolumeChange={(value) => handleChannelVolumeChange("ambientVolume", setAmbientVolume, value)}
+              onToggleMute={handleToggleMute}
+              onAudioInteract={handleAudioInteract}
+            />
+          </ChatControlWindow>
+          <ChatControlWindow
+            rowOffset={controlRowOffset}
+            id={CHAT_CONTROL_WINDOW_IDS.assets}
+            title={t("game.toolbar.assets")}
+            icon={<Folder size={14} />}
+            slot={1}
+            width={864}
+            height={640}
+            helpTarget="assets"
+            scroll={false}
+          >
+            {renderGameAssetsPanel()}
+          </ChatControlWindow>
+          {onSwitchChat ? (
+            <ChatConnectedChatWindow
+              name={connectedChatName}
+              onSwitch={handleSwitchConnectedChat}
+              rowOffset={controlRowOffset}
+            />
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

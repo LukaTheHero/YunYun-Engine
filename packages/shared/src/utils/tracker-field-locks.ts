@@ -3,6 +3,7 @@ import type {
   CustomTrackerField,
   GameState,
   InventoryItem,
+  InventoryTrackerRow,
   PlayerStats,
   PresentCharacter,
   QuestProgress,
@@ -14,11 +15,15 @@ import {
   DEFAULT_WORLD_CUSTOM_FIELD_ICON,
   normalizeWorldCustomFields,
 } from "../constants/tracker-custom-field-icons.js";
+import { excludeInventoryTrackerCarriedDuplicates } from "./inventory-tracker-rows.js";
+import { isTrackerRowsUpdate, resolveTrackerRowsUpdate } from "./tracker-updates.js";
 
 type WorldTrackerField = "date" | "time" | "location" | "weather" | "temperature";
 type TextCharacterField = "emoji" | "name" | "mood" | "appearance" | "outfit" | "thoughts";
 type StatField = "name" | "value" | "max";
 type InventoryField = "name" | "quantity" | "description" | "location";
+type InventoryTrackerField = "name" | "qty" | "description" | "location";
+export type InventoryTrackerGroup = "currencies" | "equipped" | "inventory";
 type QuestField = "name" | "completed" | "currentStage";
 type QuestObjectiveField = "text" | "completed";
 type CustomTrackerFieldKey = "name" | "value";
@@ -325,6 +330,27 @@ export function inventoryItemTrackerLockPrefix(
 
 export function inventoryTrackerLockPrefix() {
   return "player.inventory";
+}
+
+export function roleplayInventoryTrackerLockKey(
+  group: InventoryTrackerGroup,
+  rowOrIndex: Pick<InventoryTrackerRow, "name"> | number | null | undefined,
+  field: InventoryTrackerField,
+  index?: number,
+) {
+  return `${roleplayInventoryTrackerRowLockPrefix(group, rowOrIndex, index)}.${field}`;
+}
+
+export function roleplayInventoryTrackerRowLockPrefix(
+  group: InventoryTrackerGroup,
+  rowOrIndex: Pick<InventoryTrackerRow, "name"> | number | null | undefined,
+  index?: number,
+) {
+  return `player.inventoryTracker.${group}.${namedRowLockRef(rowOrIndex, index)}`;
+}
+
+export function roleplayInventoryTrackerGroupLockPrefix(group: InventoryTrackerGroup) {
+  return `player.inventoryTracker.${group}`;
 }
 
 function characterLockRef(character: Pick<PresentCharacter, "characterId" | "name"> | null | undefined, index: number) {
@@ -731,6 +757,59 @@ function mergeInventoryWithLocks(
   });
 }
 
+function mergeRoleplayInventoryTrackerRowsWithLocks(
+  group: InventoryTrackerGroup,
+  nextRows: InventoryTrackerRow[],
+  currentRows: InventoryTrackerRow[] | null | undefined,
+  locks: TrackerFieldLocks,
+) {
+  return mergeNamedRowsWithLocks(nextRows, currentRows, locks, {
+    mergeRow: (row, currentRow, currentIndex) => {
+      const next = { ...row };
+      for (const field of ["name", "qty", "description", "location"] as const) {
+        if (isTrackerFieldLocked(locks, roleplayInventoryTrackerLockKey(group, currentRow, field, currentIndex))) {
+          if (currentRow[field] === undefined) delete next[field];
+          else next[field] = currentRow[field] as never;
+        }
+      }
+      return next;
+    },
+    prefixFor: (row, index) => `${roleplayInventoryTrackerRowLockPrefix(group, row, index)}.`,
+  });
+}
+
+/**
+ * Keep a currency or equipped item out of the carried list.
+ *
+ * The route filters carried rows before locks are applied, but
+ * `mergeNamedRowsWithLocks` deliberately re-appends a locked row the agent
+ * dropped — which is exactly what happens when a locked carried item gets
+ * equipped, leaving it in both lists. Re-check after merging so the invariant
+ * holds on every path into state, including the client's patch merge.
+ *
+ * Correcting the carried list can mean adding it to a patch that only touched
+ * `equipped`; that is intended, since omitting it would persist the duplicate.
+ */
+function enforceRoleplayInventoryTrackerExclusivity(
+  playerStatsPatch: Partial<PlayerStats>,
+  currentPlayerStats: PlayerStats,
+) {
+  const patchedCurrencies = playerStatsPatch.inventoryTrackerCurrencies;
+  const patchedEquipped = playerStatsPatch.inventoryTrackerEquipped;
+  const patchedCarried = playerStatsPatch.inventoryTrackerInventory;
+  if (!Array.isArray(patchedCurrencies) && !Array.isArray(patchedEquipped) && !Array.isArray(patchedCarried)) return;
+
+  const currencies = Array.isArray(patchedCurrencies)
+    ? patchedCurrencies
+    : (currentPlayerStats.inventoryTrackerCurrencies ?? []);
+  const equipped = Array.isArray(patchedEquipped)
+    ? patchedEquipped
+    : (currentPlayerStats.inventoryTrackerEquipped ?? []);
+  const carried = Array.isArray(patchedCarried) ? patchedCarried : (currentPlayerStats.inventoryTrackerInventory ?? []);
+  const deduped = excludeInventoryTrackerCarriedDuplicates(carried, currencies, equipped);
+  if (deduped.length !== carried.length) playerStatsPatch.inventoryTrackerInventory = deduped;
+}
+
 function mergeCustomTrackerFieldsWithGenericLocks(
   nextFields: CustomTrackerField[],
   currentFields: CustomTrackerField[] | null | undefined,
@@ -883,6 +962,7 @@ function mergeWorldCustomFieldsWithLocks(
   nextFields: WorldCustomField[],
   currentFields: WorldCustomField[] | null | undefined,
   locks: TrackerFieldLocks,
+  preserveMissing = true,
 ) {
   const current = normalizeWorldCustomFields(currentFields);
   const nextNormalizedFields = normalizeWorldCustomFields(nextFields);
@@ -893,18 +973,24 @@ function mergeWorldCustomFieldsWithLocks(
   });
 
   const currentNames = new Set(current.map((field) => normalizeComparableText(field.name)));
-  const merged = current.map((field, index) => {
+  const merged = current.flatMap((field, index) => {
     const next = nextByName.get(normalizeComparableText(field.name));
-    if (!next) return field;
+    if (!next) {
+      return preserveMissing || hasLockWithPrefix(locks, `${worldCustomFieldTrackerLockPrefix(field, index)}.`)
+        ? [field]
+        : [];
+    }
     const valueLocked = isTrackerFieldLocked(locks, worldCustomFieldTrackerLockKey(field, "value", index));
-    return {
-      name: field.name,
-      value: valueLocked ? field.value : next.value,
-      icon:
-        field.icon && field.icon !== DEFAULT_WORLD_CUSTOM_FIELD_ICON
-          ? field.icon
-          : (next.icon ?? DEFAULT_WORLD_CUSTOM_FIELD_ICON),
-    };
+    return [
+      {
+        name: field.name,
+        value: valueLocked ? field.value : next.value,
+        icon:
+          field.icon && field.icon !== DEFAULT_WORLD_CUSTOM_FIELD_ICON
+            ? field.icon
+            : (next.icon ?? DEFAULT_WORLD_CUSTOM_FIELD_ICON),
+      },
+    ];
   });
 
   nextNormalizedFields.forEach((field) => {
@@ -968,9 +1054,14 @@ export function applyTrackerFieldLocksToGameStatePatch<T extends Record<string, 
   fieldLocks: TrackerFieldLocks | null | undefined = currentState?.fieldLocks,
 ): T {
   const locks = normalizeEffectiveTrackerFieldLocks(fieldLocks, currentState);
-  if (!currentState) return patch;
-
   const next = { ...patch } as Record<string, unknown>;
+  const incrementalWorldFields = isTrackerRowsUpdate(next.worldCustomFields);
+  if (incrementalWorldFields) {
+    next.worldCustomFields = normalizeWorldCustomFields(
+      resolveTrackerRowsUpdate(next.worldCustomFields, currentState?.worldCustomFields ?? []),
+    );
+  }
+  if (!currentState) return next as T;
   for (const field of ["date", "time", "location", "weather", "temperature"] as const) {
     if (field in next && isTrackerFieldLocked(locks, worldTrackerLockKey(field))) {
       next[field] = currentState[field];
@@ -982,6 +1073,7 @@ export function applyTrackerFieldLocksToGameStatePatch<T extends Record<string, 
       next.worldCustomFields as WorldCustomField[],
       currentState.worldCustomFields,
       locks,
+      !incrementalWorldFields,
     );
   }
 
@@ -1029,6 +1121,31 @@ export function applyTrackerFieldLocksToGameStatePatch<T extends Record<string, 
         locks,
       );
     }
+    if (Array.isArray(playerStatsPatch.inventoryTrackerCurrencies)) {
+      playerStatsPatch.inventoryTrackerCurrencies = mergeRoleplayInventoryTrackerRowsWithLocks(
+        "currencies",
+        playerStatsPatch.inventoryTrackerCurrencies,
+        currentPlayerStats.inventoryTrackerCurrencies,
+        locks,
+      );
+    }
+    if (Array.isArray(playerStatsPatch.inventoryTrackerEquipped)) {
+      playerStatsPatch.inventoryTrackerEquipped = mergeRoleplayInventoryTrackerRowsWithLocks(
+        "equipped",
+        playerStatsPatch.inventoryTrackerEquipped,
+        currentPlayerStats.inventoryTrackerEquipped,
+        locks,
+      );
+    }
+    if (Array.isArray(playerStatsPatch.inventoryTrackerInventory)) {
+      playerStatsPatch.inventoryTrackerInventory = mergeRoleplayInventoryTrackerRowsWithLocks(
+        "inventory",
+        playerStatsPatch.inventoryTrackerInventory,
+        currentPlayerStats.inventoryTrackerInventory,
+        locks,
+      );
+    }
+    enforceRoleplayInventoryTrackerExclusivity(playerStatsPatch, currentPlayerStats);
     next.playerStats = playerStatsPatch;
   }
 

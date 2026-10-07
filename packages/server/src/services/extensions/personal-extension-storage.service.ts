@@ -120,11 +120,8 @@ function revisionFrom(extension: PersonalExtension): PersonalExtensionRevision {
 function normalizePayload(input: CreatePersonalExtensionInput, source: PersonalExtensionSource) {
   const parsed = createPersonalExtensionSchema.parse(input);
   const runtime = parsed.runtime === "server" ? "server" : "client";
-  if (
-    source === "professor_mari" &&
-    parsed.capabilities.includes(PERSONAL_EXTENSION_FULL_PAGE_CAPABILITY)
-  ) {
-    throw new Error("Professor YunYun extensions cannot request full page access");
+  if (source === "professor_mari" && parsed.capabilities.includes(PERSONAL_EXTENSION_FULL_PAGE_CAPABILITY)) {
+    throw new Error("Professor Mari extensions cannot request full page access");
   }
   return {
     name: parsed.name,

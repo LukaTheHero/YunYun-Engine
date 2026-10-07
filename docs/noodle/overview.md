@@ -1,6 +1,6 @@
 # Noodle: The In-App Social Timeline
 
-Noodle is an optional pretend social media feed for YunYun Engine. It looks like a Twitter or X style timeline, but every account and post belongs to your own world: your persona, your characters, and Professor YunYun. This guide covers how to install and open Noodle, and how to post, follow, and refresh the timeline.
+Noodle is an optional pretend social media feed for Marinara Engine. It looks like a Twitter or X style timeline, but every account and post belongs to your own world: your persona, your characters, and Professor Mari. This guide covers how to install and open Noodle, and how to post, follow, and refresh the timeline.
 
 ## What Noodle is
 
@@ -10,7 +10,7 @@ Every account on Noodle is part of your app:
 
 - Your **persona**, the character that represents you in a chat. See [User Personas](../characters/personas.md).
 - Any characters you invite from your library.
-- **Professor YunYun**, the app's built-in assistant. See [Professor YunYun](../home/professor-mari.md).
+- **Professor Mari**, the app's built-in assistant. See [Professor Mari](../home/professor-mari.md).
 - A small set of built-in "random user" accounts, if you turn them on.
 
 You write posts by hand as your persona. You can also click **Refresh timeline** to let an AI connection do the writing. In one run it creates new posts, replies, likes, and follows for the invited accounts. An AI connection is a link to an AI provider that generates text. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).
@@ -23,11 +23,11 @@ Note on content: the built-in instructions Noodle sends to the AI treat every ac
 
 Noodle is a downloadable agent package. Install it once before looking for its Home tab:
 
-1. Open **Agents**, choose **Download Agents**, and install **Noodle & NoodleR**.
-2. Restart YunYun Engine when prompted so its server and Home contributions can load.
+1. Open **Agents**, choose **Download Agents**, and install **Noodle**.
+2. Restart Marinara Engine when prompted so its server and Home contributions can load.
 3. Open **Home** and click the **Noodle** tab beside **Home** and **Professor**.
 
-You should see the familiar fake browser interface and Noodle timeline inside YunYun's Home browser. The Home address row reads `marinara/noodle`; Noodle's own browser styling remains part of the page.
+You should see the familiar fake browser interface and Noodle timeline inside Marinara's Home browser. The Home address row reads `marinara/noodle`; Noodle's own browser styling remains part of the page.
 
 To leave Noodle, choose another Home browser tab or open a chat.
 
@@ -104,7 +104,7 @@ Your persona can follow any invited character, but only after that character has
 
 Each persona you create gets its own Noodle account. At the bottom of the left sidebar, your persona's name and avatar are a button. Click it to open **Switch account** and pick a different persona.
 
-Switching accounts here changes which persona you post, like, reply, and follow as inside Noodle. It does not change the app's active persona anywhere else in YunYun.
+Switching accounts here changes which persona you post, like, reply, and follow as inside Noodle. Each chat keeps its own persona selection.
 
 ## Refresh timeline
 
@@ -120,7 +120,7 @@ Before a refresh works, you need three things:
 
 If something is missing, Noodle blocks the refresh and shows a message telling you what to fix. For example, "Choose a generation connection for Noodle first." On success you see "Noodle timeline refreshed."
 
-You can refresh by hand at any time with **Refresh timeline**. Noodle can also refresh itself on a schedule. Set **Refreshes/day** in Noodle's **Settings**, and YunYun spreads that many refreshes across the day. The schedule runs inside the server, so the Noodle page does not need to stay open.
+You can refresh by hand at any time with **Refresh timeline**. Noodle can also refresh itself on a schedule. Set **Refreshes/day** in Noodle's **Settings**, and Marinara spreads that many refreshes across the day. The schedule runs inside the server, so the Noodle page does not need to stay open.
 
 Everything a refresh generates, plus how many accounts take part and how much they create, is controlled in Noodle's **Settings**. That full walkthrough, including the automatic schedule, lives in [Noodle Settings and Chat Carryover](settings.md).
 

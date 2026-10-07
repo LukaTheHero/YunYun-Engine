@@ -21,17 +21,35 @@ export const apiConnections = fileTable("api_connections", {
       "nanogpt",
       "xai",
       "arli",
+      "zai",
       "custom",
       "image_generation",
       "video_generation",
+      "audio",
+      "decision",
     ],
   }).notNull(),
   baseUrl: text("base_url").notNull().default(""),
   /** Encrypted API key */
   apiKeyEncrypted: text("api_key_encrypted").notNull().default(""),
+  /**
+   * NanoGPT: encrypted management token (usage:read scope) used only for the
+   * subscription usage widget. Cannot authenticate inference endpoints.
+   */
+  managementTokenEncrypted: text("management_token_encrypted").notNull().default(""),
+  /** NanoGPT: whether the subscription usage widget is shown for this connection. */
+  showUsageWidget: text("show_usage_widget").notNull().default("false"),
   /** Imported endpoints stay unavailable until the user reviews and saves them locally. */
   profileImportReviewRequired: text("profile_import_review_required").notNull().default("false"),
   model: text("model").notNull().default(""),
+  /** Model IDs pinned to the top of the model picker (JSON array). Travels with exports like other settings. */
+  pinnedModels: text("pinned_models").notNull().default("[]"),
+  /**
+   * The model list last fetched from the provider, as JSON `{ fetchedAt, models }`. A re-fetchable cache:
+   * never holds credentials, is left out of API responses and profile exports, and is cleared when the
+   * provider, base URL or API key changes.
+   */
+  savedModels: text("saved_models"),
   imagePath: text("image_path"),
   maxContext: integer("max_context").notNull().default(128000),
   isDefault: text("is_default").notNull().default("false"),
@@ -73,21 +91,36 @@ export const apiConnections = fileTable("api_connections", {
   videoGenerationSource: text("video_generation_source"),
   /** Video generation: explicitly selected service ID. */
   videoService: text("video_service"),
+  /** Audio backend for audio connections (openai | elevenlabs | pockettts | xai). */
+  audioSource: text("audio_source"),
+  decisionSource: text("decision_source"),
+  credentialsFromConnectionId: text("credentials_from_connection_id"),
+  maxStateTokens: integer("max_state_tokens"),
+  /** A Decision connection's time limit in milliseconds; null uses the default. */
+  decisionTimeoutMs: integer("decision_timeout_ms"),
+  /** Default voice id/name for speech synthesis on this audio connection. */
+  audioVoice: text("audio_voice"),
+  /** Whether this audio connection may generate game sound effects ("true"/"false"). */
+  audioSoundEffects: text("audio_sound_effects").notNull().default("false"),
+  /** Whether this audio connection may generate game music ("true"/"false"). */
+  audioMusic: text("audio_music").notNull().default("false"),
   /** Default generation parameters (stored as JSON) for new chats using this connection */
   defaultParameters: text("default_parameters"),
   /** Optional prompt preset override for Roleplay chats using this connection */
   promptPresetId: text("prompt_preset_id"),
   /** Optional hard cap on max_tokens for the API response (for providers like DeepSeek that have lower limits). */
   maxTokensOverride: integer("max_tokens_override"),
-  /** Maximum number of agent LLM jobs YunYun may run at once for this connection. */
+  /** Maximum number of agent LLM jobs Marinara may run at once for this connection. */
   maxParallelJobs: integer("max_parallel_jobs").notNull().default(1),
-  /** Treat as a local/custom endpoint for Professor YunYun JSON tool fallback behavior. */
+  /** Optional cap on outbound requests per minute to this connection (null = unlimited). */
+  maxRequestsPerMinute: integer("max_requests_per_minute"),
+  /** Treat as a local/custom endpoint for Professor Mari JSON tool fallback behavior. */
   treatAsLocalEndpoint: text("treat_as_local_endpoint").notNull().default("false"),
   /**
-   * Claude (Subscription) only. When "true", YunYun passes `settings.fastMode = true`
+   * Claude (Subscription) only. When "true", Marinara passes `settings.fastMode = true`
    * to the Claude Agent SDK, asking the SDK to use its faster, cheaper routing tier
    * (response speed up, but lower-quality model behind the scenes). When "false"
-   * (default), YunYun explicitly forces fast mode off for every request so the
+   * (default), Marinara explicitly forces fast mode off for every request so the
    * exact model chosen on the connection is what runs.
    */
   claudeFastMode: text("claude_fast_mode").notNull().default("false"),

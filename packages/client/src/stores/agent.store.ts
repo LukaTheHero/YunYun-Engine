@@ -5,10 +5,12 @@ import { create } from "zustand";
 import {
   ECHO_CHAMBER_MESSAGE_LIMIT,
   enqueueEchoChamberMessages,
+  normalizeEchoChamberMessages,
   type EchoChamberMessage,
 } from "../lib/echo-chamber-queue";
 import type {
   AgentCallDebugEvent,
+  AgentTaskProgress,
   AgentResult,
   AgentWriteApprovalProposal,
   CharacterCardFieldUpdate,
@@ -105,12 +107,27 @@ function logAgentDebugToBrowserConsole(entry: AgentDebugEntry) {
 export const EMPTY_AGENT_TYPES: string[] = [];
 export const EMPTY_AGENT_FAILURES: AgentFailure[] = [];
 
+export interface AgentProgressEntry extends AgentTaskProgress {
+  chatId: string;
+  runId: string;
+  startedAt: number;
+  receivedAt: number;
+  stopped?: boolean;
+}
+
 interface AgentState {
+  taskProgress: AgentProgressEntry[];
+  updateTaskProgress: (chatId: string, runId: string, progress: AgentTaskProgress) => void;
   activeAgents: string[];
   lastResults: Map<string, AgentResult>;
   isProcessing: boolean;
   /** Chat IDs with agent work currently in flight. Keeps active-chat UI from flashing for background runs. */
   processingChatIds: string[];
+  /** Legacy callers that do not identify an individual agent run. */
+  legacyProcessingChatIds: string[];
+  legacyGlobalProcessing: boolean;
+  /** Generation-scoped runs, kept separate so overlapping Roleplay swipes cannot clear each other. */
+  processingRunIdsByChat: Record<string, string[]>;
   /** Agent types that failed even after auto-retry — manual retry available */
   failedAgentTypes: string[];
   /** Chat ID the failed-agent list belongs to. Null means legacy/global failures. */
@@ -160,6 +177,7 @@ interface AgentState {
   // Actions
   setActiveAgents: (agents: string[]) => void;
   setProcessing: (processing: boolean, chatId?: string | null) => void;
+  setProcessingRun: (runId: string, processing: boolean, chatId: string) => void;
   addResult: (agentId: string, result: AgentResult) => void;
   addDebugEntry: (entry: Omit<AgentDebugEntry, "timestamp"> & { timestamp?: number }) => void;
   setFailedAgentTypes: (types: string[], chatId?: string | null) => void;
@@ -169,8 +187,8 @@ interface AgentState {
   dismissThoughtBubble: (index: number) => void;
   clearThoughtBubbles: () => void;
   addEchoMessage: (characterName: string, reaction: string) => void;
-  enqueueEchoMessages: (reactions: Array<{ characterName: string; reaction: string }>) => void;
-  setEchoMessages: (messages: Array<{ characterName: string; reaction: string; timestamp: number }>) => void;
+  enqueueEchoMessages: (reactions: unknown) => void;
+  setEchoMessages: (messages: unknown) => void;
   clearEchoMessages: () => void;
   setEchoVisibleCount: (count: number) => void;
   revealNextEchoMessage: () => void;
@@ -204,9 +222,13 @@ interface AgentState {
 type AgentDataState = Pick<
   AgentState,
   | "activeAgents"
+  | "taskProgress"
   | "lastResults"
   | "isProcessing"
   | "processingChatIds"
+  | "legacyProcessingChatIds"
+  | "legacyGlobalProcessing"
+  | "processingRunIdsByChat"
   | "failedAgentTypes"
   | "failedAgentChatId"
   | "failedAgentFailures"
@@ -235,8 +257,12 @@ function createInitialAgentDataState(): AgentDataState {
   return {
     activeAgents: [],
     lastResults: new Map(),
+    taskProgress: [],
     isProcessing: false,
     processingChatIds: [],
+    legacyProcessingChatIds: [],
+    legacyGlobalProcessing: false,
+    processingRunIdsByChat: {},
     failedAgentTypes: [],
     failedAgentChatId: null,
     failedAgentFailures: [],
@@ -266,24 +292,90 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   ...createInitialAgentDataState(),
 
   setActiveAgents: (agents) => set({ activeAgents: agents }),
+  updateTaskProgress: (chatId, runId, progress) =>
+    set((state) => {
+      const previous = state.taskProgress.find(
+        (entry) => entry.chatId === chatId && entry.callId === progress.callId && entry.runId === runId,
+      );
+      if (previous?.stopped) return {};
+      const receivedAt = Date.now();
+      const entry = {
+        ...progress,
+        chatId,
+        runId,
+        receivedAt,
+        startedAt: previous?.startedAt ?? receivedAt - progress.elapsedMs,
+      };
+      return {
+        taskProgress: previous
+          ? state.taskProgress.map((item) => (item === previous ? entry : item))
+          : [...state.taskProgress, entry],
+      };
+    }),
   setProcessing: (processing, chatId = null) =>
     set((s) => {
       if (!chatId) {
+        const processingChatIds = Array.from(
+          new Set([...s.legacyProcessingChatIds, ...Object.keys(s.processingRunIdsByChat)]),
+        );
         return {
-          isProcessing: processing,
-          processingChatIds: processing ? s.processingChatIds : [],
+          legacyGlobalProcessing: processing,
+          isProcessing: processing || processingChatIds.length > 0,
+          processingChatIds,
         };
       }
 
-      const processingChatIds = processing
-        ? s.processingChatIds.includes(chatId)
-          ? s.processingChatIds
-          : [...s.processingChatIds, chatId]
-        : s.processingChatIds.filter((id) => id !== chatId);
+      const legacyProcessingChatIds = processing
+        ? s.legacyProcessingChatIds.includes(chatId)
+          ? s.legacyProcessingChatIds
+          : [...s.legacyProcessingChatIds, chatId]
+        : s.legacyProcessingChatIds.filter((id) => id !== chatId);
+      const processingChatIds = Array.from(
+        new Set([...legacyProcessingChatIds, ...Object.keys(s.processingRunIdsByChat)]),
+      );
 
       return {
+        legacyProcessingChatIds,
         processingChatIds,
-        isProcessing: processingChatIds.length > 0,
+        isProcessing: s.legacyGlobalProcessing || processingChatIds.length > 0,
+      };
+    }),
+  setProcessingRun: (runId, processing, chatId) =>
+    set((s) => {
+      const processingRunIdsByChat = { ...s.processingRunIdsByChat };
+      const runIds = new Set(processingRunIdsByChat[chatId] ?? []);
+      const newRun = processing && !runIds.has(runId);
+      if (processing) runIds.add(runId);
+      else runIds.delete(runId);
+      if (runIds.size > 0) processingRunIdsByChat[chatId] = [...runIds];
+      else delete processingRunIdsByChat[chatId];
+
+      const processingChatIds = Array.from(
+        new Set([...s.legacyProcessingChatIds, ...Object.keys(processingRunIdsByChat)]),
+      );
+      return {
+        taskProgress: newRun
+          ? s.taskProgress.filter(
+              (entry) => entry.chatId !== chatId || entry.runId === runId || runIds.has(entry.runId),
+            )
+          : !processing
+            ? s.taskProgress.map((entry) =>
+                entry.chatId === chatId &&
+                entry.runId === runId &&
+                !entry.stopped &&
+                (entry.stage === "waiting" || entry.stage === "streaming")
+                  ? {
+                      ...entry,
+                      stopped: true,
+                      elapsedMs: entry.elapsedMs + Date.now() - entry.receivedAt,
+                      receivedAt: Date.now(),
+                    }
+                  : entry,
+              )
+            : s.taskProgress,
+        processingRunIdsByChat,
+        processingChatIds,
+        isProcessing: s.legacyGlobalProcessing || processingChatIds.length > 0,
       };
     }),
 
@@ -376,7 +468,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   setEchoMessages: (messages) =>
     set((state) => {
-      const nextMessages = messages.slice(-ECHO_CHAMBER_MESSAGE_LIMIT);
+      const nextMessages = normalizeEchoChamberMessages(messages, 0).slice(-ECHO_CHAMBER_MESSAGE_LIMIT);
       return {
         echoMessages: nextMessages,
         echoVisibleCount: Math.min(state.echoVisibleCount, nextMessages.length),

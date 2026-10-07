@@ -20,6 +20,7 @@ export function projectPersona(row: PersonaStorageRow): Persona {
     comment: stringValue(row.comment),
     creator: stringValue(row.creator),
     personaVersion: personaVersion || "1.0",
+    versioningEnabled: row.versioningEnabled !== "false",
     creatorNotes: stringValue(row.creatorNotes),
     phoneticName: stringValue(row.phoneticName) || undefined,
     description: stringValue(row.description),
@@ -27,6 +28,8 @@ export function projectPersona(row: PersonaStorageRow): Persona {
     scenario: stringValue(row.scenario),
     backstory: stringValue(row.backstory),
     appearance: stringValue(row.appearance),
+    imageAppearanceEnabled: row.imageAppearanceEnabled === "true",
+    imageAppearance: stringValue(row.imageAppearance),
     avatarPath: typeof row.avatarPath === "string" ? row.avatarPath : null,
     characterSheetImageId: typeof row.characterSheetImageId === "string" ? row.characterSheetImageId : null,
     useCharacterSheetAsReference: row.useCharacterSheetAsReference === "true",
@@ -68,6 +71,7 @@ export function encodePersonaUpdate(input: PersonaUpdateInput): EncodedPersonaUp
     "scenario",
     "backstory",
     "appearance",
+    "imageAppearance",
     "nameColor",
     "dialogueColor",
     "boxColor",
@@ -76,6 +80,10 @@ export function encodePersonaUpdate(input: PersonaUpdateInput): EncodedPersonaUp
   ] as const;
   for (const field of scalarFields) {
     if (Object.hasOwn(input, field)) encoded[field] = input[field]!;
+  }
+  if (Object.hasOwn(input, "versioningEnabled")) encoded.versioningEnabled = String(input.versioningEnabled);
+  if (Object.hasOwn(input, "imageAppearanceEnabled")) {
+    encoded.imageAppearanceEnabled = String(input.imageAppearanceEnabled);
   }
   if (Object.hasOwn(input, "avatarPath")) encoded.avatarPath = input.avatarPath;
   if (Object.hasOwn(input, "avatarCrop"))

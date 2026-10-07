@@ -109,7 +109,6 @@ export function getTextRewritePendingState(agents: ResolvedAgent[]): { agentType
   return { agentType: "prose-guardian", message: PROSE_GUARDIAN_PENDING_MESSAGE };
 }
 
-
 function readPositiveNumber(value: unknown): number | null {
   const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
@@ -137,37 +136,37 @@ function buildMergedRewritePrompt(agents: ResolvedAgent[]): string {
   const agentBlocks = agents.flatMap((agent) => {
     const label = getRewritePromptLabel(agent.type);
     const parts = [`<${label}>`, `Agent: ${agent.name}`];
-    
+
     // Include promptTemplate if non-empty
     if (agent.promptTemplate) {
       parts.push(agent.promptTemplate);
     }
-    
+
     // For prose-guardian, include settings-based rules (banned, avoid, prefer)
     if (agent.type === "prose-guardian") {
       const settings = agent.settings as Record<string, unknown>;
       const rules: string[] = [];
-      
+
       const banned = typeof settings.banned === "string" ? settings.banned : null;
       if (banned) {
         rules.push(`BANNED WORDS/PHRASES: ${banned}`);
       }
-      
+
       const avoid = typeof settings.avoid === "string" ? settings.avoid : null;
       if (avoid) {
         rules.push(`AVOID: ${avoid}`);
       }
-      
+
       const prefer = typeof settings.prefer === "string" ? settings.prefer : null;
       if (prefer) {
         rules.push(`PREFER: ${prefer}`);
       }
-      
+
       if (rules.length > 0) {
         parts.push(rules.join("\n"));
       }
     }
-    
+
     parts.push(`</${label}>`, ``);
     return parts;
   });
@@ -187,8 +186,13 @@ function buildMergedRewritePrompt(agents: ResolvedAgent[]): string {
   ].join("\n");
 }
 
+/** Built-in rewrite agents share one editor request unless the user turned sharing off for one (#6977). */
+export function sharesBuiltInRewriteRequest(agent: Pick<ResolvedAgent, "type" | "settings">): boolean {
+  return REWRITE_AGENT_TYPES.has(agent.type) && agent.settings.batchWithOtherAgents !== false;
+}
+
 export function mergePairedBuiltInRewriteAgents(agents: ResolvedAgent[]): ResolvedAgent[] {
-  const builtInRewriteAgents = agents.filter((agent) => REWRITE_AGENT_TYPES.has(agent.type));
+  const builtInRewriteAgents = agents.filter(sharesBuiltInRewriteRequest);
   if (builtInRewriteAgents.length <= 1) return agents;
 
   const firstMergeIndex = Math.min(...builtInRewriteAgents.map((agent) => agents.indexOf(agent)));
@@ -214,7 +218,7 @@ export function mergePairedBuiltInRewriteAgents(agents: ResolvedAgent[]): Resolv
   for (let index = 0; index < agents.length; index++) {
     const agent = agents[index]!;
     if (index === firstMergeIndex) merged.push(mergedAgent);
-    if (REWRITE_AGENT_TYPES.has(agent.type)) continue;
+    if (sharesBuiltInRewriteRequest(agent)) continue;
     merged.push(agent);
   }
   return merged;

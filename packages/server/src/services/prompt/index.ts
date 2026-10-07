@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────
 export {
   assemblePrompt,
+  appendFallbackChatSummaryToSystemPrompt,
   resolveChoiceVariableValue,
   type AssemblerInput,
   type AssemblerOutput,
@@ -12,6 +13,12 @@ export { wrapContent, wrapGroup } from "./format-engine.js";
 export { expandMarker, type MarkerContext, type ExpandedMarker } from "./marker-expander.js";
 export {
   buildPromptMacroContext,
+  cloneMacroContextForPreview,
+  decodeDeferredPresetConditionals,
+  resolveMacrosForPreview,
+  normalizeChatMacroVariables,
+  mergeGeneratedChatMacroVariables,
+  parsePresetVariableNames,
   collectCharacterAdvancedPromptEntries,
   collectCharacterDepthPromptEntries,
   collectCharacterPostHistoryEntries,
@@ -21,6 +28,7 @@ export {
   resolvePromptIdleDuration,
   resolvePromptLastGenerationType,
   resolveMacrosWithVariableSnapshot,
+  setLorebookEntryCounts,
   resolveCharacterMacroData,
   type CharacterMacroData,
   type MacroResolutionTransaction,

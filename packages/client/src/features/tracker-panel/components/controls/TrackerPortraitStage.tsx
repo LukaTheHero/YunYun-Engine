@@ -56,9 +56,9 @@ const PORTRAIT_STAGE_BASE_CLASS =
   "group/portrait relative flex min-w-0 items-end justify-center overflow-hidden border-y border-[color-mix(in_srgb,var(--tracker-profile-dialogue-border)_62%,transparent)] bg-[image:var(--tracker-profile-surface)] text-left shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_7%,transparent),inset_0_-18px_24px_color-mix(in_srgb,var(--background)_48%,transparent)] transition-all [background-blend-mode:var(--tracker-profile-surface-blend)]";
 const PORTRAIT_FRAME_TONE_CLASS = {
   featured:
-    "[--tracker-portrait-frame-accent:color-mix(in_srgb,var(--tracker-profile-accent-solid)_64%,var(--tracker-profile-display-solid)_36%)] [--tracker-portrait-frame-rim-opacity:0.74]",
+    "[--tracker-portrait-frame-accent:var(--tracker-profile-accent-solid)] [--tracker-portrait-frame-rim-opacity:0.74]",
   persona:
-    "[--tracker-portrait-frame-accent:color-mix(in_srgb,var(--tracker-profile-accent-solid)_62%,var(--tracker-profile-display-solid)_38%)] [--tracker-portrait-frame-rim-opacity:0.7]",
+    "[--tracker-portrait-frame-accent:var(--tracker-profile-accent-solid)] [--tracker-portrait-frame-rim-opacity:0.7]",
 } satisfies Record<TrackerPortraitStageFrameTone, string>;
 const PORTRAIT_STAGE_INNER_GLOW_CLASS =
   "pointer-events-none absolute inset-1 z-0 rounded-[inherit] bg-[image:radial-gradient(circle_at_50%_0%,color-mix(in_srgb,var(--tracker-profile-display-solid)_14%,transparent),transparent_42%)] opacity-[0.62]";
@@ -230,7 +230,8 @@ export function TrackerPortraitStage({
         PORTRAIT_FRAME_TONE_CLASS[frameTone],
         stageSizeClassName,
         TRACKER_PROFILE_PORTRAIT_LOWER_OUTSIDE_FRAME_CLASS_BY_SIDE[outsideSide],
-        uploadAction && "hover:border-[color-mix(in_srgb,var(--tracker-profile-dialogue-border)_72%,var(--foreground)_28%)]",
+        uploadAction &&
+          "hover:border-[color-mix(in_srgb,var(--tracker-profile-dialogue-border)_72%,var(--foreground)_28%)]",
         canAdjustView ? "cursor-grab active:cursor-grabbing" : "cursor-default",
         className,
       )}
@@ -246,7 +247,9 @@ export function TrackerPortraitStage({
           onPointerMove={handlePointerMove}
           onPointerCancel={endDrag}
           onPointerUp={endDrag}
-          title={canAdjustView ?localizeUi("ui.trackerPanel.trackerportraitstage.dragToRepositionPortrait") : undefined}
+          title={
+            canAdjustView ? localizeUi("ui.trackerPanel.trackerportraitstage.dragToRepositionPortrait") : undefined
+          }
         >
           <div className={PORTRAIT_MEDIA_OFFSET_CLASS} style={mediaOffsetStyle}>
             <img
@@ -311,7 +314,9 @@ export function TrackerPortraitStage({
           >
             <RotateCcw size="0.6875rem" />
           </button>
-          <span className="sr-only">{localizeUi("ui.trackerPanel.trackerportraitstage.portraitZoom")} {zoomPercent}%</span>
+          <span className="sr-only">
+            {localizeUi("ui.trackerPanel.trackerportraitstage.portraitZoom")} {zoomPercent}%
+          </span>
         </div>
       )}
       <div className={cn(PORTRAIT_TOP_GLEAM_BASE_CLASS, PORTRAIT_TOP_GLEAM_CLASS_BY_SIDE[outsideSide])} />

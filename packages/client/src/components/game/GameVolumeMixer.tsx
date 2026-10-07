@@ -3,10 +3,10 @@ import { Volume2, VolumeX, X } from "lucide-react";
 import { useTranslation as useUiTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import {
-  ROLEPLAY_POPOVER_CLOSE_BUTTON,
-  ROLEPLAY_POPOVER_CLOSE_ICON_SIZE,
-  ROLEPLAY_POPOVER_SHELL,
-} from "../chat/roleplay-popover-styles";
+  NEUTRAL_PANEL_CLOSE_BUTTON,
+  NEUTRAL_PANEL_CLOSE_ICON_SIZE,
+  NEUTRAL_PANEL_SHELL,
+} from "../ui/neutral-surface-styles";
 
 interface GameVolumeMixerProps {
   audioMuted: boolean;
@@ -21,7 +21,8 @@ interface GameVolumeMixerProps {
   onTtsVolumeChange: (value: number) => void;
   onAmbientVolumeChange: (value: number) => void;
   onToggleMute: () => void;
-  onClose: () => void;
+  /** Without it (inside the Volume window, which has its own title and close), only the mute button heads the mixer. */
+  onClose?: () => void;
   onAudioInteract?: () => void;
   className?: string;
   style?: CSSProperties;
@@ -66,13 +67,13 @@ export function GameVolumeMixer({
 
   return (
     <div
-      data-chat-floating-panel
-      className={cn(ROLEPLAY_POPOVER_SHELL, "w-64 max-w-[calc(100vw-1.5rem)] p-3", className)}
+      data-chat-floating-panel={onClose ? true : undefined}
+      className={cn(onClose ? cn(NEUTRAL_PANEL_SHELL, "w-64 max-w-[calc(100vw-1.5rem)]") : "w-full", "p-3", className)}
       style={style}
     >
       <div className="mb-2 flex items-center justify-between gap-3 border-b border-[var(--marinara-chat-chrome-panel-divider)] pb-2">
         <span className="text-[0.6875rem] font-semibold uppercase text-[var(--marinara-chat-chrome-panel-muted)]">
-          {localizeUi("game.toolbar.volume")}
+          {onClose ? localizeUi("game.toolbar.volume") : null}
         </span>
         <div className="flex items-center gap-1">
           <button
@@ -81,7 +82,7 @@ export function GameVolumeMixer({
             className={cn(
               "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
               audioMuted
-                ? "bg-red-500/30 text-red-300 hover:bg-red-500/50"
+                ? "bg-[var(--marinara-chat-chrome-button-bg-active)] text-[var(--marinara-chat-chrome-button-text-active)] ring-1 ring-[var(--marinara-chat-chrome-button-border-active)] hover:bg-[var(--marinara-chat-chrome-button-bg-hover)]"
                 : "bg-[var(--marinara-chat-chrome-button-bg)] text-[var(--marinara-chat-chrome-button-text)] ring-1 ring-[var(--marinara-chat-chrome-button-border)] hover:bg-[var(--marinara-chat-chrome-button-bg-hover)] hover:text-[var(--marinara-chat-chrome-button-text-hover)]",
             )}
             title={
@@ -93,14 +94,16 @@ export function GameVolumeMixer({
           >
             {audioMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className={ROLEPLAY_POPOVER_CLOSE_BUTTON}
-            aria-label={localizeUi("ui.game.gamevolumemixer.closeVolume")}
-          >
-            <X size={ROLEPLAY_POPOVER_CLOSE_ICON_SIZE} />
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className={NEUTRAL_PANEL_CLOSE_BUTTON}
+              aria-label={localizeUi("ui.game.gamevolumemixer.closeVolume")}
+            >
+              <X size={NEUTRAL_PANEL_CLOSE_ICON_SIZE} />
+            </button>
+          )}
         </div>
       </div>
 

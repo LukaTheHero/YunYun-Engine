@@ -31,13 +31,14 @@ const [
   { customStickersRoutes },
   { gameAssetsRoutes },
   { knowledgeSourcesRoutes },
+  { cleanupStagedProfileAssets, promoteStagedProfileAssets, stageProfileImportAssets },
   {
-    ProfileImportAssetValidationError,
-    cleanupStagedProfileAssets,
-    promoteStagedProfileAssets,
-    stageProfileImportAssets,
+    isCanonicalMediaPathInsideRoot,
+    sendValidatedMediaFile,
+    validateImageAssetBuffer,
+    validateImageAssetFile,
+    validateVideoAssetFile,
   },
-  { sendValidatedMediaFile, validateImageAssetBuffer, validateImageAssetFile, validateVideoAssetFile },
 ] = await Promise.all([
   import("../../packages/server/src/db/file-backed-store.js"),
   import("../../packages/server/src/db/schema/index.js"),
@@ -55,6 +56,7 @@ const validPng = Buffer.from(
   "base64",
 );
 const html = Buffer.from("<!doctype html><script>globalThis.pwned=true</script>", "utf8");
+const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>globalThis.pwned=true</script></svg>', "utf8");
 const javascript = Buffer.from("globalThis.pwned=true", "utf8");
 const passiveSvgWithDoctype = Buffer.from(
   '<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>',
@@ -92,6 +94,39 @@ const validMp4 = Buffer.from([0, 0, 0, 20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0
 const videoManifest = Buffer.from('{"version":1,"videos":[]}', "utf8");
 
 try {
+  assert.equal(
+    isCanonicalMediaPathInsideRoot(
+      "F:\\MarinaraEngine2\\packages\\server\\data\\gallery\\chat-1\\selfie.png",
+      "f:\\marinaraengine2\\packages\\server\\data",
+      "win32",
+    ),
+    true,
+    "Windows media containment must ignore canonical drive and directory casing",
+  );
+  assert.equal(
+    isCanonicalMediaPathInsideRoot(
+      "F:\\MarinaraEngine2\\packages\\server\\data-escape\\selfie.png",
+      "f:\\marinaraengine2\\packages\\server\\data",
+      "win32",
+    ),
+    false,
+    "Windows media containment must still reject sibling-prefix escapes",
+  );
+  assert.equal(
+    isCanonicalMediaPathInsideRoot(
+      "G:\\MarinaraEngine2\\packages\\server\\data\\gallery\\selfie.png",
+      "F:\\MarinaraEngine2\\packages\\server\\data",
+      "win32",
+    ),
+    false,
+    "Windows media containment must reject a different drive",
+  );
+  assert.equal(
+    isCanonicalMediaPathInsideRoot("/srv/Marinara/data/gallery/selfie.png", "/srv/marinara/data", "linux"),
+    false,
+    "case-sensitive hosts must retain case-sensitive media containment",
+  );
+
   assert.ok(validateImageAssetBuffer(validPng, "valid.png"));
   assert.equal(validateImageAssetBuffer(html, "payload.png"), null);
   assert.equal(validateImageAssetBuffer(javascript, "payload.js"), null);
@@ -130,20 +165,35 @@ try {
   assert.ok(validatedRaceSafeImage);
   const replacementPath = join(dataDir, "replacement.html");
   writeFileSync(replacementPath, html);
-  renameSync(replacementPath, raceSafePath);
-  const descriptorApp = Fastify();
-  descriptorApp.get("/validated-image", (req, reply) =>
-    sendValidatedMediaFile(reply, validatedRaceSafeImage, { method: req.method, rangeHeader: req.headers.range }),
-  );
-  await descriptorApp.ready();
-  const descriptorResponse = await descriptorApp.inject({ method: "GET", url: "/validated-image" });
-  assert.equal(descriptorResponse.statusCode, 200);
-  assert.deepEqual(
-    descriptorResponse.rawPayload,
-    validPng,
-    "serving must use the validated descriptor even when its path is replaced",
-  );
-  await descriptorApp.close();
+  if (process.platform === "win32") {
+    try {
+      assert.throws(
+        () => renameSync(replacementPath, raceSafePath),
+        (error: unknown) => (error as NodeJS.ErrnoException).code === "EPERM",
+        "Windows must block replacing the validated file while its descriptor is open",
+      );
+    } finally {
+      await validatedRaceSafeImage.handle.close();
+    }
+  } else {
+    const descriptorApp = Fastify();
+    try {
+      renameSync(replacementPath, raceSafePath);
+      descriptorApp.get("/validated-image", (req, reply) =>
+        sendValidatedMediaFile(reply, validatedRaceSafeImage, { method: req.method, rangeHeader: req.headers.range }),
+      );
+      await descriptorApp.ready();
+      const descriptorResponse = await descriptorApp.inject({ method: "GET", url: "/validated-image" });
+      assert.equal(descriptorResponse.statusCode, 200);
+      assert.deepEqual(
+        descriptorResponse.rawPayload,
+        validPng,
+        "serving must use the validated descriptor even when its path is replaced",
+      );
+    } finally {
+      await descriptorApp.close();
+    }
+  }
 
   const videoPath = join(dataDir, "range.mp4");
   const rangeVideo = Buffer.concat([validMp4, Buffer.from(Array.from({ length: 128 }, (_, index) => index))]);
@@ -165,43 +215,58 @@ try {
   assert.deepEqual(rangeResponse.rawPayload, rangeVideo.subarray(4, 12));
   await rangeApp.close();
 
-  await assert.rejects(
-    stageProfileImportAssets(
-      dataDir,
-      [{ path: "gallery/global/payload.html", expectedSize: html.length, read: () => html }],
-      1024 * 1024,
-    ),
-    (error) => error instanceof ProfileImportAssetValidationError && /not a supported image file/u.test(error.message),
-    "a profile must not smuggle executable HTML into a same-origin gallery route",
+  const mixedStage = await stageProfileImportAssets(
+    dataDir,
+    [
+      { path: "gallery/global/payload.html", expectedSize: html.length, read: () => html },
+      { path: "game-assets/other/payload.svg", expectedSize: svg.length, read: () => svg },
+      { path: "game-assets/sprites/.native", expectedSize: html.length, read: () => html },
+      { path: "gallery/character-videos/char/payload.mp4", expectedSize: html.length, read: () => html },
+      { path: "custom-emojis/payload.png", expectedSize: javascript.length, read: () => javascript },
+      { path: "gallery/global/still-valid.png", expectedSize: validPng.length, read: () => validPng },
+    ],
+    1024 * 1024,
   );
-  await assert.rejects(
-    stageProfileImportAssets(
-      dataDir,
-      [{ path: "game-assets/other/payload.svg", expectedSize: html.length, read: () => html }],
-      1024 * 1024,
-    ),
-    ProfileImportAssetValidationError,
-    "a profile must not smuggle active SVG into a game-asset route",
+  assert.deepEqual(
+    mixedStage.assets.map((asset) => asset.path),
+    ["gallery/global/still-valid.png"],
+    "invalid media must be omitted without blocking a valid profile asset",
   );
-  await assert.rejects(
-    stageProfileImportAssets(
-      dataDir,
-      [{ path: "gallery/character-videos/char/payload.mp4", expectedSize: html.length, read: () => html }],
-      1024 * 1024,
-    ),
-    ProfileImportAssetValidationError,
-    "a video extension must not override the imported container bytes",
+  assert.deepEqual(
+    mixedStage.skipped.map((asset) => asset.path),
+    [
+      "gallery/global/payload.html",
+      "game-assets/other/payload.svg",
+      "game-assets/sprites/.native",
+      "gallery/character-videos/char/payload.mp4",
+      "custom-emojis/payload.png",
+    ],
+    "every rejected asset must be reported instead of aborting the profile",
   );
-  await assert.rejects(
-    stageProfileImportAssets(
-      dataDir,
-      [{ path: "custom-emojis/payload.png", expectedSize: javascript.length, read: () => javascript }],
-      1024 * 1024,
-    ),
-    ProfileImportAssetValidationError,
-    "a trusted image extension must not override the imported bytes",
-  );
+  assert.ok(mixedStage.skipped.every((asset) => /not a supported/u.test(asset.message)));
+  await promoteStagedProfileAssets(mixedStage);
+  assert.deepEqual(readFileSync(join(dataDir, "gallery", "global", "still-valid.png")), validPng);
+  for (const skipped of mixedStage.skipped) {
+    assert.equal(existsSync(join(dataDir, ...skipped.path.split("/"))), false, `${skipped.path} must stay omitted`);
+  }
+  await cleanupStagedProfileAssets(mixedStage);
 
+  const emptyNativeMarker = Buffer.alloc(0);
+  const nativeMarkerStage = await stageProfileImportAssets(
+    dataDir,
+    [
+      { path: "game-assets/sprites/.native", expectedSize: 0, read: () => emptyNativeMarker },
+      { path: "game-assets/backgrounds/pack/.native", expectedSize: 0, read: () => emptyNativeMarker },
+    ],
+    1024 * 1024,
+  );
+  assert.equal(
+    nativeMarkerStage.assets.length,
+    2,
+    "the seeder's empty .native directory markers must stage instead of failing a stock profile restore",
+  );
+  await cleanupStagedProfileAssets(nativeMarkerStage);
+  assert.equal(existsSync(nativeMarkerStage.rootDir), false, "cleanup must remove the .native marker staging root");
   const validStage = await stageProfileImportAssets(
     dataDir,
     [

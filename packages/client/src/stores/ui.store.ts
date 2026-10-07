@@ -13,14 +13,19 @@ import {
   type LorebookCategory,
   type QuoteFormat,
   type ScenePromptPreferences,
+  type ScenePackageOrigin,
 } from "@marinara-engine/shared";
 import type { LegacyNoodleNavigationState as NoodleNavigationState } from "../lib/legacy-noodle-navigation";
-import { isCssGradient, RAINBOW_GRADIENT_PRESET } from "../lib/css-colors";
+import { isCssGradient, MARINARA_GRADIENT_PRESET, RAINBOW_GRADIENT_PRESET } from "../lib/css-colors";
 import { announceChatFloatingUiDismiss } from "../lib/chat-floating-ui-events";
 import { detectConversationTimeZone, normalizeConversationTimeZone } from "../lib/conversation-time-zone";
 import { BASIC_PANEL_SORT_OPTIONS, normalizeBasicPanelSort, type BasicPanelSort } from "../lib/panel-sort";
 import { resetProfessorMariNavigator } from "../lib/professor-mari-navigation";
 import { DEFAULT_APP_LANGUAGE, type AppLanguage } from "../localization/locale-types";
+import { deferEditorLeave } from "../lib/editor-leave";
+import { UI_PERSISTENCE } from "../lib/ui-persistence";
+import { normalizeChatWidgetFont } from "../lib/font-family";
+import type { ChatWizardDefaults, ChatWizardMode } from "../lib/chat-wizard-defaults";
 
 export type Panel =
   | "chat"
@@ -37,7 +42,8 @@ export type ChatModeShortcut = "conversation" | "roleplay" | "game";
 export const CHARACTER_LIBRARY_SORT_OPTIONS = ["name-asc", "name-desc", "newest", "oldest", "favorites"] as const;
 export type CharacterLibrarySort = (typeof CHARACTER_LIBRARY_SORT_OPTIONS)[number];
 export type CardLibraryKind = "characters" | "personas";
-export const MOBILE_SHELL_MEDIA_QUERY = "(max-width: 767px), (max-width: 1366px) and (any-pointer: coarse)";
+export const MOBILE_SHELL_MEDIA_QUERY =
+  "(max-width: 767px), (max-width: 1440px) and (hover: none) and (any-pointer: coarse)";
 export const CHARACTER_PANEL_FAVORITE_FILTER_OPTIONS = ["all", "favorites", "non-favorites"] as const;
 export type CharacterPanelFavoriteFilter = (typeof CHARACTER_PANEL_FAVORITE_FILTER_OPTIONS)[number];
 export const LOREBOOK_PANEL_CATEGORY_OPTIONS = [
@@ -61,8 +67,27 @@ function normalizeConnectionPanelSort(value: unknown): ConnectionPanelSort {
     ? (value as ConnectionPanelSort)
     : "name-asc";
 }
-type FontSize = 12 | 14 | 16 | 17 | 19 | 22;
+type FontSize = 12 | 14 | 16 | 17 | 19 | 22 | 26 | 30 | 34;
 export type VisualTheme = "default" | "sillytavern";
+export type ChatWidgetPreset = "default" | "dottore" | "mari";
+export type ChatWidgetShape = "preset" | "rounded" | "square" | "cut-corner" | "arched";
+
+export function normalizeChatWidgetPreset(value: unknown): ChatWidgetPreset {
+  return value === "dottore" || value === "mari" ? value : "default";
+}
+
+export function normalizeChatWidgetShape(value: unknown): ChatWidgetShape {
+  return value === "rounded" || value === "square" || value === "cut-corner" || value === "arched" ? value : "preset";
+}
+
+/** No override preserves the existing desktop, phone and custom-theme sizes. */
+export function normalizeChatWidgetButtonSize(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(32, Math.min(96, Math.round(value))) : null;
+}
+
+export function normalizeChatWidgetColor(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
 export type ConversationMessageStyle = "classic" | "bubble";
 export type ConversationAvatarShape = "circle" | "square";
 export type TrackerPanelSide = "left" | "right";
@@ -74,7 +99,7 @@ export type TrackerTemperatureUnit = (typeof TRACKER_TEMPERATURE_UNITS)[number];
 export const QUICK_REPLIES_SETTINGS_CONTROL_ID = "quick-replies" as const;
 export const TRACKER_PANEL_SIZE_PROFILES = ["compact", "standard", "expanded"] as const;
 export type TrackerPanelSizeProfile = (typeof TRACKER_PANEL_SIZE_PROFILES)[number];
-export type TrackerDataPanelSection = "world" | "persona" | "characters" | "quests" | "custom";
+export type TrackerDataPanelSection = "world" | "persona" | "characters" | "inventory" | "quests" | "custom";
 export type TrackerPanelCollapsedSections = Partial<Record<TrackerDataPanelSection, boolean>>;
 export type TrackerPanelSectionOrder = TrackerDataPanelSection[];
 export type EchoChamberSide = "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -84,15 +109,29 @@ export interface EchoChamberSize {
 }
 export type UserStatus = "active" | "idle" | "dnd" | "invisible";
 export type RoleplayAvatarStyle = "none" | "circles" | "rectangles" | "panel";
+export type RoleplayChatPosition = "left" | "center" | "right";
+
+/** Stale or unknown synced values fall back to the centred layout. */
+export function normalizeRoleplayChatPosition(value: unknown): RoleplayChatPosition {
+  return value === "left" || value === "right" ? value : "center";
+}
 export type GameDialogueDisplayMode = "classic" | "stacked";
 /** How much of the chat list shows each chat's background as a row banner. */
 export type ChatListBackgroundMode = "hover" | "always" | "off";
 export type SummaryPopoverSourceMode = "last" | "range";
 export const DEFAULT_ROLEPLAY_BACKGROUND_URL = "/api/backgrounds/file/Black.jpg";
+const DEFAULT_CONVERSATION_BACKGROUND_IMAGE_OPACITY = 45;
+
+export function normalizeConversationBackgroundImageOpacity(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.min(100, Math.round(value)))
+    : DEFAULT_CONVERSATION_BACKGROUND_IMAGE_OPACITY;
+}
 export interface FloatingWidgetPosition {
   x: number;
   y: number;
 }
+export const DEFAULT_MOBILE_MUSIC_WIDGET_POSITION = { x: 16, y: 144 } as const;
 export interface SummaryPopoverSettings {
   sourceMode: SummaryPopoverSourceMode;
   contextSize: number | null;
@@ -175,6 +214,8 @@ function normalizeEchoChamberSides(value: unknown): Record<string, EchoChamberSi
 
 interface ImmediateUiStorageSnapshot {
   customCursorEnabled: boolean | undefined;
+  chatSettingsMoveTipDismissed: boolean | undefined;
+  chatWindowIntroDismissed: boolean | undefined;
   echoChamberSides: string;
   echoChamberSizes: string;
 }
@@ -183,6 +224,8 @@ function readImmediateUiStorageSnapshot(value: string | null): ImmediateUiStorag
   if (!value) {
     return {
       customCursorEnabled: undefined,
+      chatSettingsMoveTipDismissed: undefined,
+      chatWindowIntroDismissed: undefined,
       echoChamberSides: "{}",
       echoChamberSizes: "{}",
     };
@@ -192,6 +235,8 @@ function readImmediateUiStorageSnapshot(value: string | null): ImmediateUiStorag
     const parsed = JSON.parse(value) as {
       state?: {
         customCursorEnabled?: unknown;
+        chatSettingsMoveTipDismissed?: unknown;
+        chatWindowIntroDismissed?: unknown;
         echoChamberSideByChatId?: unknown;
         echoChamberSizeByChatId?: unknown;
       };
@@ -199,12 +244,20 @@ function readImmediateUiStorageSnapshot(value: string | null): ImmediateUiStorag
     return {
       customCursorEnabled:
         typeof parsed.state?.customCursorEnabled === "boolean" ? parsed.state.customCursorEnabled : undefined,
+      chatSettingsMoveTipDismissed:
+        typeof parsed.state?.chatSettingsMoveTipDismissed === "boolean"
+          ? parsed.state.chatSettingsMoveTipDismissed
+          : undefined,
+      chatWindowIntroDismissed:
+        typeof parsed.state?.chatWindowIntroDismissed === "boolean" ? parsed.state.chatWindowIntroDismissed : undefined,
       echoChamberSides: JSON.stringify(normalizeEchoChamberSides(parsed.state?.echoChamberSideByChatId)),
       echoChamberSizes: JSON.stringify(normalizeEchoChamberSizes(parsed.state?.echoChamberSizeByChatId)),
     };
   } catch {
     return {
       customCursorEnabled: undefined,
+      chatSettingsMoveTipDismissed: undefined,
+      chatWindowIntroDismissed: undefined,
       echoChamberSides: "{}",
       echoChamberSizes: "{}",
     };
@@ -216,6 +269,8 @@ function shouldFlushUiStorageImmediately(previousValue: string | null, nextValue
   const next = readImmediateUiStorageSnapshot(nextValue);
   return (
     previous.customCursorEnabled !== next.customCursorEnabled ||
+    previous.chatSettingsMoveTipDismissed !== next.chatSettingsMoveTipDismissed ||
+    previous.chatWindowIntroDismissed !== next.chatWindowIntroDismissed ||
     previous.echoChamberSides !== next.echoChamberSides ||
     previous.echoChamberSizes !== next.echoChamberSizes
   );
@@ -227,8 +282,6 @@ export const TRACKER_PANEL_DEFAULT_BACKGROUND_COLOR = "#09090b";
 export const DEFAULT_APP_BACKGROUND_DARK = "#050312";
 export const DEFAULT_APP_BACKGROUND_LIGHT = "#faf8ff";
 const DEFAULT_APP_BACKGROUNDS = new Set([DEFAULT_APP_BACKGROUND_DARK, DEFAULT_APP_BACKGROUND_LIGHT]);
-export const DEFAULT_APP_ACCENT_DARK = "#d4acfb";
-export const DEFAULT_APP_ACCENT_LIGHT = "#d4acfb";
 const LEGACY_DEFAULT_APP_ACCENTS = new Set(["#d4d4d4", "#1a1025"]);
 export const DEFAULT_CHAT_TEXT_DARK = "#d4d4d4";
 export const DEFAULT_CHAT_TEXT_LIGHT = "#1a1025";
@@ -243,6 +296,15 @@ export const TRACKER_DATA_PANEL_SECTIONS: TrackerDataPanelSection[] = [
   "world",
   "persona",
   "characters",
+  "quests",
+  "inventory",
+  "custom",
+];
+const LEGACY_TRACKER_DATA_PANEL_SECTIONS: TrackerDataPanelSection[] = [
+  "world",
+  "persona",
+  "characters",
+  "inventory",
   "quests",
   "custom",
 ];
@@ -281,8 +343,13 @@ function normalizeUserActivity(activity: string): string {
   return activity.replace(/\s+/g, " ").trim().slice(0, USER_ACTIVITY_MAX_LENGTH);
 }
 
-export function getDefaultAppAccentColor(theme: "dark" | "light") {
-  return theme === "light" ? DEFAULT_APP_ACCENT_LIGHT : DEFAULT_APP_ACCENT_DARK;
+export function getDefaultAppAccentColor() {
+  return MARINARA_GRADIENT_PRESET;
+}
+
+export function getDefaultAppAccentPulseMode() {
+  // Device input, not window width: a narrow desktop window still gets the desktop default.
+  return typeof window !== "undefined" && !window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
 export function getDefaultAppBackgroundColor(theme: "dark" | "light") {
@@ -339,8 +406,16 @@ function normalizeScrollTop(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
-function isMobileShellViewport() {
-  return typeof window !== "undefined" && window.matchMedia(MOBILE_SHELL_MEDIA_QUERY).matches;
+let mobileShellQuery: MediaQueryList | null = null;
+
+export function isMobileShellViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  mobileShellQuery ??= window.matchMedia(MOBILE_SHELL_MEDIA_QUERY);
+  if (mobileShellQuery.matches) return true;
+  const { sidebarWidth, rightPanelWidth } = useUIStore.getState();
+  // Reserve both docked widths plus room for the topbar controls. Checking
+  // capacity, not open panels, avoids layout flips while switching sidebars.
+  return window.innerWidth < 2 * (rightPanelWidth || sidebarWidth) + 384;
 }
 
 function dismissChatFloatingUiForMobilePanel(open: boolean) {
@@ -390,7 +465,7 @@ export function normalizeTrackerPanelSizeProfile(value: unknown, legacyWidth?: u
   return "standard";
 }
 
-function normalizeTrackerPanelCollapsedSections(value: unknown): TrackerPanelCollapsedSections {
+export function normalizeTrackerPanelCollapsedSections(value: unknown): TrackerPanelCollapsedSections {
   const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   const collapsed: TrackerPanelCollapsedSections = {};
   for (const section of TRACKER_DATA_PANEL_SECTIONS) {
@@ -399,7 +474,7 @@ function normalizeTrackerPanelCollapsedSections(value: unknown): TrackerPanelCol
   return collapsed;
 }
 
-function normalizeTrackerPanelSectionOrder(value: unknown): TrackerPanelSectionOrder {
+export function normalizeTrackerPanelSectionOrder(value: unknown): TrackerPanelSectionOrder {
   const order: TrackerPanelSectionOrder = [];
   const seen = new Set<TrackerDataPanelSection>();
   const raw = Array.isArray(value) ? value : [];
@@ -414,6 +489,17 @@ function normalizeTrackerPanelSectionOrder(value: unknown): TrackerPanelSectionO
 
   for (const section of TRACKER_DATA_PANEL_SECTIONS) {
     if (!seen.has(section)) order.push(section);
+  }
+
+  if (order.every((section, index) => section === LEGACY_TRACKER_DATA_PANEL_SECTIONS[index])) {
+    return [...TRACKER_DATA_PANEL_SECTIONS];
+  }
+
+  const inventoryIndex = order.indexOf("inventory");
+  const customIndex = order.indexOf("custom");
+  if (inventoryIndex >= 0 && customIndex >= 0 && inventoryIndex > customIndex) {
+    order.splice(inventoryIndex, 1);
+    order.splice(customIndex, 0, "inventory");
   }
 
   return order;
@@ -445,7 +531,8 @@ export function normalizeScenePromptPreferences(value: unknown): ScenePromptPref
       : DEFAULT_SCENE_PROMPT_PREFERENCES.tense;
   const extraInstructions =
     typeof raw.extraInstructions === "string" ? raw.extraInstructions.trim().slice(0, 2000) : "";
-  return { pov, tense, extraInstructions };
+  const promptPresetId = typeof raw.promptPresetId === "string" ? raw.promptPresetId.trim() || null : null;
+  return { pov, tense, extraInstructions, promptPresetId };
 }
 
 export function normalizeConversationMessageStyle(value: unknown): ConversationMessageStyle {
@@ -535,12 +622,18 @@ export type MariPanelSortMode = "az" | "za" | "newest" | "oldest";
 export type MariEditViewMode = "easy" | "raw";
 
 interface UIState {
+  /** Transient: the initial cross-device settings fetch has settled. */
+  settingsSyncReady: boolean;
+  showHomeBrowserAddressBar: boolean;
+  showHomeBrowserDesktopBookmarksOnOtherTabs: boolean;
+  showHomeBrowserMobileBookmarksOnOtherTabs: boolean;
   sidebarOpen: boolean;
   sidebarWidth: number;
   rightPanelOpen: boolean;
   rightPanelWidth: number;
   rightPanel: Panel;
   trackerPanelEnabled: boolean;
+  /** This chat uses the Tracker Panel; its runtime visibility lives in the floating-window store. */
   trackerPanelOpen: boolean;
   trackerPanelOpenByChatId: Record<string, boolean>;
   trackerPanelSide: TrackerPanelSide;
@@ -578,10 +671,14 @@ interface UIState {
   defaultRoleplayBackground: string;
   /** Native blur applied to selected chat/game background images, in px. */
   chatBackgroundBlur: number;
+  /** Persisted opacity applied to conversation background images, as a percentage. */
+  conversationBackgroundImageOpacity: number;
   /** When set, the main area shows the full-page character editor instead of chat */
   characterDetailId: string | null;
   /** When set, the main area shows the full-page lorebook editor instead of chat */
   lorebookDetailId: string | null;
+  /** In-app clipboard, intentionally not persisted or synced between devices. */
+  lorebookLinkClipboard: { characterIds: string[]; personaIds: string[] } | null;
   /** When set, the main area shows the full-page preset editor instead of chat */
   presetDetailId: string | null;
   /** One-shot tab the preset editor should open to. */
@@ -602,12 +699,16 @@ interface UIState {
   pendingSpatialMapDraftReview: PendingSpatialMapDraftReview | null;
   /** Pre-selected target characters for a NEW regex script opened via openRegexDetail("__new__") */
   regexDetailDefaultCharacterIds: string[] | null;
+  /** Pre-selected preset targets when adding a script from a preset's Regex tab. */
+  regexDetailDefaultPresetIds: string[] | null;
   /** Where to return when the regex editor closes — e.g. back to a character's Advanced tab */
-  regexDetailReturn: { characterId: string; tab?: string } | null;
+  regexDetailReturn: ({ characterId: string; tab?: string } | { presetId: string }) | null;
   /** One-shot tab the character editor should open to (set by the regex-editor return path) */
   characterDetailInitialTab: string | null;
   /** One-shot tab the lorebook editor should open to. */
   lorebookDetailInitialTab: string | null;
+  /** One-shot entry the lorebook editor should open expanded. */
+  lorebookDetailInitialEntryId: string | null;
   /** One-shot tab the persona editor should open to. */
   personaDetailInitialTab: string | null;
   /** When true, the main area shows the browser */
@@ -626,8 +727,12 @@ interface UIState {
   cardLibraryKind: CardLibraryKind;
   /** When true, the main area shows the full-page downloadable agent catalog */
   agentCatalogOpen: boolean;
+  /** Optional package selected when opening the downloadable agent catalog */
+  agentCatalogInitialPackageId: string | null;
   /** Last selected character card inside the full-page character library */
   characterLibrarySelectedId: string | null;
+  /** Optional card to reveal when opening from a library shortcut; not persisted. */
+  characterLibraryInitialId: string | null;
   /** Last selected persona card inside the full-page card library */
   personaLibrarySelectedId: string | null;
   /** Last selected sort order for character lists and the full-page character library */
@@ -680,8 +785,20 @@ interface UIState {
   chatFontSize: number;
   /** Custom font family name (empty = default Inter) */
   fontFamily: string;
+  chatWidgetPreset: ChatWidgetPreset;
+  chatWidgetFont: string;
+  chatWidgetShape: ChatWidgetShape;
+  chatWidgetButtonSize: number | null;
+  chatWidgetBorderColor: string;
+  chatWidgetBackgroundColor: string;
+  chatWidgetTextColor: string;
+  chatWidgetApplyFont: boolean;
+  chatWidgetApplyShape: boolean;
+  chatWidgetApplyColors: boolean;
   enableStreaming: boolean;
   debugMode: boolean;
+  /** When true, warn when an agent uses the configured default connection. */
+  showPaidAgentConnectionWarning: boolean;
   /** Typewriter speed: 1 (very slow) to 100 (instant). Controls how fast streaming tokens appear. */
   streamingSpeed: number;
   /** When true, Game mode narration segments are revealed in full as soon as they become active. */
@@ -696,6 +813,12 @@ interface UIState {
   /** Game mode dialogue layout: classic VN box or a VN box with a scrollable segment history above it. */
   gameDialogueDisplayMode: GameDialogueDisplayMode;
   /**
+   * Game mode narration box collapsed to its handle, so the scene, map or Experience behind it
+   * is visible. The player's standing preference — the box still opens itself whenever it holds
+   * something they must act on (a turn to type, a segment to advance).
+   */
+  gameNarrationCollapsed: boolean;
+  /**
    * Chat-list row banners. "hover" (default) paints the active and hovered rows; touch
    * devices have no hover, so there it means the active row only. "always" paints every
    * row — more images decoded at once, though the sidebar requests downscaled copies.
@@ -709,27 +832,35 @@ interface UIState {
   queueImageGenerationRequests: boolean;
   /** When true, generated image prompts are shown for review before supported provider calls are sent. */
   reviewImagePromptsBeforeSend: boolean;
+  autoSaveGeneratedImagesToGalleries: boolean;
   imageBackgroundWidth: number;
   imageBackgroundHeight: number;
   imageIllustrationWidth: number;
   imageIllustrationHeight: number;
-  imageNoodleWidth: number;
-  imageNoodleHeight: number;
   imageGameWidth: number;
   imageGameHeight: number;
   imagePortraitWidth: number;
   imagePortraitHeight: number;
+  imageCharacterSheetWidth: number;
+  imageCharacterSheetHeight: number;
   imageSelfieWidth: number;
   imageSelfieHeight: number;
   imageStyleProfiles: ImageStyleProfileSettings;
 
   conversationMessageStyle: ConversationMessageStyle;
+  alwaysDisplayConversationSwipeMenu: boolean;
+  alwaysDisplayRoleplaySwipeMenu: boolean;
   conversationAvatarShape: ConversationAvatarShape;
   showTimestamps: boolean;
   showModelName: boolean;
   showTokenUsage: boolean;
+  showContextUsage: boolean;
   showMessageNumbers: boolean;
+  /** When true, character cards are available in Persona pickers. */
+  showCharactersInPersonaPickers: boolean;
   guideGenerations: boolean;
+  /** When true, guided regeneration leaves its guidance in the composer instead of clearing it. */
+  keepGuidanceAfterRegenerate: boolean;
   showQuickRepliesMenu: boolean;
   showQuickReplyPostOnly: boolean;
   showQuickReplyGuide: boolean;
@@ -741,10 +872,16 @@ interface UIState {
   confirmBeforeDelete: boolean;
   /** When true, chat exports include saved thinking/reasoning metadata. */
   includeReasoningInExports: boolean;
+  /** When true, chat exports include private message notes. */
+  includePrivateNotesInExports: boolean;
   /** Number of messages to load per page (0 = load all) */
   messagesPerPage: number;
   /** Bold quoted dialogue in chat messages; color highlighting can still remain when this is off */
   boldDialogue: boolean;
+  /** When true, character names and aliases are colored in chat prose using the character's nameColor. */
+  colorInlineNames: boolean;
+  /** When true, inline name coloring uses the first solid color from gradients instead of rendering the gradient. */
+  disableInlineNameGradients: boolean;
   /** Preferred quote style applied to AI output and user input. */
   quoteFormat: QuoteFormat;
   /** When true, common LaTeX symbol commands render as plain Unicode symbols in chat text. */
@@ -793,6 +930,8 @@ interface UIState {
   summaryPopoverSettings: SummaryPopoverSettings;
   /** Last-used preferences for generating character/user-initiated roleplay scenes. */
   scenePromptPreferences: ScenePromptPreferences;
+  /** A package thread the Home browser should open once: where a scene came from. Not persisted. */
+  sceneOriginFocus: ScenePackageOrigin | null;
 
   // ── Text Appearance ──
   /** Color for chat message text (empty = theme default) */
@@ -805,6 +944,10 @@ interface UIState {
   chatFontOpacity: number;
   /** When true, flatten expensive Roleplay paint effects for smoother navigation. */
   roleplayReducedPaintEffects: boolean;
+  /** When true, show saved and streaming model reasoning inside Roleplay message bubbles. */
+  showRoleplayThinkingInMessages: boolean;
+  /** When true, inline Roleplay reasoning stays expanded until the user collapses it. */
+  keepRoleplayThinkingExpanded: boolean;
   /** Whether Game mode applies animated emphasis to narration and dialogue text. */
   gameTextEffectsEnabled: boolean;
   /** Layout style for roleplay message avatars */
@@ -817,6 +960,14 @@ interface UIState {
   roleplayNarratorAvatarCycling: boolean;
   /** Default scale multiplier for Roleplay full-body sprites. */
   roleplaySpriteScale: number;
+  /** Default presentation for Roleplay chats without a saved choice. */
+  roleplayDisplayStyle: "classic" | "visual-novel";
+  /** Where the Roleplay messages and input sit on wide screens. Phones always use the full width. */
+  roleplayChatPosition: RoleplayChatPosition;
+  roleplayVnAutoPlay: boolean;
+  roleplayVnAutoPlayDelay: number;
+  roleplayVnPortraitScale: number;
+  roleplayVnSpriteScale: number;
   /** Scale multiplier for Game mode VN dialogue portraits. */
   gameAvatarScale: number;
   /** Scale multiplier for Game mode center full-body sprites. */
@@ -840,6 +991,8 @@ interface UIState {
   rpNotificationSound: boolean;
   gameNotificationSound: boolean;
   notificationSoundsOnlyWhenUnfocused: boolean;
+  notificationPosition: "top" | "bottom";
+  chatWizardDefaults: Partial<Record<ChatWizardMode, ChatWizardDefaults>>;
   conversationBrowserNotifications: boolean;
   conversationMobileNotifications: boolean;
   generationBrowserNotifications: boolean;
@@ -878,11 +1031,17 @@ interface UIState {
 
   // ── Onboarding ──
   hasCompletedOnboarding: boolean;
-  /** True once the user has permanently disabled the in-game tutorial (? icon still re-opens). */
-  gameTutorialDisabled: boolean;
+  /** Chat modes whose first-chat help overlay has already been dismissed. */
+  chatHelpSeenModes: ChatModeShortcut[];
+  /** Removes the chat Help button and suppresses automatic help overlays. */
+  chatHelpButtonHidden: boolean;
 
   // ── Dismissals ──
   linkApiBannerDismissed: boolean;
+  /** The Chat Settings "drag to place it" tip was dismissed on this device. */
+  chatSettingsMoveTipDismissed: boolean;
+  /** The once-only chat window introduction was dismissed across chats and devices. */
+  chatWindowIntroDismissed: boolean;
 
   // ── EchoChamber ──
   echoChamberOpen: boolean;
@@ -920,6 +1079,9 @@ interface UIState {
   chatModeShortcutRequest: { mode: ChatModeShortcut; token: number } | null;
 
   // Actions
+  setShowHomeBrowserAddressBar: (visible: boolean) => void;
+  setShowHomeBrowserDesktopBookmarksOnOtherTabs: (visible: boolean) => void;
+  setShowHomeBrowserMobileBookmarksOnOtherTabs: (visible: boolean) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
@@ -960,6 +1122,7 @@ interface UIState {
   setChatBackground: (url: string | null) => void;
   setDefaultRoleplayBackground: (url: string) => void;
   setChatBackgroundBlur: (v: number) => void;
+  setConversationBackgroundImageOpacity: (v: number) => void;
   setCharacterLibrarySelectedId: (id: string | null) => void;
   setPersonaLibrarySelectedId: (id: string | null) => void;
   setCharacterLibrarySort: (sort: CharacterLibrarySort) => void;
@@ -983,8 +1146,9 @@ interface UIState {
   setAgentPanelSort: (sort: ResourcePanelSort) => void;
   openCharacterDetail: (id: string, options?: { preserveCharacterLibrary?: boolean; initialTab?: string }) => void;
   closeCharacterDetail: () => void;
-  openLorebookDetail: (id: string, options?: { initialTab?: string }) => void;
+  openLorebookDetail: (id: string, options?: { initialTab?: string; entryId?: string }) => void;
   closeLorebookDetail: () => void;
+  setLorebookLinkClipboard: (links: NonNullable<UIState["lorebookLinkClipboard"]>) => void;
   openPresetDetail: (id: string, options?: { initialTab?: string }) => void;
   closePresetDetail: () => void;
   openConnectionDetail: (id: string) => void;
@@ -997,17 +1161,21 @@ interface UIState {
   closePersonaDetail: () => void;
   openRegexDetail: (
     id: string,
-    options?: { defaultCharacterIds?: string[]; returnTo?: { characterId: string; tab?: string } },
+    options?: {
+      defaultCharacterIds?: string[];
+      defaultPresetIds?: string[];
+      returnTo?: { characterId: string; tab?: string } | { presetId: string };
+    },
   ) => void;
   closeRegexDetail: () => void;
   openSpatialMapDetail: (chatId: string) => void;
   openSpatialMapDraftReview: (review: PendingSpatialMapDraftReview) => void;
   clearPendingSpatialMapDraftReview: () => void;
   closeSpatialMapDetail: () => void;
-  openCharacterLibrary: () => void;
+  openCharacterLibrary: (characterId?: string) => void;
   openPersonaLibrary: () => void;
   closeCharacterLibrary: () => void;
-  openAgentCatalog: () => void;
+  openAgentCatalog: (packageId?: string) => void;
   closeAgentCatalog: () => void;
   openBotBrowser: () => void;
   closeBotBrowser: () => void;
@@ -1030,32 +1198,50 @@ interface UIState {
   setLanguage: (language: AppLanguage) => void;
   setChatFontSize: (size: number) => void;
   setFontFamily: (family: string) => void;
+  setChatWidgetPreset: (preset: ChatWidgetPreset) => void;
+  setChatWidgetFont: (font: string) => void;
+  setChatWidgetShape: (shape: ChatWidgetShape) => void;
+  setChatWidgetButtonSize: (size: number | null) => void;
+  setChatWidgetBorderColor: (color: string) => void;
+  setChatWidgetBackgroundColor: (color: string) => void;
+  setChatWidgetTextColor: (color: string) => void;
+  setChatWidgetApplyFont: (enabled: boolean) => void;
+  setChatWidgetApplyShape: (enabled: boolean) => void;
+  setChatWidgetApplyColors: (enabled: boolean) => void;
   setEnableStreaming: (v: boolean) => void;
   setDebugMode: (v: boolean) => void;
+  setShowPaidAgentConnectionWarning: (v: boolean) => void;
   setStreamingSpeed: (v: number) => void;
   setGameInstantTextReveal: (v: boolean) => void;
   setGameMiddleMouseNav: (v: boolean) => void;
   setGameDialogueDisplayMode: (v: GameDialogueDisplayMode) => void;
+  setGameNarrationCollapsed: (v: boolean) => void;
   setChatListBackgrounds: (v: ChatListBackgroundMode) => void;
   setGameTextSpeed: (v: number) => void;
   setGameAutoPlayDelay: (v: number) => void;
   setQueueImageGenerationRequests: (v: boolean) => void;
   setReviewImagePromptsBeforeSend: (v: boolean) => void;
+  setAutoSaveGeneratedImagesToGalleries: (v: boolean) => void;
   setImageBackgroundDimensions: (width: number, height: number) => void;
   setImageIllustrationDimensions: (width: number, height: number) => void;
-  setImageNoodleDimensions: (width: number, height: number) => void;
   setImageGameDimensions: (width: number, height: number) => void;
   setImagePortraitDimensions: (width: number, height: number) => void;
+  setImageCharacterSheetDimensions: (width: number, height: number) => void;
   setImageSelfieDimensions: (width: number, height: number) => void;
   setImageStyleProfiles: (settings: ImageStyleProfileSettings) => void;
 
   setConversationMessageStyle: (v: ConversationMessageStyle) => void;
+  setAlwaysDisplayConversationSwipeMenu: (v: boolean) => void;
+  setAlwaysDisplayRoleplaySwipeMenu: (v: boolean) => void;
   setConversationAvatarShape: (v: ConversationAvatarShape) => void;
   setShowTimestamps: (v: boolean) => void;
   setShowModelName: (v: boolean) => void;
   setShowTokenUsage: (v: boolean) => void;
+  setShowContextUsage: (v: boolean) => void;
   setShowMessageNumbers: (v: boolean) => void;
+  setShowCharactersInPersonaPickers: (v: boolean) => void;
   setGuideGenerations: (v: boolean) => void;
+  setKeepGuidanceAfterRegenerate: (v: boolean) => void;
   setShowQuickRepliesMenu: (v: boolean) => void;
   setShowQuickReplyPostOnly: (v: boolean) => void;
   setShowQuickReplyGuide: (v: boolean) => void;
@@ -1066,8 +1252,11 @@ interface UIState {
   setChatSettingsSectionExpanded: (id: string, open: boolean) => void;
   setConfirmBeforeDelete: (v: boolean) => void;
   setIncludeReasoningInExports: (v: boolean) => void;
+  setIncludePrivateNotesInExports: (v: boolean) => void;
   setMessagesPerPage: (n: number) => void;
   setBoldDialogue: (v: boolean) => void;
+  setColorInlineNames: (v: boolean) => void;
+  setDisableInlineNameGradients: (v: boolean) => void;
   setQuoteFormat: (v: QuoteFormat) => void;
   setConvertLatexSymbols: (v: boolean) => void;
   setTrimIncompleteModelOutput: (v: boolean) => void;
@@ -1092,17 +1281,26 @@ interface UIState {
   setEditMessageOnDoubleClick: (v: boolean) => void;
   setSummaryPopoverSettings: (settings: Partial<SummaryPopoverSettings>) => void;
   setScenePromptPreferences: (preferences: ScenePromptPreferences) => void;
+  setSceneOriginFocus: (origin: ScenePackageOrigin | null) => void;
   setChatFontColor: (v: string) => void;
   setDefaultDialogueColor: (v: string) => void;
   setChatChromeTextColor: (v: string) => void;
   setChatFontOpacity: (v: number) => void;
   setRoleplayReducedPaintEffects: (v: boolean) => void;
+  setShowRoleplayThinkingInMessages: (v: boolean) => void;
+  setKeepRoleplayThinkingExpanded: (v: boolean) => void;
   setGameTextEffectsEnabled: (v: boolean) => void;
   setRoleplayAvatarStyle: (v: RoleplayAvatarStyle) => void;
   setRoleplayAvatarScale: (v: number) => void;
   setRoleplayAvatarsScrollable: (v: boolean) => void;
   setRoleplayNarratorAvatarCycling: (v: boolean) => void;
   setRoleplaySpriteScale: (v: number) => void;
+  setRoleplayDisplayStyle: (v: "classic" | "visual-novel") => void;
+  setRoleplayChatPosition: (v: RoleplayChatPosition) => void;
+  setRoleplayVnAutoPlay: (v: boolean) => void;
+  setRoleplayVnAutoPlayDelay: (v: number) => void;
+  setRoleplayVnPortraitScale: (v: number) => void;
+  setRoleplayVnSpriteScale: (v: number) => void;
   setGameAvatarScale: (v: number) => void;
   setGameFullBodySpriteScale: (v: number) => void;
   setTextStrokeWidth: (v: number) => void;
@@ -1116,6 +1314,8 @@ interface UIState {
   setRpNotificationSound: (v: boolean) => void;
   setGameNotificationSound: (v: boolean) => void;
   setNotificationSoundsOnlyWhenUnfocused: (v: boolean) => void;
+  setNotificationPosition: (v: "top" | "bottom") => void;
+  setChatWizardDefaults: (mode: ChatWizardMode, defaults: ChatWizardDefaults | null) => void;
   setConversationBrowserNotifications: (v: boolean) => void;
   setConversationMobileNotifications: (v: boolean) => void;
   setGenerationBrowserNotifications: (v: boolean) => void;
@@ -1146,8 +1346,11 @@ interface UIState {
   setHasMigratedCustomThemesToServer: (v: boolean) => void;
   clearLegacyCustomThemes: () => void;
   setHasCompletedOnboarding: (v: boolean) => void;
-  setGameTutorialDisabled: (v: boolean) => void;
+  markChatHelpSeen: (mode: ChatModeShortcut) => void;
+  setChatHelpButtonHidden: (v: boolean) => void;
   dismissLinkApiBanner: () => void;
+  dismissChatSettingsMoveTip: () => void;
+  dismissChatWindowIntro: () => void;
   toggleEchoChamber: () => void;
   setEchoChamberSide: (side: EchoChamberSide) => void;
   setEchoChamberSideForChat: (chatId: string, side: EchoChamberSide) => void;
@@ -1216,8 +1419,12 @@ function normalizePersistedMainSurface(persisted: Record<string, unknown>) {
  */
 export function pickSyncedSettings(state: UIState) {
   return {
+    showHomeBrowserAddressBar: state.showHomeBrowserAddressBar,
+    showHomeBrowserDesktopBookmarksOnOtherTabs: state.showHomeBrowserDesktopBookmarksOnOtherTabs,
+    showHomeBrowserMobileBookmarksOnOtherTabs: state.showHomeBrowserMobileBookmarksOnOtherTabs,
     sidebarOpen: state.sidebarOpen,
     sidebarWidth: state.sidebarWidth,
+    rightPanelWidth: state.rightPanelWidth,
     trackerPanelEnabled: state.trackerPanelEnabled,
     trackerPanelSide: state.trackerPanelSide,
     trackerPanelHideHudWidgets: state.trackerPanelHideHudWidgets,
@@ -1239,39 +1446,58 @@ export function pickSyncedSettings(state: UIState) {
     chatBackground: state.chatBackground,
     defaultRoleplayBackground: state.defaultRoleplayBackground,
     chatBackgroundBlur: state.chatBackgroundBlur,
+    conversationBackgroundImageOpacity: state.conversationBackgroundImageOpacity,
     language: state.language,
     fontFamily: state.fontFamily,
+    chatWidgetPreset: state.chatWidgetPreset,
+    chatWidgetFont: state.chatWidgetFont,
+    chatWidgetShape: state.chatWidgetShape,
+    chatWidgetButtonSize: state.chatWidgetButtonSize,
+    chatWidgetBorderColor: state.chatWidgetBorderColor,
+    chatWidgetBackgroundColor: state.chatWidgetBackgroundColor,
+    chatWidgetTextColor: state.chatWidgetTextColor,
+    chatWidgetApplyFont: state.chatWidgetApplyFont,
+    chatWidgetApplyShape: state.chatWidgetApplyShape,
+    chatWidgetApplyColors: state.chatWidgetApplyColors,
     enableStreaming: state.enableStreaming,
     streamingSpeed: state.streamingSpeed,
+    showPaidAgentConnectionWarning: state.showPaidAgentConnectionWarning,
     gameInstantTextReveal: state.gameInstantTextReveal,
     gameMiddleMouseNav: state.gameMiddleMouseNav,
     gameDialogueDisplayMode: state.gameDialogueDisplayMode,
+    gameNarrationCollapsed: state.gameNarrationCollapsed,
     chatListBackgrounds: state.chatListBackgrounds,
     gameTextSpeed: state.gameTextSpeed,
     gameAutoPlayDelay: state.gameAutoPlayDelay,
     queueImageGenerationRequests: state.queueImageGenerationRequests,
     reviewImagePromptsBeforeSend: state.reviewImagePromptsBeforeSend,
+    autoSaveGeneratedImagesToGalleries: state.autoSaveGeneratedImagesToGalleries,
     imageBackgroundWidth: state.imageBackgroundWidth,
     imageBackgroundHeight: state.imageBackgroundHeight,
     imageIllustrationWidth: state.imageIllustrationWidth,
     imageIllustrationHeight: state.imageIllustrationHeight,
-    imageNoodleWidth: state.imageNoodleWidth,
-    imageNoodleHeight: state.imageNoodleHeight,
     imageGameWidth: state.imageGameWidth,
     imageGameHeight: state.imageGameHeight,
     imagePortraitWidth: state.imagePortraitWidth,
     imagePortraitHeight: state.imagePortraitHeight,
+    imageCharacterSheetWidth: state.imageCharacterSheetWidth,
+    imageCharacterSheetHeight: state.imageCharacterSheetHeight,
     imageSelfieWidth: state.imageSelfieWidth,
     imageSelfieHeight: state.imageSelfieHeight,
     [IMAGE_STYLE_PROFILES_STORAGE_KEY]: state.imageStyleProfiles,
 
     conversationMessageStyle: state.conversationMessageStyle,
+    alwaysDisplayConversationSwipeMenu: state.alwaysDisplayConversationSwipeMenu,
+    alwaysDisplayRoleplaySwipeMenu: state.alwaysDisplayRoleplaySwipeMenu,
     conversationAvatarShape: state.conversationAvatarShape,
     showTimestamps: state.showTimestamps,
     showModelName: state.showModelName,
     showTokenUsage: state.showTokenUsage,
+    showContextUsage: state.showContextUsage,
     showMessageNumbers: state.showMessageNumbers,
+    showCharactersInPersonaPickers: state.showCharactersInPersonaPickers,
     guideGenerations: state.guideGenerations,
+    keepGuidanceAfterRegenerate: state.keepGuidanceAfterRegenerate,
     showQuickRepliesMenu: state.showQuickRepliesMenu,
     showQuickReplyPostOnly: state.showQuickReplyPostOnly,
     showQuickReplyGuide: state.showQuickReplyGuide,
@@ -1280,8 +1506,11 @@ export function pickSyncedSettings(state: UIState) {
     chatSettingsExpandedSections: state.chatSettingsExpandedSections,
     confirmBeforeDelete: state.confirmBeforeDelete,
     includeReasoningInExports: state.includeReasoningInExports,
+    includePrivateNotesInExports: state.includePrivateNotesInExports,
     messagesPerPage: state.messagesPerPage,
     boldDialogue: state.boldDialogue,
+    colorInlineNames: state.colorInlineNames,
+    disableInlineNameGradients: state.disableInlineNameGradients,
     quoteFormat: state.quoteFormat,
     convertLatexSymbols: state.convertLatexSymbols,
     trimIncompleteModelOutput: state.trimIncompleteModelOutput,
@@ -1310,12 +1539,20 @@ export function pickSyncedSettings(state: UIState) {
     defaultDialogueColor: state.defaultDialogueColor,
     chatChromeTextColor: state.chatChromeTextColor,
     chatFontOpacity: state.chatFontOpacity,
+    showRoleplayThinkingInMessages: state.showRoleplayThinkingInMessages,
+    keepRoleplayThinkingExpanded: state.keepRoleplayThinkingExpanded,
     gameTextEffectsEnabled: state.gameTextEffectsEnabled,
     roleplayAvatarStyle: state.roleplayAvatarStyle,
     roleplayAvatarScale: state.roleplayAvatarScale,
     roleplayAvatarsScrollable: state.roleplayAvatarsScrollable,
     roleplayNarratorAvatarCycling: state.roleplayNarratorAvatarCycling,
     roleplaySpriteScale: state.roleplaySpriteScale,
+    roleplayDisplayStyle: state.roleplayDisplayStyle,
+    roleplayChatPosition: state.roleplayChatPosition,
+    roleplayVnAutoPlay: state.roleplayVnAutoPlay,
+    roleplayVnAutoPlayDelay: state.roleplayVnAutoPlayDelay,
+    roleplayVnPortraitScale: state.roleplayVnPortraitScale,
+    roleplayVnSpriteScale: state.roleplayVnSpriteScale,
     gameAvatarScale: state.gameAvatarScale,
     gameFullBodySpriteScale: state.gameFullBodySpriteScale,
     textStrokeWidth: state.textStrokeWidth,
@@ -1328,8 +1565,11 @@ export function pickSyncedSettings(state: UIState) {
     enterToSendProfessorMari: state.enterToSendProfessorMari,
     weatherEffects: state.weatherEffects,
     hasCompletedOnboarding: state.hasCompletedOnboarding,
-    gameTutorialDisabled: state.gameTutorialDisabled,
+    chatHelpSeenModes: state.chatHelpSeenModes,
+    chatHelpButtonHidden: state.chatHelpButtonHidden,
     linkApiBannerDismissed: state.linkApiBannerDismissed,
+    chatSettingsMoveTipDismissed: state.chatSettingsMoveTipDismissed,
+    chatWindowIntroDismissed: state.chatWindowIntroDismissed,
     echoChamberOpen: state.echoChamberOpen,
     echoChamberSide: state.echoChamberSide,
     userStatusManual: state.userStatusManual,
@@ -1339,6 +1579,8 @@ export function pickSyncedSettings(state: UIState) {
     rpNotificationSound: state.rpNotificationSound,
     gameNotificationSound: state.gameNotificationSound,
     notificationSoundsOnlyWhenUnfocused: state.notificationSoundsOnlyWhenUnfocused,
+    notificationPosition: state.notificationPosition,
+    chatWizardDefaults: state.chatWizardDefaults,
     conversationBrowserNotifications: state.conversationBrowserNotifications,
     conversationMobileNotifications: state.conversationMobileNotifications,
     generationBrowserNotifications: state.generationBrowserNotifications,
@@ -1355,394 +1597,718 @@ export function pickSyncedSettings(state: UIState) {
   };
 }
 
+export function pickPersistedUIState(state: UIState) {
+  return {
+    showHomeBrowserAddressBar: state.showHomeBrowserAddressBar,
+    showHomeBrowserDesktopBookmarksOnOtherTabs: state.showHomeBrowserDesktopBookmarksOnOtherTabs,
+    showHomeBrowserMobileBookmarksOnOtherTabs: state.showHomeBrowserMobileBookmarksOnOtherTabs,
+    sidebarOpen: state.sidebarOpen,
+    sidebarWidth: state.sidebarWidth,
+    rightPanelOpen: state.rightPanelOpen,
+    rightPanelWidth: state.rightPanelWidth,
+    rightPanel: state.rightPanel,
+    settingsTab: state.settingsTab,
+    characterDetailId: state.characterDetailId,
+    lorebookDetailId: state.lorebookDetailId,
+    presetDetailId: state.presetDetailId,
+    connectionDetailId: state.connectionDetailId,
+    agentDetailId: state.agentDetailId,
+    toolDetailId: state.toolDetailId,
+    personaDetailId: state.personaDetailId,
+    regexDetailId: state.regexDetailId,
+    spatialMapDetailChatId: state.spatialMapDetailChatId,
+    botBrowserOpen: state.botBrowserOpen,
+    gameAssetsBrowserOpen: state.gameAssetsBrowserOpen,
+    noodleOpen: state.noodleOpen,
+    noodleSelectedPersonaId: state.noodleSelectedPersonaId,
+    noodleNavigation: state.noodleNavigation,
+    characterLibraryOpen: state.characterLibraryOpen,
+    cardLibraryKind: state.cardLibraryKind,
+    agentCatalogOpen: state.agentCatalogOpen,
+    characterLibrarySelectedId: state.characterLibrarySelectedId,
+    personaLibrarySelectedId: state.personaLibrarySelectedId,
+    characterLibrarySort: state.characterLibrarySort,
+    personaLibrarySort: state.personaLibrarySort,
+    characterLibraryScrollTop: state.characterLibraryScrollTop,
+    personaLibraryScrollTop: state.personaLibraryScrollTop,
+    lorebookPanelCategory: state.lorebookPanelCategory,
+    lorebookPanelSearch: state.lorebookPanelSearch,
+    lorebookPanelSort: state.lorebookPanelSort,
+    lorebookPanelActiveTag: state.lorebookPanelActiveTag,
+    lorebookPanelTagsExpanded: state.lorebookPanelTagsExpanded,
+    botBrowserPanelSort: state.botBrowserPanelSort,
+    presetPanelSort: state.presetPanelSort,
+    connectionPanelSort: state.connectionPanelSort,
+    agentPanelSort: state.agentPanelSort,
+    trackerPanelEnabled: state.trackerPanelEnabled,
+    trackerPanelOpen: state.trackerPanelOpen,
+    trackerPanelOpenByChatId: state.trackerPanelOpenByChatId,
+    trackerPanelSide: state.trackerPanelSide,
+    trackerPanelHideHudWidgets: state.trackerPanelHideHudWidgets,
+    trackerPanelUseExpressionSprites: state.trackerPanelUseExpressionSprites,
+    trackerPanelThoughtBubbleDisplay: state.trackerPanelThoughtBubbleDisplay,
+    trackerStatDisplayMode: state.trackerStatDisplayMode,
+    trackerPanelDockedThoughtsAlwaysVisible: state.trackerPanelDockedThoughtsAlwaysVisible,
+    trackerPanelSizeProfile: state.trackerPanelSizeProfile,
+    trackerPanelBackgroundColor: state.trackerPanelBackgroundColor,
+    trackerTemperatureUnit: state.trackerTemperatureUnit,
+    trackerPanelCollapsedSections: state.trackerPanelCollapsedSections,
+    trackerPanelSectionOrder: state.trackerPanelSectionOrder,
+    expandedPersonaGroupIds: state.expandedPersonaGroupIds,
+    expandedCharacterGroupIds: state.expandedCharacterGroupIds,
+    theme: state.theme,
+    appBackgroundColor: state.appBackgroundColor,
+    appAccentColor: state.appAccentColor,
+    appAccentPulseMode: state.appAccentPulseMode,
+    appAccentRgbMode: state.appAccentRgbMode,
+    customCursorEnabled: state.customCursorEnabled,
+    reduceAmbientEffects: state.reduceAmbientEffects,
+    mariPanelSortMode: state.mariPanelSortMode,
+    mariEditViewMode: state.mariEditViewMode,
+    chatBackground: state.chatBackground,
+    defaultRoleplayBackground: state.defaultRoleplayBackground,
+    chatBackgroundBlur: state.chatBackgroundBlur,
+    conversationBackgroundImageOpacity: state.conversationBackgroundImageOpacity,
+    fontSize: state.fontSize,
+    language: state.language,
+    chatFontSize: state.chatFontSize,
+    fontFamily: state.fontFamily,
+    chatWidgetPreset: state.chatWidgetPreset,
+    chatWidgetFont: state.chatWidgetFont,
+    chatWidgetShape: state.chatWidgetShape,
+    chatWidgetButtonSize: state.chatWidgetButtonSize,
+    chatWidgetBorderColor: state.chatWidgetBorderColor,
+    chatWidgetBackgroundColor: state.chatWidgetBackgroundColor,
+    chatWidgetTextColor: state.chatWidgetTextColor,
+    chatWidgetApplyFont: state.chatWidgetApplyFont,
+    chatWidgetApplyShape: state.chatWidgetApplyShape,
+    chatWidgetApplyColors: state.chatWidgetApplyColors,
+    enableStreaming: state.enableStreaming,
+    debugMode: state.debugMode,
+    showPaidAgentConnectionWarning: state.showPaidAgentConnectionWarning,
+    streamingSpeed: state.streamingSpeed,
+    gameInstantTextReveal: state.gameInstantTextReveal,
+    gameMiddleMouseNav: state.gameMiddleMouseNav,
+    gameDialogueDisplayMode: state.gameDialogueDisplayMode,
+    gameNarrationCollapsed: state.gameNarrationCollapsed,
+    chatListBackgrounds: state.chatListBackgrounds,
+    gameTextSpeed: state.gameTextSpeed,
+    gameAutoPlayDelay: state.gameAutoPlayDelay,
+    queueImageGenerationRequests: state.queueImageGenerationRequests,
+    reviewImagePromptsBeforeSend: state.reviewImagePromptsBeforeSend,
+    autoSaveGeneratedImagesToGalleries: state.autoSaveGeneratedImagesToGalleries,
+    imageBackgroundWidth: state.imageBackgroundWidth,
+    imageBackgroundHeight: state.imageBackgroundHeight,
+    imageIllustrationWidth: state.imageIllustrationWidth,
+    imageIllustrationHeight: state.imageIllustrationHeight,
+    imageGameWidth: state.imageGameWidth,
+    imageGameHeight: state.imageGameHeight,
+    imagePortraitWidth: state.imagePortraitWidth,
+    imagePortraitHeight: state.imagePortraitHeight,
+    imageCharacterSheetWidth: state.imageCharacterSheetWidth,
+    imageCharacterSheetHeight: state.imageCharacterSheetHeight,
+    imageSelfieWidth: state.imageSelfieWidth,
+    imageSelfieHeight: state.imageSelfieHeight,
+    imageStyleProfiles: state.imageStyleProfiles,
+
+    conversationMessageStyle: state.conversationMessageStyle,
+    alwaysDisplayConversationSwipeMenu: state.alwaysDisplayConversationSwipeMenu,
+    alwaysDisplayRoleplaySwipeMenu: state.alwaysDisplayRoleplaySwipeMenu,
+    conversationAvatarShape: state.conversationAvatarShape,
+    showTimestamps: state.showTimestamps,
+    showModelName: state.showModelName,
+    showTokenUsage: state.showTokenUsage,
+    showContextUsage: state.showContextUsage,
+    showMessageNumbers: state.showMessageNumbers,
+    showCharactersInPersonaPickers: state.showCharactersInPersonaPickers,
+    guideGenerations: state.guideGenerations,
+    keepGuidanceAfterRegenerate: state.keepGuidanceAfterRegenerate,
+    showQuickRepliesMenu: state.showQuickRepliesMenu,
+    showQuickReplyPostOnly: state.showQuickReplyPostOnly,
+    showQuickReplyGuide: state.showQuickReplyGuide,
+    showQuickReplyImpersonate: state.showQuickReplyImpersonate,
+    customQuickReplies: state.customQuickReplies,
+    chatSettingsExpandedSections: state.chatSettingsExpandedSections,
+    confirmBeforeDelete: state.confirmBeforeDelete,
+    includeReasoningInExports: state.includeReasoningInExports,
+    includePrivateNotesInExports: state.includePrivateNotesInExports,
+    messagesPerPage: state.messagesPerPage,
+    boldDialogue: state.boldDialogue,
+    colorInlineNames: state.colorInlineNames,
+    disableInlineNameGradients: state.disableInlineNameGradients,
+    quoteFormat: state.quoteFormat,
+    convertLatexSymbols: state.convertLatexSymbols,
+    trimIncompleteModelOutput: state.trimIncompleteModelOutput,
+    continueAddsNewline: state.continueAddsNewline,
+    speechToTextEnabled: state.speechToTextEnabled,
+    ttsLineVolume: state.ttsLineVolume,
+    chibiProfessorMariEnabled: state.chibiProfessorMariEnabled,
+    professorMariSuggestionsEnabled: state.professorMariSuggestionsEnabled,
+    professorMariNavigationEnabled: state.professorMariNavigationEnabled,
+    achievementsEnabled: state.achievementsEnabled,
+    musicPlayerEnabled: state.musicPlayerEnabled,
+    musicPlayerSource: state.musicPlayerSource,
+    youtubePlayerVolume: state.youtubePlayerVolume,
+    localMusicPlayerVolume: state.localMusicPlayerVolume,
+    conversationCallVoiceVolume: state.conversationCallVoiceVolume,
+    conversationCallVoiceMuted: state.conversationCallVoiceMuted,
+    spotifyMobileWidgetCollapsed: state.spotifyMobileWidgetCollapsed,
+    spotifyMobileWidgetPosition: state.spotifyMobileWidgetPosition,
+    intuitiveSwipeNavigation: state.intuitiveSwipeNavigation,
+    intuitiveSwipeRerollLatest: state.intuitiveSwipeRerollLatest,
+    editLastMessageOnArrowUp: state.editLastMessageOnArrowUp,
+    editMessageOnDoubleClick: state.editMessageOnDoubleClick,
+    summaryPopoverSettings: state.summaryPopoverSettings,
+    scenePromptPreferences: state.scenePromptPreferences,
+    chatFontColor: state.chatFontColor,
+    defaultDialogueColor: state.defaultDialogueColor,
+    chatChromeTextColor: state.chatChromeTextColor,
+    chatFontOpacity: state.chatFontOpacity,
+    roleplayReducedPaintEffects: state.roleplayReducedPaintEffects,
+    showRoleplayThinkingInMessages: state.showRoleplayThinkingInMessages,
+    keepRoleplayThinkingExpanded: state.keepRoleplayThinkingExpanded,
+    gameTextEffectsEnabled: state.gameTextEffectsEnabled,
+    roleplayAvatarStyle: state.roleplayAvatarStyle,
+    roleplayAvatarScale: state.roleplayAvatarScale,
+    roleplayAvatarsScrollable: state.roleplayAvatarsScrollable,
+    roleplayNarratorAvatarCycling: state.roleplayNarratorAvatarCycling,
+    roleplaySpriteScale: state.roleplaySpriteScale,
+    roleplayDisplayStyle: state.roleplayDisplayStyle,
+    roleplayChatPosition: state.roleplayChatPosition,
+    roleplayVnAutoPlay: state.roleplayVnAutoPlay,
+    roleplayVnAutoPlayDelay: state.roleplayVnAutoPlayDelay,
+    roleplayVnPortraitScale: state.roleplayVnPortraitScale,
+    roleplayVnSpriteScale: state.roleplayVnSpriteScale,
+    gameAvatarScale: state.gameAvatarScale,
+    gameFullBodySpriteScale: state.gameFullBodySpriteScale,
+    textStrokeWidth: state.textStrokeWidth,
+    textStrokeColor: state.textStrokeColor,
+    visualTheme: state.visualTheme,
+    convoGradient: state.convoGradient,
+    enterToSendRP: state.enterToSendRP,
+    enterToSendConvo: state.enterToSendConvo,
+    enterToSendGame: state.enterToSendGame,
+    enterToSendProfessorMari: state.enterToSendProfessorMari,
+    weatherEffects: state.weatherEffects,
+    hasMigratedCustomThemesToServer: state.hasMigratedCustomThemesToServer,
+    activeCustomTheme: state.activeCustomTheme,
+    customThemes: state.customThemes,
+    hasCompletedOnboarding: state.hasCompletedOnboarding,
+    chatHelpSeenModes: state.chatHelpSeenModes,
+    chatHelpButtonHidden: state.chatHelpButtonHidden,
+    linkApiBannerDismissed: state.linkApiBannerDismissed,
+    chatSettingsMoveTipDismissed: state.chatSettingsMoveTipDismissed,
+    chatWindowIntroDismissed: state.chatWindowIntroDismissed,
+    echoChamberOpen: state.echoChamberOpen,
+    echoChamberSide: state.echoChamberSide,
+    echoChamberSideByChatId: state.echoChamberSideByChatId,
+    echoChamberSizeByChatId: state.echoChamberSizeByChatId,
+    userStatusManual: state.userStatusManual,
+    userStatus: state.userStatus,
+    userActivity: state.userActivity,
+    recentUserActivities: state.recentUserActivities,
+    convoNotificationSound: state.convoNotificationSound,
+    rpNotificationSound: state.rpNotificationSound,
+    gameNotificationSound: state.gameNotificationSound,
+    notificationSoundsOnlyWhenUnfocused: state.notificationSoundsOnlyWhenUnfocused,
+    notificationPosition: state.notificationPosition,
+    chatWizardDefaults: state.chatWizardDefaults,
+    conversationBrowserNotifications: state.conversationBrowserNotifications,
+    conversationMobileNotifications: state.conversationMobileNotifications,
+    generationBrowserNotifications: state.generationBrowserNotifications,
+    generationMobileNotifications: state.generationMobileNotifications,
+    customConversationPrompt: state.customConversationPrompt,
+    scheduleGenerationPreferences: state.scheduleGenerationPreferences,
+    conversationTimeZone: state.conversationTimeZone,
+    impersonatePromptTemplate: state.impersonatePromptTemplate,
+    activeImpersonatePromptTemplateId: state.activeImpersonatePromptTemplateId,
+    impersonateCyoaChoices: state.impersonateCyoaChoices,
+    impersonatePresetId: state.impersonatePresetId,
+    impersonateConnectionId: state.impersonateConnectionId,
+    impersonateBlockAgents: state.impersonateBlockAgents,
+    learnedGameSetupOptions: state.learnedGameSetupOptions,
+    rememberedGameSetupText: state.rememberedGameSetupText,
+  };
+}
+
 export const useUIStore = create<UIState>()(
   persist(
-    (set, get) => ({
-      sidebarOpen: true,
-      sidebarWidth: 320,
-      rightPanelOpen: false,
-      rightPanelWidth: 320,
-      rightPanel: "chat" as Panel,
-      trackerPanelEnabled: true,
-      trackerPanelOpen: false,
-      trackerPanelOpenByChatId: {},
-      trackerPanelSide: "right" as TrackerPanelSide,
-      trackerPanelHideHudWidgets: false,
-      trackerPanelUseExpressionSprites: false,
-      trackerPanelThoughtBubbleDisplay: "inline" as TrackerThoughtBubbleDisplay,
-      trackerStatDisplayMode: "bars" as TrackerStatDisplayMode,
-      trackerPanelDockedThoughtsAlwaysVisible: false,
-      trackerPanelSizeProfile: "standard" as TrackerPanelSizeProfile,
-      trackerPanelBackgroundColor: TRACKER_PANEL_DEFAULT_BACKGROUND_COLOR,
-      trackerTemperatureUnit: "celsius" as TrackerTemperatureUnit,
-      trackerPanelCollapsedSections: {},
-      trackerPanelSectionOrder: [...TRACKER_DATA_PANEL_SECTIONS],
-      expandedPersonaGroupIds: [],
-      expandedCharacterGroupIds: [],
-      settingsTab: "general",
-      settingsTargetControlId: null,
-      modal: null,
-      theme: "dark" as const,
-      appBackgroundColor: "",
-      appAccentColor: "",
-      appAccentPulseMode: false,
-      appAccentRgbMode: false,
-      customCursorEnabled: true,
-      reduceAmbientEffects: false,
-      mariPanelSortMode: "az",
-      mariEditViewMode: "easy",
-      chatBackground: null,
-      defaultRoleplayBackground: DEFAULT_ROLEPLAY_BACKGROUND_URL,
-      chatBackgroundBlur: 0,
-      characterDetailId: null,
-      lorebookDetailId: null,
-      presetDetailId: null,
-      presetDetailInitialTab: null,
-      connectionDetailId: null,
-      agentDetailId: null,
-      toolDetailId: null,
-      personaDetailId: null,
-      regexDetailId: null,
-      spatialMapDetailChatId: null,
-      pendingSpatialMapDraftReview: null,
-      regexDetailDefaultCharacterIds: null,
-      regexDetailReturn: null,
-      characterDetailInitialTab: null,
-      lorebookDetailInitialTab: null,
-      personaDetailInitialTab: null,
-      botBrowserOpen: false,
-      gameAssetsBrowserOpen: false,
-      noodleOpen: false,
-      noodleSelectedPersonaId: null,
-      noodleNavigation: { mode: "public", view: "home" },
-      characterLibraryOpen: false,
-      cardLibraryKind: "characters" as CardLibraryKind,
-      agentCatalogOpen: false,
-      characterLibrarySelectedId: null,
-      personaLibrarySelectedId: null,
-      characterLibrarySort: "name-asc" as CharacterLibrarySort,
-      personaLibrarySort: "name-asc" as ResourcePanelSort,
-      characterPanelSearch: "",
-      characterPanelIncludedTags: [],
-      characterPanelExcludedTags: [],
-      characterPanelTagsExpanded: false,
-      characterPanelFavoriteFilter: "all" as CharacterPanelFavoriteFilter,
-      characterPanelScrollTop: 0,
-      characterLibraryScrollTop: 0,
-      personaLibraryScrollTop: 0,
-      lorebookPanelCategory: "all" as LorebookPanelCategory,
-      lorebookPanelSearch: "",
-      lorebookPanelSort: "name-asc" as LorebookPanelSort,
-      lorebookPanelActiveTag: null,
-      lorebookPanelTagsExpanded: false,
-      botBrowserPanelSort: "name-asc" as ResourcePanelSort,
-      presetPanelSort: "name-asc" as ResourcePanelSort,
-      connectionPanelSort: "name-asc" as ConnectionPanelSort,
-      agentPanelSort: "name-asc" as ResourcePanelSort,
-      editorDirty: false,
-      detailReturnRightPanel: null,
+    (setState, get) => {
+      const set = (next: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => {
+        const state = get();
+        const patch = typeof next === "function" ? next(state) : next;
+        const apply = () => setState(patch);
+        if (!deferEditorLeave(state, patch, apply)) apply();
+      };
+      return {
+        settingsSyncReady: false,
+        showHomeBrowserAddressBar: true,
+        showHomeBrowserDesktopBookmarksOnOtherTabs: true,
+        showHomeBrowserMobileBookmarksOnOtherTabs: true,
+        sidebarOpen: true,
+        sidebarWidth: 320,
+        rightPanelOpen: false,
+        rightPanelWidth: 320,
+        rightPanel: "chat" as Panel,
+        trackerPanelEnabled: true,
+        trackerPanelOpen: false,
+        trackerPanelOpenByChatId: {},
+        trackerPanelSide: "right" as TrackerPanelSide,
+        trackerPanelHideHudWidgets: false,
+        trackerPanelUseExpressionSprites: false,
+        trackerPanelThoughtBubbleDisplay: "inline" as TrackerThoughtBubbleDisplay,
+        trackerStatDisplayMode: "bars" as TrackerStatDisplayMode,
+        trackerPanelDockedThoughtsAlwaysVisible: false,
+        trackerPanelSizeProfile: "standard" as TrackerPanelSizeProfile,
+        trackerPanelBackgroundColor: TRACKER_PANEL_DEFAULT_BACKGROUND_COLOR,
+        trackerTemperatureUnit: "celsius" as TrackerTemperatureUnit,
+        trackerPanelCollapsedSections: {},
+        trackerPanelSectionOrder: [...TRACKER_DATA_PANEL_SECTIONS],
+        expandedPersonaGroupIds: [],
+        expandedCharacterGroupIds: [],
+        settingsTab: "general",
+        settingsTargetControlId: null,
+        modal: null,
+        theme: "dark" as const,
+        appBackgroundColor: "",
+        appAccentColor: "",
+        appAccentPulseMode: getDefaultAppAccentPulseMode(),
+        appAccentRgbMode: false,
+        customCursorEnabled: true,
+        reduceAmbientEffects: false,
+        mariPanelSortMode: "az",
+        mariEditViewMode: "easy",
+        chatBackground: null,
+        defaultRoleplayBackground: DEFAULT_ROLEPLAY_BACKGROUND_URL,
+        chatBackgroundBlur: 0,
+        conversationBackgroundImageOpacity: DEFAULT_CONVERSATION_BACKGROUND_IMAGE_OPACITY,
+        characterDetailId: null,
+        lorebookDetailId: null,
+        lorebookLinkClipboard: null,
+        presetDetailId: null,
+        presetDetailInitialTab: null,
+        connectionDetailId: null,
+        agentDetailId: null,
+        toolDetailId: null,
+        personaDetailId: null,
+        regexDetailId: null,
+        spatialMapDetailChatId: null,
+        pendingSpatialMapDraftReview: null,
+        regexDetailDefaultCharacterIds: null,
+        regexDetailDefaultPresetIds: null,
+        regexDetailReturn: null,
+        characterDetailInitialTab: null,
+        lorebookDetailInitialTab: null,
+        lorebookDetailInitialEntryId: null,
+        personaDetailInitialTab: null,
+        botBrowserOpen: false,
+        gameAssetsBrowserOpen: false,
+        noodleOpen: false,
+        noodleSelectedPersonaId: null,
+        noodleNavigation: { mode: "public", view: "home" },
+        characterLibraryOpen: false,
+        cardLibraryKind: "characters" as CardLibraryKind,
+        agentCatalogOpen: false,
+        agentCatalogInitialPackageId: null,
+        characterLibrarySelectedId: null,
+        characterLibraryInitialId: null,
+        personaLibrarySelectedId: null,
+        characterLibrarySort: "name-asc" as CharacterLibrarySort,
+        personaLibrarySort: "name-asc" as ResourcePanelSort,
+        characterPanelSearch: "",
+        characterPanelIncludedTags: [],
+        characterPanelExcludedTags: [],
+        characterPanelTagsExpanded: false,
+        characterPanelFavoriteFilter: "all" as CharacterPanelFavoriteFilter,
+        characterPanelScrollTop: 0,
+        characterLibraryScrollTop: 0,
+        personaLibraryScrollTop: 0,
+        lorebookPanelCategory: "all" as LorebookPanelCategory,
+        lorebookPanelSearch: "",
+        lorebookPanelSort: "name-asc" as LorebookPanelSort,
+        lorebookPanelActiveTag: null,
+        lorebookPanelTagsExpanded: false,
+        botBrowserPanelSort: "name-asc" as ResourcePanelSort,
+        presetPanelSort: "name-asc" as ResourcePanelSort,
+        connectionPanelSort: "name-asc" as ConnectionPanelSort,
+        agentPanelSort: "name-asc" as ResourcePanelSort,
+        editorDirty: false,
+        detailReturnRightPanel: null,
 
-      // Settings defaults
-      fontSize: 17 as FontSize,
-      language: DEFAULT_APP_LANGUAGE as AppLanguage,
-      chatFontSize: 16,
-      fontFamily: "",
-      enableStreaming: true,
-      debugMode: false,
-      streamingSpeed: 50,
-      gameInstantTextReveal: false,
-      gameMiddleMouseNav: false,
-      gameDialogueDisplayMode: "classic" as GameDialogueDisplayMode,
-      chatListBackgrounds: "hover" as ChatListBackgroundMode,
-      gameTextSpeed: 50,
-      gameAutoPlayDelay: 3000,
-      queueImageGenerationRequests: true,
-      reviewImagePromptsBeforeSend: false,
-      imageBackgroundWidth: 1280,
-      imageBackgroundHeight: 720,
-      imageIllustrationWidth: 896,
-      imageIllustrationHeight: 1280,
-      imageNoodleWidth: 1024,
-      imageNoodleHeight: 1536,
-      imageGameWidth: 1280,
-      imageGameHeight: 720,
-      imagePortraitWidth: 1024,
-      imagePortraitHeight: 1024,
-      imageSelfieWidth: 896,
-      imageSelfieHeight: 1152,
-      imageStyleProfiles: normalizeImageStyleProfileSettings(null),
+        // Settings defaults
+        fontSize: 17 as FontSize,
+        language: DEFAULT_APP_LANGUAGE as AppLanguage,
+        chatFontSize: 16,
+        fontFamily: "",
+        chatWidgetPreset: "default" as ChatWidgetPreset,
+        chatWidgetFont: "",
+        chatWidgetShape: "preset" as ChatWidgetShape,
+        chatWidgetButtonSize: null,
+        chatWidgetBorderColor: "",
+        chatWidgetBackgroundColor: "",
+        chatWidgetTextColor: "",
+        chatWidgetApplyFont: false,
+        chatWidgetApplyShape: false,
+        chatWidgetApplyColors: false,
+        enableStreaming: true,
+        debugMode: false,
+        showPaidAgentConnectionWarning: true,
+        streamingSpeed: 50,
+        gameInstantTextReveal: false,
+        gameMiddleMouseNav: false,
+        gameDialogueDisplayMode: "classic" as GameDialogueDisplayMode,
+        gameNarrationCollapsed: false,
+        chatListBackgrounds: "hover" as ChatListBackgroundMode,
+        gameTextSpeed: 50,
+        gameAutoPlayDelay: 3000,
+        queueImageGenerationRequests: true,
+        reviewImagePromptsBeforeSend: false,
+        autoSaveGeneratedImagesToGalleries: true,
+        imageBackgroundWidth: 1280,
+        imageBackgroundHeight: 720,
+        imageIllustrationWidth: 896,
+        imageIllustrationHeight: 1280,
+        imageGameWidth: 1280,
+        imageGameHeight: 720,
+        imagePortraitWidth: 1024,
+        imagePortraitHeight: 1024,
+        imageCharacterSheetWidth: 1280,
+        imageCharacterSheetHeight: 720,
+        imageSelfieWidth: 896,
+        imageSelfieHeight: 1152,
+        imageStyleProfiles: normalizeImageStyleProfileSettings(null),
 
-      conversationMessageStyle: "classic" as ConversationMessageStyle,
-      conversationAvatarShape: "circle" as ConversationAvatarShape,
-      showTimestamps: false,
-      showModelName: false,
-      showTokenUsage: false,
-      showMessageNumbers: false,
-      guideGenerations: false,
-      showQuickRepliesMenu: false,
-      showQuickReplyPostOnly: true,
-      showQuickReplyGuide: true,
-      showQuickReplyImpersonate: true,
-      customQuickReplies: [],
-      chatSettingsExpandedSections: {},
-      confirmBeforeDelete: true,
-      includeReasoningInExports: false,
-      messagesPerPage: 20,
-      boldDialogue: true,
-      quoteFormat: "straight" as QuoteFormat,
-      convertLatexSymbols: true,
-      trimIncompleteModelOutput: false,
-      continueAddsNewline: true,
-      speechToTextEnabled: false,
-      ttsLineVolume: 50,
-      chibiProfessorMariEnabled: true,
-      professorMariSuggestionsEnabled: true,
-      professorMariNavigationEnabled: true,
-      achievementsEnabled: true,
-      musicPlayerEnabled: true,
-      musicPlayerSource: "youtube" as MusicPlayerSource,
-      youtubePlayerVolume: 70,
-      localMusicPlayerVolume: 70,
-      conversationCallVoiceVolume: 100,
-      conversationCallVoiceMuted: false,
-      spotifyMobileWidgetCollapsed: true,
-      spotifyMobileWidgetPosition: { x: 16, y: 96 },
-      intuitiveSwipeNavigation: false,
-      intuitiveSwipeRerollLatest: false,
-      editLastMessageOnArrowUp: true,
-      editMessageOnDoubleClick: true,
-      summaryPopoverSettings: DEFAULT_SUMMARY_POPOVER_SETTINGS,
-      scenePromptPreferences: DEFAULT_SCENE_PROMPT_PREFERENCES,
-      chatFontColor: "",
-      defaultDialogueColor: "",
-      chatChromeTextColor: "",
-      chatFontOpacity: 90,
-      roleplayReducedPaintEffects: false,
-      gameTextEffectsEnabled: true,
-      roleplayAvatarStyle: "circles" as RoleplayAvatarStyle,
-      roleplayAvatarScale: 1,
-      roleplayAvatarsScrollable: false,
-      roleplayNarratorAvatarCycling: true,
-      roleplaySpriteScale: 1,
-      gameAvatarScale: 1,
-      gameFullBodySpriteScale: 1.35,
-      textStrokeWidth: 0.5,
-      textStrokeColor: "#000000",
-      visualTheme: "default" as VisualTheme,
-      convoGradient: {
-        dark: { from: "#0a0a0e", to: "#1c2133" },
-        light: { from: "#f2eff7", to: "#eae6f0" },
-      },
-      convoNotificationSound: true,
-      rpNotificationSound: true,
-      gameNotificationSound: true,
-      notificationSoundsOnlyWhenUnfocused: false,
-      conversationBrowserNotifications: false,
-      conversationMobileNotifications: false,
-      generationBrowserNotifications: false,
-      generationMobileNotifications: false,
-      customConversationPrompt: null,
-      scheduleGenerationPreferences: "",
-      conversationTimeZone: detectConversationTimeZone(),
-      learnedGameSetupOptions: DEFAULT_GAME_SETUP_LEARNED_OPTIONS,
-      rememberedGameSetupText: DEFAULT_GAME_SETUP_REMEMBERED_TEXT,
-      enterToSendRP: false,
-      enterToSendConvo: true,
-      enterToSendGame: true,
-      enterToSendProfessorMari: true,
-      weatherEffects: true,
-      activeCustomTheme: null,
-      customThemes: [],
-      hasMigratedCustomThemesToServer: false,
-      hasCompletedOnboarding: false,
-      gameTutorialDisabled: false,
-      linkApiBannerDismissed: false,
-      echoChamberOpen: true,
-      echoChamberSide: "bottom-right" as EchoChamberSide,
-      echoChamberSideByChatId: {},
-      echoChamberSizeByChatId: {},
-      userStatusManual: "active" as const,
-      userStatus: "active" as UserStatus,
-      userActivity: "",
-      recentUserActivities: [],
-      centerCompact: false,
-      chatModeShortcutRequest: null,
+        conversationMessageStyle: "classic" as ConversationMessageStyle,
+        alwaysDisplayConversationSwipeMenu: true,
+        alwaysDisplayRoleplaySwipeMenu: true,
+        conversationAvatarShape: "circle" as ConversationAvatarShape,
+        showTimestamps: false,
+        showModelName: false,
+        showTokenUsage: false,
+        showContextUsage: true,
+        showMessageNumbers: false,
+        showCharactersInPersonaPickers: false,
+        guideGenerations: false,
+        keepGuidanceAfterRegenerate: true,
+        showQuickRepliesMenu: false,
+        showQuickReplyPostOnly: true,
+        showQuickReplyGuide: true,
+        showQuickReplyImpersonate: true,
+        customQuickReplies: [],
+        chatSettingsExpandedSections: {},
+        confirmBeforeDelete: true,
+        includeReasoningInExports: false,
+        includePrivateNotesInExports: false,
+        messagesPerPage: 20,
+        boldDialogue: true,
+        colorInlineNames: false,
+        disableInlineNameGradients: false,
+        quoteFormat: "straight" as QuoteFormat,
+        convertLatexSymbols: true,
+        trimIncompleteModelOutput: false,
+        continueAddsNewline: true,
+        speechToTextEnabled: false,
+        ttsLineVolume: 50,
+        chibiProfessorMariEnabled: true,
+        professorMariSuggestionsEnabled: true,
+        professorMariNavigationEnabled: true,
+        achievementsEnabled: true,
+        musicPlayerEnabled: true,
+        musicPlayerSource: "youtube" as MusicPlayerSource,
+        youtubePlayerVolume: 70,
+        localMusicPlayerVolume: 70,
+        conversationCallVoiceVolume: 100,
+        conversationCallVoiceMuted: false,
+        spotifyMobileWidgetCollapsed: true,
+        spotifyMobileWidgetPosition: { ...DEFAULT_MOBILE_MUSIC_WIDGET_POSITION },
+        intuitiveSwipeNavigation: false,
+        intuitiveSwipeRerollLatest: false,
+        editLastMessageOnArrowUp: true,
+        editMessageOnDoubleClick: true,
+        summaryPopoverSettings: DEFAULT_SUMMARY_POPOVER_SETTINGS,
+        scenePromptPreferences: DEFAULT_SCENE_PROMPT_PREFERENCES,
+        sceneOriginFocus: null,
+        chatFontColor: "",
+        defaultDialogueColor: "",
+        chatChromeTextColor: "",
+        chatFontOpacity: 90,
+        roleplayReducedPaintEffects: false,
+        showRoleplayThinkingInMessages: false,
+        keepRoleplayThinkingExpanded: false,
+        gameTextEffectsEnabled: true,
+        roleplayAvatarStyle: "circles" as RoleplayAvatarStyle,
+        roleplayAvatarScale: 1,
+        roleplayAvatarsScrollable: false,
+        roleplayNarratorAvatarCycling: true,
+        roleplaySpriteScale: 1,
+        roleplayDisplayStyle: "classic",
+        roleplayChatPosition: "center",
+        roleplayVnAutoPlay: false,
+        roleplayVnAutoPlayDelay: 3000,
+        roleplayVnPortraitScale: 1,
+        roleplayVnSpriteScale: 1.35,
+        gameAvatarScale: 1,
+        gameFullBodySpriteScale: 1.35,
+        textStrokeWidth: 0.5,
+        textStrokeColor: "#000000",
+        visualTheme: "default" as VisualTheme,
+        convoGradient: {
+          dark: { from: "#0a0a0e", to: "#1c2133" },
+          light: { from: "#f2eff7", to: "#eae6f0" },
+        },
+        convoNotificationSound: true,
+        rpNotificationSound: true,
+        gameNotificationSound: true,
+        notificationSoundsOnlyWhenUnfocused: false,
+        notificationPosition: "top",
+        chatWizardDefaults: {},
+        conversationBrowserNotifications: false,
+        conversationMobileNotifications: false,
+        generationBrowserNotifications: false,
+        generationMobileNotifications: false,
+        customConversationPrompt: null,
+        scheduleGenerationPreferences: "",
+        conversationTimeZone: detectConversationTimeZone(),
+        learnedGameSetupOptions: DEFAULT_GAME_SETUP_LEARNED_OPTIONS,
+        rememberedGameSetupText: DEFAULT_GAME_SETUP_REMEMBERED_TEXT,
+        enterToSendRP: false,
+        enterToSendConvo: true,
+        enterToSendGame: true,
+        enterToSendProfessorMari: true,
+        weatherEffects: true,
+        activeCustomTheme: null,
+        customThemes: [],
+        hasMigratedCustomThemesToServer: false,
+        hasCompletedOnboarding: false,
+        chatHelpSeenModes: [],
+        chatHelpButtonHidden: false,
+        linkApiBannerDismissed: false,
+        chatSettingsMoveTipDismissed: false,
+        chatWindowIntroDismissed: false,
+        echoChamberOpen: true,
+        echoChamberSide: "bottom-right" as EchoChamberSide,
+        echoChamberSideByChatId: {},
+        echoChamberSizeByChatId: {},
+        userStatusManual: "active" as const,
+        userStatus: "active" as UserStatus,
+        userActivity: "",
+        recentUserActivities: [],
+        centerCompact: false,
+        chatModeShortcutRequest: null,
 
-      // Impersonate settings defaults
-      impersonatePromptTemplate: "",
-      activeImpersonatePromptTemplateId: null,
-      impersonateCyoaChoices: false,
-      impersonatePresetId: null,
-      impersonateConnectionId: null,
-      impersonateBlockAgents: false,
+        // Impersonate settings defaults
+        impersonatePromptTemplate: "",
+        activeImpersonatePromptTemplateId: null,
+        impersonateCyoaChoices: false,
+        impersonatePresetId: null,
+        impersonateConnectionId: null,
+        impersonateBlockAgents: false,
 
-      toggleSidebar: () =>
-        set((s) => {
-          const sidebarOpen = !s.sidebarOpen;
-          const mobile = isMobileShellViewport();
-          dismissChatFloatingUiForMobilePanel(sidebarOpen);
-          return {
-            sidebarOpen,
-            ...(mobile && sidebarOpen ? { rightPanelOpen: false } : {}),
-          };
-        }),
-      setSidebarOpen: (open) => {
-        dismissChatFloatingUiForMobilePanel(open);
-        set({ sidebarOpen: open });
-      },
-      setSidebarWidth: (width) =>
-        set({ sidebarWidth: Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, width)) }),
-      setRightPanelWidth: (width) =>
-        set({ rightPanelWidth: Math.max(RIGHT_PANEL_WIDTH_MIN, Math.min(RIGHT_PANEL_WIDTH_MAX, width)) }),
-      toggleTrackerPanel: (chatId) =>
-        set((s) => {
-          const trackerPanelOpen = s.trackerPanelEnabled ? !s.trackerPanelOpen : false;
-          return {
-            trackerPanelOpen,
-            ...(chatId
-              ? { trackerPanelOpenByChatId: { ...s.trackerPanelOpenByChatId, [chatId]: trackerPanelOpen } }
-              : {}),
-          };
-        }),
-      setTrackerPanelEnabled: (enabled) =>
-        set({
-          trackerPanelEnabled: enabled,
-          trackerPanelOpen: enabled ? get().trackerPanelOpen : false,
-        }),
-      setTrackerPanelOpen: (open, chatId) =>
-        set((s) => {
-          const trackerPanelOpen = s.trackerPanelEnabled ? open : false;
-          return {
-            trackerPanelOpen,
-            ...(chatId
-              ? { trackerPanelOpenByChatId: { ...s.trackerPanelOpenByChatId, [chatId]: trackerPanelOpen } }
-              : {}),
-          };
-        }),
-      restoreTrackerPanelOpenForChat: (chatId) => {
-        if (!chatId) return;
-        set((s) => {
-          const hasRememberedState = Object.prototype.hasOwnProperty.call(s.trackerPanelOpenByChatId, chatId);
-          const legacyOpen = Object.keys(s.trackerPanelOpenByChatId).length === 0 && s.trackerPanelOpen;
-          const rememberedOpen = hasRememberedState ? s.trackerPanelOpenByChatId[chatId] === true : legacyOpen;
-          return {
-            trackerPanelOpen: s.trackerPanelEnabled && rememberedOpen,
-            ...(hasRememberedState
-              ? {}
-              : { trackerPanelOpenByChatId: { ...s.trackerPanelOpenByChatId, [chatId]: rememberedOpen } }),
-          };
-        });
-      },
-      setTrackerPanelSide: (side) => set({ trackerPanelSide: side }),
-      setTrackerPanelHideHudWidgets: (hidden) => set({ trackerPanelHideHudWidgets: hidden }),
-      setTrackerPanelUseExpressionSprites: (enabled) => set({ trackerPanelUseExpressionSprites: enabled }),
-      setTrackerPanelThoughtBubbleDisplay: (display) =>
-        set({ trackerPanelThoughtBubbleDisplay: normalizeTrackerThoughtBubbleDisplay(display) }),
-      setTrackerStatDisplayMode: (display) => set({ trackerStatDisplayMode: normalizeTrackerStatDisplayMode(display) }),
-      setTrackerPanelDockedThoughtsAlwaysVisible: (visible) =>
-        set({ trackerPanelDockedThoughtsAlwaysVisible: visible }),
-      setTrackerPanelSizeProfile: (profile) =>
-        set({ trackerPanelSizeProfile: normalizeTrackerPanelSizeProfile(profile) }),
-      setTrackerPanelBackgroundColor: (color) =>
-        set({ trackerPanelBackgroundColor: normalizeTrackerPanelBackgroundColor(color) }),
-      setTrackerTemperatureUnit: (unit) => set({ trackerTemperatureUnit: normalizeTrackerTemperatureUnit(unit) }),
-      setTrackerPanelSectionOrder: (order) =>
-        set({ trackerPanelSectionOrder: normalizeTrackerPanelSectionOrder(order) }),
-      toggleTrackerPanelSectionCollapsed: (section) =>
-        set((s) => {
-          const next = { ...s.trackerPanelCollapsedSections };
-          if (next[section]) {
-            delete next[section];
-          } else {
-            next[section] = true;
-          }
-          return { trackerPanelCollapsedSections: next };
-        }),
+        toggleSidebar: () =>
+          set((s) => {
+            const mobile = isMobileShellViewport();
+            const sidebarOpen = !s.sidebarOpen || (mobile && s.rightPanelOpen);
+            dismissChatFloatingUiForMobilePanel(sidebarOpen);
+            return {
+              sidebarOpen,
+              ...(mobile && sidebarOpen ? { rightPanelOpen: false } : {}),
+            };
+          }),
+        setSidebarOpen: (open) => {
+          dismissChatFloatingUiForMobilePanel(open);
+          set({ sidebarOpen: open });
+        },
+        setSidebarWidth: (width) =>
+          set({ sidebarWidth: Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, width)) }),
+        setRightPanelWidth: (width) =>
+          set({ rightPanelWidth: Math.max(RIGHT_PANEL_WIDTH_MIN, Math.min(RIGHT_PANEL_WIDTH_MAX, width)) }),
+        toggleTrackerPanel: (chatId) =>
+          set((s) => {
+            const trackerPanelOpen = s.trackerPanelEnabled ? !s.trackerPanelOpen : false;
+            return {
+              trackerPanelOpen,
+              ...(chatId
+                ? { trackerPanelOpenByChatId: { ...s.trackerPanelOpenByChatId, [chatId]: trackerPanelOpen } }
+                : {}),
+            };
+          }),
+        setTrackerPanelEnabled: (enabled) =>
+          set({
+            trackerPanelEnabled: enabled,
+            trackerPanelOpen: enabled ? get().trackerPanelOpen : false,
+          }),
+        setTrackerPanelOpen: (open, chatId) =>
+          set((s) => {
+            const trackerPanelOpen = s.trackerPanelEnabled ? open : false;
+            return {
+              trackerPanelOpen,
+              ...(chatId
+                ? { trackerPanelOpenByChatId: { ...s.trackerPanelOpenByChatId, [chatId]: trackerPanelOpen } }
+                : {}),
+            };
+          }),
+        restoreTrackerPanelOpenForChat: (chatId) => {
+          if (!chatId) return;
+          set((s) => {
+            const hasRememberedState = Object.prototype.hasOwnProperty.call(s.trackerPanelOpenByChatId, chatId);
+            const legacyOpen = Object.keys(s.trackerPanelOpenByChatId).length === 0 && s.trackerPanelOpen;
+            const rememberedOpen = hasRememberedState ? s.trackerPanelOpenByChatId[chatId] === true : legacyOpen;
+            return {
+              trackerPanelOpen: s.trackerPanelEnabled && rememberedOpen,
+              ...(hasRememberedState
+                ? {}
+                : { trackerPanelOpenByChatId: { ...s.trackerPanelOpenByChatId, [chatId]: rememberedOpen } }),
+            };
+          });
+        },
+        setTrackerPanelSide: (side) => set({ trackerPanelSide: side }),
+        setTrackerPanelHideHudWidgets: (hidden) => set({ trackerPanelHideHudWidgets: hidden }),
+        setTrackerPanelUseExpressionSprites: (enabled) => set({ trackerPanelUseExpressionSprites: enabled }),
+        setTrackerPanelThoughtBubbleDisplay: (display) =>
+          set({ trackerPanelThoughtBubbleDisplay: normalizeTrackerThoughtBubbleDisplay(display) }),
+        setTrackerStatDisplayMode: (display) =>
+          set({ trackerStatDisplayMode: normalizeTrackerStatDisplayMode(display) }),
+        setTrackerPanelDockedThoughtsAlwaysVisible: (visible) =>
+          set({ trackerPanelDockedThoughtsAlwaysVisible: visible }),
+        setTrackerPanelSizeProfile: (profile) =>
+          set({ trackerPanelSizeProfile: normalizeTrackerPanelSizeProfile(profile) }),
+        setTrackerPanelBackgroundColor: (color) =>
+          set({ trackerPanelBackgroundColor: normalizeTrackerPanelBackgroundColor(color) }),
+        setTrackerTemperatureUnit: (unit) => set({ trackerTemperatureUnit: normalizeTrackerTemperatureUnit(unit) }),
+        setTrackerPanelSectionOrder: (order) =>
+          set({ trackerPanelSectionOrder: normalizeTrackerPanelSectionOrder(order) }),
+        toggleTrackerPanelSectionCollapsed: (section) =>
+          set((s) => {
+            const next = { ...s.trackerPanelCollapsedSections };
+            if (next[section]) {
+              delete next[section];
+            } else {
+              next[section] = true;
+            }
+            return { trackerPanelCollapsedSections: next };
+          }),
 
-      togglePersonaGroupExpanded: (id) =>
-        set((s) => ({
-          expandedPersonaGroupIds: s.expandedPersonaGroupIds.includes(id)
-            ? s.expandedPersonaGroupIds.filter((groupId) => groupId !== id)
-            : [...s.expandedPersonaGroupIds, id],
-        })),
+        togglePersonaGroupExpanded: (id) =>
+          set((s) => ({
+            expandedPersonaGroupIds: s.expandedPersonaGroupIds.includes(id)
+              ? s.expandedPersonaGroupIds.filter((groupId) => groupId !== id)
+              : [...s.expandedPersonaGroupIds, id],
+          })),
 
-      toggleCharacterGroupExpanded: (id) =>
-        set((s) => ({
-          expandedCharacterGroupIds: s.expandedCharacterGroupIds.includes(id)
-            ? s.expandedCharacterGroupIds.filter((groupId) => groupId !== id)
-            : [...s.expandedCharacterGroupIds, id],
-        })),
+        toggleCharacterGroupExpanded: (id) =>
+          set((s) => ({
+            expandedCharacterGroupIds: s.expandedCharacterGroupIds.includes(id)
+              ? s.expandedCharacterGroupIds.filter((groupId) => groupId !== id)
+              : [...s.expandedCharacterGroupIds, id],
+          })),
 
-      openRightPanel: (panel) =>
-        set(() => {
-          const mobile = isMobileShellViewport();
-          dismissChatFloatingUiForMobilePanel(true);
-          return {
-            rightPanelOpen: true,
-            rightPanel: panel,
-            ...(mobile ? { sidebarOpen: false } : {}),
-          };
-        }),
-      closeRightPanel: () => set({ rightPanelOpen: false }),
-      toggleRightPanel: (panel) =>
-        set((s) => {
-          if (s.rightPanelOpen && s.rightPanel === panel) return { rightPanelOpen: false };
-          const mobile = isMobileShellViewport();
-          dismissChatFloatingUiForMobilePanel(true);
-          return {
-            rightPanelOpen: true,
-            rightPanel: panel,
-            ...(mobile ? { sidebarOpen: false } : {}),
-          };
-        }),
+        openRightPanel: (panel) =>
+          set(() => {
+            const mobile = isMobileShellViewport();
+            dismissChatFloatingUiForMobilePanel(true);
+            return {
+              rightPanelOpen: true,
+              rightPanel: panel,
+              ...(mobile ? { sidebarOpen: false } : {}),
+            };
+          }),
+        closeRightPanel: () => set({ rightPanelOpen: false }),
+        toggleRightPanel: (panel) =>
+          set((s) => {
+            if (s.rightPanelOpen && s.rightPanel === panel) return { rightPanelOpen: false };
+            const mobile = isMobileShellViewport();
+            dismissChatFloatingUiForMobilePanel(true);
+            return {
+              rightPanelOpen: true,
+              rightPanel: panel,
+              ...(mobile ? { sidebarOpen: false } : {}),
+            };
+          }),
 
-      setSettingsTab: (tab) => set({ settingsTab: tab }),
-      setSettingsTargetControlId: (controlId) => set({ settingsTargetControlId: controlId }),
-      openModal: (type, props) => set({ modal: { type, props } }),
-      closeModal: () => set({ modal: null }),
-      setTheme: (theme) => set({ theme }),
-      setAppBackgroundColor: (color) => set({ appBackgroundColor: normalizeAppBackgroundColor(color) }),
-      setAppAccentColor: (color) => set({ appAccentColor: normalizeAppAccentColor(color) }),
-      setAppAccentPulseMode: (enabled) => set({ appAccentPulseMode: enabled }),
-      setAppAccentRgbMode: (enabled) => set({ appAccentRgbMode: enabled }),
-      setCustomCursorEnabled: (enabled) => set({ customCursorEnabled: enabled }),
-      setReduceAmbientEffects: (enabled) => set({ reduceAmbientEffects: enabled }),
-      setMariPanelSortMode: (mode) => set({ mariPanelSortMode: mode }),
-      setMariEditViewMode: (mode) => set({ mariEditViewMode: mode }),
-      setChatBackground: (url) => set({ chatBackground: url }),
-      setDefaultRoleplayBackground: (url) =>
-        set({ defaultRoleplayBackground: normalizeDefaultRoleplayBackground(url) }),
-      setChatBackgroundBlur: (v) => set({ chatBackgroundBlur: Math.max(0, Math.min(24, Math.round(v))) }),
-      setCharacterLibrarySelectedId: (id) => set({ characterLibrarySelectedId: id }),
-      setPersonaLibrarySelectedId: (id) => set({ personaLibrarySelectedId: id }),
-      setCharacterLibrarySort: (sort) => set({ characterLibrarySort: normalizeCharacterLibrarySort(sort) }),
-      setPersonaLibrarySort: (sort) => set({ personaLibrarySort: normalizeBasicPanelSort(sort) }),
-      setCharacterPanelSearch: (search) => set({ characterPanelSearch: normalizePanelText(search) }),
-      setCharacterPanelIncludedTags: (tags) => set({ characterPanelIncludedTags: normalizePanelStringArray(tags) }),
-      setCharacterPanelExcludedTags: (tags) => set({ characterPanelExcludedTags: normalizePanelStringArray(tags) }),
-      setCharacterPanelTagsExpanded: (expanded) => set({ characterPanelTagsExpanded: expanded }),
-      setCharacterPanelFavoriteFilter: (filter) =>
-        set({ characterPanelFavoriteFilter: normalizeCharacterPanelFavoriteFilter(filter) }),
-      setCharacterPanelScrollTop: (scrollTop) => set({ characterPanelScrollTop: normalizeScrollTop(scrollTop) }),
-      setCharacterLibraryScrollTop: (scrollTop) => set({ characterLibraryScrollTop: normalizeScrollTop(scrollTop) }),
-      setPersonaLibraryScrollTop: (scrollTop) => set({ personaLibraryScrollTop: normalizeScrollTop(scrollTop) }),
-      setLorebookPanelCategory: (category) => set({ lorebookPanelCategory: normalizeLorebookPanelCategory(category) }),
-      setLorebookPanelSearch: (search) => set({ lorebookPanelSearch: normalizePanelText(search) }),
-      setLorebookPanelSort: (sort) => set({ lorebookPanelSort: normalizeLorebookPanelSort(sort) }),
-      setLorebookPanelActiveTag: (tag) => set({ lorebookPanelActiveTag: tag ? tag.trim() || null : null }),
-      setLorebookPanelTagsExpanded: (expanded) => set({ lorebookPanelTagsExpanded: expanded }),
-      setBotBrowserPanelSort: (sort) => set({ botBrowserPanelSort: normalizeBasicPanelSort(sort) }),
-      setPresetPanelSort: (sort) => set({ presetPanelSort: normalizeBasicPanelSort(sort) }),
-      setConnectionPanelSort: (sort) => set({ connectionPanelSort: normalizeConnectionPanelSort(sort) }),
-      setAgentPanelSort: (sort) => set({ agentPanelSort: normalizeBasicPanelSort(sort) }),
-      openCharacterDetail: (id, options) =>
-        set((s) => {
-          const preserveCharacterLibrary =
-            options?.preserveCharacterLibrary ?? (s.characterLibraryOpen && s.cardLibraryKind === "characters");
-          return {
-            characterDetailId: id,
-            characterDetailInitialTab: options?.initialTab ?? null,
-            lorebookDetailId: null,
+        setSettingsTab: (tab) => set({ settingsTab: tab }),
+        setSettingsTargetControlId: (controlId) => set({ settingsTargetControlId: controlId }),
+        openModal: (type, props) => set({ modal: { type, props } }),
+        closeModal: () => set({ modal: null }),
+        setTheme: (theme) => set({ theme }),
+        setAppBackgroundColor: (color) => set({ appBackgroundColor: normalizeAppBackgroundColor(color) }),
+        setAppAccentColor: (color) => set({ appAccentColor: normalizeAppAccentColor(color) }),
+        setAppAccentPulseMode: (enabled) => set({ appAccentPulseMode: enabled }),
+        setAppAccentRgbMode: (enabled) => set({ appAccentRgbMode: enabled }),
+        setCustomCursorEnabled: (enabled) => set({ customCursorEnabled: enabled }),
+        setReduceAmbientEffects: (enabled) => set({ reduceAmbientEffects: enabled }),
+        setMariPanelSortMode: (mode) => set({ mariPanelSortMode: mode }),
+        setMariEditViewMode: (mode) => set({ mariEditViewMode: mode }),
+        setChatBackground: (url) => set({ chatBackground: url }),
+        setDefaultRoleplayBackground: (url) =>
+          set({ defaultRoleplayBackground: normalizeDefaultRoleplayBackground(url) }),
+        setChatBackgroundBlur: (v) => set({ chatBackgroundBlur: Math.max(0, Math.min(24, Math.round(v))) }),
+        setConversationBackgroundImageOpacity: (v) =>
+          set({ conversationBackgroundImageOpacity: normalizeConversationBackgroundImageOpacity(v) }),
+        setCharacterLibrarySelectedId: (id) => set({ characterLibrarySelectedId: id }),
+        setPersonaLibrarySelectedId: (id) => set({ personaLibrarySelectedId: id }),
+        setCharacterLibrarySort: (sort) => set({ characterLibrarySort: normalizeCharacterLibrarySort(sort) }),
+        setPersonaLibrarySort: (sort) => set({ personaLibrarySort: normalizeBasicPanelSort(sort) }),
+        setCharacterPanelSearch: (search) => set({ characterPanelSearch: normalizePanelText(search) }),
+        setCharacterPanelIncludedTags: (tags) => set({ characterPanelIncludedTags: normalizePanelStringArray(tags) }),
+        setCharacterPanelExcludedTags: (tags) => set({ characterPanelExcludedTags: normalizePanelStringArray(tags) }),
+        setCharacterPanelTagsExpanded: (expanded) => set({ characterPanelTagsExpanded: expanded }),
+        setCharacterPanelFavoriteFilter: (filter) =>
+          set({ characterPanelFavoriteFilter: normalizeCharacterPanelFavoriteFilter(filter) }),
+        setCharacterPanelScrollTop: (scrollTop) => set({ characterPanelScrollTop: normalizeScrollTop(scrollTop) }),
+        setCharacterLibraryScrollTop: (scrollTop) => set({ characterLibraryScrollTop: normalizeScrollTop(scrollTop) }),
+        setPersonaLibraryScrollTop: (scrollTop) => set({ personaLibraryScrollTop: normalizeScrollTop(scrollTop) }),
+        setLorebookPanelCategory: (category) =>
+          set({ lorebookPanelCategory: normalizeLorebookPanelCategory(category) }),
+        setLorebookPanelSearch: (search) => set({ lorebookPanelSearch: normalizePanelText(search) }),
+        setLorebookPanelSort: (sort) => set({ lorebookPanelSort: normalizeLorebookPanelSort(sort) }),
+        setLorebookPanelActiveTag: (tag) => set({ lorebookPanelActiveTag: tag ? tag.trim() || null : null }),
+        setLorebookPanelTagsExpanded: (expanded) => set({ lorebookPanelTagsExpanded: expanded }),
+        setBotBrowserPanelSort: (sort) => set({ botBrowserPanelSort: normalizeBasicPanelSort(sort) }),
+        setPresetPanelSort: (sort) => set({ presetPanelSort: normalizeBasicPanelSort(sort) }),
+        setConnectionPanelSort: (sort) => set({ connectionPanelSort: normalizeConnectionPanelSort(sort) }),
+        setAgentPanelSort: (sort) => set({ agentPanelSort: normalizeBasicPanelSort(sort) }),
+        openCharacterDetail: (id, options) =>
+          set((s) => {
+            const preserveCharacterLibrary =
+              options?.preserveCharacterLibrary ?? (s.characterLibraryOpen && s.cardLibraryKind === "characters");
+            return {
+              characterDetailId: id,
+              characterDetailInitialTab: options?.initialTab ?? null,
+              lorebookDetailId: null,
+              presetDetailId: null,
+              connectionDetailId: null,
+              agentDetailId: null,
+              toolDetailId: null,
+              personaDetailId: null,
+              regexDetailId: null,
+              spatialMapDetailChatId: null,
+              characterLibraryOpen: preserveCharacterLibrary ? s.characterLibraryOpen : false,
+              agentCatalogOpen: false,
+              characterLibrarySelectedId: preserveCharacterLibrary ? id : s.characterLibrarySelectedId,
+              botBrowserOpen: false,
+              gameAssetsBrowserOpen: false,
+              noodleOpen: false,
+              ...getMobileDetailReturnState(s),
+            };
+          }),
+        closeCharacterDetail: () =>
+          set((s) => ({
+            characterDetailId: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
+        setLorebookLinkClipboard: (links) => set({ lorebookLinkClipboard: links }),
+        openLorebookDetail: (id, options) =>
+          set((s) => ({
+            lorebookDetailId: id,
+            lorebookDetailInitialTab: options?.initialTab ?? null,
+            lorebookDetailInitialEntryId: options?.entryId ?? null,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            characterDetailId: null,
             presetDetailId: null,
             connectionDetailId: null,
             agentDetailId: null,
@@ -1750,153 +2316,150 @@ export const useUIStore = create<UIState>()(
             personaDetailId: null,
             regexDetailId: null,
             spatialMapDetailChatId: null,
-            characterLibraryOpen: preserveCharacterLibrary ? s.characterLibraryOpen : false,
+            ...getMobileDetailReturnState(s),
+          })),
+        closeLorebookDetail: () =>
+          set((s) => ({
+            lorebookDetailId: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
+        openPresetDetail: (id, options) =>
+          set((s) => ({
+            presetDetailId: id,
+            presetDetailInitialTab: options?.initialTab ?? null,
+            characterLibraryOpen: false,
             agentCatalogOpen: false,
-            characterLibrarySelectedId: preserveCharacterLibrary ? id : s.characterLibrarySelectedId,
             botBrowserOpen: false,
             gameAssetsBrowserOpen: false,
             noodleOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
             ...getMobileDetailReturnState(s),
-          };
-        }),
-      closeCharacterDetail: () =>
-        set((s) => ({
-          characterDetailId: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openLorebookDetail: (id, options) =>
-        set((s) => ({
-          lorebookDetailId: id,
-          lorebookDetailInitialTab: options?.initialTab ?? null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          characterDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          ...getMobileDetailReturnState(s),
-        })),
-      closeLorebookDetail: () =>
-        set((s) => ({
-          lorebookDetailId: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openPresetDetail: (id, options) =>
-        set((s) => ({
-          presetDetailId: id,
-          presetDetailInitialTab: options?.initialTab ?? null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          ...getMobileDetailReturnState(s),
-        })),
-      closePresetDetail: () =>
-        set((s) => ({
-          presetDetailId: null,
-          presetDetailInitialTab: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openConnectionDetail: (id) =>
-        set((s) => ({
-          connectionDetailId: id,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          ...getMobileDetailReturnState(s),
-        })),
-      closeConnectionDetail: () =>
-        set((s) => ({
-          connectionDetailId: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openAgentDetail: (agentType) =>
-        set((s) => ({
-          agentDetailId: agentType,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          ...getMobileDetailReturnState(s),
-        })),
-      closeAgentDetail: () =>
-        set((s) => ({
-          agentDetailId: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openToolDetail: (id) =>
-        set((s) => ({
-          toolDetailId: id,
-          agentDetailId: null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          ...getMobileDetailReturnState(s),
-        })),
-      closeToolDetail: () =>
-        set((s) => ({
-          toolDetailId: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openPersonaDetail: (id, options) =>
-        set((s) => {
-          const preservePersonaLibrary =
-            options?.preservePersonaLibrary ?? (s.characterLibraryOpen && s.cardLibraryKind === "personas");
-          return {
-            personaDetailId: id,
-            personaDetailInitialTab: options?.initialTab ?? null,
-            characterLibraryOpen: preservePersonaLibrary ? s.characterLibraryOpen : false,
-            personaLibrarySelectedId: preservePersonaLibrary ? id : s.personaLibrarySelectedId,
+          })),
+        closePresetDetail: () =>
+          set((s) => ({
+            presetDetailId: null,
+            presetDetailInitialTab: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
+        openConnectionDetail: (id) =>
+          set((s) => ({
+            connectionDetailId: id,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            ...getMobileDetailReturnState(s),
+          })),
+        closeConnectionDetail: () =>
+          set((s) => ({
+            connectionDetailId: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
+        openAgentDetail: (agentType) =>
+          set((s) => ({
+            agentDetailId: agentType,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            ...getMobileDetailReturnState(s),
+          })),
+        closeAgentDetail: () =>
+          set((s) => ({
+            agentDetailId: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
+        openToolDetail: (id) =>
+          set((s) => ({
+            toolDetailId: id,
+            agentDetailId: null,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            ...getMobileDetailReturnState(s),
+          })),
+        closeToolDetail: () =>
+          set((s) => ({
+            toolDetailId: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
+        openPersonaDetail: (id, options) =>
+          set((s) => {
+            const preservePersonaLibrary =
+              options?.preservePersonaLibrary ?? (s.characterLibraryOpen && s.cardLibraryKind === "personas");
+            return {
+              personaDetailId: id,
+              personaDetailInitialTab: options?.initialTab ?? null,
+              characterLibraryOpen: preservePersonaLibrary ? s.characterLibraryOpen : false,
+              personaLibrarySelectedId: preservePersonaLibrary ? id : s.personaLibrarySelectedId,
+              agentCatalogOpen: false,
+              botBrowserOpen: false,
+              gameAssetsBrowserOpen: false,
+              noodleOpen: false,
+              characterDetailId: null,
+              lorebookDetailId: null,
+              presetDetailId: null,
+              connectionDetailId: null,
+              agentDetailId: null,
+              toolDetailId: null,
+              regexDetailId: null,
+              spatialMapDetailChatId: null,
+              ...getMobileDetailReturnState(s),
+            };
+          }),
+        closePersonaDetail: () =>
+          set((s) => ({
+            personaDetailId: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
+        openRegexDetail: (id, options) =>
+          set((s) => ({
+            regexDetailId: id,
+            regexDetailDefaultCharacterIds: options?.defaultCharacterIds ?? null,
+            regexDetailDefaultPresetIds: options?.defaultPresetIds ?? null,
+            regexDetailReturn: options?.returnTo ?? null,
+            personaDetailId: null,
+            characterLibraryOpen: false,
             agentCatalogOpen: false,
             botBrowserOpen: false,
             gameAssetsBrowserOpen: false,
@@ -1907,627 +2470,704 @@ export const useUIStore = create<UIState>()(
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
-            regexDetailId: null,
             spatialMapDetailChatId: null,
             ...getMobileDetailReturnState(s),
-          };
-        }),
-      closePersonaDetail: () =>
-        set((s) => ({
-          personaDetailId: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openRegexDetail: (id, options) =>
-        set((s) => ({
-          regexDetailId: id,
-          regexDetailDefaultCharacterIds: options?.defaultCharacterIds ?? null,
-          regexDetailReturn: options?.returnTo ?? null,
-          personaDetailId: null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          spatialMapDetailChatId: null,
-          ...getMobileDetailReturnState(s),
-        })),
-      closeRegexDetail: () =>
-        set((s) => {
-          const ret = s.regexDetailReturn;
-          if (ret) {
-            // Opened from a character's scoped-regex manager — return to that character's tab.
+          })),
+        closeRegexDetail: () =>
+          set((s) => {
+            const ret = s.regexDetailReturn;
+            if (ret) {
+              // Return to the character/preset manager that opened the existing editor.
+              return {
+                regexDetailId: null,
+                regexDetailReturn: null,
+                regexDetailDefaultCharacterIds: null,
+                regexDetailDefaultPresetIds: null,
+                ...("presetId" in ret
+                  ? { presetDetailId: ret.presetId, presetDetailInitialTab: "regex" }
+                  : { characterDetailId: ret.characterId, characterDetailInitialTab: ret.tab ?? null }),
+                editorDirty: false,
+              };
+            }
             return {
               regexDetailId: null,
               regexDetailReturn: null,
               regexDetailDefaultCharacterIds: null,
-              characterDetailId: ret.characterId,
-              characterDetailInitialTab: ret.tab ?? null,
+              regexDetailDefaultPresetIds: null,
               editorDirty: false,
+              ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
             };
-          }
-          return {
+          }),
+        openSpatialMapDetail: (chatId) =>
+          set((s) => ({
+            spatialMapDetailChatId: chatId,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
             regexDetailId: null,
-            regexDetailReturn: null,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            ...getMobileDetailReturnState(s),
+          })),
+        openSpatialMapDraftReview: (review) =>
+          set((s) => ({
+            pendingSpatialMapDraftReview: review,
+            spatialMapDetailChatId: review.chatId,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            ...getMobileDetailReturnState(s),
+          })),
+        clearPendingSpatialMapDraftReview: () => set({ pendingSpatialMapDraftReview: null }),
+        closeSpatialMapDetail: () =>
+          set((s) => ({
+            spatialMapDetailChatId: null,
+            pendingSpatialMapDraftReview: null,
             editorDirty: false,
             ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-          };
-        }),
-      openSpatialMapDetail: (chatId) =>
-        set((s) => ({
-          spatialMapDetailChatId: chatId,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          ...getMobileDetailReturnState(s),
-        })),
-      openSpatialMapDraftReview: (review) =>
-        set((s) => ({
-          pendingSpatialMapDraftReview: review,
-          spatialMapDetailChatId: review.chatId,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          ...getMobileDetailReturnState(s),
-        })),
-      clearPendingSpatialMapDraftReview: () => set({ pendingSpatialMapDraftReview: null }),
-      closeSpatialMapDetail: () =>
-        set((s) => ({
-          spatialMapDetailChatId: null,
-          pendingSpatialMapDraftReview: null,
-          editorDirty: false,
-          ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
-        })),
-      openCharacterLibrary: () =>
-        set((state) => ({
-          characterLibraryOpen: true,
-          cardLibraryKind: "characters",
-          agentCatalogOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          pendingSpatialMapDraftReview: null,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          editorDirty: false,
-          detailReturnRightPanel: null,
-          rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
-        })),
-      openPersonaLibrary: () =>
-        set((state) => ({
-          characterLibraryOpen: true,
-          cardLibraryKind: "personas",
-          agentCatalogOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          pendingSpatialMapDraftReview: null,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          editorDirty: false,
-          detailReturnRightPanel: null,
-          rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
-        })),
-      closeCharacterLibrary: () => set({ characterLibraryOpen: false }),
-      openAgentCatalog: () =>
-        set((state) => ({
-          agentCatalogOpen: true,
-          characterLibraryOpen: false,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          pendingSpatialMapDraftReview: null,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          editorDirty: false,
-          detailReturnRightPanel: null,
-          rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
-        })),
-      closeAgentCatalog: () => set({ agentCatalogOpen: false }),
-      openBotBrowser: () =>
-        set({
-          botBrowserOpen: true,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          detailReturnRightPanel: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          personaDetailId: null,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          ...(window.innerWidth < 768 && { rightPanelOpen: false }),
-        }),
-      closeBotBrowser: () => set({ botBrowserOpen: false }),
-      openGameAssetsBrowser: () =>
-        set({
-          gameAssetsBrowserOpen: true,
-          botBrowserOpen: false,
-          noodleOpen: false,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          detailReturnRightPanel: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          personaDetailId: null,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          ...(window.innerWidth < 768 && { rightPanelOpen: false }),
-        }),
-      closeGameAssetsBrowser: () => set({ gameAssetsBrowserOpen: false }),
-      openNoodle: () =>
-        set({
-          noodleOpen: true,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          detailReturnRightPanel: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          personaDetailId: null,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          editorDirty: false,
-          ...(window.innerWidth < 768 && { rightPanelOpen: false }),
-        }),
-      closeNoodle: () => set({ noodleOpen: false }),
-      setNoodleSelectedPersonaId: (id) => set({ noodleSelectedPersonaId: id }),
-      setNoodleNavigation: (navigation) => set({ noodleNavigation: navigation }),
-
-      hasAnyDetailOpen: () => {
-        const s = get();
-        return !!(
-          s.characterDetailId ||
-          s.lorebookDetailId ||
-          s.presetDetailId ||
-          s.connectionDetailId ||
-          s.agentDetailId ||
-          s.toolDetailId ||
-          s.personaDetailId ||
-          s.regexDetailId ||
-          s.spatialMapDetailChatId ||
-          s.characterLibraryOpen ||
-          s.agentCatalogOpen ||
-          s.botBrowserOpen ||
-          s.gameAssetsBrowserOpen ||
-          s.noodleOpen
-        );
-      },
-      closeAllDetails: () =>
-        set({
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          editorDirty: false,
-          detailReturnRightPanel: null,
-        }),
-      setEditorDirty: (dirty) => set({ editorDirty: dirty }),
-      requestChatModeShortcut: (mode) =>
-        set((state) => ({
-          sidebarOpen: true,
-          rightPanelOpen: window.innerWidth < 768 ? false : state.rightPanelOpen,
-          characterDetailId: null,
-          lorebookDetailId: null,
-          presetDetailId: null,
-          connectionDetailId: null,
-          agentDetailId: null,
-          toolDetailId: null,
-          personaDetailId: null,
-          regexDetailId: null,
-          spatialMapDetailChatId: null,
-          characterLibraryOpen: false,
-          agentCatalogOpen: false,
-          botBrowserOpen: false,
-          gameAssetsBrowserOpen: false,
-          noodleOpen: false,
-          editorDirty: false,
-          detailReturnRightPanel: null,
-          chatModeShortcutRequest: {
-            mode,
-            token: (state.chatModeShortcutRequest?.token ?? 0) + 1,
-          },
-        })),
-
-      // Settings actions
-      setFontSize: (size) => set({ fontSize: size }),
-      setLanguage: (language) => set({ language }),
-      setChatFontSize: (size) => set({ chatFontSize: size }),
-      setFontFamily: (family) => set({ fontFamily: family }),
-      setEnableStreaming: (v) => set({ enableStreaming: v }),
-      setDebugMode: (v) => set({ debugMode: v }),
-      setStreamingSpeed: (v) => set({ streamingSpeed: Math.max(1, Math.min(100, v)) }),
-      setGameInstantTextReveal: (v) => set({ gameInstantTextReveal: v }),
-      setGameMiddleMouseNav: (v) => set({ gameMiddleMouseNav: v }),
-      setGameDialogueDisplayMode: (v) => set({ gameDialogueDisplayMode: v }),
-      setChatListBackgrounds: (v) => set({ chatListBackgrounds: v }),
-      setGameTextSpeed: (v) => set({ gameTextSpeed: Math.max(1, Math.min(100, v)) }),
-      setGameAutoPlayDelay: (v) => set({ gameAutoPlayDelay: Math.max(200, Math.min(10000, Math.round(v))) }),
-      setQueueImageGenerationRequests: (v) => set({ queueImageGenerationRequests: v }),
-      setReviewImagePromptsBeforeSend: (v) => set({ reviewImagePromptsBeforeSend: v }),
-      setImageBackgroundDimensions: (width, height) =>
-        set({
-          imageBackgroundWidth: clampImageDimension(width),
-          imageBackgroundHeight: clampImageDimension(height),
-        }),
-      setImageIllustrationDimensions: (width, height) =>
-        set({
-          imageIllustrationWidth: clampImageDimension(width),
-          imageIllustrationHeight: clampImageDimension(height),
-        }),
-      setImageNoodleDimensions: (width, height) =>
-        set({
-          imageNoodleWidth: clampImageDimension(width),
-          imageNoodleHeight: clampImageDimension(height),
-        }),
-      setImageGameDimensions: (width, height) =>
-        set({
-          imageGameWidth: clampImageDimension(width),
-          imageGameHeight: clampImageDimension(height),
-        }),
-      setImagePortraitDimensions: (width, height) =>
-        set({
-          imagePortraitWidth: clampImageDimension(width),
-          imagePortraitHeight: clampImageDimension(height),
-        }),
-      setImageSelfieDimensions: (width, height) =>
-        set({
-          imageSelfieWidth: clampImageDimension(width),
-          imageSelfieHeight: clampImageDimension(height),
-        }),
-      setImageStyleProfiles: (settings) => set({ imageStyleProfiles: normalizeImageStyleProfileSettings(settings) }),
-
-      setConversationMessageStyle: (v) => set({ conversationMessageStyle: normalizeConversationMessageStyle(v) }),
-      setConversationAvatarShape: (v) => set({ conversationAvatarShape: normalizeConversationAvatarShape(v) }),
-      setShowTimestamps: (v) => set({ showTimestamps: v }),
-      setShowModelName: (v) => set({ showModelName: v }),
-      setShowTokenUsage: (v) => set({ showTokenUsage: v }),
-      setShowMessageNumbers: (v) => set({ showMessageNumbers: v }),
-      setGuideGenerations: (v) => set({ guideGenerations: v }),
-      setShowQuickRepliesMenu: (v) => set({ showQuickRepliesMenu: v }),
-      setShowQuickReplyPostOnly: (v) => set({ showQuickReplyPostOnly: v }),
-      setShowQuickReplyGuide: (v) => set({ showQuickReplyGuide: v }),
-      setShowQuickReplyImpersonate: (v) => set({ showQuickReplyImpersonate: v }),
-      addCustomQuickReply: (label, content) =>
-        set((state) => ({
-          customQuickReplies: [
-            ...state.customQuickReplies,
-            { id: generateClientId(), label: label.trim(), content, icon: "✨" },
-          ],
-        })),
-      updateCustomQuickReply: (id, patch) =>
-        set((state) => ({
-          customQuickReplies: state.customQuickReplies.map((entry) =>
-            entry.id === id
-              ? {
-                  ...entry,
-                  ...(patch.label !== undefined ? { label: patch.label } : {}),
-                  ...(patch.content !== undefined ? { content: patch.content } : {}),
-                  ...(patch.icon !== undefined ? { icon: patch.icon } : {}),
-                }
-              : entry,
-          ),
-        })),
-      removeCustomQuickReply: (id) =>
-        set((state) => ({ customQuickReplies: state.customQuickReplies.filter((entry) => entry.id !== id) })),
-      setChatSettingsSectionExpanded: (id, open) =>
-        set((state) => ({
-          chatSettingsExpandedSections: { ...state.chatSettingsExpandedSections, [id]: open },
-        })),
-      setConfirmBeforeDelete: (v) => set({ confirmBeforeDelete: v }),
-      setIncludeReasoningInExports: (v) => set({ includeReasoningInExports: v }),
-      setMessagesPerPage: (n) => set({ messagesPerPage: n }),
-      setBoldDialogue: (v) => set({ boldDialogue: v }),
-      setQuoteFormat: (v) => set({ quoteFormat: normalizeQuoteFormat(v) }),
-      setConvertLatexSymbols: (v) => set({ convertLatexSymbols: v }),
-      setTrimIncompleteModelOutput: (v) => set({ trimIncompleteModelOutput: v }),
-      setContinueAddsNewline: (v) => set({ continueAddsNewline: v }),
-      setSpeechToTextEnabled: (v) => set({ speechToTextEnabled: v }),
-      setTTSLineVolume: (v) => set({ ttsLineVolume: Math.max(0, Math.min(100, Math.round(v))) }),
-      setChibiProfessorMariEnabled: (v) => set({ chibiProfessorMariEnabled: v }),
-      setProfessorMariSuggestionsEnabled: (v) => set({ professorMariSuggestionsEnabled: v }),
-      setProfessorMariNavigationEnabled: (v) => {
-        const wasEnabled = get().professorMariNavigationEnabled;
-        set({ professorMariNavigationEnabled: v });
-        if (v && !wasEnabled) resetProfessorMariNavigator();
-      },
-      setAchievementsEnabled: (v) => set({ achievementsEnabled: v }),
-      setMusicPlayerEnabled: (v) => set({ musicPlayerEnabled: v }),
-      setMusicPlayerSource: (v) =>
-        set({
-          musicPlayerEnabled: true,
-          musicPlayerSource: v,
-        }),
-      setYoutubePlayerVolume: (v) => set({ youtubePlayerVolume: Math.max(0, Math.min(100, Math.round(v))) }),
-      setLocalMusicPlayerVolume: (v) => set({ localMusicPlayerVolume: Math.max(0, Math.min(100, Math.round(v))) }),
-      setConversationCallVoiceVolume: (v) =>
-        set({ conversationCallVoiceVolume: Math.max(0, Math.min(100, Math.round(v))) }),
-      setConversationCallVoiceMuted: (v) => set({ conversationCallVoiceMuted: v }),
-      setSpotifyMobileWidgetCollapsed: (v) => set({ spotifyMobileWidgetCollapsed: v }),
-      setSpotifyMobileWidgetPosition: (position) =>
-        set({
-          spotifyMobileWidgetPosition: {
-            x: Number.isFinite(position.x) ? Math.max(8, Math.round(position.x)) : 16,
-            y: Number.isFinite(position.y) ? Math.max(8, Math.round(position.y)) : 96,
-          },
-        }),
-      setIntuitiveSwipeNavigation: (v) => set({ intuitiveSwipeNavigation: v }),
-      setIntuitiveSwipeRerollLatest: (v) => set({ intuitiveSwipeRerollLatest: v }),
-      setEditLastMessageOnArrowUp: (v) => set({ editLastMessageOnArrowUp: v }),
-      setEditMessageOnDoubleClick: (v) => set({ editMessageOnDoubleClick: v }),
-      setSummaryPopoverSettings: (settings) =>
-        set((state) => ({
-          summaryPopoverSettings: normalizeSummaryPopoverSettings({
-            ...state.summaryPopoverSettings,
-            ...settings,
+          })),
+        openCharacterLibrary: (characterId) =>
+          set((state) => ({
+            characterLibraryOpen: true,
+            characterLibraryInitialId: characterId ?? null,
+            characterLibrarySelectedId: characterId ?? state.characterLibrarySelectedId,
+            cardLibraryKind: "characters",
+            agentCatalogOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            pendingSpatialMapDraftReview: null,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            editorDirty: false,
+            detailReturnRightPanel: null,
+            rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
+          })),
+        openPersonaLibrary: () =>
+          set((state) => ({
+            characterLibraryOpen: true,
+            cardLibraryKind: "personas",
+            agentCatalogOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            pendingSpatialMapDraftReview: null,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            editorDirty: false,
+            detailReturnRightPanel: null,
+            rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
+          })),
+        closeCharacterLibrary: () => set({ characterLibraryOpen: false, characterLibraryInitialId: null }),
+        openAgentCatalog: (packageId) =>
+          set((state) => ({
+            agentCatalogOpen: true,
+            agentCatalogInitialPackageId: packageId ?? null,
+            characterLibraryOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            pendingSpatialMapDraftReview: null,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            editorDirty: false,
+            detailReturnRightPanel: null,
+            rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
+          })),
+        closeAgentCatalog: () => set({ agentCatalogOpen: false, agentCatalogInitialPackageId: null }),
+        openBotBrowser: () =>
+          set({
+            botBrowserOpen: true,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            detailReturnRightPanel: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            personaDetailId: null,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            ...(isMobileShellViewport() && { rightPanelOpen: false }),
           }),
-        })),
-      setScenePromptPreferences: (preferences) =>
-        set({ scenePromptPreferences: normalizeScenePromptPreferences(preferences) }),
-      setChatFontColor: (v) => set({ chatFontColor: v }),
-      setDefaultDialogueColor: (v) => set({ defaultDialogueColor: v }),
-      setChatChromeTextColor: (v) => set({ chatChromeTextColor: normalizeChatChromeTextColor(v) }),
-      setChatFontOpacity: (v) => set({ chatFontOpacity: Math.max(0, Math.min(100, v)) }),
-      setRoleplayReducedPaintEffects: (v) => set({ roleplayReducedPaintEffects: v }),
-      setGameTextEffectsEnabled: (v) => set({ gameTextEffectsEnabled: v }),
-      setRoleplayAvatarStyle: (v) => set({ roleplayAvatarStyle: v }),
-      setRoleplayAvatarScale: (v) =>
-        set({ roleplayAvatarScale: Math.max(ROLEPLAY_AVATAR_SCALE_MIN, Math.min(ROLEPLAY_AVATAR_SCALE_MAX, v)) }),
-      setRoleplayAvatarsScrollable: (v) => set({ roleplayAvatarsScrollable: v }),
-      setRoleplayNarratorAvatarCycling: (v) => set({ roleplayNarratorAvatarCycling: v }),
-      setRoleplaySpriteScale: (v) =>
-        set({ roleplaySpriteScale: Math.max(ROLEPLAY_SPRITE_SCALE_MIN, Math.min(ROLEPLAY_SPRITE_SCALE_MAX, v)) }),
-      setGameAvatarScale: (v) => set({ gameAvatarScale: Math.max(0.75, Math.min(1.75, v)) }),
-      setGameFullBodySpriteScale: (v) => set({ gameFullBodySpriteScale: Math.max(0.75, Math.min(2.75, v)) }),
-      setTextStrokeWidth: (v) => set({ textStrokeWidth: Math.max(0, Math.min(5, v)) }),
-      setTextStrokeColor: (v) => set({ textStrokeColor: v }),
-      setCenterCompact: (v) => set({ centerCompact: v }),
-      setVisualTheme: (v) => set({ visualTheme: v }),
-      setConvoGradientField: (scheme, field, value) =>
-        set((s) => ({
-          convoGradient: {
-            ...s.convoGradient,
-            [scheme]: { ...s.convoGradient[scheme], [field]: value },
-          },
-        })),
-      resetAppearanceSettings: () =>
-        set({
-          trackerPanelEnabled: true,
-          trackerPanelOpen: false,
-          trackerPanelOpenByChatId: {},
-          trackerPanelSide: "right" as TrackerPanelSide,
-          trackerPanelHideHudWidgets: false,
-          trackerPanelUseExpressionSprites: false,
-          trackerPanelThoughtBubbleDisplay: "inline" as TrackerThoughtBubbleDisplay,
-          trackerStatDisplayMode: "bars" as TrackerStatDisplayMode,
-          trackerPanelDockedThoughtsAlwaysVisible: false,
-          trackerPanelSizeProfile: "standard" as TrackerPanelSizeProfile,
-          trackerPanelBackgroundColor: TRACKER_PANEL_DEFAULT_BACKGROUND_COLOR,
-          trackerTemperatureUnit: "celsius" as TrackerTemperatureUnit,
-          trackerPanelCollapsedSections: {},
-          trackerPanelSectionOrder: [...TRACKER_DATA_PANEL_SECTIONS],
-          theme: "dark" as const,
-          appBackgroundColor: "",
-          appAccentColor: "",
-          appAccentRgbMode: false,
-          customCursorEnabled: true,
-          reduceAmbientEffects: false,
-          mariPanelSortMode: "az",
-          mariEditViewMode: "easy",
-          chatBackground: null,
-          defaultRoleplayBackground: DEFAULT_ROLEPLAY_BACKGROUND_URL,
-          chatBackgroundBlur: 0,
-          fontSize: 17 as FontSize,
-          chatFontSize: 16,
-          fontFamily: "",
-          conversationMessageStyle: "classic" as ConversationMessageStyle,
-          conversationAvatarShape: "circle" as ConversationAvatarShape,
-          chatFontColor: "",
-          defaultDialogueColor: "",
-          chatChromeTextColor: "",
-          chatFontOpacity: 90,
-          roleplayReducedPaintEffects: false,
-          gameTextEffectsEnabled: true,
-          roleplayAvatarStyle: "circles" as RoleplayAvatarStyle,
-          roleplayAvatarScale: 1,
-          roleplayAvatarsScrollable: false,
-          roleplayNarratorAvatarCycling: true,
-          roleplaySpriteScale: 1,
-          gameDialogueDisplayMode: "classic" as GameDialogueDisplayMode,
-          chatListBackgrounds: "hover" as ChatListBackgroundMode,
-          gameAvatarScale: 1,
-          gameFullBodySpriteScale: 1.35,
-          textStrokeWidth: 0.5,
-          textStrokeColor: "#000000",
-          visualTheme: "default" as VisualTheme,
-          convoGradient: {
-            dark: { from: "#0a0a0e", to: "#1c2133" },
-            light: { from: "#f2eff7", to: "#eae6f0" },
-          },
-          weatherEffects: true,
-        }),
-      setConvoNotificationSound: (v) => set({ convoNotificationSound: v }),
-      setRpNotificationSound: (v) => set({ rpNotificationSound: v }),
-      setGameNotificationSound: (v) => set({ gameNotificationSound: v }),
-      setNotificationSoundsOnlyWhenUnfocused: (v) => set({ notificationSoundsOnlyWhenUnfocused: v }),
-      setConversationBrowserNotifications: (v) => set({ conversationBrowserNotifications: v }),
-      setConversationMobileNotifications: (v) => set({ conversationMobileNotifications: v }),
-      setGenerationBrowserNotifications: (v) => set({ generationBrowserNotifications: v }),
-      setGenerationMobileNotifications: (v) => set({ generationMobileNotifications: v }),
-      setCustomConversationPrompt: (v) => set({ customConversationPrompt: v }),
-      setScheduleGenerationPreferences: (v) => set({ scheduleGenerationPreferences: v }),
-      setConversationTimeZone: (v) => set({ conversationTimeZone: normalizeConversationTimeZone(v) }),
-      rememberGameSetupOptions: (options, text) =>
-        set((state) => {
-          const learned = state.learnedGameSetupOptions ?? DEFAULT_GAME_SETUP_LEARNED_OPTIONS;
-          const remembered = state.rememberedGameSetupText ?? DEFAULT_GAME_SETUP_REMEMBERED_TEXT;
-          return {
-            learnedGameSetupOptions: {
-              genres: mergeLearnedGameSetupOptions(learned.genres, options.genres ?? []),
-              tones: mergeLearnedGameSetupOptions(learned.tones, options.tones ?? []),
-              settings: mergeLearnedGameSetupOptions(learned.settings, options.settings ?? []),
-              goals: mergeLearnedGameSetupOptions(learned.goals, options.goals ?? []),
-              preferences: mergeLearnedGameSetupOptions(learned.preferences, options.preferences ?? []),
-            },
-            rememberedGameSetupText: {
-              playerGoals:
-                text?.playerGoals !== undefined
-                  ? normalizeRememberedGameSetupText(text.playerGoals)
-                  : remembered.playerGoals,
-              preferences:
-                text?.preferences !== undefined
-                  ? normalizeRememberedGameSetupText(text.preferences)
-                  : remembered.preferences,
-            },
-          };
-        }),
-      forgetGameSetupOption: (group, value) =>
-        set((state) => {
-          const learned = state.learnedGameSetupOptions ?? DEFAULT_GAME_SETUP_LEARNED_OPTIONS;
-          const targetKey = normalizeLearnedGameSetupOption(value).toLowerCase();
-          if (!targetKey) return state;
-          const next = learned[group].filter(
-            (entry) => normalizeLearnedGameSetupOption(entry).toLowerCase() !== targetKey,
+        closeBotBrowser: () => set({ botBrowserOpen: false }),
+        openGameAssetsBrowser: () =>
+          set({
+            gameAssetsBrowserOpen: true,
+            botBrowserOpen: false,
+            noodleOpen: false,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            detailReturnRightPanel: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            personaDetailId: null,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            ...(isMobileShellViewport() && { rightPanelOpen: false }),
+          }),
+        closeGameAssetsBrowser: () => set({ gameAssetsBrowserOpen: false }),
+        openNoodle: () =>
+          set({
+            noodleOpen: true,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            detailReturnRightPanel: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            personaDetailId: null,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            editorDirty: false,
+            ...(isMobileShellViewport() && { rightPanelOpen: false }),
+          }),
+        closeNoodle: () => set({ noodleOpen: false }),
+        setNoodleSelectedPersonaId: (id) => set({ noodleSelectedPersonaId: id }),
+        setNoodleNavigation: (navigation) => set({ noodleNavigation: navigation }),
+
+        hasAnyDetailOpen: () => {
+          const s = get();
+          return !!(
+            s.characterDetailId ||
+            s.lorebookDetailId ||
+            s.presetDetailId ||
+            s.connectionDetailId ||
+            s.agentDetailId ||
+            s.toolDetailId ||
+            s.personaDetailId ||
+            s.regexDetailId ||
+            s.spatialMapDetailChatId ||
+            s.characterLibraryOpen ||
+            s.agentCatalogOpen ||
+            s.botBrowserOpen ||
+            s.gameAssetsBrowserOpen ||
+            s.noodleOpen
           );
-          if (next.length === learned[group].length) return state;
-          return {
-            learnedGameSetupOptions: { ...learned, [group]: next },
-          };
-        }),
-      setEnterToSendRP: (v) => set({ enterToSendRP: v }),
-      setEnterToSendConvo: (v) => set({ enterToSendConvo: v }),
-      setEnterToSendGame: (v) => set({ enterToSendGame: v }),
-      setEnterToSendProfessorMari: (v) => set({ enterToSendProfessorMari: v }),
-      setWeatherEffects: (v) => set({ weatherEffects: v }),
-      setImpersonatePromptTemplate: (v) => set({ impersonatePromptTemplate: v }),
-      selectImpersonatePromptTemplate: (template) =>
-        set({
-          activeImpersonatePromptTemplateId: template?.id ?? null,
-          impersonatePromptTemplate: template?.prompt ?? "",
-        }),
-      clearActiveImpersonatePromptTemplate: () => set({ activeImpersonatePromptTemplateId: null }),
-      setImpersonateCyoaChoices: (v) => set({ impersonateCyoaChoices: v }),
-      setImpersonatePresetId: (id) => set({ impersonatePresetId: id }),
-      setImpersonateConnectionId: (id) => set({ impersonateConnectionId: id }),
-      setImpersonateBlockAgents: (v) => set({ impersonateBlockAgents: v }),
-      setHasMigratedCustomThemesToServer: (v) => set({ hasMigratedCustomThemesToServer: v }),
-      clearLegacyCustomThemes: () => set({ customThemes: [], activeCustomTheme: null }),
-      setHasCompletedOnboarding: (v) => set({ hasCompletedOnboarding: v }),
-      setGameTutorialDisabled: (v) => set({ gameTutorialDisabled: v }),
-      dismissLinkApiBanner: () => set({ linkApiBannerDismissed: true }),
-      toggleEchoChamber: () => set((s) => ({ echoChamberOpen: !s.echoChamberOpen })),
-      setEchoChamberSide: (side) => set({ echoChamberSide: side }),
-      setEchoChamberSideForChat: (chatId, side) => {
-        const normalizedChatId = chatId.trim();
-        if (!normalizedChatId) return;
-        set((state) => ({
-          echoChamberSide: side,
-          echoChamberSideByChatId: {
-            ...state.echoChamberSideByChatId,
-            [normalizedChatId]: side,
-          },
-        }));
-      },
-      setEchoChamberSizeForChat: (chatId, size) => {
-        const normalizedChatId = chatId.trim();
-        const normalizedSize = normalizeEchoChamberSize(size);
-        if (!normalizedChatId || !normalizedSize) return;
-        set((state) => ({
-          echoChamberSizeByChatId: {
-            ...state.echoChamberSizeByChatId,
-            [normalizedChatId]: normalizedSize,
-          },
-        }));
-      },
-      setUserStatus: (status) => set({ userStatus: status }),
-      setUserStatusManual: (status) => set({ userStatusManual: status, userStatus: status }),
-      setUserActivity: (activity) => set({ userActivity: activity.slice(0, USER_ACTIVITY_MAX_LENGTH) }),
-      rememberUserActivity: (activity) =>
-        set((state) => {
-          const normalized = normalizeUserActivity(activity);
-          if (!normalized) return { recentUserActivities: state.recentUserActivities };
-          return {
-            recentUserActivities: [
-              normalized,
-              ...state.recentUserActivities.filter((item) => item.toLowerCase() !== normalized.toLowerCase()),
-            ].slice(0, RECENT_USER_ACTIVITY_LIMIT),
-          };
-        }),
-    }),
+        },
+        closeAllDetails: () =>
+          set({
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            editorDirty: false,
+            detailReturnRightPanel: null,
+          }),
+        setEditorDirty: (dirty) => set({ editorDirty: dirty }),
+        requestChatModeShortcut: (mode) =>
+          set((state) => ({
+            sidebarOpen: true,
+            rightPanelOpen: isMobileShellViewport() ? false : state.rightPanelOpen,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            editorDirty: false,
+            detailReturnRightPanel: null,
+            chatModeShortcutRequest: {
+              mode,
+              token: (state.chatModeShortcutRequest?.token ?? 0) + 1,
+            },
+          })),
+
+        // Settings actions
+        setFontSize: (size) => set({ fontSize: size }),
+        setLanguage: (language) => set({ language }),
+        setChatFontSize: (size) => set({ chatFontSize: size }),
+        setFontFamily: (family) => set({ fontFamily: family }),
+        setChatWidgetPreset: (preset) =>
+          set({
+            chatWidgetPreset: normalizeChatWidgetPreset(preset),
+            chatWidgetFont: "",
+            chatWidgetShape: "preset",
+            chatWidgetBorderColor: "",
+            chatWidgetBackgroundColor: "",
+            chatWidgetTextColor: "",
+          }),
+        setChatWidgetFont: (font) => set({ chatWidgetFont: normalizeChatWidgetFont(font) }),
+        setChatWidgetShape: (shape) => set({ chatWidgetShape: normalizeChatWidgetShape(shape) }),
+        setChatWidgetButtonSize: (size) => set({ chatWidgetButtonSize: normalizeChatWidgetButtonSize(size) }),
+        setChatWidgetBorderColor: (color) => set({ chatWidgetBorderColor: normalizeChatWidgetColor(color) }),
+        setChatWidgetBackgroundColor: (color) => set({ chatWidgetBackgroundColor: normalizeChatWidgetColor(color) }),
+        setChatWidgetTextColor: (color) => set({ chatWidgetTextColor: normalizeChatWidgetColor(color) }),
+        setChatWidgetApplyFont: (enabled) => set({ chatWidgetApplyFont: enabled }),
+        setChatWidgetApplyShape: (enabled) => set({ chatWidgetApplyShape: enabled }),
+        setChatWidgetApplyColors: (enabled) => set({ chatWidgetApplyColors: enabled }),
+        setEnableStreaming: (v) => set({ enableStreaming: v }),
+        setDebugMode: (v) => set({ debugMode: v }),
+        setShowPaidAgentConnectionWarning: (v) => set({ showPaidAgentConnectionWarning: v }),
+        setStreamingSpeed: (v) => set({ streamingSpeed: Math.max(1, Math.min(100, v)) }),
+        setGameInstantTextReveal: (v) => set({ gameInstantTextReveal: v }),
+        setGameMiddleMouseNav: (v) => set({ gameMiddleMouseNav: v }),
+        setGameDialogueDisplayMode: (v) => set({ gameDialogueDisplayMode: v }),
+        setGameNarrationCollapsed: (v) => set({ gameNarrationCollapsed: v }),
+        setChatListBackgrounds: (v) => set({ chatListBackgrounds: v }),
+        setGameTextSpeed: (v) => set({ gameTextSpeed: Math.max(1, Math.min(100, v)) }),
+        setGameAutoPlayDelay: (v) => set({ gameAutoPlayDelay: Math.max(200, Math.min(10000, Math.round(v))) }),
+        setQueueImageGenerationRequests: (v) => set({ queueImageGenerationRequests: v }),
+        setReviewImagePromptsBeforeSend: (v) => set({ reviewImagePromptsBeforeSend: v }),
+        setAutoSaveGeneratedImagesToGalleries: (v) => set({ autoSaveGeneratedImagesToGalleries: v }),
+        setImageBackgroundDimensions: (width, height) =>
+          set({
+            imageBackgroundWidth: clampImageDimension(width),
+            imageBackgroundHeight: clampImageDimension(height),
+          }),
+        setImageIllustrationDimensions: (width, height) =>
+          set({
+            imageIllustrationWidth: clampImageDimension(width),
+            imageIllustrationHeight: clampImageDimension(height),
+          }),
+        setImageGameDimensions: (width, height) =>
+          set({
+            imageGameWidth: clampImageDimension(width),
+            imageGameHeight: clampImageDimension(height),
+          }),
+        setImagePortraitDimensions: (width, height) =>
+          set({
+            imagePortraitWidth: clampImageDimension(width),
+            imagePortraitHeight: clampImageDimension(height),
+          }),
+        setImageCharacterSheetDimensions: (width, height) =>
+          set({
+            imageCharacterSheetWidth: clampImageDimension(width),
+            imageCharacterSheetHeight: clampImageDimension(height),
+          }),
+        setImageSelfieDimensions: (width, height) =>
+          set({
+            imageSelfieWidth: clampImageDimension(width),
+            imageSelfieHeight: clampImageDimension(height),
+          }),
+        setImageStyleProfiles: (settings) => set({ imageStyleProfiles: normalizeImageStyleProfileSettings(settings) }),
+
+        setConversationMessageStyle: (v) => set({ conversationMessageStyle: normalizeConversationMessageStyle(v) }),
+        setAlwaysDisplayConversationSwipeMenu: (v) => set({ alwaysDisplayConversationSwipeMenu: v }),
+        setAlwaysDisplayRoleplaySwipeMenu: (v) => set({ alwaysDisplayRoleplaySwipeMenu: v }),
+        setConversationAvatarShape: (v) => set({ conversationAvatarShape: normalizeConversationAvatarShape(v) }),
+        setShowTimestamps: (v) => set({ showTimestamps: v }),
+        setShowModelName: (v) => set({ showModelName: v }),
+        setShowTokenUsage: (v) => set({ showTokenUsage: v }),
+        setShowContextUsage: (v) => set({ showContextUsage: v }),
+        setShowMessageNumbers: (v) => set({ showMessageNumbers: v }),
+        setShowCharactersInPersonaPickers: (v) => set({ showCharactersInPersonaPickers: v }),
+        setGuideGenerations: (v) => set({ guideGenerations: v }),
+        setKeepGuidanceAfterRegenerate: (v) => set({ keepGuidanceAfterRegenerate: v }),
+        setShowQuickRepliesMenu: (v) => set({ showQuickRepliesMenu: v }),
+        setShowQuickReplyPostOnly: (v) => set({ showQuickReplyPostOnly: v }),
+        setShowQuickReplyGuide: (v) => set({ showQuickReplyGuide: v }),
+        setShowQuickReplyImpersonate: (v) => set({ showQuickReplyImpersonate: v }),
+        addCustomQuickReply: (label, content) =>
+          set((state) => ({
+            customQuickReplies: [
+              ...state.customQuickReplies,
+              { id: generateClientId(), label: label.trim(), content, icon: "✨" },
+            ],
+          })),
+        updateCustomQuickReply: (id, patch) =>
+          set((state) => ({
+            customQuickReplies: state.customQuickReplies.map((entry) =>
+              entry.id === id
+                ? {
+                    ...entry,
+                    ...(patch.label !== undefined ? { label: patch.label } : {}),
+                    ...(patch.content !== undefined ? { content: patch.content } : {}),
+                    ...(patch.icon !== undefined ? { icon: patch.icon } : {}),
+                  }
+                : entry,
+            ),
+          })),
+        removeCustomQuickReply: (id) =>
+          set((state) => ({ customQuickReplies: state.customQuickReplies.filter((entry) => entry.id !== id) })),
+        setChatSettingsSectionExpanded: (id, open) =>
+          set((state) => ({
+            chatSettingsExpandedSections: { ...state.chatSettingsExpandedSections, [id]: open },
+          })),
+        setConfirmBeforeDelete: (v) => set({ confirmBeforeDelete: v }),
+        setIncludeReasoningInExports: (v) => set({ includeReasoningInExports: v }),
+        setIncludePrivateNotesInExports: (v) => set({ includePrivateNotesInExports: v }),
+        setMessagesPerPage: (n) => set({ messagesPerPage: n }),
+        setBoldDialogue: (v) => set({ boldDialogue: v }),
+        setColorInlineNames: (v) => set({ colorInlineNames: v }),
+        setDisableInlineNameGradients: (v) => set({ disableInlineNameGradients: v }),
+        setQuoteFormat: (v) => set({ quoteFormat: normalizeQuoteFormat(v) }),
+        setConvertLatexSymbols: (v) => set({ convertLatexSymbols: v }),
+        setTrimIncompleteModelOutput: (v) => set({ trimIncompleteModelOutput: v }),
+        setShowHomeBrowserAddressBar: (visible) => set({ showHomeBrowserAddressBar: visible }),
+        setShowHomeBrowserDesktopBookmarksOnOtherTabs: (visible) =>
+          set({ showHomeBrowserDesktopBookmarksOnOtherTabs: visible }),
+        setShowHomeBrowserMobileBookmarksOnOtherTabs: (visible) =>
+          set({ showHomeBrowserMobileBookmarksOnOtherTabs: visible }),
+        setContinueAddsNewline: (v) => set({ continueAddsNewline: v }),
+        setSpeechToTextEnabled: (v) => set({ speechToTextEnabled: v }),
+        setTTSLineVolume: (v) => set({ ttsLineVolume: Math.max(0, Math.min(100, Math.round(v))) }),
+        setChibiProfessorMariEnabled: (v) => set({ chibiProfessorMariEnabled: v }),
+        setProfessorMariSuggestionsEnabled: (v) => set({ professorMariSuggestionsEnabled: v }),
+        setProfessorMariNavigationEnabled: (v) => {
+          const wasEnabled = get().professorMariNavigationEnabled;
+          set({ professorMariNavigationEnabled: v });
+          if (v && !wasEnabled) resetProfessorMariNavigator();
+        },
+        setAchievementsEnabled: (v) => set({ achievementsEnabled: v }),
+        setMusicPlayerEnabled: (v) => set({ musicPlayerEnabled: v }),
+        setMusicPlayerSource: (v) =>
+          set({
+            musicPlayerEnabled: true,
+            musicPlayerSource: v,
+          }),
+        setYoutubePlayerVolume: (v) => set({ youtubePlayerVolume: Math.max(0, Math.min(100, Math.round(v))) }),
+        setLocalMusicPlayerVolume: (v) => set({ localMusicPlayerVolume: Math.max(0, Math.min(100, Math.round(v))) }),
+        setConversationCallVoiceVolume: (v) =>
+          set({ conversationCallVoiceVolume: Math.max(0, Math.min(100, Math.round(v))) }),
+        setConversationCallVoiceMuted: (v) => set({ conversationCallVoiceMuted: v }),
+        setSpotifyMobileWidgetCollapsed: (v) => set({ spotifyMobileWidgetCollapsed: v }),
+        setSpotifyMobileWidgetPosition: (position) =>
+          set({
+            spotifyMobileWidgetPosition: {
+              x: Number.isFinite(position.x)
+                ? Math.max(8, Math.round(position.x))
+                : DEFAULT_MOBILE_MUSIC_WIDGET_POSITION.x,
+              y: Number.isFinite(position.y)
+                ? Math.max(8, Math.round(position.y))
+                : DEFAULT_MOBILE_MUSIC_WIDGET_POSITION.y,
+            },
+          }),
+        setIntuitiveSwipeNavigation: (v) => set({ intuitiveSwipeNavigation: v }),
+        setIntuitiveSwipeRerollLatest: (v) => set({ intuitiveSwipeRerollLatest: v }),
+        setEditLastMessageOnArrowUp: (v) => set({ editLastMessageOnArrowUp: v }),
+        setEditMessageOnDoubleClick: (v) => set({ editMessageOnDoubleClick: v }),
+        setSummaryPopoverSettings: (settings) =>
+          set((state) => ({
+            summaryPopoverSettings: normalizeSummaryPopoverSettings({
+              ...state.summaryPopoverSettings,
+              ...settings,
+            }),
+          })),
+        setScenePromptPreferences: (preferences) =>
+          set({ scenePromptPreferences: normalizeScenePromptPreferences(preferences) }),
+        setSceneOriginFocus: (origin) => set({ sceneOriginFocus: origin }),
+        setChatFontColor: (v) => set({ chatFontColor: v }),
+        setDefaultDialogueColor: (v) => set({ defaultDialogueColor: v }),
+        setChatChromeTextColor: (v) => set({ chatChromeTextColor: normalizeChatChromeTextColor(v) }),
+        setChatFontOpacity: (v) => set({ chatFontOpacity: Math.max(0, Math.min(100, v)) }),
+        setRoleplayReducedPaintEffects: (v) => set({ roleplayReducedPaintEffects: v }),
+        setShowRoleplayThinkingInMessages: (v) =>
+          set({
+            showRoleplayThinkingInMessages: v,
+            ...(!v ? { keepRoleplayThinkingExpanded: false } : {}),
+          }),
+        setKeepRoleplayThinkingExpanded: (v) =>
+          set((state) => ({ keepRoleplayThinkingExpanded: state.showRoleplayThinkingInMessages && v })),
+        setGameTextEffectsEnabled: (v) => set({ gameTextEffectsEnabled: v }),
+        setRoleplayAvatarStyle: (v) => set({ roleplayAvatarStyle: v }),
+        setRoleplayAvatarScale: (v) =>
+          set({ roleplayAvatarScale: Math.max(ROLEPLAY_AVATAR_SCALE_MIN, Math.min(ROLEPLAY_AVATAR_SCALE_MAX, v)) }),
+        setRoleplayAvatarsScrollable: (v) => set({ roleplayAvatarsScrollable: v }),
+        setRoleplayNarratorAvatarCycling: (v) => set({ roleplayNarratorAvatarCycling: v }),
+        setRoleplaySpriteScale: (v) =>
+          set({ roleplaySpriteScale: Math.max(ROLEPLAY_SPRITE_SCALE_MIN, Math.min(ROLEPLAY_SPRITE_SCALE_MAX, v)) }),
+        setGameAvatarScale: (v) => set({ gameAvatarScale: Math.max(0.75, Math.min(1.75, v)) }),
+        setRoleplayDisplayStyle: (v) => set({ roleplayDisplayStyle: v }),
+        setRoleplayChatPosition: (v) => set({ roleplayChatPosition: normalizeRoleplayChatPosition(v) }),
+        setRoleplayVnAutoPlay: (v) => set({ roleplayVnAutoPlay: v }),
+        setRoleplayVnAutoPlayDelay: (v) =>
+          set({ roleplayVnAutoPlayDelay: Math.max(200, Math.min(10000, Math.round(v))) }),
+        setRoleplayVnPortraitScale: (v) =>
+          set({ roleplayVnPortraitScale: Number.isFinite(v) ? Math.max(0.75, Math.min(1.75, v)) : 1 }),
+        setRoleplayVnSpriteScale: (v) =>
+          set({ roleplayVnSpriteScale: Number.isFinite(v) ? Math.max(0.75, Math.min(2.75, v)) : 1.35 }),
+        setGameFullBodySpriteScale: (v) => set({ gameFullBodySpriteScale: Math.max(0.75, Math.min(2.75, v)) }),
+        setTextStrokeWidth: (v) => set({ textStrokeWidth: Math.max(0, Math.min(5, v)) }),
+        setTextStrokeColor: (v) => set({ textStrokeColor: v }),
+        setCenterCompact: (v) => set({ centerCompact: v }),
+        setVisualTheme: (v) => set({ visualTheme: v }),
+        setConvoGradientField: (scheme, field, value) =>
+          set((s) => ({
+            convoGradient: {
+              ...s.convoGradient,
+              [scheme]: { ...s.convoGradient[scheme], [field]: value },
+            },
+          })),
+        // Swipe-menu choices intentionally survive appearance resets; only their toggles change them.
+        resetAppearanceSettings: () =>
+          set({
+            trackerPanelEnabled: true,
+            trackerPanelOpen: false,
+            trackerPanelOpenByChatId: {},
+            trackerPanelSide: "right" as TrackerPanelSide,
+            trackerPanelHideHudWidgets: false,
+            trackerPanelUseExpressionSprites: false,
+            trackerPanelThoughtBubbleDisplay: "inline" as TrackerThoughtBubbleDisplay,
+            trackerStatDisplayMode: "bars" as TrackerStatDisplayMode,
+            trackerPanelDockedThoughtsAlwaysVisible: false,
+            trackerPanelSizeProfile: "standard" as TrackerPanelSizeProfile,
+            trackerPanelBackgroundColor: TRACKER_PANEL_DEFAULT_BACKGROUND_COLOR,
+            trackerTemperatureUnit: "celsius" as TrackerTemperatureUnit,
+            trackerPanelCollapsedSections: {},
+            trackerPanelSectionOrder: [...TRACKER_DATA_PANEL_SECTIONS],
+            theme: "dark" as const,
+            appBackgroundColor: "",
+            appAccentColor: "",
+            appAccentPulseMode: getDefaultAppAccentPulseMode(),
+            appAccentRgbMode: false,
+            customCursorEnabled: true,
+            reduceAmbientEffects: false,
+            mariPanelSortMode: "az",
+            mariEditViewMode: "easy",
+            chatBackground: null,
+            defaultRoleplayBackground: DEFAULT_ROLEPLAY_BACKGROUND_URL,
+            chatBackgroundBlur: 0,
+            conversationBackgroundImageOpacity: DEFAULT_CONVERSATION_BACKGROUND_IMAGE_OPACITY,
+            fontSize: 17 as FontSize,
+            chatFontSize: 16,
+            fontFamily: "",
+            chatWidgetPreset: "default" as ChatWidgetPreset,
+            chatWidgetFont: "",
+            chatWidgetShape: "preset" as ChatWidgetShape,
+            chatWidgetButtonSize: null,
+            chatWidgetBorderColor: "",
+            chatWidgetBackgroundColor: "",
+            chatWidgetTextColor: "",
+            chatWidgetApplyFont: false,
+            chatWidgetApplyShape: false,
+            chatWidgetApplyColors: false,
+            conversationMessageStyle: "classic" as ConversationMessageStyle,
+            conversationAvatarShape: "circle" as ConversationAvatarShape,
+            chatFontColor: "",
+            defaultDialogueColor: "",
+            chatChromeTextColor: "",
+            chatFontOpacity: 90,
+            roleplayReducedPaintEffects: false,
+            showRoleplayThinkingInMessages: false,
+            keepRoleplayThinkingExpanded: false,
+            gameTextEffectsEnabled: true,
+            roleplayAvatarStyle: "circles" as RoleplayAvatarStyle,
+            roleplayAvatarScale: 1,
+            roleplayAvatarsScrollable: false,
+            roleplayNarratorAvatarCycling: true,
+            roleplaySpriteScale: 1,
+            roleplayDisplayStyle: "classic",
+            roleplayChatPosition: "center",
+            roleplayVnAutoPlay: false,
+            roleplayVnAutoPlayDelay: 3000,
+            roleplayVnPortraitScale: 1,
+            roleplayVnSpriteScale: 1.35,
+            gameDialogueDisplayMode: "classic" as GameDialogueDisplayMode,
+            gameNarrationCollapsed: false,
+            chatListBackgrounds: "hover" as ChatListBackgroundMode,
+            gameAvatarScale: 1,
+            gameFullBodySpriteScale: 1.35,
+            textStrokeWidth: 0.5,
+            textStrokeColor: "#000000",
+            visualTheme: "default" as VisualTheme,
+            convoGradient: {
+              dark: { from: "#0a0a0e", to: "#1c2133" },
+              light: { from: "#f2eff7", to: "#eae6f0" },
+            },
+            weatherEffects: true,
+          }),
+        setConvoNotificationSound: (v) => set({ convoNotificationSound: v }),
+        setRpNotificationSound: (v) => set({ rpNotificationSound: v }),
+        setGameNotificationSound: (v) => set({ gameNotificationSound: v }),
+        setNotificationSoundsOnlyWhenUnfocused: (v) => set({ notificationSoundsOnlyWhenUnfocused: v }),
+        setNotificationPosition: (v) => set({ notificationPosition: v === "bottom" ? "bottom" : "top" }),
+        setChatWizardDefaults: (mode, defaults) =>
+          set((state) => {
+            const next = { ...state.chatWizardDefaults };
+            if (defaults) next[mode] = defaults;
+            else delete next[mode];
+            return { chatWizardDefaults: next };
+          }),
+        setConversationBrowserNotifications: (v) => set({ conversationBrowserNotifications: v }),
+        setConversationMobileNotifications: (v) => set({ conversationMobileNotifications: v }),
+        setGenerationBrowserNotifications: (v) => set({ generationBrowserNotifications: v }),
+        setGenerationMobileNotifications: (v) => set({ generationMobileNotifications: v }),
+        setCustomConversationPrompt: (v) => set({ customConversationPrompt: v }),
+        setScheduleGenerationPreferences: (v) => set({ scheduleGenerationPreferences: v }),
+        setConversationTimeZone: (v) => set({ conversationTimeZone: normalizeConversationTimeZone(v) }),
+        rememberGameSetupOptions: (options, text) =>
+          set((state) => {
+            const learned = state.learnedGameSetupOptions ?? DEFAULT_GAME_SETUP_LEARNED_OPTIONS;
+            const remembered = state.rememberedGameSetupText ?? DEFAULT_GAME_SETUP_REMEMBERED_TEXT;
+            return {
+              learnedGameSetupOptions: {
+                genres: mergeLearnedGameSetupOptions(learned.genres, options.genres ?? []),
+                tones: mergeLearnedGameSetupOptions(learned.tones, options.tones ?? []),
+                settings: mergeLearnedGameSetupOptions(learned.settings, options.settings ?? []),
+                goals: mergeLearnedGameSetupOptions(learned.goals, options.goals ?? []),
+                preferences: mergeLearnedGameSetupOptions(learned.preferences, options.preferences ?? []),
+              },
+              rememberedGameSetupText: {
+                playerGoals:
+                  text?.playerGoals !== undefined
+                    ? normalizeRememberedGameSetupText(text.playerGoals)
+                    : remembered.playerGoals,
+                preferences:
+                  text?.preferences !== undefined
+                    ? normalizeRememberedGameSetupText(text.preferences)
+                    : remembered.preferences,
+              },
+            };
+          }),
+        forgetGameSetupOption: (group, value) =>
+          set((state) => {
+            const learned = state.learnedGameSetupOptions ?? DEFAULT_GAME_SETUP_LEARNED_OPTIONS;
+            const targetKey = normalizeLearnedGameSetupOption(value).toLowerCase();
+            if (!targetKey) return state;
+            const next = learned[group].filter(
+              (entry) => normalizeLearnedGameSetupOption(entry).toLowerCase() !== targetKey,
+            );
+            if (next.length === learned[group].length) return state;
+            return {
+              learnedGameSetupOptions: { ...learned, [group]: next },
+            };
+          }),
+        setEnterToSendRP: (v) => set({ enterToSendRP: v }),
+        setEnterToSendConvo: (v) => set({ enterToSendConvo: v }),
+        setEnterToSendGame: (v) => set({ enterToSendGame: v }),
+        setEnterToSendProfessorMari: (v) => set({ enterToSendProfessorMari: v }),
+        setWeatherEffects: (v) => set({ weatherEffects: v }),
+        setImpersonatePromptTemplate: (v) => set({ impersonatePromptTemplate: v }),
+        selectImpersonatePromptTemplate: (template) =>
+          set({
+            activeImpersonatePromptTemplateId: template?.id ?? null,
+            impersonatePromptTemplate: template?.prompt ?? "",
+          }),
+        clearActiveImpersonatePromptTemplate: () => set({ activeImpersonatePromptTemplateId: null }),
+        setImpersonateCyoaChoices: (v) => set({ impersonateCyoaChoices: v }),
+        setImpersonatePresetId: (id) => set({ impersonatePresetId: id }),
+        setImpersonateConnectionId: (id) => set({ impersonateConnectionId: id }),
+        setImpersonateBlockAgents: (v) => set({ impersonateBlockAgents: v }),
+        setHasMigratedCustomThemesToServer: (v) => set({ hasMigratedCustomThemesToServer: v }),
+        clearLegacyCustomThemes: () => set({ customThemes: [], activeCustomTheme: null }),
+        setHasCompletedOnboarding: (v) => set({ hasCompletedOnboarding: v }),
+        markChatHelpSeen: (mode) =>
+          set((state) => {
+            const seenModes = state.chatHelpSeenModes ?? [];
+            return seenModes.includes(mode) ? state : { chatHelpSeenModes: [...seenModes, mode] };
+          }),
+        setChatHelpButtonHidden: (v) =>
+          set((state) => ({
+            chatHelpButtonHidden: v,
+            chatHelpSeenModes: v ? ["conversation", "roleplay", "game"] : state.chatHelpSeenModes,
+          })),
+        dismissLinkApiBanner: () => set({ linkApiBannerDismissed: true }),
+        dismissChatSettingsMoveTip: () => set({ chatSettingsMoveTipDismissed: true }),
+        dismissChatWindowIntro: () => set({ chatWindowIntroDismissed: true }),
+        toggleEchoChamber: () => set((s) => ({ echoChamberOpen: !s.echoChamberOpen })),
+        setEchoChamberSide: (side) => set({ echoChamberSide: side }),
+        setEchoChamberSideForChat: (chatId, side) => {
+          const normalizedChatId = chatId.trim();
+          if (!normalizedChatId) return;
+          set((state) => ({
+            echoChamberSide: side,
+            echoChamberSideByChatId: {
+              ...state.echoChamberSideByChatId,
+              [normalizedChatId]: side,
+            },
+          }));
+        },
+        setEchoChamberSizeForChat: (chatId, size) => {
+          const normalizedChatId = chatId.trim();
+          const normalizedSize = normalizeEchoChamberSize(size);
+          if (!normalizedChatId || !normalizedSize) return;
+          set((state) => ({
+            echoChamberSizeByChatId: {
+              ...state.echoChamberSizeByChatId,
+              [normalizedChatId]: normalizedSize,
+            },
+          }));
+        },
+        setUserStatus: (status) => set({ userStatus: status }),
+        setUserStatusManual: (status) => set({ userStatusManual: status, userStatus: status }),
+        setUserActivity: (activity) => set({ userActivity: activity.slice(0, USER_ACTIVITY_MAX_LENGTH) }),
+        rememberUserActivity: (activity) =>
+          set((state) => {
+            const normalized = normalizeUserActivity(activity);
+            if (!normalized) return { recentUserActivities: state.recentUserActivities };
+            return {
+              recentUserActivities: [
+                normalized,
+                ...state.recentUserActivities.filter((item) => item.toLowerCase() !== normalized.toLowerCase()),
+              ].slice(0, RECENT_USER_ACTIVITY_LIMIT),
+            };
+          }),
+      };
+    },
     {
-      name: "marinara-engine-ui",
-      version: 93,
+      name: UI_PERSISTENCE.name,
+      // v99 -> v100: separate character-sheet dimensions from backgrounds.
+      version: UI_PERSISTENCE.version,
       // Debounce localStorage writes to avoid sync I/O on every state change
       storage: createJSONStorage(() => {
         let timer: ReturnType<typeof setTimeout> | null = null;
@@ -2572,6 +3212,39 @@ export const useUIStore = create<UIState>()(
         };
       }),
       migrate: (persisted: any, version: number) => {
+        if (version <= 99) {
+          persisted.imageCharacterSheetWidth ??= persisted.imageBackgroundWidth ?? 1280;
+          persisted.imageCharacterSheetHeight ??= persisted.imageBackgroundHeight ?? 720;
+        }
+        if (version <= 98 && (persisted.imageNoodleWidth !== undefined || persisted.imageNoodleHeight !== undefined)) {
+          try {
+            localStorage.setItem(
+              "marinara:noodle:legacy-image-size",
+              JSON.stringify({
+                width: persisted.imageNoodleWidth,
+                height: persisted.imageNoodleHeight,
+              }),
+            );
+          } catch {
+            // Package settings use their defaults if browser storage is unavailable.
+          }
+        }
+        if (version <= 97) {
+          if (persisted.showHomeBrowserAddressBar === undefined) persisted.showHomeBrowserAddressBar = true;
+          if (persisted.showHomeBrowserDesktopBookmarksOnOtherTabs === undefined) {
+            persisted.showHomeBrowserDesktopBookmarksOnOtherTabs = true;
+          }
+          if (persisted.showHomeBrowserMobileBookmarksOnOtherTabs === undefined) {
+            persisted.showHomeBrowserMobileBookmarksOnOtherTabs = true;
+          }
+        }
+        if (version <= 96 && persisted.showCharactersInPersonaPickers === undefined) {
+          persisted.showCharactersInPersonaPickers = false;
+        }
+        if (version <= 95 && !Array.isArray(persisted.chatHelpSeenModes)) {
+          persisted.chatHelpSeenModes = persisted.gameTutorialDisabled === true ? ["game"] : [];
+        }
+        delete persisted.gameTutorialDisabled;
         if (version <= 91 && persisted.rightPanel === "bot-browser") {
           persisted.rightPanel = "characters";
           persisted.rightPanelOpen = false;
@@ -2719,7 +3392,7 @@ export const useUIStore = create<UIState>()(
         if (version <= 19) {
           if (persisted.spotifyMobileWidgetCollapsed === undefined) persisted.spotifyMobileWidgetCollapsed = true;
           if (persisted.spotifyMobileWidgetPosition === undefined) {
-            persisted.spotifyMobileWidgetPosition = { x: 16, y: 96 };
+            persisted.spotifyMobileWidgetPosition = { ...DEFAULT_MOBILE_MUSIC_WIDGET_POSITION };
           }
         }
         // v20 -> v21: remember Game setup free-text fields and learned preference chips.
@@ -2796,6 +3469,12 @@ export const useUIStore = create<UIState>()(
         if (version <= 31 && persisted.chatBackgroundBlur === undefined) {
           persisted.chatBackgroundBlur = 0;
         }
+        if (persisted.conversationBackgroundImageOpacity === undefined) {
+          persisted.conversationBackgroundImageOpacity = DEFAULT_CONVERSATION_BACKGROUND_IMAGE_OPACITY;
+        }
+        persisted.conversationBackgroundImageOpacity = normalizeConversationBackgroundImageOpacity(
+          persisted.conversationBackgroundImageOpacity,
+        );
         persisted.trackerPanelThoughtBubbleDisplay = normalizeTrackerThoughtBubbleDisplay(
           persisted.trackerPanelThoughtBubbleDisplay,
         );
@@ -2928,9 +3607,6 @@ export const useUIStore = create<UIState>()(
         if (version <= 59 && persisted.appAccentRgbMode === undefined) {
           persisted.appAccentRgbMode = false;
         }
-        if (version <= 60 && persisted.appAccentPulseMode === undefined) {
-          persisted.appAccentPulseMode = false;
-        }
         const legacyAccentBeforeRgb = persisted.appAccentColorBeforeRgbMode;
         if (
           version <= 61 &&
@@ -2979,11 +3655,12 @@ export const useUIStore = create<UIState>()(
         }
         persisted.appAccentColor = normalizeAppAccentColor(persisted.appAccentColor);
         persisted.appBackgroundColor = normalizeAppBackgroundColor(persisted.appBackgroundColor);
-        persisted.appAccentPulseMode = persisted.appAccentPulseMode === true;
+        if (typeof persisted.appAccentPulseMode !== "boolean") {
+          persisted.appAccentPulseMode = persisted.appAccentRgbMode !== true && getDefaultAppAccentPulseMode();
+        }
         if (version <= 60 && persisted.appAccentRgbMode === true) {
-          const persistedTheme = persisted.theme === "light" ? "light" : "dark";
-          const persistedAccentSource = persisted.appAccentColor || getDefaultAppAccentColor(persistedTheme);
-          if (!isCssGradient(persistedAccentSource)) {
+          // The old scheme default was solid, even though today's default is a gradient.
+          if (!persisted.appAccentColor || !isCssGradient(persisted.appAccentColor)) {
             persisted.appAccentPulseMode = true;
             persisted.appAccentRgbMode = false;
           }
@@ -3083,14 +3760,22 @@ export const useUIStore = create<UIState>()(
         if (version <= 88 && persisted.reduceAmbientEffects === undefined) {
           persisted.reduceAmbientEffects = false;
         }
-        // v89 -> v90: give Noodle timeline images their own provider-compatible canvas.
-        if (version <= 89) {
-          if (persisted.imageNoodleWidth === undefined) persisted.imageNoodleWidth = 1024;
-          if (persisted.imageNoodleHeight === undefined) persisted.imageNoodleHeight = 1536;
-        }
         // v90 -> v91: make the Home navigation assistant an explicit, default-on preference.
         if (version <= 90 && persisted.professorMariNavigationEnabled === undefined) {
           persisted.professorMariNavigationEnabled = true;
+        }
+        // v94 -> v95: existing custom positions stay untouched; the exact legacy
+        // default is the only reliable indication that the widget was never moved.
+        if (
+          version <= 94 &&
+          persisted.spotifyMobileWidgetPosition?.x === 16 &&
+          persisted.spotifyMobileWidgetPosition?.y === 96
+        ) {
+          persisted.spotifyMobileWidgetPosition = { ...DEFAULT_MOBILE_MUSIC_WIDGET_POSITION };
+        }
+        if (version <= 95) {
+          persisted.showRoleplayThinkingInMessages = false;
+          persisted.keepRoleplayThinkingExpanded = false;
         }
         // v84 -> v85: keep the historical blank-line behavior for /continue by default.
         if (version <= 84 && persisted.continueAddsNewline === undefined) {
@@ -3102,7 +3787,11 @@ export const useUIStore = create<UIState>()(
         persisted.professorMariSuggestionsEnabled = persisted.professorMariSuggestionsEnabled !== false;
         persisted.professorMariNavigationEnabled = persisted.professorMariNavigationEnabled !== false;
         persisted.includeReasoningInExports = persisted.includeReasoningInExports === true;
+        persisted.includePrivateNotesInExports = persisted.includePrivateNotesInExports === true;
         persisted.roleplayReducedPaintEffects = persisted.roleplayReducedPaintEffects === true;
+        persisted.showRoleplayThinkingInMessages = persisted.showRoleplayThinkingInMessages === true;
+        persisted.keepRoleplayThinkingExpanded =
+          persisted.showRoleplayThinkingInMessages && persisted.keepRoleplayThinkingExpanded === true;
         persisted.roleplayNarratorAvatarCycling = persisted.roleplayNarratorAvatarCycling !== false;
         persisted.gameTextEffectsEnabled = persisted.gameTextEffectsEnabled !== false;
         persisted.defaultDialogueColor =
@@ -3112,199 +3801,29 @@ export const useUIStore = create<UIState>()(
         delete persisted.trackerPanelWidth;
         return persisted;
       },
-      partialize: (state) => ({
-        sidebarOpen: state.sidebarOpen,
-        sidebarWidth: state.sidebarWidth,
-        rightPanelOpen: state.rightPanelOpen,
-        rightPanelWidth: state.rightPanelWidth,
-        rightPanel: state.rightPanel,
-        settingsTab: state.settingsTab,
-        characterDetailId: state.characterDetailId,
-        lorebookDetailId: state.lorebookDetailId,
-        presetDetailId: state.presetDetailId,
-        connectionDetailId: state.connectionDetailId,
-        agentDetailId: state.agentDetailId,
-        toolDetailId: state.toolDetailId,
-        personaDetailId: state.personaDetailId,
-        regexDetailId: state.regexDetailId,
-        spatialMapDetailChatId: state.spatialMapDetailChatId,
-        botBrowserOpen: state.botBrowserOpen,
-        gameAssetsBrowserOpen: state.gameAssetsBrowserOpen,
-        noodleOpen: state.noodleOpen,
-        noodleSelectedPersonaId: state.noodleSelectedPersonaId,
-        noodleNavigation: state.noodleNavigation,
-        characterLibraryOpen: state.characterLibraryOpen,
-        cardLibraryKind: state.cardLibraryKind,
-        agentCatalogOpen: state.agentCatalogOpen,
-        characterLibrarySelectedId: state.characterLibrarySelectedId,
-        personaLibrarySelectedId: state.personaLibrarySelectedId,
-        characterLibrarySort: state.characterLibrarySort,
-        personaLibrarySort: state.personaLibrarySort,
-        characterLibraryScrollTop: state.characterLibraryScrollTop,
-        personaLibraryScrollTop: state.personaLibraryScrollTop,
-        lorebookPanelCategory: state.lorebookPanelCategory,
-        lorebookPanelSearch: state.lorebookPanelSearch,
-        lorebookPanelSort: state.lorebookPanelSort,
-        lorebookPanelActiveTag: state.lorebookPanelActiveTag,
-        lorebookPanelTagsExpanded: state.lorebookPanelTagsExpanded,
-        botBrowserPanelSort: state.botBrowserPanelSort,
-        presetPanelSort: state.presetPanelSort,
-        connectionPanelSort: state.connectionPanelSort,
-        agentPanelSort: state.agentPanelSort,
-        trackerPanelEnabled: state.trackerPanelEnabled,
-        trackerPanelOpen: state.trackerPanelOpen,
-        trackerPanelOpenByChatId: state.trackerPanelOpenByChatId,
-        trackerPanelSide: state.trackerPanelSide,
-        trackerPanelHideHudWidgets: state.trackerPanelHideHudWidgets,
-        trackerPanelUseExpressionSprites: state.trackerPanelUseExpressionSprites,
-        trackerPanelThoughtBubbleDisplay: state.trackerPanelThoughtBubbleDisplay,
-        trackerStatDisplayMode: state.trackerStatDisplayMode,
-        trackerPanelDockedThoughtsAlwaysVisible: state.trackerPanelDockedThoughtsAlwaysVisible,
-        trackerPanelSizeProfile: state.trackerPanelSizeProfile,
-        trackerPanelBackgroundColor: state.trackerPanelBackgroundColor,
-        trackerTemperatureUnit: state.trackerTemperatureUnit,
-        trackerPanelCollapsedSections: state.trackerPanelCollapsedSections,
-        trackerPanelSectionOrder: state.trackerPanelSectionOrder,
-        expandedPersonaGroupIds: state.expandedPersonaGroupIds,
-        expandedCharacterGroupIds: state.expandedCharacterGroupIds,
-        theme: state.theme,
-        appBackgroundColor: state.appBackgroundColor,
-        appAccentColor: state.appAccentColor,
-        appAccentPulseMode: state.appAccentPulseMode,
-        appAccentRgbMode: state.appAccentRgbMode,
-        customCursorEnabled: state.customCursorEnabled,
-        reduceAmbientEffects: state.reduceAmbientEffects,
-        mariPanelSortMode: state.mariPanelSortMode,
-        mariEditViewMode: state.mariEditViewMode,
-        chatBackground: state.chatBackground,
-        defaultRoleplayBackground: state.defaultRoleplayBackground,
-        chatBackgroundBlur: state.chatBackgroundBlur,
-        fontSize: state.fontSize,
-        language: state.language,
-        chatFontSize: state.chatFontSize,
-        fontFamily: state.fontFamily,
-        enableStreaming: state.enableStreaming,
-        debugMode: state.debugMode,
-        streamingSpeed: state.streamingSpeed,
-        gameInstantTextReveal: state.gameInstantTextReveal,
-        gameMiddleMouseNav: state.gameMiddleMouseNav,
-        gameDialogueDisplayMode: state.gameDialogueDisplayMode,
-        chatListBackgrounds: state.chatListBackgrounds,
-        gameTextSpeed: state.gameTextSpeed,
-        gameAutoPlayDelay: state.gameAutoPlayDelay,
-        queueImageGenerationRequests: state.queueImageGenerationRequests,
-        reviewImagePromptsBeforeSend: state.reviewImagePromptsBeforeSend,
-        imageBackgroundWidth: state.imageBackgroundWidth,
-        imageBackgroundHeight: state.imageBackgroundHeight,
-        imageIllustrationWidth: state.imageIllustrationWidth,
-        imageIllustrationHeight: state.imageIllustrationHeight,
-        imageNoodleWidth: state.imageNoodleWidth,
-        imageNoodleHeight: state.imageNoodleHeight,
-        imageGameWidth: state.imageGameWidth,
-        imageGameHeight: state.imageGameHeight,
-        imagePortraitWidth: state.imagePortraitWidth,
-        imagePortraitHeight: state.imagePortraitHeight,
-        imageSelfieWidth: state.imageSelfieWidth,
-        imageSelfieHeight: state.imageSelfieHeight,
-        imageStyleProfiles: state.imageStyleProfiles,
-
-        conversationMessageStyle: state.conversationMessageStyle,
-        conversationAvatarShape: state.conversationAvatarShape,
-        showTimestamps: state.showTimestamps,
-        showModelName: state.showModelName,
-        showTokenUsage: state.showTokenUsage,
-        showMessageNumbers: state.showMessageNumbers,
-        guideGenerations: state.guideGenerations,
-        showQuickRepliesMenu: state.showQuickRepliesMenu,
-        showQuickReplyPostOnly: state.showQuickReplyPostOnly,
-        showQuickReplyGuide: state.showQuickReplyGuide,
-        showQuickReplyImpersonate: state.showQuickReplyImpersonate,
-        customQuickReplies: state.customQuickReplies,
-        chatSettingsExpandedSections: state.chatSettingsExpandedSections,
-        confirmBeforeDelete: state.confirmBeforeDelete,
-        includeReasoningInExports: state.includeReasoningInExports,
-        messagesPerPage: state.messagesPerPage,
-        boldDialogue: state.boldDialogue,
-        quoteFormat: state.quoteFormat,
-        convertLatexSymbols: state.convertLatexSymbols,
-        trimIncompleteModelOutput: state.trimIncompleteModelOutput,
-        continueAddsNewline: state.continueAddsNewline,
-        speechToTextEnabled: state.speechToTextEnabled,
-        ttsLineVolume: state.ttsLineVolume,
-        chibiProfessorMariEnabled: state.chibiProfessorMariEnabled,
-        professorMariSuggestionsEnabled: state.professorMariSuggestionsEnabled,
-        professorMariNavigationEnabled: state.professorMariNavigationEnabled,
-        achievementsEnabled: state.achievementsEnabled,
-        musicPlayerEnabled: state.musicPlayerEnabled,
-        musicPlayerSource: state.musicPlayerSource,
-        youtubePlayerVolume: state.youtubePlayerVolume,
-        localMusicPlayerVolume: state.localMusicPlayerVolume,
-        conversationCallVoiceVolume: state.conversationCallVoiceVolume,
-        conversationCallVoiceMuted: state.conversationCallVoiceMuted,
-        spotifyMobileWidgetCollapsed: state.spotifyMobileWidgetCollapsed,
-        spotifyMobileWidgetPosition: state.spotifyMobileWidgetPosition,
-        intuitiveSwipeNavigation: state.intuitiveSwipeNavigation,
-        intuitiveSwipeRerollLatest: state.intuitiveSwipeRerollLatest,
-        editLastMessageOnArrowUp: state.editLastMessageOnArrowUp,
-        editMessageOnDoubleClick: state.editMessageOnDoubleClick,
-        summaryPopoverSettings: state.summaryPopoverSettings,
-        scenePromptPreferences: state.scenePromptPreferences,
-        chatFontColor: state.chatFontColor,
-        defaultDialogueColor: state.defaultDialogueColor,
-        chatChromeTextColor: state.chatChromeTextColor,
-        chatFontOpacity: state.chatFontOpacity,
-        roleplayReducedPaintEffects: state.roleplayReducedPaintEffects,
-        gameTextEffectsEnabled: state.gameTextEffectsEnabled,
-        roleplayAvatarStyle: state.roleplayAvatarStyle,
-        roleplayAvatarScale: state.roleplayAvatarScale,
-        roleplayAvatarsScrollable: state.roleplayAvatarsScrollable,
-        roleplayNarratorAvatarCycling: state.roleplayNarratorAvatarCycling,
-        roleplaySpriteScale: state.roleplaySpriteScale,
-        gameAvatarScale: state.gameAvatarScale,
-        gameFullBodySpriteScale: state.gameFullBodySpriteScale,
-        textStrokeWidth: state.textStrokeWidth,
-        textStrokeColor: state.textStrokeColor,
-        visualTheme: state.visualTheme,
-        convoGradient: state.convoGradient,
-        enterToSendRP: state.enterToSendRP,
-        enterToSendConvo: state.enterToSendConvo,
-        enterToSendGame: state.enterToSendGame,
-        enterToSendProfessorMari: state.enterToSendProfessorMari,
-        weatherEffects: state.weatherEffects,
-        hasMigratedCustomThemesToServer: state.hasMigratedCustomThemesToServer,
-        activeCustomTheme: state.activeCustomTheme,
-        customThemes: state.customThemes,
-        hasCompletedOnboarding: state.hasCompletedOnboarding,
-        gameTutorialDisabled: state.gameTutorialDisabled,
-        linkApiBannerDismissed: state.linkApiBannerDismissed,
-        echoChamberOpen: state.echoChamberOpen,
-        echoChamberSide: state.echoChamberSide,
-        echoChamberSideByChatId: state.echoChamberSideByChatId,
-        echoChamberSizeByChatId: state.echoChamberSizeByChatId,
-        userStatusManual: state.userStatusManual,
-        userStatus: state.userStatus,
-        userActivity: state.userActivity,
-        recentUserActivities: state.recentUserActivities,
-        convoNotificationSound: state.convoNotificationSound,
-        rpNotificationSound: state.rpNotificationSound,
-        gameNotificationSound: state.gameNotificationSound,
-        notificationSoundsOnlyWhenUnfocused: state.notificationSoundsOnlyWhenUnfocused,
-        conversationBrowserNotifications: state.conversationBrowserNotifications,
-        conversationMobileNotifications: state.conversationMobileNotifications,
-        generationBrowserNotifications: state.generationBrowserNotifications,
-        generationMobileNotifications: state.generationMobileNotifications,
-        customConversationPrompt: state.customConversationPrompt,
-        scheduleGenerationPreferences: state.scheduleGenerationPreferences,
-        conversationTimeZone: state.conversationTimeZone,
-        impersonatePromptTemplate: state.impersonatePromptTemplate,
-        activeImpersonatePromptTemplateId: state.activeImpersonatePromptTemplateId,
-        impersonateCyoaChoices: state.impersonateCyoaChoices,
-        impersonatePresetId: state.impersonatePresetId,
-        impersonateConnectionId: state.impersonateConnectionId,
-        impersonateBlockAgents: state.impersonateBlockAgents,
-        learnedGameSetupOptions: state.learnedGameSetupOptions,
-        rememberedGameSetupText: state.rememberedGameSetupText,
-      }),
+      merge: (persistedState: unknown, currentState) => {
+        const persisted =
+          persistedState && typeof persistedState === "object" ? (persistedState as Record<string, unknown>) : {};
+        return {
+          ...currentState,
+          ...persisted,
+          conversationBackgroundImageOpacity: normalizeConversationBackgroundImageOpacity(
+            persisted.conversationBackgroundImageOpacity,
+          ),
+          chatWidgetPreset: normalizeChatWidgetPreset(persisted.chatWidgetPreset),
+          roleplayChatPosition: normalizeRoleplayChatPosition(persisted.roleplayChatPosition),
+          chatWidgetFont: normalizeChatWidgetFont(persisted.chatWidgetFont),
+          chatWidgetShape: normalizeChatWidgetShape(persisted.chatWidgetShape),
+          chatWidgetButtonSize: normalizeChatWidgetButtonSize(persisted.chatWidgetButtonSize),
+          chatWidgetBorderColor: normalizeChatWidgetColor(persisted.chatWidgetBorderColor),
+          chatWidgetBackgroundColor: normalizeChatWidgetColor(persisted.chatWidgetBackgroundColor),
+          chatWidgetTextColor: normalizeChatWidgetColor(persisted.chatWidgetTextColor),
+          chatWidgetApplyFont: persisted.chatWidgetApplyFont === true,
+          chatWidgetApplyShape: persisted.chatWidgetApplyShape === true,
+          chatWidgetApplyColors: persisted.chatWidgetApplyColors === true,
+        };
+      },
+      partialize: pickPersistedUIState,
     },
   ),
 );

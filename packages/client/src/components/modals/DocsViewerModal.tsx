@@ -1,3 +1,4 @@
+import { useCodeBlockCopy } from "../../hooks/use-code-block-copy";
 // ──────────────────────────────────────────────
 // DocsViewerModal: Browse the guides shipped in docs/
 // ──────────────────────────────────────────────
@@ -578,48 +579,7 @@ export function DocsViewerModal({
     setPendingScrollTerm(null);
   }, [scrollEl, rendered, selected, pendingScrollTerm]);
 
-  // Give every rendered code block a Copy button (docs-viewer only — the
-  // markdown renderer is shared with chat, so we augment the committed DOM
-  // here instead of changing it globally). The rendered tree is memoized and
-  // the container remounts per doc, so these nodes are stable until cleanup.
-  useEffect(() => {
-    if (!scrollEl || !rendered) return;
-    const cleanups: (() => void)[] = [];
-    scrollEl.querySelectorAll<HTMLPreElement>("pre.mari-md-codeblock").forEach((block) => {
-      if (block.querySelector(".docs-copy-button")) return;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = localizeUi("ui.modals.docsviewermodal.copy");
-      button.className =
-        "docs-copy-button absolute bottom-1.5 right-1.5 rounded-md border border-[var(--border)] bg-[var(--card)]/90 px-1.5 py-0.5 font-sans text-[0.625rem] text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)]";
-      let resetTimer: ReturnType<typeof setTimeout> | undefined;
-      const onClick = () => {
-        const code = block.querySelector("code")?.textContent ?? "";
-        navigator.clipboard
-          .writeText(code)
-          .then(() => {
-            button.textContent = localizeUi("ui.modals.docsviewermodal.copied");
-          })
-          .catch(() => {
-            button.textContent = localizeUi("ui.modals.docsviewermodal.copyFailed");
-          })
-          .finally(() => {
-            clearTimeout(resetTimer);
-            resetTimer = setTimeout(() => {
-              button.textContent = localizeUi("ui.modals.docsviewermodal.copy");
-            }, 1500);
-          });
-      };
-      button.addEventListener("click", onClick);
-      block.appendChild(button);
-      cleanups.push(() => {
-        clearTimeout(resetTimer);
-        button.removeEventListener("click", onClick);
-        button.remove();
-      });
-    });
-    return () => cleanups.forEach((cleanup) => cleanup());
-  }, [scrollEl, rendered, localizeUi]);
+  useCodeBlockCopy(scrollEl, rendered);
 
   /** Follow rewritten cross-doc links inside the modal instead of opening a new tab. */
   const handleContentClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -657,7 +617,13 @@ export function DocsViewerModal({
   );
 
   return (
-    <Modal open={open} onClose={onClose} title={localizeUi("home.actions.documentation")} width="max-w-6xl" mobileFullscreen>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={localizeUi("home.actions.documentation")}
+      width="max-w-6xl"
+      mobileFullscreen
+    >
       <div className="flex h-full min-h-0 gap-3 sm:h-[min(46rem,calc(90dvh-6.5rem))]">
         {/* Guide list / search */}
         <aside
@@ -688,13 +654,19 @@ export function DocsViewerModal({
 
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pe-1">
             {indexLoading ? (
-              <p className="px-1 py-2 text-xs text-[var(--muted-foreground)]">{localizeUi("ui.modals.docsviewermodal.loadingGuides")}</p>
+              <p className="px-1 py-2 text-xs text-[var(--muted-foreground)]">
+                {localizeUi("ui.modals.docsviewermodal.loadingGuides")}
+              </p>
             ) : indexError || !index ? (
-              <p className="px-1 py-2 text-xs text-[var(--muted-foreground)]">{localizeUi("ui.modals.docsviewermodal.couldNotLoadTheDocumentationListTheDocsFolder")}</p>
+              <p className="px-1 py-2 text-xs text-[var(--muted-foreground)]">
+                {localizeUi("ui.modals.docsviewermodal.couldNotLoadTheDocumentationListTheDocsFolder")}
+              </p>
             ) : searching ? (
               searchResults.length === 0 ? (
                 <p className="px-1 py-2 text-xs text-[var(--muted-foreground)]">
-                  {searchFetching ?localizeUi("ui.modals.docsviewermodal.searching") :localizeUi("ui.modals.docsviewermodal.noMatchesForValue1", { value1: trimmedQuery })}
+                  {searchFetching
+                    ? localizeUi("ui.modals.docsviewermodal.searching")
+                    : localizeUi("ui.modals.docsviewermodal.noMatchesForValue1", { value1: trimmedQuery })}
                 </p>
               ) : (
                 <div className={cn("space-y-1.5", searchFetching && "opacity-60")}>
@@ -712,7 +684,10 @@ export function DocsViewerModal({
                     >
                       <span className="flex items-center gap-2">
                         <FileText size="0.875rem" className="shrink-0 text-[var(--muted-foreground)]" />
-                        <span dir="auto" className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--foreground)]">
+                        <span
+                          dir="auto"
+                          className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--foreground)]"
+                        >
                           {highlightTermNodes(result.title, highlightTerm)}
                         </span>
                         {docsLanguage !== "en" && result.language === "en" ? englishBadge : null}
@@ -734,7 +709,9 @@ export function DocsViewerModal({
                 </div>
               )
             ) : groups.length === 0 ? (
-              <p className="px-1 py-2 text-xs text-[var(--muted-foreground)]">{localizeUi("ui.modals.docsviewermodal.noGuidesFoundInTheDocsFolder")}</p>
+              <p className="px-1 py-2 text-xs text-[var(--muted-foreground)]">
+                {localizeUi("ui.modals.docsviewermodal.noGuidesFoundInTheDocsFolder")}
+              </p>
             ) : (
               groups.map((group) => (
                 <div key={group.dir || "root"}>
@@ -753,7 +730,13 @@ export function DocsViewerModal({
                         key={entry.path}
                         type="button"
                         onClick={() => selectDoc(entry.path)}
-                        title={entry.updatedAt ?localizeUi("ui.modals.docsviewermodal.lastUpdatedValue1", { value1: formatUpdatedAt(entry.updatedAt, uiLocale) }) : undefined}
+                        title={
+                          entry.updatedAt
+                            ? localizeUi("ui.modals.docsviewermodal.lastUpdatedValue1", {
+                                value1: formatUpdatedAt(entry.updatedAt, uiLocale),
+                              })
+                            : undefined
+                        }
                         className={cn(
                           "flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-start transition-colors",
                           selected === entry.path
@@ -763,7 +746,9 @@ export function DocsViewerModal({
                       >
                         <FileText size="0.875rem" className="mt-0.5 shrink-0" />
                         <span className="min-w-0 flex-1">
-                          <span dir="auto" className="block break-words text-xs font-medium leading-snug">{entry.title}</span>
+                          <span dir="auto" className="block break-words text-xs font-medium leading-snug">
+                            {entry.title}
+                          </span>
                           <span dir="ltr" className="block truncate text-[0.625rem] text-[var(--muted-foreground)]/70">
                             {entry.path}
                           </span>
@@ -778,8 +763,14 @@ export function DocsViewerModal({
           </div>
           {index ? (
             <div className="mt-2 shrink-0 border-t border-[var(--border)]/60 pt-2">
-              <p className="text-[0.625rem] text-[var(--muted-foreground)]/70">{localizeUi("ui.modals.docsviewermodal.alsoOnDiskAt")}</p>
-              <code dir="ltr" className="block break-all text-[0.625rem] text-[var(--muted-foreground)]" title={index.root}>
+              <p className="text-[0.625rem] text-[var(--muted-foreground)]/70">
+                {localizeUi("ui.modals.docsviewermodal.alsoOnDiskAt")}
+              </p>
+              <code
+                dir="ltr"
+                className="block break-all text-[0.625rem] text-[var(--muted-foreground)]"
+                title={index.root}
+              >
                 {index.root}
               </code>
             </div>
@@ -815,8 +806,17 @@ export function DocsViewerModal({
                 <p className="min-w-0 truncate text-[0.625rem] text-[var(--muted-foreground)]/70">
                   {/* The path is an LTR isolate so an RTL UI locale cannot
                       reorder it against the updated-at clause beside it. */}
-                  <span dir="ltr" className="[unicode-bidi:isolate]">{localizeUi("ui.modals.docsviewermodal.docs")}{selected}</span>
-                  <span>{doc?.updatedAt ?localizeUi("ui.modals.docsviewermodal.lastUpdatedValue1_f97aff7", { value1: formatUpdatedAt(doc.updatedAt, uiLocale) }) : ""}</span>
+                  <span dir="ltr" className="[unicode-bidi:isolate]">
+                    {localizeUi("ui.modals.docsviewermodal.docs")}
+                    {selected}
+                  </span>
+                  <span>
+                    {doc?.updatedAt
+                      ? localizeUi("ui.modals.docsviewermodal.lastUpdatedValue1_f97aff7", {
+                          value1: formatUpdatedAt(doc.updatedAt, uiLocale),
+                        })
+                      : ""}
+                  </span>
                 </p>
                 {doc && docsLanguage !== "en" && doc.language === "en" ? englishBadge : null}
               </div>
@@ -829,9 +829,13 @@ export function DocsViewerModal({
                 className="min-h-0 flex-1 overflow-y-auto pe-1"
               >
                 {docLoading ? (
-                  <p className="py-2 text-xs text-[var(--muted-foreground)]">{localizeUi("ui.panels.ttsconfigcard.loading")}</p>
+                  <p className="py-2 text-xs text-[var(--muted-foreground)]">
+                    {localizeUi("ui.panels.ttsconfigcard.loading")}
+                  </p>
                 ) : docError || !doc ? (
-                  <p className="py-2 text-xs text-[var(--muted-foreground)]">{localizeUi("ui.modals.docsviewermodal.couldNotLoadThisGuide")}</p>
+                  <p className="py-2 text-xs text-[var(--muted-foreground)]">
+                    {localizeUi("ui.modals.docsviewermodal.couldNotLoadThisGuide")}
+                  </p>
                 ) : (
                   <div
                     // Keyed on the rendered tree's identity so React remounts
@@ -845,7 +849,7 @@ export function DocsViewerModal({
                     // .mari-md-codeblock rule is unlayered CSS (beats the utilities
                     // layer, hence the !), and the corner-anchored lang tag + Copy
                     // button would float over the text of a scrolled block.
-                    className="mari-message-content docs-reader-content whitespace-pre-wrap break-words text-sm text-[var(--foreground)] [&_.mari-md-codeblock]:whitespace-pre-wrap! [&_.mari-md-codeblock]:[overflow-wrap:anywhere]! [&_.mari-md-codeblock]:pb-9!"
+                    className="mari-message-content docs-reader-content whitespace-pre-wrap break-words text-sm text-[var(--foreground)] [&_.mari-md-codeblock]:whitespace-pre-wrap! [&_.mari-md-codeblock]:[overflow-wrap:anywhere]! [&_.mari-md-codeblock]:pb-12!"
                     onClick={handleContentClick}
                   >
                     {rendered}

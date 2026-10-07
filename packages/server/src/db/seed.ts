@@ -104,7 +104,11 @@ function withoutRowIdentity(value: unknown): unknown {
   return out;
 }
 
-function stableKeyMap<T extends { id?: unknown }>(rows: T[], prefix: string, getBase: (row: T) => string): Map<string, string> {
+function stableKeyMap<T extends { id?: unknown }>(
+  rows: T[],
+  prefix: string,
+  getBase: (row: T) => string,
+): Map<string, string> {
   const counts = new Map<string, number>();
   const sorted = [...rows].sort((a, b) => {
     const aBase = getBase(a);
@@ -124,7 +128,9 @@ function stableKeyMap<T extends { id?: unknown }>(rows: T[], prefix: string, get
 }
 
 function orderedStableKeys(value: unknown, keyMap: Map<string, string>): string[] {
-  return parseJsonField<string[]>(value, []).map((id) => keyMap.get(id)).filter((id): id is string => Boolean(id));
+  return parseJsonField<string[]>(value, [])
+    .map((id) => keyMap.get(id))
+    .filter((id): id is string => Boolean(id));
 }
 
 function bundledPresetDescription(envelope: BundledPresetEnvelope): string {
@@ -171,8 +177,7 @@ function buildPresetSnapshot(args: {
       .map((group) => ({
         key: typeof group.id === "string" ? (groupKeyMap.get(group.id) ?? "") : "",
         name: String(group.name ?? ""),
-        parentGroupKey:
-          typeof group.parentGroupId === "string" ? (groupKeyMap.get(group.parentGroupId) ?? null) : null,
+        parentGroupKey: typeof group.parentGroupId === "string" ? (groupKeyMap.get(group.parentGroupId) ?? null) : null,
         order: numberField(group.order, 100),
         enabled: booleanField(group.enabled, true),
       }))
@@ -192,6 +197,8 @@ function buildPresetSnapshot(args: {
         injectionDepth: numberField(section.injectionDepth, 0),
         injectionOrder: numberField(section.injectionOrder, 100),
         forbidOverrides: booleanField(section.forbidOverrides, false),
+        // Emitted only when set so snapshot hashes stored before this field existed still match.
+        ...(booleanField(section.skipWrap, false) ? { skipWrap: true } : {}),
       }))
       .sort((a, b) => a.key.localeCompare(b.key)),
     choiceBlocks: choiceBlocks
@@ -317,6 +324,7 @@ async function applyBundledPresetToExisting(
       injectionDepth: numberField(section.injectionDepth, 0),
       injectionOrder: numberField(section.injectionOrder, 100),
       forbidOverrides: section.forbidOverrides === true || section.forbidOverrides === "true",
+      skipWrap: section.skipWrap === true || section.skipWrap === "true",
     });
     if (newSection) sectionMap.set(String(section.id), newSection.id);
   }
@@ -440,11 +448,7 @@ export async function seedDefaultPreset(db: DB) {
 
   if (
     existingMarinaraPreset &&
-    (await migrateExistingMarinaraConversationPrompt(
-      storage,
-      existingMarinaraPreset,
-      bundledConversationPromptValue,
-    ))
+    (await migrateExistingMarinaraConversationPrompt(storage, existingMarinaraPreset, bundledConversationPromptValue))
   ) {
     logger.info("[seed] Updated the legacy Marinara Conversation prompt lead sentence");
   }

@@ -41,6 +41,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -76,6 +77,7 @@ public class MainActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1005;
     private static final int FILE_SAVE_REQUEST = 1006;
     private static final String DISPLAY_PREFS = "marinara_display";
+    private static final String OPEN_IN_BROWSER = "open_in_browser";
     private static final String STATUS_BAR_VISIBLE = "status_bar_visible";
     private static final String NOTIFICATION_PERMISSION_PREFS = "marinara_notification_permission";
     private static final String NOTIFICATION_PERMISSION_REQUESTED = "requested";
@@ -101,12 +103,14 @@ public class MainActivity extends Activity {
     private static final String ANDROID_SECRET_PREF = "android_local_secret";
     private static final String INSTALL_SESSION_PREF = "termux_install_session";
     private static final String INSTALL_NONCE_PREF = "termux_install_nonce";
+    private static final String SETUP_IN_PROGRESS_PREF = "termux_setup_in_progress";
+    private static final String START_REQUESTED_PREF = "termux_start_requested";
     private static final String TERMUX_HOME = "/data/data/com.termux/files/home";
     private static final String TERMUX_BASH = "/data/data/com.termux/files/usr/bin/bash";
     private static final String TERMUX_EXTERNAL_APPS_COMMAND =
             "mkdir -p ~/.termux; "
                     + "grep -qxF 'allow-external-apps=true' ~/.termux/termux.properties 2>/dev/null || echo 'allow-external-apps=true' >> ~/.termux/termux.properties; "
-                    + "if command -v termux-reload-settings >/dev/null 2>&1; then termux-reload-settings; else echo 'allow-external-apps=true saved. Fully close and reopen Termux if YunYun still cannot start it.'; fi";
+                    + "if command -v termux-reload-settings >/dev/null 2>&1; then termux-reload-settings; else echo 'allow-external-apps=true saved. Fully close and reopen Termux if Marinara still cannot start it.'; fi";
 
     private WebView webView;
     private View splashView;
@@ -114,6 +118,9 @@ public class MainActivity extends Activity {
     private TextView statusText;
     private Button manualServerButton;
     private ValueCallback<Uri[]> fileUploadCallback;
+    /** The empty photo the camera choice of the current file chooser writes into, if it offered one. */
+    private Uri pendingCameraPhoto;
+    private static final String PENDING_CAMERA_PHOTO_STATE = "pendingCameraPhoto";
     private byte[] pendingFileSaveData;
     private String pendingFileSaveName;
     private boolean isDownloadingTermux;
@@ -134,6 +141,10 @@ public class MainActivity extends Activity {
     @SuppressLint("SetJavaScriptEnabled")
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Android may close the app while the camera is open; keep the photo's address so a cancelled
+        // capture can still be cleaned up when it returns. The page's upload itself can't be resumed.
+        String pendingPhoto = savedInstanceState == null ? null : savedInstanceState.getString(PENDING_CAMERA_PHOTO_STATE);
+        if (pendingPhoto != null) pendingCameraPhoto = Uri.parse(pendingPhoto);
 
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         applyStatusBarVisibility(isStatusBarVisible());
@@ -176,7 +187,7 @@ public class MainActivity extends Activity {
 
         // Status text
         statusText = new TextView(this);
-        statusText.setText("YunYun Engine Android shell\nTap Install / Start YunYun to begin.");
+        statusText.setText("Marinara Engine Android shell\nTap Install / Start Marinara to begin.");
         statusText.setTextColor(0xFFCCCCCC);
         statusText.setTextSize(16f);
         statusText.setGravity(android.view.Gravity.CENTER);
@@ -192,7 +203,16 @@ public class MainActivity extends Activity {
         actions.setOrientation(LinearLayout.VERTICAL);
         actions.setPadding(0, 28, 0, 0);
 
-        Button setupButton = buildActionButton("Install / Start YunYun");
+        CheckBox browserChoice = new CheckBox(this);
+        browserChoice.setText("Open in browser");
+        browserChoice.setTextColor(0xFFCCCCCC);
+        browserChoice.setChecked(shouldOpenInBrowser());
+        browserChoice.setOnCheckedChangeListener((button, checked) ->
+                getSharedPreferences(DISPLAY_PREFS, MODE_PRIVATE).edit()
+                        .putBoolean(OPEN_IN_BROWSER, checked).apply());
+        actions.addView(browserChoice, buildActionButtonLayoutParams());
+
+        Button setupButton = buildActionButton("Install / Start Marinara");
         setupButton.setOnClickListener(v -> startTermuxSetup());
         actions.addView(setupButton, buildActionButtonLayoutParams());
 
@@ -256,6 +276,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setTextZoom(100);
         settings.setUserAgentString(settings.getUserAgentString() + " MarinaraEngine/Android");
 
         webView.addJavascriptInterface(new MarinaraAndroidBridge(), "MarinaraAndroidNative");
@@ -264,7 +285,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
-                // Keep only the exact configured YunYun origin inside the WebView.
+                // Keep only the exact configured Marinara origin inside the WebView.
                 if (isServerUrl(url)) {
                     return false;
                 }
@@ -329,10 +350,10 @@ public class MainActivity extends Activity {
                     fileUploadCallback.onReceiveValue(null);
                 }
                 fileUploadCallback = callback;
-                Intent intent = params.createIntent();
                 try {
-                    startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+                    startActivityForResult(withCameraChoice(params), FILE_CHOOSER_REQUEST);
                 } catch (Exception e) {
+                    discardPendingCameraPhoto();
                     fileUploadCallback = null;
                     return false;
                 }
@@ -344,23 +365,45 @@ public class MainActivity extends Activity {
     private void tryConnect() {
         if (isCheckingServer) return;
         cancelPendingConnectionRetry();
-        showBootstrap("Connecting to YunYun Engine…\nIf this is your first launch, tap Install / Start YunYun.", true);
+        showBootstrap("Connecting to Marinara Engine…\nIf this is your first launch, tap Install / Start Marinara.", true);
 
         isCheckingServer = true;
+        final boolean openInBrowser = shouldOpenInBrowser();
         new Thread(() -> {
             AndroidSessionAttempt attempt = prepareAndroidSession();
+            String browserTicket = attempt.session != null && openInBrowser
+                    ? prepareBrowserTicket(attempt.session) : null;
             runOnUiThread(() -> {
                 isCheckingServer = false;
-                if (connectionRetryPaused) return;
+                if (isDestroyed() || connectionRetryPaused) return;
+                if (openInBrowser != shouldOpenInBrowser()) {
+                    tryConnect();
+                    return;
+                }
                 if (attempt.session != null) {
+                    setStartRequested(false);
+                    setTermuxSetupInProgress(false);
+                    if (openInBrowser) {
+                        pauseConnectionRetryLoop();
+                        if (browserTicket != null) {
+                            openBrowser(SERVER_URL + "/android-login#ticket=" + browserTicket);
+                        } else {
+                            showBootstrap("Could not sign in to the browser. Update the Engine and APK, then tap Retry connection. You can also uncheck Open in browser to use the app.", false);
+                        }
+                        return;
+                    }
                     mainFrameLoadFailed = false;
-                    statusText.setText("Opening YunYun Engine…");
+                    statusText.setText("Opening Marinara Engine…");
                     webView.postUrl(
                             SERVER_URL + "/api/android-auth/session",
                             attempt.session.formBody().getBytes(StandardCharsets.UTF_8)
                     );
                 } else if (attempt.manualServerDetected) {
+                    setStartRequested(false);
                     showManualServerOption();
+                } else if (isStartRequested()) {
+                    setStartRequested(false);
+                    beginTermuxSetup();
                 } else {
                     retryConnection();
                 }
@@ -369,7 +412,7 @@ public class MainActivity extends Activity {
     }
 
     private void retryConnection() {
-        showBootstrap("Waiting for YunYun Engine…\nTap Install / Start YunYun if the local server is not running yet.", true);
+        showBootstrap("Waiting for Marinara Engine…\nTap Install / Start Marinara if the local server is not running yet.", true);
         scheduleConnectionRetry();
     }
 
@@ -392,7 +435,7 @@ public class MainActivity extends Activity {
     private void showManualServerOption() {
         pauseConnectionRetryLoop();
         showBootstrap(
-                "A manually installed YunYun server is running, but it does not support APK authentication.\n"
+                "A manually installed Marinara server is running, but it does not support APK authentication.\n"
                         + "You can still open it after confirming that you started this server in Termux.",
                 false
         );
@@ -401,17 +444,22 @@ public class MainActivity extends Activity {
 
     private void confirmManualServerAccess() {
         new AlertDialog.Builder(this)
-                .setTitle("Open manual YunYun server?")
+                .setTitle("Open manual Marinara server?")
                 .setMessage(
                         "The Android app cannot verify this server's identity. Continue only if you started "
-                                + "YunYun in Termux yourself. This keeps manual installations available."
+                                + "Marinara in Termux yourself. This keeps manual installations available."
                 )
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Open server", (dialog, which) -> {
                     resumeConnectionRetryLoop();
                     mainFrameLoadFailed = false;
                     showBootstrap("Opening the confirmed manual server…", true);
-                    webView.loadUrl(SERVER_URL);
+                    if (shouldOpenInBrowser()) {
+                        pauseConnectionRetryLoop();
+                        openBrowser(SERVER_URL);
+                    } else {
+                        webView.loadUrl(SERVER_URL);
+                    }
                 })
                 .show();
     }
@@ -434,6 +482,7 @@ public class MainActivity extends Activity {
     }
 
     private void pauseConnectionRetryLoop() {
+        setStartRequested(false);
         connectionRetryPaused = true;
         cancelPendingConnectionRetry();
     }
@@ -486,6 +535,45 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean shouldOpenInBrowser() {
+        return getSharedPreferences(DISPLAY_PREFS, MODE_PRIVATE).getBoolean(OPEN_IN_BROWSER, false);
+    }
+
+    private String prepareBrowserTicket(AndroidSessionBootstrap session) {
+        HttpURLConnection connection = null;
+        try {
+            byte[] body = (session.formBody() + "&browser=true").getBytes(StandardCharsets.UTF_8);
+            connection = (HttpURLConnection) new URL(SERVER_URL + "/api/android-auth/session").openConnection();
+            connection.setConnectTimeout(1_000);
+            connection.setReadTimeout(1_500);
+            connection.setInstanceFollowRedirects(false);
+            connection.setUseCaches(false);
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            connection.setFixedLengthStreamingMode(body.length);
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(body);
+            }
+            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) return null;
+            String ticket = new JSONObject(readSmallResponse(connection)).getString("browserTicket");
+            return isHex256(ticket) ? ticket : null;
+        } catch (Exception error) {
+            return null;
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private void openBrowser(String url) {
+        showBootstrap("Marinara is open in your browser.\nTo use the app instead, uncheck Open in browser and tap Retry connection.", false);
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (ActivityNotFoundException error) {
+            showBootstrap("No browser is available. Install a browser, or uncheck Open in browser and tap Retry connection.", false);
+        }
+    }
+
     private boolean isServerUrl(String url) {
         if (url == null) return false;
         try {
@@ -532,6 +620,7 @@ public class MainActivity extends Activity {
                 + "requestNotificationPermission: () => nativeBridge.requestNotificationPermission('" + token + "'),"
                 + "showNotification: (...values) => nativeBridge.showNotification('" + token + "', ...withoutToken(values)),"
                 + "saveFile: (...values) => nativeBridge.saveFile('" + token + "', ...withoutToken(values)),"
+                + "openLauncher: () => nativeBridge.openLauncher('" + token + "'),"
                 + "openConsole: () => nativeBridge.openConsole('" + token + "')"
                 + "});"
                 + "Object.defineProperty(window, 'MarinaraAndroid', {"
@@ -686,6 +775,25 @@ public class MainActivity extends Activity {
     }
 
     private void startTermuxSetup() {
+        if (getSharedPreferences(SECURITY_PREFS, MODE_PRIVATE).getBoolean(SETUP_IN_PROGRESS_PREF, false)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Marinara setup is already starting")
+                    .setMessage("Wait for Termux to finish. Retry setup only if that session has stopped or failed.")
+                    .setNegativeButton("View Termux", (dialog, which) -> openTermux())
+                    .setPositiveButton("Retry setup", (dialog, which) -> {
+                        setTermuxSetupInProgress(false);
+                        startTermuxSetup();
+                    })
+                    .show();
+            return;
+        }
+        // Authenticate a running server before asking Termux to start another session.
+        setStartRequested(true);
+        resumeConnectionRetryLoop();
+        tryConnect();
+    }
+
+    private void beginTermuxSetup() {
         pauseConnectionRetryLoop();
         if (!isTermuxInstalled()) {
             startTermuxInstallFlow();
@@ -699,7 +807,7 @@ public class MainActivity extends Activity {
         }
 
         if (!hasTermuxRunCommandPermission()) {
-            showBootstrap("Android needs one permission so YunYun can start Termux for you.\nApprove Run commands in Termux environment.", false);
+            showBootstrap("Android needs one permission so Marinara can start Termux for you.\nApprove Run commands in Termux environment.", false);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 requestPermissions(new String[]{TERMUX_RUN_COMMAND_PERMISSION}, TERMUX_PERMISSION_REQUEST);
             }
@@ -713,7 +821,7 @@ public class MainActivity extends Activity {
         pendingStartAfterTermuxInstall = true;
         pauseConnectionRetryLoop();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getPackageManager().canRequestPackageInstalls()) {
-            showBootstrap("Android needs permission to let YunYun install Termux.\nEnable Allow from this source, then return here.", false);
+            showBootstrap("Android needs permission to let Marinara install Termux.\nEnable Allow from this source, then return here.", false);
             try {
                 Intent intent = new Intent(
                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
@@ -948,12 +1056,12 @@ public class MainActivity extends Activity {
         String fingerprint = signer == null
                 ? "Android could not read its signing certificate."
                 : "Certificate SHA-256: " + signer;
-        showBootstrap("Termux needs verification before YunYun can send its setup command.", false);
+        showBootstrap("Termux needs verification before Marinara can send its setup command.", false);
         new AlertDialog.Builder(this)
                 .setTitle("Unverified Termux installation")
                 .setMessage(
                         "This Termux app is not signed by F-Droid, Google Play, or the Termux developers. "
-                                + "YunYun's setup command includes a private local-access secret.\n\n"
+                                + "Marinara's setup command includes a private local-access secret.\n\n"
                                 + fingerprint
                                 + "\n\nContinue only if you trust where this Termux app came from."
                 )
@@ -983,23 +1091,42 @@ public class MainActivity extends Activity {
         intent.putExtra("com.termux.RUN_COMMAND_WORKDIR", TERMUX_HOME);
         intent.putExtra("com.termux.RUN_COMMAND_BACKGROUND", false);
         intent.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", "0");
-        intent.putExtra("com.termux.RUN_COMMAND_LABEL", "Install / start YunYun Engine");
+        intent.putExtra("com.termux.RUN_COMMAND_LABEL", "Install / start Marinara Engine");
         intent.putExtra(
                 "com.termux.RUN_COMMAND_DESCRIPTION",
-                "Installs Git and Node.js in Termux, fetches YunYun Engine, and starts the local server.");
+                "Installs Git and Node.js in Termux, fetches Marinara Engine, and starts the local server.");
 
         try {
             intent.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-lc", buildTermuxSetupCommand(true)});
+            setTermuxSetupInProgress(true);
             startService(intent);
             resumeConnectionRetryLoop();
             showBootstrap("Termux setup launched.\nWatch Termux finish installing, then this shell will connect automatically.", true);
             handler.postDelayed(this::openTermux, 500);
             scheduleConnectionRetry();
         } catch (SecurityException e) {
+            setTermuxSetupInProgress(false);
             showTermuxExternalAppsInstructions();
         } catch (IllegalStateException | ActivityNotFoundException e) {
+            setTermuxSetupInProgress(false);
             showManualTermuxSetupInstructions("Android blocked the Termux setup launch.");
         }
+    }
+
+    private boolean isStartRequested() {
+        return getSharedPreferences(SECURITY_PREFS, MODE_PRIVATE).getBoolean(START_REQUESTED_PREF, false);
+    }
+
+    private void setStartRequested(boolean requested) {
+        // A pending authenticated probe must survive Activity recreation too.
+        getSharedPreferences(SECURITY_PREFS, MODE_PRIVATE).edit()
+                .putBoolean(START_REQUESTED_PREF, requested).apply();
+    }
+
+    private void setTermuxSetupInProgress(boolean inProgress) {
+        // Termux keeps running when Android recreates this Activity.
+        getSharedPreferences(SECURITY_PREFS, MODE_PRIVATE).edit()
+                .putBoolean(SETUP_IN_PROGRESS_PREF, inProgress).apply();
     }
 
     private String buildTermuxSetupCommand(boolean provisionAndroidSecret) {
@@ -1015,6 +1142,9 @@ public class MainActivity extends Activity {
                     + "printf '%s\\n' " + androidSecret + " > \"$HOME/.marinara-engine/android-secret\"\n"
                     + "chmod 600 \"$HOME/.marinara-engine/android-secret\"\n";
         }
+        String launcherCommand = provisionAndroidSecret
+                ? "AUTO_OPEN_BROWSER=false ./start-termux.sh --skip-update\n"
+                : "./start-termux.sh --skip-update\n";
         return "set -e\n"
                 + "umask 077\n"
                 + "pkg update -y\n"
@@ -1031,10 +1161,10 @@ public class MainActivity extends Activity {
                 + "  guard_status=0\n"
                 + "  node scripts/protect-launcher-data.mjs check-target " + releaseCommit + " || guard_status=$?\n"
                 + "  if [ \"$guard_status\" -eq 2 ]; then\n"
-                + "    echo 'This YunYun Android build is older than your stored data format. Install a newer APK.'\n"
+                + "    echo 'This Marinara Android build is older than your stored data format. Install a newer APK.'\n"
                 + "    exit 1\n"
                 + "  elif [ \"$guard_status\" -ne 0 ]; then\n"
-                + "    echo 'Could not verify that this YunYun Android build can safely read your stored data. Install a newer APK or retry later.'\n"
+                + "    echo 'Could not verify that this Marinara Android build can safely read your stored data. Install a newer APK or retry later.'\n"
                 + "    exit 1\n"
                 + "  fi\n"
                 + "fi\n"
@@ -1042,7 +1172,7 @@ public class MainActivity extends Activity {
                 + "test \"$(git rev-parse HEAD)\" = " + releaseCommit + "\n"
                 + secretProvisioning
                 + "chmod +x start-termux.sh\n"
-                + "./start-termux.sh --skip-update\n";
+                + launcherCommand;
     }
 
     private String shellQuote(String value) {
@@ -1052,19 +1182,19 @@ public class MainActivity extends Activity {
     private void showTermuxExternalAppsInstructions() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("YunYun Termux setup", TERMUX_EXTERNAL_APPS_COMMAND));
+            clipboard.setPrimaryClip(ClipData.newPlainText("Marinara Termux setup", TERMUX_EXTERNAL_APPS_COMMAND));
             Toast.makeText(this, "Copied Termux permission command", Toast.LENGTH_LONG).show();
         }
         pauseConnectionRetryLoop();
-        showBootstrap("Termux blocked external setup.\nPaste the copied allow-external-apps command once, then return and tap Install / Start YunYun.", false);
+        showBootstrap("Termux blocked external setup.\nPaste the copied allow-external-apps command once, then return and tap Install / Start Marinara.", false);
         openTermux();
     }
 
     private void showManualTermuxSetupInstructions(String reason) {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("YunYun Termux setup", buildTermuxSetupCommand(false)));
-            Toast.makeText(this, "Copied YunYun setup command", Toast.LENGTH_LONG).show();
+            clipboard.setPrimaryClip(ClipData.newPlainText("Marinara Termux setup", buildTermuxSetupCommand(false)));
+            Toast.makeText(this, "Copied Marinara setup command", Toast.LENGTH_LONG).show();
         }
         pauseConnectionRetryLoop();
         showBootstrap(
@@ -1188,13 +1318,23 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void openLauncher(String token) {
+            if (!isTrustedBridgeCaller(token)) return;
+            runOnUiThread(() -> {
+                pauseConnectionRetryLoop();
+                webView.stopLoading();
+                showBootstrap("Choose how Marinara opens, then tap Retry connection.", false);
+            });
+        }
+
+        @JavascriptInterface
         public void openConsole(String token) {
             if (!isTrustedBridgeCaller(token)) return;
             runOnUiThread(() -> {
                 if (!isTermuxInstalled()) {
                     Toast.makeText(
                             MainActivity.this,
-                            "Termux is not installed yet. Use Install / Start YunYun first.",
+                            "Termux is not installed yet. Use Install / Start Marinara first.",
                             Toast.LENGTH_LONG
                     ).show();
                     return;
@@ -1232,6 +1372,71 @@ public class MainActivity extends Activity {
         return message == null || message.trim().isEmpty() ? error.getClass().getSimpleName() : message;
     }
 
+    /**
+     * Adds a Camera choice next to the file picker when the page asks for images, as Chrome does
+     * (#6953). The photo goes to Pictures/Marinara like the app's other saved images; Android 9 and
+     * older keep the plain file picker.
+     */
+    private Intent withCameraChoice(WebChromeClient.FileChooserParams params) {
+        Intent picker = params.createIntent();
+        discardPendingCameraPhoto();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || !acceptsImages(params.getAcceptTypes())) return picker;
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, "Marinara_" + System.currentTimeMillis() + ".jpg");
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Marinara");
+        Uri photo;
+        try {
+            photo = getContentResolver().insert(
+                    MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
+        } catch (Exception error) {
+            return picker;
+        }
+        if (photo == null) return picker;
+        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        camera.putExtra(MediaStore.EXTRA_OUTPUT, photo);
+        camera.setClipData(ClipData.newRawUri("", photo));
+        camera.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        pendingCameraPhoto = photo;
+        Intent chooser = Intent.createChooser(picker, null);
+        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { camera });
+        return chooser;
+    }
+
+    private static boolean acceptsImages(String[] acceptTypes) {
+        if (acceptTypes == null || acceptTypes.length == 0) return true;
+        for (String type : acceptTypes) {
+            String value = type == null ? "" : type.trim().toLowerCase();
+            if (value.isEmpty() || value.equals("*/*") || value.startsWith("image/")) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsUri(Uri[] uris, Uri target) {
+        if (uris == null) return false;
+        for (Uri uri : uris) {
+            if (target.equals(uri)) return true;
+        }
+        return false;
+    }
+
+    /** Removes the empty photo file when the camera wasn't used. */
+    private void discardPendingCameraPhoto() {
+        if (pendingCameraPhoto == null) return;
+        try {
+            getContentResolver().delete(pendingCameraPhoto, null, null);
+        } catch (Exception ignored) {
+            // Nothing else to clean up.
+        }
+        pendingCameraPhoto = null;
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (pendingCameraPhoto != null) outState.putString(PENDING_CAMERA_PHOTO_STATE, pendingCameraPhoto.toString());
+    }
+
     /** Writes a download into the app's Pictures or Downloads collection on Android 10 and newer. */
     private void saveFileToMediaStore(byte[] data, String mimeType, String filename) throws Exception {
         ContentResolver resolver = getContentResolver();
@@ -1240,7 +1445,7 @@ public class MainActivity extends Activity {
                 ? MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
                 : MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
         String directory = (isImage ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS)
-                + "/YunYun";
+                + "/Marinara";
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
         values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
@@ -1297,7 +1502,7 @@ public class MainActivity extends Activity {
                 "Background messages",
                 NotificationManager.IMPORTANCE_DEFAULT
         );
-        channel.setDescription("Notifications for new YunYun character messages");
+        channel.setDescription("Notifications for new Marinara character messages");
         manager.createNotificationChannel(channel);
     }
 
@@ -1326,8 +1531,8 @@ public class MainActivity extends Activity {
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
 
-        String title = truncateNotificationText(rawTitle, "New YunYun message", 100);
-        String body = truncateNotificationText(rawBody, "Open YunYun to read it.", 180);
+        String title = truncateNotificationText(rawTitle, "New Marinara message", 100);
+        String body = truncateNotificationText(rawBody, "Open Marinara to read it.", 180);
         String tag = truncateNotificationText(rawTag, "marinara-message", 120);
         Intent openIntent = new Intent(this, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -1398,7 +1603,7 @@ public class MainActivity extends Activity {
         clearPendingInstallCallback();
 
         if (status == PackageInstaller.STATUS_SUCCESS) {
-            showBootstrap("Termux installed.\nContinuing YunYun setup…", true);
+            showBootstrap("Termux installed.\nContinuing Marinara setup…", true);
             pendingStartAfterTermuxInstall = false;
             startTermuxSetup();
             return;
@@ -1406,7 +1611,7 @@ public class MainActivity extends Activity {
 
         String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
         if (status == PackageInstaller.STATUS_FAILURE_ABORTED) {
-            showBootstrap("Termux installation was cancelled.\nTap Install / Start YunYun to try again.", false);
+            showBootstrap("Termux installation was cancelled.\nTap Install / Start Marinara to try again.", false);
             return;
         }
         showBootstrap("Termux installation failed.\n" + (message != null ? message : "Use Get Termux manually, then return here."), false);
@@ -1433,7 +1638,7 @@ public class MainActivity extends Activity {
         applyStatusBarVisibility(isStatusBarVisible());
         if (pendingStartAfterTermuxInstall && isTermuxInstalled()) {
             pendingStartAfterTermuxInstall = false;
-            showBootstrap("Termux installed.\nContinuing YunYun setup…", true);
+            showBootstrap("Termux installed.\nContinuing Marinara setup…", true);
             startTermuxSetup();
         }
     }
@@ -1450,7 +1655,7 @@ public class MainActivity extends Activity {
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             sendTermuxSetupCommand();
         } else {
-            showBootstrap("Run commands permission was not granted.\nGrant it from Android App Info > Permissions, then tap Install / Start YunYun.", false);
+            showBootstrap("Run commands permission was not granted.\nGrant it from Android App Info > Permissions, then tap Install / Start Marinara.", false);
         }
     }
 
@@ -1466,8 +1671,17 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_CHOOSER_REQUEST) {
+            Uri cameraPhoto = pendingCameraPhoto;
+            pendingCameraPhoto = null;
+            Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+            // The camera usually answers without data: its photo is already in the file made for it.
+            if (result == null && resultCode == RESULT_OK && cameraPhoto != null) {
+                result = new Uri[] { cameraPhoto };
+            } else if (cameraPhoto != null && !containsUri(result, cameraPhoto)) {
+                pendingCameraPhoto = cameraPhoto;
+                discardPendingCameraPhoto();
+            }
             if (fileUploadCallback != null) {
-                Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
                 fileUploadCallback.onReceiveValue(result);
                 fileUploadCallback = null;
             }
@@ -1508,6 +1722,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (isFinishing()) setStartRequested(false);
         bridgeEnabled = false;
         bridgeToken = null;
         cancelPendingConnectionRetry();

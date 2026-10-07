@@ -43,6 +43,7 @@ export function validatePullRequestTriage() {
   ).replace(/\r\n/gu, "\n");
   const approvalEvaluator = readFileSync(new URL("./evaluate-owner-approval.mjs", import.meta.url), "utf8");
   const codeOwners = readFileSync(new URL("../.github/CODEOWNERS", import.meta.url), "utf8");
+  const codeqlWorkflow = readFileSync(new URL("../.github/workflows/codeql.yml", import.meta.url), "utf8");
   const triggersSectionStart = triageWorkflow.indexOf("\non:\n");
   const triggersSectionEnd = triageWorkflow.indexOf("\nconcurrency:\n", triggersSectionStart);
   const jobsSectionStart = triageWorkflow.indexOf("\njobs:\n");
@@ -57,9 +58,7 @@ export function validatePullRequestTriage() {
   );
 
   const jobIds = [
-    ...triageWorkflow
-      .slice(jobsSectionStart + "\njobs:\n".length)
-      .matchAll(/^  ([A-Za-z_][A-Za-z0-9_-]*):\s*$/gmu),
+    ...triageWorkflow.slice(jobsSectionStart + "\njobs:\n".length).matchAll(/^  ([A-Za-z_][A-Za-z0-9_-]*):\s*$/gmu),
   ].map((match) => match[1]);
   assert.ok(jobIds.includes("branch-policy"));
   assert.ok(jobIds.includes("owner-approval"));
@@ -74,10 +73,7 @@ export function validatePullRequestTriage() {
   assert.match(ownerApprovalJob, /run: node scripts\/evaluate-owner-approval\.mjs/u);
   assert.doesNotMatch(ownerApprovalJob, /github\.event\.pull_request\.head/u);
 
-  assert.match(
-    reviewSignal,
-    /on:\n  pull_request_review:\n    types: \[submitted, edited, dismissed\]/u,
-  );
+  assert.match(reviewSignal, /on:\n  pull_request_review:\n    types: \[submitted, edited, dismissed\]/u);
   assert.match(reviewSignal, /permissions: \{\}/u);
   assert.doesNotMatch(reviewSignal, /secrets\.|github\.token|actions\/checkout|PASTA_DEVS_MEMBERS_TOKEN/u);
 
@@ -110,7 +106,7 @@ export function validatePullRequestTriage() {
     exemptionStep,
     [
       "      - name: Exempt trusted contributor",
-      "        if: contains(fromJSON('[\"MEMBER\",\"OWNER\",\"COLLABORATOR\"]'), github.event.pull_request.author_association)",
+      '        if: contains(fromJSON(\'["MEMBER","OWNER","COLLABORATOR"]\'), github.event.pull_request.author_association)',
       '        run: echo "Trusted contributor; pull request template validation is not required."',
     ].join("\n"),
   );
@@ -122,6 +118,44 @@ export function validatePullRequestTriage() {
   );
 
   assert.match(codeOwners, /^\* @SpicyMarinara$/mu);
+  assert.match(codeqlWorkflow, /pull_request:\s*\n\s*branches:\s*\[main, staging\]/u);
+
+  // A nightly scheduler may dispatch staging tests, but must never execute
+  // candidate code with its write token or inside the default branch cache.
+  const browserWorkflow = readFileSync(new URL("../.github/workflows/playwright.yml", import.meta.url), "utf8");
+  const nightly = extractJob(browserWorkflow, "nightly");
+  assert.match(nightly, /if: github\.event_name == 'schedule'/u);
+  assert.match(nightly, /actions: write/u);
+  assert.doesNotMatch(nightly, /uses:/u);
+  assert.deepEqual(
+    [...nightly.matchAll(/^\s+run: (.+)$/gmu)].map((match) => match[1]),
+    ['gh api --method POST "repos/$GH_REPO/actions/workflows/playwright.yml/dispatches" -f ref=staging'],
+  );
+  const browserRevision = extractJob(browserWorkflow, "revision");
+  assert.match(browserRevision, /if: github\.event_name != 'schedule'/u);
+  assert.match(browserRevision, /permissions: \{\}/u);
+  assert.match(
+    browserRevision,
+    /full: \$\{\{ github\.event_name == 'workflow_dispatch' \|\| github\.base_ref == 'main' \}\}/u,
+  );
+  const browserCheckouts = [...browserWorkflow.matchAll(/^\s+ref: (.+)$/gmu)];
+  assert.ok(browserCheckouts.length > 0);
+  for (const checkout of browserCheckouts) assert.equal(checkout[1], "${{ github.sha }}");
+  for (const jobId of ["node", "smoke", "desktop-chromium-shards", "mobile-chromium-shards", "mobile-webkit-shards"]) {
+    const job = extractJob(browserWorkflow, jobId);
+    assert.match(job, /needs: revision/u);
+    assert.doesNotMatch(job, /^\s+[\w-]+: write\s*$/mu);
+    if (jobId === "smoke") {
+      assert.ok(job.includes("if: github.event_name == 'push' && needs.revision.outputs.full != 'true'"));
+    } else if (jobId !== "node") assert.ok(job.includes("if: needs.revision.outputs.full == 'true'"));
+  }
+
+  const prChecks = readFileSync(new URL("../.github/workflows/pull-request-checks.yml", import.meta.url), "utf8");
+  const requiredSmoke = extractNamedStep(extractJob(prChecks, "pnpm-validate"), "Run required Chromium smoke suite");
+  assert.match(requiredSmoke, /if: github\.base_ref == 'staging'/u);
+  assert.match(requiredSmoke, /run: pnpm smoke:ui/u);
+  assert.match(requiredSmoke, /PLAYWRIGHT_ONLY_PROJECT: desktop/u);
+  assert.doesNotMatch(extractJob(prChecks, "pnpm-validate"), /continue-on-error/u);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

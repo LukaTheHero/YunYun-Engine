@@ -14,6 +14,7 @@ import { chats, messages } from "../../db/schema/index.js";
 import { wrapContent } from "../prompt/format-engine.js";
 import { sanitizePromptLeaf } from "../prompt/prompt-escaping.js";
 import { createCharactersStorage } from "../storage/characters.storage.js";
+import { resolveChatUserIdentity } from "../chat-user-identity.js";
 import {
   formatZonedConversationDate,
   formatZonedConversationTime,
@@ -56,7 +57,11 @@ function defaultWindow(now = new Date()): { start: Date; end: Date } {
  * Detect temporal keywords in a user message and return
  * all matching time windows (plus the default 1h window).
  */
-function detectTimeWindows(userMessage: string, now = new Date(), timeZone?: string): Array<{ start: Date; end: Date }> {
+function detectTimeWindows(
+  userMessage: string,
+  now = new Date(),
+  timeZone?: string,
+): Array<{ start: Date; end: Date }> {
   const windows: Array<{ start: Date; end: Date }> = [defaultWindow(now)];
   for (const { pattern, getWindow } of TEMPORAL_PATTERNS) {
     if (pattern.test(userMessage)) {
@@ -91,6 +96,7 @@ interface ChatRow {
   characterIds: string;
   mode: string;
   personaId: string | null;
+  personaCharacterId: string | null;
 }
 
 interface MessageRow {
@@ -204,6 +210,7 @@ export async function buildAwarenessBlock(
       characterIds: chats.characterIds,
       mode: chats.mode,
       personaId: chats.personaId,
+      personaCharacterId: chats.personaCharacterId,
     })
     .from(chats)
     .where(eq(chats.mode, "conversation"));
@@ -235,12 +242,8 @@ export async function buildAwarenessBlock(
 
   // 3. Pull messages from sibling chats within the time windows
   const charStorage = createCharactersStorage(db);
-  const personas = await charStorage.listPersonas();
-  const activePersona = personas.find((persona) => persona.isActive === "true");
-  const resolveChatPersonaName = (chat: ChatRow): string => {
-    const persona = chat.personaId ? personas.find((entry) => entry.id === chat.personaId) : activePersona;
-    return persona?.name || userName;
-  };
+  const resolveChatPersonaName = async (chat: ChatRow): Promise<string> =>
+    (await resolveChatUserIdentity(charStorage, chat))?.name || userName;
 
   const chatMessages = new Map<
     string,
@@ -250,7 +253,7 @@ export async function buildAwarenessBlock(
   for (const chat of siblingChats) {
     const charIds: string[] = JSON.parse(chat.characterIds);
     const memberNames = charIds.map((id) => characterNames.get(id) ?? "Unknown");
-    const chatUserName = resolveChatPersonaName(chat);
+    const chatUserName = await resolveChatPersonaName(chat);
     memberNames.push(chatUserName);
 
     const rows = (await db

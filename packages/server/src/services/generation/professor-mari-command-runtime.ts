@@ -26,7 +26,7 @@ import {
 import { bumpCharacterVersion } from "./generation-text-utils.js";
 import { createEntityEmbeddingStore } from "../entity-embedding-store.js";
 import { tieredResolveEntity, type EntityDescriptor, type EntitySearchType } from "../entity-semantic-search.js";
-import type { MemoryRecallEmbeddingSource } from "../memory-recall.js";
+import { DEFAULT_LOCAL_MEMORY_EMBEDDING_SPACE_ID, type MemoryRecallEmbeddingSource } from "../memory-recall.js";
 import {
   MAX_MARI_FETCHED_PRESET_CONTEXT_CHARS,
   normalizeAssistantPresetIdentifier,
@@ -144,10 +144,14 @@ async function createPersona(command: CreatePersonaCommand, args: Parameters<typ
   }
 }
 
-async function createCharacter(command: CreateCharacterCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
+async function createCharacter(
+  command: CreateCharacterCommand,
+  args: Parameters<typeof handleProfessorMariCommand>[0],
+) {
   try {
     const charData = {
       name: command.name,
+      summary: (command.summary ?? "").trim().slice(0, 500),
       description: command.description ?? "",
       personality: command.personality ?? "",
       first_mes: command.firstMessage ?? "",
@@ -185,7 +189,10 @@ async function createCharacter(command: CreateCharacterCommand, args: Parameters
   }
 }
 
-async function updateCharacter(command: UpdateCharacterCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
+async function updateCharacter(
+  command: UpdateCharacterCommand,
+  args: Parameters<typeof handleProfessorMariCommand>[0],
+) {
   try {
     const allCharsList = await args.stores.chars.list();
     const targetChar = allCharsList.find((character: any) => {
@@ -207,13 +214,15 @@ async function updateCharacter(command: UpdateCharacterCommand, args: Parameters
     const updates: Record<string, unknown> = {};
     const extensionUpdates: Record<string, unknown> = {};
     if (command.description !== undefined) updates.description = command.description;
+    if (command.summary !== undefined) updates.summary = command.summary.trim().slice(0, 500);
     if (command.personality !== undefined) updates.personality = command.personality;
     if (command.firstMessage !== undefined) updates.first_mes = command.firstMessage;
     if (command.scenario !== undefined) updates.scenario = command.scenario;
     if (command.mesExample !== undefined) updates.mes_example = command.mesExample;
     if (command.creatorNotes !== undefined) updates.creator_notes = command.creatorNotes;
     if (command.systemPrompt !== undefined) updates.system_prompt = command.systemPrompt;
-    if (command.postHistoryInstructions !== undefined) updates.post_history_instructions = command.postHistoryInstructions;
+    if (command.postHistoryInstructions !== undefined)
+      updates.post_history_instructions = command.postHistoryInstructions;
     if (command.creator !== undefined) updates.creator = command.creator;
     if (command.characterVersion !== undefined) updates.character_version = command.characterVersion;
     if (command.tags !== undefined) updates.tags = command.tags;
@@ -280,8 +289,77 @@ async function updatePersona(command: UpdatePersonaCommand, args: Parameters<typ
   }
 }
 
+function normalizeLorebookFolderPath(value: string): string {
+  return value
+    .split("/")
+    .map((part) => part.trim())
+    .filter((part) => part && part !== "." && part !== "..")
+    .slice(0, 12)
+    .join("/");
+}
+
+export const MAX_LOREBOOK_FOLDER_PATH_REQUESTS = 200;
+
+function assertLorebookFolderPathLimit(requestedPaths: string[]): void {
+  if (requestedPaths.length > MAX_LOREBOOK_FOLDER_PATH_REQUESTS) {
+    throw new Error(`Lorebook commands support at most ${MAX_LOREBOOK_FOLDER_PATH_REQUESTS} folder paths`);
+  }
+}
+
+export async function ensureLorebookFolderPaths(
+  lorebooksStore: ProfessorMariCommandStores["lorebooksStore"],
+  lorebookId: string,
+  requestedPaths: string[],
+): Promise<{ folderIds: Map<string, string>; createdCount: number }> {
+  assertLorebookFolderPathLimit(requestedPaths);
+  const folders = (await lorebooksStore.listFolders(lorebookId)) as Array<{
+    id: string;
+    name: string;
+    parentFolderId: string | null;
+  }>;
+  const byParentAndName = new Map(
+    folders.map((folder) => [`${folder.parentFolderId ?? ""}\0${folder.name.trim().toLowerCase()}`, folder.id]),
+  );
+  const folderIds = new Map<string, string>();
+  let createdCount = 0;
+
+  for (const rawPath of requestedPaths) {
+    const path = normalizeLorebookFolderPath(rawPath);
+    if (!path) continue;
+    let parentFolderId: string | null = null;
+    const parts: string[] = [];
+    for (const name of path.split("/")) {
+      parts.push(name);
+      const key = `${parentFolderId ?? ""}\0${name.toLowerCase()}`;
+      let folderId = byParentAndName.get(key);
+      if (!folderId) {
+        const created = (await lorebooksStore.createFolder(lorebookId, {
+          name,
+          parentFolderId,
+          enabled: true,
+        })) as { id?: string } | null;
+        folderId = created?.id;
+        if (!folderId) break;
+        byParentAndName.set(key, folderId);
+        createdCount += 1;
+      }
+      parentFolderId = folderId;
+      folderIds.set(parts.join("/").toLowerCase(), folderId);
+    }
+  }
+
+  return { folderIds, createdCount };
+}
+
+function resolveLorebookEntryFolderId(folderIds: Map<string, string>, path: string | undefined): string | undefined {
+  if (!path) return undefined;
+  return folderIds.get(normalizeLorebookFolderPath(path).toLowerCase());
+}
+
 async function createLorebook(command: CreateLorebookCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
   try {
+    const folderPaths = [...(command.folders ?? []), ...(command.entries ?? []).flatMap((entry) => entry.path ?? [])];
+    assertLorebookFolderPathLimit(folderPaths);
     const category = ["character", "world", "npc", "spellbook"].includes(command.category ?? "")
       ? command.category
       : "uncategorized";
@@ -296,6 +374,12 @@ async function createLorebook(command: CreateLorebookCommand, args: Parameters<t
     });
     if (!created) return;
 
+    const { folderIds, createdCount: folderCount } = await ensureLorebookFolderPaths(
+      args.stores.lorebooksStore,
+      created.id,
+      folderPaths,
+    );
+
     let entryCount = 0;
     for (const entry of command.entries ?? []) {
       await args.stores.lorebooksStore.createEntry({
@@ -309,12 +393,24 @@ async function createLorebook(command: CreateLorebookCommand, args: Parameters<t
         constant: entry.constant ?? false,
         selective: entry.selective ?? false,
         enabled: true,
+        folderId: resolveLorebookEntryFolderId(folderIds, entry.path) ?? null,
       });
       entryCount += 1;
     }
 
-    args.sendAssistantAction({ action: "lorebook_created", id: created.id, name: command.name, entryCount });
-    logger.info('[commands] Assistant created lorebook: "%s" (%s) with %d entries', command.name, created.id, entryCount);
+    args.sendAssistantAction({
+      action: "lorebook_created",
+      id: created.id,
+      name: command.name,
+      entryCount,
+      folderCount,
+    });
+    logger.info(
+      '[commands] Assistant created lorebook: "%s" (%s) with %d entries',
+      command.name,
+      created.id,
+      entryCount,
+    );
   } catch (err) {
     logger.error(err, "[commands] Create lorebook failed");
   }
@@ -333,6 +429,9 @@ async function updateLorebook(command: UpdateLorebookCommand, args: Parameters<t
       return;
     }
 
+    const folderPaths = [...(command.folders ?? []), ...(command.entries ?? []).flatMap((entry) => entry.path ?? [])];
+    assertLorebookFolderPathLimit(folderPaths);
+
     const category = ["character", "world", "npc", "spellbook", "uncategorized"].includes(command.category ?? "")
       ? command.category
       : undefined;
@@ -346,6 +445,11 @@ async function updateLorebook(command: UpdateLorebookCommand, args: Parameters<t
     }
 
     const existingEntries = (await args.stores.lorebooksStore.listEntries(targetLorebook.id)) as any[];
+    const { folderIds, createdCount: folderCount } = await ensureLorebookFolderPaths(
+      args.stores.lorebooksStore,
+      targetLorebook.id,
+      folderPaths,
+    );
     const existingByName = new Map(
       existingEntries.map((entry: any) => [
         String(entry.name ?? "")
@@ -372,6 +476,8 @@ async function updateLorebook(command: UpdateLorebookCommand, args: Parameters<t
         if (entry.tag !== undefined) entryUpdates.tag = entry.tag;
         if (entry.constant !== undefined) entryUpdates.constant = entry.constant;
         if (entry.selective !== undefined) entryUpdates.selective = entry.selective;
+        const folderId = resolveLorebookEntryFolderId(folderIds, entry.path);
+        if (folderId) entryUpdates.folderId = folderId;
         if (Object.keys(entryUpdates).length > 0) {
           const updatedEntry = await args.stores.lorebooksStore.updateEntry(existingEntry.id, entryUpdates);
           if (updatedEntry) {
@@ -392,6 +498,7 @@ async function updateLorebook(command: UpdateLorebookCommand, args: Parameters<t
           constant: entry.constant ?? false,
           selective: entry.selective ?? false,
           enabled: true,
+          folderId: resolveLorebookEntryFolderId(folderIds, entry.path) ?? null,
         });
         if (createdEntry) {
           createdEntryCount += 1;
@@ -407,6 +514,7 @@ async function updateLorebook(command: UpdateLorebookCommand, args: Parameters<t
       name: finalName,
       updatedEntryCount,
       createdEntryCount,
+      folderCount,
     });
     logger.info(
       '[commands] Assistant updated lorebook: "%s" (%s), entries updated=%d created=%d',
@@ -478,6 +586,7 @@ async function createPreset(command: CreatePresetCommand, args: Parameters<typeo
           injectionDepth: Math.max(0, section.injectionDepth ?? 0),
           injectionOrder: section.injectionOrder ?? (index + 1) * 100,
           forbidOverrides: section.forbidOverrides ?? false,
+          skipWrap: section.skipWrap ?? false,
         });
         sectionCount += 1;
       }
@@ -636,19 +745,28 @@ async function fetchProfessorMariContext(
       args.sendAssistantAction({ action: "data_fetched", fetchType: command.fetchType, name: resolution.name });
       logger.info('[commands] Assistant fetched %s: "%s"', command.fetchType, resolution.name);
     } else {
-      mariContext[`${command.fetchType} options for "${resolution.query}"`] = renderCandidateBlock(command.fetchType, resolution);
+      mariContext[`${command.fetchType} options for "${resolution.query}"`] = renderCandidateBlock(
+        command.fetchType,
+        resolution,
+      );
       args.sendAssistantAction({
         action: "data_candidates",
         fetchType: command.fetchType,
         name: resolution.query,
         candidates: resolution.candidates,
       });
-      logger.info('[commands] Assistant fetch "%s" matched %d candidates', resolution.query, resolution.candidates.length);
+      logger.info(
+        '[commands] Assistant fetch "%s" matched %d candidates',
+        resolution.query,
+        resolution.candidates.length,
+      );
     }
     currentMeta.mariContext = mariContext;
     await args.stores.chats.updateMetadata(args.chatId, currentMeta);
 
-    return args.isHomeProfessorMariAssistantChat && (args.characterId === PROFESSOR_MARI_ID || args.characterId === null);
+    return (
+      args.isHomeProfessorMariAssistantChat && (args.characterId === PROFESSOR_MARI_ID || args.characterId === null)
+    );
   } catch (err) {
     logger.error(err, "[commands] Fetch failed");
     return false;
@@ -670,7 +788,11 @@ async function resolveFetchedContent(
   args: Parameters<typeof handleProfessorMariCommand>[0],
 ): Promise<FetchResolution> {
   const type = command.fetchType as EntitySearchType;
-  const sourceId = args.embeddingSource?.spaceId ?? args.embeddingSource?.label ?? "local";
+  // Persisted entity envelopes already compare this value exactly. Remote IDs
+  // include the input-profile revision, while the local fallback is explicitly
+  // versioned, so vectors created before asymmetric formatting are re-warmed.
+  const sourceId =
+    args.embeddingSource?.spaceId ?? args.embeddingSource?.label ?? DEFAULT_LOCAL_MEMORY_EMBEDDING_SPACE_ID;
   const store = createEntityEmbeddingStore(args.db, sourceId);
   const descriptor: EntityDescriptor = {
     type,
@@ -701,7 +823,10 @@ async function resolveFetchedContent(
   return { kind: "single", name: resolution.candidate.name, id: resolution.candidate.id, content };
 }
 
-async function renderSingleFetchContent(command: ResolvedFetchCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
+async function renderSingleFetchContent(
+  command: ResolvedFetchCommand,
+  args: Parameters<typeof handleProfessorMariCommand>[0],
+) {
   if (command.fetchType === "character") return fetchCharacterContent(command, args);
   if (command.fetchType === "persona") return fetchPersonaContent(command, args);
   if (command.fetchType === "lorebook") return fetchLorebookContent(command, args);
@@ -710,7 +835,10 @@ async function renderSingleFetchContent(command: ResolvedFetchCommand, args: Par
   return "";
 }
 
-async function fetchCharacterContent(command: ResolvedFetchCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
+async function fetchCharacterContent(
+  command: ResolvedFetchCommand,
+  args: Parameters<typeof handleProfessorMariCommand>[0],
+) {
   const allCharsList = await args.stores.chars.list();
   const found = allCharsList.find((character: any) => {
     if (command.resolvedId) return character.id === command.resolvedId;
@@ -734,10 +862,15 @@ async function fetchCharacterContent(command: ResolvedFetchCommand, args: Parame
   return parts.join("\n");
 }
 
-async function fetchPersonaContent(command: ResolvedFetchCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
+async function fetchPersonaContent(
+  command: ResolvedFetchCommand,
+  args: Parameters<typeof handleProfessorMariCommand>[0],
+) {
   const allPersonasList = await args.stores.chars.listPersonas();
   const found = allPersonasList.find((persona: any) =>
-    command.resolvedId ? persona.id === command.resolvedId : normalizeTextForMatch(persona.name) === normalizeTextForMatch(command.name),
+    command.resolvedId
+      ? persona.id === command.resolvedId
+      : normalizeTextForMatch(persona.name) === normalizeTextForMatch(command.name),
   );
   if (!found) return "";
 
@@ -750,10 +883,15 @@ async function fetchPersonaContent(command: ResolvedFetchCommand, args: Paramete
   return parts.join("\n");
 }
 
-async function fetchLorebookContent(command: ResolvedFetchCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
+async function fetchLorebookContent(
+  command: ResolvedFetchCommand,
+  args: Parameters<typeof handleProfessorMariCommand>[0],
+) {
   const allLorebooks = await args.stores.lorebooksStore.list();
   const found = allLorebooks.find((lorebook: any) =>
-    command.resolvedId ? lorebook.id === command.resolvedId : normalizeTextForMatch(lorebook.name) === normalizeTextForMatch(command.name),
+    command.resolvedId
+      ? lorebook.id === command.resolvedId
+      : normalizeTextForMatch(lorebook.name) === normalizeTextForMatch(command.name),
   );
   if (!found) return "";
 
@@ -773,7 +911,9 @@ async function fetchLorebookContent(command: ResolvedFetchCommand, args: Paramet
 async function fetchChatContent(command: ResolvedFetchCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
   const allChats = await args.stores.chats.list();
   const found = allChats.find((chat: any) =>
-    command.resolvedId ? chat.id === command.resolvedId : normalizeTextForMatch(chat.name) === normalizeTextForMatch(command.name),
+    command.resolvedId
+      ? chat.id === command.resolvedId
+      : normalizeTextForMatch(chat.name) === normalizeTextForMatch(command.name),
   );
   if (!found) return "";
 
@@ -789,7 +929,10 @@ async function fetchChatContent(command: ResolvedFetchCommand, args: Parameters<
   return parts.join("\n");
 }
 
-async function fetchPresetContent(command: ResolvedFetchCommand, args: Parameters<typeof handleProfessorMariCommand>[0]) {
+async function fetchPresetContent(
+  command: ResolvedFetchCommand,
+  args: Parameters<typeof handleProfessorMariCommand>[0],
+) {
   const allPresetsList = await args.stores.presets.list();
   const found = allPresetsList.find((preset: any) =>
     command.resolvedId
@@ -836,6 +979,7 @@ async function fetchPresetContent(command: ResolvedFetchCommand, args: Parameter
         `  Group: ${group?.name ?? "none"}`,
         `  Injection: ${section.injectionPosition} depth=${section.injectionDepth} order=${section.injectionOrder}`,
         `  Forbid Overrides: ${String(section.forbidOverrides) === "true" ? "true" : "false"}`,
+        `  Skip Wrap: ${String(section.skipWrap) === "true" ? "true" : "false"}`,
         `  Content:\n${truncateMariFetchedText(section.content, 3000)}`,
       ].join("\n"),
     );

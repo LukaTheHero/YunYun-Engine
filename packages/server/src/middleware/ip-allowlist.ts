@@ -134,7 +134,7 @@ function matchesCIDR(ipBytes: number[], cidr: CIDREntry): boolean {
 }
 
 // ── Loopback CIDRs (always allowed) ──
-const LOOPBACK_CIDRS: CIDREntry[] = [parseCIDR("127.0.0.1")!, parseCIDR("::1")!];
+const LOOPBACK_CIDRS: CIDREntry[] = [parseCIDR("127.0.0.0/8")!, parseCIDR("::1")!];
 
 // ── Specific interface CIDRs used by the Tailscale / Docker bypass ──
 // Tailscale assigns Tailnet peer IPs from the CGNAT block 100.64.0.0/10.
@@ -400,6 +400,25 @@ function getAllowlist() {
 // ── Reusable predicates (shared with basic-auth) ──
 
 /** True if the given IP string is a loopback address. */
+/**
+ * True when a base URL points at an inference server running on this machine
+ * or this LAN (llama.cpp, Ollama, vLLM, LM Studio). Such servers expose
+ * arbitrary model names that never match any provider catalog, so callers use
+ * this to decide when local-server-specific request shaping is safe.
+ */
+export function isLocalInferenceBaseUrl(baseUrl: string): boolean {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase().replace(/^\[|\]$|\.$/g, "");
+    if (hostname === "localhost" || isLoopbackIp(hostname)) return true;
+    if (hostname.endsWith(".local") || hostname.endsWith(".localhost")) return true;
+    if (hostname === "host.docker.internal" || hostname === "host.containers.internal") return true;
+    if (!hostname.includes(".") || hostname.endsWith(".internal")) return true;
+    return isNonRoutableNetworkIp(hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function isLoopbackIp(ip: string): boolean {
   const bytes = ipToBytes(ip);
   if (!bytes) return false;
@@ -407,6 +426,12 @@ export function isLoopbackIp(ip: string): boolean {
     if (matchesCIDR(bytes, lb)) return true;
   }
   return false;
+}
+
+/** True when the IP belongs to the built-in private/non-routable ranges, independent of auth configuration. */
+export function isNonRoutableNetworkIp(ip: string): boolean {
+  const bytes = ipToBytes(ip);
+  return Boolean(bytes && DEFAULT_PRIVATE_NETWORK_CIDRS.some((cidr) => matchesCIDR(bytes, cidr)));
 }
 
 /**

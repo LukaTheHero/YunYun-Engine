@@ -1,7 +1,8 @@
-import type { FastifyReply } from "fastify";
+import type { GenerationOutput } from "../../routes/generate/sse.js";
 import { getTurnGameEngine } from "@marinara-engine/shared";
 import type { DB } from "../../db/connection.js";
 import { logger } from "../../lib/logger.js";
+import { sendSseEvent } from "../../routes/generate/sse.js";
 import { getEnabledConversationSchedules } from "./conversation-context-utils.js";
 import { getCurrentStatus, type WeekSchedule } from "../conversation/schedule.service.js";
 import { resolveConversationTimeZone, toZonedWallClockDate } from "../conversation/timezone.js";
@@ -17,7 +18,7 @@ interface TurnGameCommandArgs {
   chats: { getById(id: string): Promise<{ characterIds?: unknown } | null> };
   conn: unknown;
   baseUrl: string;
-  reply: FastifyReply;
+  reply: GenerationOutput;
   signal: AbortSignal;
   debugLog?: (message: string, ...args: unknown[]) => void;
 }
@@ -80,7 +81,7 @@ export async function handleTurnGameCommand(args: TurnGameCommandArgs): Promise<
       return true;
     }
 
-    args.reply.raw.write(`data: ${JSON.stringify({ type: "turn_game_state_patch", data: outcome.view })}\n\n`);
+    sendSseEvent(args.reply, { type: "turn_game_state_patch", data: outcome.view });
     logger.info(
       "[commands] %s started in chat %s with %d player(s)",
       gameType,

@@ -17,12 +17,70 @@ export type APIProvider =
   | "nanogpt"
   | "xai"
   | "arli"
+  | "zai"
   | "custom"
   | "image_generation"
-  | "video_generation";
+  | "video_generation"
+  | "audio"
+  | "decision";
 
-export const IMAGE_GENERATION_QUALITIES = ["auto", "low", "medium", "high"] as const;
+/**
+ * `custom` is a System One server; `openai_compatible` is an ordinary chat model on a
+ * server the user already runs (Ollama, LM Studio, llama.cpp), asked for one yes/no
+ * token and read from its log-probabilities, the way the local slots are.
+ */
+export const DECISION_SOURCES = ["typesafe", "openrouter", "custom", "openai_compatible"] as const;
+export type DecisionSource = (typeof DECISION_SOURCES)[number];
+
+export const DECISION_SOURCE_BASE_URLS = {
+  typesafe: "https://api.typesafe.ai",
+  openrouter: "https://openrouter.ai/api",
+  custom: "",
+  openai_compatible: "",
+} as const;
+
+/**
+ * Sources that run on a server the user names: the base URL is required, the key is
+ * optional and may be borrowed from a same-origin custom chat connection, and the state
+ * budget defaults to 3,500 tokens. TypeSafe may also be given a base URL (#7084) but keeps
+ * the hosted rules.
+ */
+export function decisionSourceTakesUrl(source: string | null | undefined): boolean {
+  return source === "custom" || source === "openai_compatible";
+}
+
+export function defaultDecisionStateTokens(source: string | null | undefined): number {
+  return decisionSourceTakesUrl(source) ? 3500 : 30000;
+}
+
+/** Audio backends an audio connection can target (the former TTS sources). */
+export const AUDIO_GENERATION_SOURCES = ["openai", "elevenlabs", "pockettts", "xai"] as const;
+export type AudioGenerationSource = (typeof AUDIO_GENERATION_SOURCES)[number];
+
+export const IMAGE_GENERATION_QUALITIES = ["auto", "low", "medium", "high", "xhigh", "max"] as const;
 export type ImageGenerationQuality = (typeof IMAGE_GENERATION_QUALITIES)[number];
+
+/** Limits for model IDs pinned in a connection's model picker. */
+export const MAX_PINNED_MODELS = 100;
+export const MAX_MODEL_ID_LENGTH = 512;
+
+/** A connection's pinned model IDs, stored as a JSON array; anything malformed reads as none. */
+export function parsePinnedModels(value: unknown): string[] {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  const ids = parsed
+    .filter((id): id is string => typeof id === "string")
+    .map((id) => id.trim())
+    .filter((id) => id && id.length <= MAX_MODEL_ID_LENGTH);
+  return [...new Set(ids)].slice(0, MAX_PINNED_MODELS);
+}
 
 /** An API connection configuration. */
 export interface APIConnection {
@@ -33,6 +91,8 @@ export interface APIConnection {
   baseUrl: string;
   /** Model identifier (e.g. "gpt-4o", "claude-sonnet-4-20250514") */
   model: string;
+  /** Model IDs pinned to the top of this connection's model picker, as a JSON array (see `parsePinnedModels`). */
+  pinnedModels: string;
   /** Optional custom picture shown in the Connections panel */
   imagePath: string | null;
   /** Maximum context window size for this model */
@@ -49,7 +109,7 @@ export interface APIConnection {
   fallbackForAgents: boolean;
   /** Whether provider-native prompt caching is enabled */
   enableCaching: boolean;
-  /** Anthropic only: use the 1-hour prompt-cache TTL instead of the default 5-minute TTL */
+  /** Anthropic and Claude Subscription: request a 1-hour prompt-cache TTL. */
   anthropicExtendedCacheTtl: boolean;
   /** Conversation message depth for Anthropic cache breakpoints */
   cachingAtDepth: number;
@@ -77,18 +137,36 @@ export interface APIConnection {
   videoGenerationSource: string | null;
   /** Explicitly selected video generation service ID. Overrides URL/model inference when set. */
   videoService: string | null;
+  /** Audio backend for audio connections (e.g. "elevenlabs"). Null for non-audio providers. */
+  audioSource: AudioGenerationSource | null;
+  /** System One backend; absent on older connections. */
+  decisionSource?: DecisionSource | null;
+  credentialsFromConnectionId?: string | null;
+  maxStateTokens?: number | null;
+  /** How long a Decision connection may take to answer, in milliseconds; null is the default. */
+  decisionTimeoutMs?: number | null;
+  /** Default voice id/name for speech synthesis on this audio connection. */
+  audioVoice: string | null;
+  /** Whether this audio connection may generate game sound effects (ElevenLabs only today). */
+  audioSoundEffects: boolean;
+  /** Whether this audio connection may generate game music (ElevenLabs only today). */
+  audioMusic: boolean;
   /** Default generation parameters for new chats using this connection (JSON) */
   defaultParameters: string | null;
   /** Prompt preset to use instead of a chat's selected preset when this connection is active */
   promptPresetId: string | null;
   /** Hard cap on max_tokens for the API response (for providers with lower limits, e.g. DeepSeek at 8192). */
   maxTokensOverride: number | null;
-  /** Maximum number of agent LLM jobs YunYun may run at once for this connection. */
+  /** Maximum number of agent LLM jobs Marinara may run at once for this connection. */
   maxParallelJobs: number;
-  /** Treat this endpoint as local/custom for Professor YunYun tool-protocol fallbacks. */
+  /** Cap on outbound requests per minute to this connection (null = unlimited). */
+  maxRequestsPerMinute: number | null;
+  /** Treat this endpoint as local/custom for Professor Mari tool-protocol fallbacks. */
   treatAsLocalEndpoint: boolean;
   /** Folder this connection belongs to (null = root/unfiled). */
   folderId: string | null;
+  /** NanoGPT only: whether the subscription usage widget is shown. */
+  showUsageWidget: boolean;
   /** Manual sort order within a folder (lower = higher). 0 = use default sort. */
   sortOrder: number;
   createdAt: string;
@@ -129,4 +207,14 @@ export interface ConnectionTestResult {
   message: string;
   latencyMs: number;
   modelName: string | null;
+  decisionProbability?: number;
+  errorCode?: string;
+  /** A Decision connection's limit during chats, to compare `latencyMs` with. */
+  timeLimitMs?: number;
+  /** How long this Decision test waited before giving up. */
+  testTimeoutMs?: number;
+  /** A chat-model Decision connection: whether the server returned log-probabilities. */
+  logprobs?: boolean;
+  /** A chat-model Decision connection: whether the model answered without thinking first. */
+  answersDirectly?: boolean;
 }

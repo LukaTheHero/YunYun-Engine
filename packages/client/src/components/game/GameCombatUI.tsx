@@ -1,3 +1,4 @@
+import { CombatAiControls } from "./CombatAiControls";
 // ──────────────────────────────────────────────
 // Game: Turn-Based Combat UI
 //
@@ -30,6 +31,7 @@ import { useGameAssetManifest } from "../../hooks/use-game-assets";
 import { useCombatRound } from "../../hooks/use-game";
 import { useTTSConfig } from "../../hooks/use-tts";
 import { AnimatedText } from "./AnimatedText";
+import { combatInterruptFields } from "@marinara-engine/shared";
 import type {
   Combatant,
   CombatAttackResult,
@@ -41,9 +43,11 @@ import type {
   CombatMechanic,
   CombatSkill,
   CombatStatus,
+  DirectedRulesetView,
   PartyDialogueLine,
   TTSConfig,
 } from "@marinara-engine/shared";
+import { RulesetCombatMenu } from "./RulesetCombatMenu";
 import {
   Heart,
   Droplets,
@@ -123,6 +127,28 @@ function normalizeCombatSkillType(value: unknown): CombatSkillType {
   return value === "heal" || value === "buff" || value === "debuff" ? value : "attack";
 }
 
+function combatSkillTargetsAllies(type: CombatSkillType | undefined): boolean {
+  return type === "heal" || type === "buff";
+}
+
+function combatSkillTargetsEnemies(type: CombatSkillType | undefined): boolean {
+  return type === "attack" || type === "debuff";
+}
+
+function combatSkillTypeLabelKey(type: CombatSkillType): string {
+  if (type === "heal") return "ui.game.gamecombatui.heal";
+  if (type === "buff") return "ui.game.gamecombatui.buff";
+  if (type === "debuff") return "ui.game.gamecombatui.debuff";
+  return "ui.game.gamecombatui.atk";
+}
+
+function combatSkillDescriptionKey(type: CombatSkillType): string {
+  if (type === "heal") return "ui.game.gamecombatui.restoresHp";
+  if (type === "buff") return "ui.game.gamecombatui.strengthensAnAlly";
+  if (type === "debuff") return "ui.game.gamecombatui.weakensAnEnemy";
+  return "ui.game.gamecombatui.specialAttack";
+}
+
 function normalizeCombatStatusStat(value: unknown): CombatStatusStat {
   return value === "attack" || value === "defense" || value === "speed" || value === "hp" ? value : "hp";
 }
@@ -142,6 +168,10 @@ function sanitizeCombatSkills(skills: unknown): Combatant["skills"] {
       mpCost: Math.max(0, numberFromUnknown(skill.mpCost, 0)),
       power: Math.max(0.1, numberFromUnknown(skill.power, 1)),
     };
+    for (const [field, schema] of Object.entries(combatInterruptFields)) {
+      const parsed = schema.safeParse(skill[field]);
+      if (parsed.success && parsed.data !== undefined) Object.assign(next, { [field]: parsed.data });
+    }
     const description = stringFromUnknown(skill.description);
     if (description) next.description = description;
     if (typeof skill.cooldown === "number" && Number.isFinite(skill.cooldown)) next.cooldown = skill.cooldown;
@@ -293,6 +323,10 @@ function sanitizeCombatMechanics(mechanics: unknown): CombatMechanic[] | undefin
 
 function sanitizeCombatantForRound(combatant: Combatant): Omit<Combatant, "sprite"> {
   return {
+    tactics: combatant.tactics,
+    controller: combatant.controller,
+    skillCooldowns: combatant.skillCooldowns,
+    spellSlots: combatant.spellSlots,
     id: stringFromUnknown(combatant.id) ?? combatant.id,
     name: stringFromUnknown(combatant.name) ?? combatant.name,
     hp: numberFromUnknown(combatant.hp, 0),
@@ -365,9 +399,7 @@ interface CombatLogEntry {
 type CombatImpactTone = "hit" | "critical" | "miss" | "heal" | "reaction";
 
 type CombatVoiceEntry =
-  | { status: "loading"; urls?: undefined }
-  | { status: "ready"; urls: string[] }
-  | { status: "error"; urls?: undefined };
+  { status: "loading"; urls?: undefined } | { status: "ready"; urls: string[] } | { status: "error"; urls?: undefined };
 
 type CombatVoiceLine = PartyDialogueLine & {
   chunks: string[];
@@ -403,6 +435,28 @@ function CombatantSpriteVisual({
 }
 
 interface GameCombatUIProps {
+  directed?: {
+    actorId?: string;
+    canAct: boolean;
+    round: number;
+    outcome?: "victory" | "defeat" | "flee";
+    onAction: (action: CombatPlayerAction) => void;
+    onControl: (id: string, controller: "manual" | "ai") => void;
+    /** Present only for a fight the game's own ruleset resolves. The stage above is unchanged (the
+     *  server keeps `party` and `enemies` in step with the fight), and this replaces the hardcoded
+     *  attack/skill/defend menu with the ruleset's own legal menu. Absent, every path below is the
+     *  Classic one it has always been. */
+    ruleset?: {
+      view: DirectedRulesetView;
+      /** The ruleset's own name for a budget id. */
+      budgetLabel: (id: string) => string;
+      /** What the ruleset calls its defense. */
+      defenseLabel?: string;
+      busy: boolean;
+      onChoose: (optionId: string, targetIds: string[], payWith?: string) => void;
+      onFlee: () => void;
+    };
+  };
   chatId: string;
   /** Player party combatants. */
   party: Combatant[];
@@ -542,6 +596,9 @@ function buildCombatVoiceConfigSignature(config?: TTSConfig | null): string {
     config.baseUrl,
     config.model,
     config.voice,
+    config.skipTagContent ? "skip-tags" : "read-tags",
+    config.skipCodeBlocks !== false ? "skip-code" : "read-code",
+    config.skipBracketedText ? "skip-brackets" : "read-brackets",
     config.narratorVoiceEnabled ? "narrator-voice" : "narrator-global",
     config.narratorVoice,
     config.voiceMode,
@@ -555,9 +612,14 @@ function buildCombatVoiceConfigSignature(config?: TTSConfig | null): string {
   ].join("|");
 }
 
-function buildCombatVoiceLineKey(configSignature: string, line: PartyDialogueLine, voice?: string): string {
+function buildCombatVoiceLineKey(
+  configSignature: string,
+  line: PartyDialogueLine,
+  chunks: string[],
+  voice?: string,
+): string {
   return `combat-voice-v1:${hashCombatVoiceKey(
-    [configSignature, line.character, line.type, line.expression ?? "", voice ?? "", line.content].join("\n"),
+    [configSignature, line.character, line.type, line.expression ?? "", voice ?? "", JSON.stringify(chunks)].join("\n"),
   )}`;
 }
 
@@ -632,6 +694,7 @@ function combatItemTargetsEnemies(effect?: CombatItemEffect): boolean {
 // ── Component ──
 
 export function GameCombatUI({
+  directed,
   chatId,
   party: initialParty,
   enemies: initialEnemies,
@@ -655,11 +718,21 @@ export function GameCombatUI({
   const { t: localizeUi } = useUiTranslation();
   useRenderTimer("game-combat"); // [#3104 diagnostic]
   // Combat state
-  const [phase, setPhase] = useState<CombatPhase>("intro");
-  const [round, setRound] = useState(1);
+  const [phase, setPhase] = useState<CombatPhase>(() =>
+    !initialEnemies.some((c) => c.hp > 0) ? "victory" : !initialParty.some((c) => c.hp > 0) ? "defeat" : "intro",
+  );
+  const [round, setRound] = useState(Math.max(1, ...initialParty.map((c) => c.combatRound ?? 1)));
+  const [queuedOrders, setQueuedOrders] = useState<Record<string, CombatPlayerAction>>({});
   const [party, setParty] = useState<Combatant[]>(initialParty);
   const [enemies, setEnemies] = useState<Combatant[]>(initialEnemies);
-  const [activePlayerIndex, setActivePlayerIndex] = useState(0);
+  const lastPartyProp = useRef(initialParty);
+  const lastEnemiesProp = useRef(initialEnemies);
+  const [activePlayerIndex, setActivePlayerIndex] = useState(
+    Math.max(
+      0,
+      initialParty.findIndex((c) => c.hp > 0),
+    ),
+  );
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [selectedItemName, setSelectedItemName] = useState<string | null>(null);
@@ -851,14 +924,14 @@ export function GameCombatUI({
       const voice = resolveTTSVoiceForSpeaker(ttsConfig, line.character);
       if (ttsConfig.source === "elevenlabs" && !voice) continue;
 
-      const chunks = splitTTSChunks(line.content);
+      const chunks = splitTTSChunks(line.content, ttsConfig);
       if (chunks.length === 0) continue;
 
       lines.push({
         ...line,
         chunks,
         voice: voice || undefined,
-        voiceKey: buildCombatVoiceLineKey(combatVoiceConfigSignature, line, voice),
+        voiceKey: buildCombatVoiceLineKey(combatVoiceConfigSignature, line, chunks, voice),
       });
     }
 
@@ -1114,8 +1187,16 @@ export function GameCombatUI({
               type="button"
               onClick={combatVoicePaused ? resumeCombatVoicePlayback : pauseCombatVoicePlayback}
               className="inline-flex h-6 w-6 items-center justify-center rounded-full text-sky-100 transition-colors hover:bg-white/10"
-              title={combatVoicePaused ?localizeUi("ui.game.gamecombatui.resumeCombatVoiceOver") :localizeUi("ui.game.gamecombatui.pauseCombatVoiceOver")}
-              aria-label={combatVoicePaused ?localizeUi("ui.game.gamecombatui.resumeCombatVoiceOver") :localizeUi("ui.game.gamecombatui.pauseCombatVoiceOver")}
+              title={
+                combatVoicePaused
+                  ? localizeUi("ui.game.gamecombatui.resumeCombatVoiceOver")
+                  : localizeUi("ui.game.gamecombatui.pauseCombatVoiceOver")
+              }
+              aria-label={
+                combatVoicePaused
+                  ? localizeUi("ui.game.gamecombatui.resumeCombatVoiceOver")
+                  : localizeUi("ui.game.gamecombatui.pauseCombatVoiceOver")
+              }
             >
               {combatVoicePaused ? <Play size={12} /> : <Pause size={12} />}
             </button>
@@ -1154,20 +1235,49 @@ export function GameCombatUI({
     ) : null;
 
   useEffect(() => {
-    setParty(initialParty);
-  }, [initialParty]);
+    if (phase !== "resolving" && phase !== "animating" && initialParty !== lastPartyProp.current) {
+      lastPartyProp.current = initialParty;
+      setParty(initialParty);
+    }
+  }, [initialParty, phase]);
 
   useEffect(() => {
+    if (phase !== "resolving" && phase !== "animating" && initialEnemies !== lastEnemiesProp.current) {
+      lastEnemiesProp.current = initialEnemies;
+      setEnemies(initialEnemies);
+    }
+  }, [initialEnemies, phase]);
+
+  const directedRound = directed?.round,
+    directedActorId = directed?.actorId,
+    directedOutcome = directed?.outcome,
+    directedCanAct = directed?.canAct;
+  useEffect(() => {
+    if (directedRound === undefined) return;
+    setParty(initialParty);
     setEnemies(initialEnemies);
-  }, [initialEnemies]);
+    setRound(directedRound);
+    const index = initialParty.findIndex((c) => c.id === directedActorId);
+    if (index >= 0) setActivePlayerIndex(index);
+    setPhase(
+      directedOutcome === "victory"
+        ? "victory"
+        : directedOutcome === "defeat"
+          ? "defeat"
+          : directedCanAct
+            ? "player-turn"
+            : "resolving",
+    );
+  }, [directedRound, directedActorId, directedOutcome, directedCanAct, initialParty, initialEnemies]);
 
   // ── Intro phase ──
   useEffect(() => {
+    if (phase !== "intro" || directed) return;
     introTimer.current = setTimeout(() => {
       setPhase("player-turn");
     }, INTRO_DURATION_MS);
     return () => clearTimeout(introTimer.current);
-  }, []);
+  }, [phase, directed]);
 
   // ── All combatants merged for server requests ──
   const allCombatants = useMemo(
@@ -1189,6 +1299,11 @@ export function GameCombatUI({
           hp: c.hp,
           maxHp: c.maxHp,
           ko: c.hp <= 0,
+          // Carried like the director's and the tactical summary do: what a battle spent is what a
+          // ruleset sheet has to be told about afterwards.
+          mp: c.mp,
+          maxMp: c.maxMp,
+          spellSlots: c.spellSlots,
           statusEffects: (c.statusEffects ?? []).map((e) => e.name),
         })),
         enemies: enemies.map((c) => ({
@@ -1207,13 +1322,13 @@ export function GameCombatUI({
   const selectedSkill = activePlayer?.skills?.find((skill) => skill.id === selectedSkillId) ?? null;
   const selectedItemEffect = selectedItemName ? getCombatItemEffect(selectedItemName, combatItemEffects) : undefined;
   const selectingAllyTarget =
-    (selectedAction === "skill" && selectedSkill?.type === "heal") ||
+    (selectedAction === "skill" && combatSkillTargetsAllies(selectedSkill?.type)) ||
     (selectedAction === "item" &&
       combatItemTargetsAllies(selectedItemEffect) &&
       !combatItemTargetsEnemies(selectedItemEffect));
   const selectingEnemyTarget =
     selectedAction === "attack" ||
-    (selectedAction === "skill" && selectedSkill?.type !== "heal") ||
+    (selectedAction === "skill" && combatSkillTargetsEnemies(selectedSkill?.type)) ||
     (selectedAction === "item" && combatItemTargetsEnemies(selectedItemEffect));
   const activeCombatAction =
     phase === "animating" && roundResult && animatingActionIndex >= 0
@@ -1294,9 +1409,9 @@ export function GameCombatUI({
   );
 
   useEffect(() => {
-    if (phase !== "intro") return;
+    if (phase !== "intro" || directed) return;
     playSfx(COMBAT_SFX.start);
-  }, [phase, playSfx]);
+  }, [phase, playSfx, directed]);
 
   // ── Spawn damage popup ──
   const spawnDamage = useCallback(
@@ -1335,9 +1450,14 @@ export function GameCombatUI({
               hp: u.hp,
               mp: u.mp ?? p.mp,
               maxMp: u.maxMp ?? p.maxMp,
+              spellSlots: u.spellSlots ?? p.spellSlots,
               statusEffects: u.statusEffects,
               elementAura: u.elementAura,
               element: u.element,
+              tactics: u.tactics,
+              controller: u.controller,
+              skillCooldowns: u.skillCooldowns,
+              combatRound: u.combatRound,
             }
           : p;
       });
@@ -1349,9 +1469,14 @@ export function GameCombatUI({
               hp: u.hp,
               mp: u.mp ?? e.mp,
               maxMp: u.maxMp ?? e.maxMp,
+              spellSlots: u.spellSlots ?? e.spellSlots,
               statusEffects: u.statusEffects,
               elementAura: u.elementAura,
               element: u.element,
+              tactics: u.tactics,
+              controller: u.controller,
+              skillCooldowns: u.skillCooldowns,
+              combatRound: u.combatRound,
             }
           : e;
       });
@@ -1381,7 +1506,13 @@ export function GameCombatUI({
       setSelectedAction(null);
       setSelectedSkillId(null);
       setSelectedItemName(null);
-      setActivePlayerIndex(0);
+      setActivePlayerIndex(
+        Math.max(
+          0,
+          updatedParty.findIndex((c) => c.hp > 0),
+        ),
+      );
+      setQueuedOrders({});
     },
     [party, enemies, onCombatantsChange, playSfx],
   );
@@ -1451,7 +1582,28 @@ export function GameCombatUI({
 
   // ── Resolve a combat round on the server ──
   const resolveRound = useCallback(
-    (playerAction: CombatPlayerAction, usedItemName?: string) => {
+    (playerAction: CombatPlayerAction) => {
+      if (directed) {
+        if (directed.canAct) directed.onAction(playerAction);
+        return;
+      }
+      if (!activePlayer) return;
+      const orders = { ...queuedOrders, [activePlayer.id]: playerAction };
+      const nextManual = party.findIndex(
+        (member, index) =>
+          member.hp > 0 &&
+          !(member.id in orders) &&
+          (index === party.findIndex((c) => c.hp > 0) || member.controller === "manual"),
+      );
+      if (nextManual >= 0) {
+        setQueuedOrders(orders);
+        setActivePlayerIndex(nextManual);
+        setSelectedAction(null);
+        setSelectedSkillId(null);
+        setSelectedItemName(null);
+        setPhase("player-turn");
+        return;
+      }
       setPhase("resolving");
 
       combatRound.mutate(
@@ -1459,6 +1611,8 @@ export function GameCombatUI({
           chatId,
           combatants: allCombatants.filter((c) => c.hp > 0).map((c) => sanitizeCombatantForRound(c)),
           round,
+          partyActions: orders,
+          controlledId: activePlayer.id,
           playerAction:
             playerAction.type === "item"
               ? { ...playerAction, itemEffect: sanitizeCombatItemEffect(playerAction.itemEffect) }
@@ -1468,9 +1622,25 @@ export function GameCombatUI({
         {
           onSuccess: (data) => {
             const result = data.result as CombatRoundResult;
-            const updatedCombatants = data.combatants as Combatant[];
-            if (usedItemName) {
-              void onInventoryItemUsed?.(usedItemName);
+            const updatedCombatants = (data.combatants as Combatant[]).map((c) => ({
+              ...c,
+              combatRound: result.round + 1,
+            }));
+            onCombatantsChange?.(
+              party.map((c) => ({ ...c, ...updatedCombatants.find((u) => u.id === c.id) })),
+              enemies.map((c) => ({ ...c, ...updatedCombatants.find((u) => u.id === c.id) })),
+            );
+            // Consume from accepted orders, never a discarded choice from an earlier failed request.
+            // Only the leader has an item menu; a KO/skipped turn must not spend the queued item.
+            // ponytail: legacy rounds retain separate inventory persistence; migrate them to the
+            // director ledger for atomic round/item commits and idempotent persistence retries.
+            for (const [actorId, order] of Object.entries(orders)) {
+              if (
+                order.type === "item" &&
+                (order.itemEffect?.consumes !== false || order.itemEffect?.charges) &&
+                result.actions.some((action) => action.attackerId === actorId && action.skillName === order.itemId)
+              )
+                void onInventoryItemUsed?.(order.itemId);
             }
             setRoundResult(result);
             setTurnOrder(result.initiative.map((e) => ({ id: e.id, name: e.name })));
@@ -1480,12 +1650,51 @@ export function GameCombatUI({
         },
       );
     },
-    [chatId, allCombatants, round, combatRound, combatMechanics, onInventoryItemUsed, animateRoundResults],
+    [
+      directed,
+      chatId,
+      allCombatants,
+      round,
+      combatRound,
+      combatMechanics,
+      onInventoryItemUsed,
+      animateRoundResults,
+      activePlayer,
+      queuedOrders,
+      party,
+      enemies,
+      onCombatantsChange,
+    ],
   );
+
+  // A fight the game's own ruleset resolves brings its whole menu with it, so none of the Classic
+  // menu, its sub-phases or its keyboard handling is reachable while this is set.
+  const rulesetFight = directed?.ruleset;
+  const rulesetMenu = rulesetFight ? (
+    <RulesetCombatMenu
+      view={rulesetFight.view}
+      budgetLabel={rulesetFight.budgetLabel}
+      defenseLabel={rulesetFight.defenseLabel}
+      busy={rulesetFight.busy}
+      onChoose={rulesetFight.onChoose}
+      onFlee={rulesetFight.onFlee}
+    />
+  ) : null;
+
+  const actionMenu = (
+    activePlayerIndex === party.findIndex((c) => c.hp > 0)
+      ? ACTION_MENU
+      : ACTION_MENU.filter((a) => a.id === "attack" || a.id === "skill" || a.id === "defend")
+  ).filter((a) => !directed || a.id !== "custom");
 
   // ── Handle action selection ──
   const handleActionSelect = useCallback(
     (actionId: string) => {
+      if (directed && actionId === "custom") return;
+      if (directed && actionId === "flee") {
+        directed.onAction({ type: "flee" });
+        return;
+      }
       playSfx(COMBAT_SFX.menuSelect);
 
       if (actionId === "flee") {
@@ -1528,7 +1737,7 @@ export function GameCombatUI({
         return;
       }
     },
-    [activePlayer?.name, appendCombatLog, playSfx, onCombatEnd, resolveRound, buildSummary],
+    [directed, activePlayer?.name, appendCombatLog, playSfx, onCombatEnd, resolveRound, buildSummary],
   );
 
   const submitCustomInstruction = useCallback(() => {
@@ -1571,10 +1780,7 @@ export function GameCombatUI({
         return;
       }
       const targetId = itemEffect?.target === "ally" ? party.find((member) => member.hp > 0)?.id : activePlayer.id;
-      resolveRound(
-        { type: "item", itemId: normalizedItemName, targetId, itemEffect },
-        itemEffect?.consumes === false ? undefined : normalizedItemName,
-      );
+      resolveRound({ type: "item", itemId: normalizedItemName, targetId, itemEffect });
     },
     [activePlayer, combatItemEffects, party, playSfx, resolveRound],
   );
@@ -1596,37 +1802,56 @@ export function GameCombatUI({
                 itemEffect: selectedItemEffect,
               }
             : { type: "attack", targetId };
-      const usedItemName =
-        selectedAction === "item" && selectedItemName && selectedItemEffect?.consumes !== false
-          ? selectedItemName
-          : undefined;
-      resolveRound(action, usedItemName);
+      resolveRound(action);
     },
     [selectedAction, selectedItemEffect, selectedItemName, selectedSkillId, playSfx, resolveRound],
   );
 
+  const aiControls = (
+    <CombatAiControls
+      party={party}
+      enemies={enemies}
+      defaultController="ai"
+      // A ruleset fight has no queued orders and lets anybody be handed over at any point, so the
+      // only thing that locks the toggle is a step already on its way to the server.
+      locked={rulesetFight ? rulesetFight.busy : phase !== "player-turn" || Object.keys(queuedOrders).length > 0}
+      onChange={(id, controller) => {
+        if (directed) {
+          directed.onControl(id, controller);
+          return;
+        }
+        const updated = party.map((c) => (c.id === id ? { ...c, controller } : c));
+        setParty(updated);
+        onCombatantsChange?.(updated, enemies);
+      }}
+    />
+  );
+
   // ── Keyboard navigation for action menu ──
   useEffect(() => {
-    if (phase !== "player-turn") return;
+    // The ruleset's own menu is a list of ordinary buttons, reached with Tab, so the Classic
+    // menu's arrow keys must not also be sending Classic actions the fight would refuse.
+    if (phase !== "player-turn" || rulesetFight) return;
 
     const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && e.target.closest("input, select, textarea, summary")) return;
       if (e.key === "ArrowUp" || e.key === "w") {
         e.preventDefault();
-        setActionMenuIndex((i) => (i - 1 + ACTION_MENU.length) % ACTION_MENU.length);
+        setActionMenuIndex((i) => (i - 1 + actionMenu.length) % actionMenu.length);
         playSfx(COMBAT_SFX.menuHover);
       } else if (e.key === "ArrowDown" || e.key === "s") {
         e.preventDefault();
-        setActionMenuIndex((i) => (i + 1) % ACTION_MENU.length);
+        setActionMenuIndex((i) => (i + 1) % actionMenu.length);
         playSfx(COMBAT_SFX.menuHover);
       } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        handleActionSelect(ACTION_MENU[actionMenuIndex]!.id);
+        handleActionSelect(actionMenu[actionMenuIndex % actionMenu.length]!.id);
       }
     };
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [phase, actionMenuIndex, handleActionSelect, playSfx]);
+  }, [phase, actionMenuIndex, handleActionSelect, playSfx, actionMenu, rulesetFight]);
 
   // ── Mobile layout state ──
   // Keyboard parity for tablets / external keyboards: Escape dismisses the drawer
@@ -1681,8 +1906,8 @@ export function GameCombatUI({
             <div className="absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-lg border border-white/10 bg-black/75 px-3 py-2 text-xs text-white/70 backdrop-blur-md">
               <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               {selectedAction === "custom"
-                ?localizeUi("ui.game.gamecombatui.theGameMasterIsAdjudicatingYourManeuver")
-                :localizeUi("ui.game.gamecombatui.resolvingActions")}
+                ? localizeUi("ui.game.gamecombatui.theGameMasterIsAdjudicatingYourManeuver")
+                : localizeUi("ui.game.gamecombatui.resolvingActions")}
             </div>
           )}
 
@@ -1736,7 +1961,9 @@ export function GameCombatUI({
               <button
                 onClick={() => onCombatEnd("victory", buildSummary("victory"))}
                 className="rounded-lg bg-amber-500/20 px-6 py-2.5 text-sm font-semibold text-amber-200 ring-1 ring-amber-400/30 transition-colors hover:bg-amber-500/30"
-              >{localizeUi("ui.noodle.wizardfooter.continue")}</button>
+              >
+                {localizeUi("ui.noodle.wizardfooter.continue")}
+              </button>
             </div>
           )}
           {phase === "defeat" && (
@@ -1747,7 +1974,9 @@ export function GameCombatUI({
               <button
                 onClick={() => onCombatEnd("defeat", buildSummary("defeat"))}
                 className="rounded-lg bg-red-500/20 px-6 py-2.5 text-sm font-semibold text-red-200 ring-1 ring-red-400/30 transition-colors hover:bg-red-500/30"
-              >{localizeUi("ui.noodle.wizardfooter.continue")}</button>
+              >
+                {localizeUi("ui.noodle.wizardfooter.continue")}
+              </button>
             </div>
           )}
         </div>
@@ -1807,7 +2036,9 @@ export function GameCombatUI({
                   ? "border-blue-400/40 bg-blue-500/15 text-blue-100"
                   : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10",
               )}
-            >{localizeUi("ui.game.gamecombatui.party")}</button>
+            >
+              {localizeUi("ui.game.gamecombatui.party")}
+            </button>
             {combatMechanics.length > 0 && (
               <button
                 type="button"
@@ -1818,7 +2049,8 @@ export function GameCombatUI({
                     ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
                     : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10",
                 )}
-              >{localizeUi("ui.game.gamecombatui.mech")} {combatMechanics.length}
+              >
+                {localizeUi("ui.game.gamecombatui.mech")} {combatMechanics.length}
               </button>
             )}
             {visibleCombatDialogue.length > 0 && (
@@ -1831,7 +2063,9 @@ export function GameCombatUI({
                     ? "border-sky-400/40 bg-sky-500/15 text-sky-100"
                     : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10",
                 )}
-              >{localizeUi("ui.game.gamecombatui.cues")}</button>
+              >
+                {localizeUi("ui.game.gamecombatui.cues")}
+              </button>
             )}
             <button
               type="button"
@@ -1842,9 +2076,12 @@ export function GameCombatUI({
                   ? "border-white/30 bg-white/15 text-white"
                   : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10",
               )}
-            >{localizeUi("ui.game.gamecombatui.log")}</button>
+            >
+              {localizeUi("ui.game.gamecombatui.log")}
+            </button>
             {turnOrder.length > 0 && (
-              <span className="ml-auto shrink-0 truncate rounded bg-white/5 px-2 py-1 text-[0.55rem] font-semibold uppercase tracking-wide text-white/45">{localizeUi("ui.game.gamecombatui.next")} {turnOrder[0]?.name ?? "—"}
+              <span className="ml-auto shrink-0 truncate rounded bg-white/5 px-2 py-1 text-[0.55rem] font-semibold uppercase tracking-wide text-white/45">
+                {localizeUi("ui.game.gamecombatui.next")} {turnOrder[0]?.name ?? "—"}
               </span>
             )}
           </div>
@@ -1867,23 +2104,34 @@ export function GameCombatUI({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs font-semibold text-white">{activePlayer.name}</div>
-                  <div className="text-[0.55rem] tabular-nums text-white/45">{localizeUi("ui.game.gamecharactersheet.hp")} {activePlayer.hp}/{activePlayer.maxHp}
-                    {activePlayer.maxMp ?localizeUi("ui.game.gamecombatui.mpValue1Value2", { value1: activePlayer.mp ?? 0, value2: activePlayer.maxMp }) : ""}
+                  <div className="text-[0.55rem] tabular-nums text-white/45">
+                    {localizeUi("ui.game.gamecharactersheet.hp")} {activePlayer.hp}/{activePlayer.maxHp}
+                    {activePlayer.maxMp
+                      ? localizeUi("ui.game.gamecombatui.mpValue1Value2", {
+                          value1: activePlayer.mp ?? 0,
+                          value2: activePlayer.maxMp,
+                        })
+                      : ""}
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-center gap-0.5 text-center">
-                  <span className="min-w-[4.25rem] rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.5rem] font-semibold uppercase tracking-wide text-white/45">{localizeUi("ui.game.gamecombatui.round")} {round}
+                  <span className="min-w-[4.25rem] rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[0.5rem] font-semibold uppercase tracking-wide text-white/45">
+                    {localizeUi("ui.game.gamecombatui.round")} {round}
                   </span>
-                  <span className="min-w-[4.25rem] rounded bg-amber-500/20 px-1.5 py-0.5 text-[0.55rem] font-semibold uppercase tracking-wide text-amber-200">{localizeUi("ui.game.gamecombatui.yourTurn")}</span>
+                  <span className="min-w-[4.25rem] rounded bg-amber-500/20 px-1.5 py-0.5 text-[0.55rem] font-semibold uppercase tracking-wide text-amber-200">
+                    {localizeUi("ui.game.gamecombatui.yourTurn")}
+                  </span>
                 </div>
               </div>
             )}
 
+          {aiControls}
           {/* Phase-specific content — bounded so the action sheet never grows past ~half the screen */}
           <div className="max-h-[42svh] overflow-y-auto">
-            {phase === "player-turn" && activePlayer && (
+            {phase === "player-turn" && rulesetMenu}
+            {phase === "player-turn" && activePlayer && !rulesetFight && (
               <div className="grid grid-cols-3 gap-1.5 p-2">
-                {ACTION_MENU.map((action, i) => (
+                {actionMenu.map((action, i) => (
                   <button
                     key={action.id}
                     onClick={() => {
@@ -1908,39 +2156,53 @@ export function GameCombatUI({
               <div className="flex flex-col gap-2 p-2">
                 <div className="flex items-center gap-2">
                   <Sparkles size={13} className="text-blue-400" />
-                  <div className="text-[0.65rem] text-white/60">{localizeUi("ui.game.gamecombatui.pickASkillThenATargetGreyedOutNot")}</div>
+                  <div className="text-[0.65rem] text-white/60">
+                    {localizeUi("ui.game.gamecombatui.pickASkillThenATargetGreyedOutNot")}
+                  </div>
                 </div>
-                {activePlayer.skills && activePlayer.skills.length > 0 ? (
+                {activePlayer.skills && activePlayer.skills.some((skill) => !skill.reaction) ? (
                   <div className="grid grid-cols-1 gap-1.5">
-                    {activePlayer.skills.map((skill) => {
-                      const insufficientMp = (activePlayer.mp ?? 0) < skill.mpCost;
-                      return (
-                        <button
-                          key={skill.id}
-                          type="button"
-                          disabled={insufficientMp}
-                          onClick={() => {
-                            setSelectedAction("skill");
-                            setSelectedSkillId(skill.id);
-                            setSelectedItemName(null);
-                            setPhase("target-select");
-                          }}
-                          className={cn(
-                            "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-all",
-                            insufficientMp
-                              ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30"
-                              : "border-blue-400/20 bg-blue-500/10 text-white/85 hover:border-blue-400/40 hover:bg-blue-500/15",
-                          )}
-                        >
-                          <span className="min-w-0 truncate font-semibold text-white/90">{skill.name}</span>
-                          <span className="shrink-0 text-[0.6rem] tabular-nums text-white/45">
-                            {skill.type === "heal" ?localizeUi("ui.game.gamecombatui.heal") :localizeUi("ui.game.gamecombatui.atk")} · {skill.mpCost} {localizeUi("ui.game.gamecombatui.mp")}</span>
-                        </button>
-                      );
-                    })}
+                    {activePlayer.skills
+                      .filter((s) => !s.reaction)
+                      .map((skill) => {
+                        const insufficientMp =
+                          (activePlayer.skillCooldowns?.[skill.id] ?? 0) > 0 ||
+                          (skill.slotLevel
+                            ? (activePlayer.spellSlots?.[String(skill.slotLevel)] ?? 0) <= 0
+                            : (activePlayer.mp ?? 0) < skill.mpCost);
+                        return (
+                          <button
+                            key={skill.id}
+                            type="button"
+                            disabled={insufficientMp}
+                            onClick={() => {
+                              setSelectedAction("skill");
+                              setSelectedSkillId(skill.id);
+                              setSelectedItemName(null);
+                              setPhase("target-select");
+                            }}
+                            className={cn(
+                              "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-all",
+                              insufficientMp
+                                ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30"
+                                : "border-blue-400/20 bg-blue-500/10 text-white/85 hover:border-blue-400/40 hover:bg-blue-500/15",
+                            )}
+                          >
+                            <span className="min-w-0 truncate font-semibold text-white/90">{skill.name}</span>
+                            <span className="shrink-0 text-[0.6rem] tabular-nums text-white/45">
+                              {localizeUi(combatSkillTypeLabelKey(skill.type))} ·{" "}
+                              {skill.slotLevel
+                                ? localizeUi("game.combat.director.slotCost", { level: skill.slotLevel })
+                                : localizeUi("game.combat.director.mpCost", { amount: skill.mpCost })}
+                            </span>
+                          </button>
+                        );
+                      })}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/45">{localizeUi("ui.game.gamecombatui.noCombatSkillsAreAvailableForThisCombatant")}</div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/45">
+                    {localizeUi("ui.game.gamecombatui.noCombatSkillsAreAvailableForThisCombatant")}
+                  </div>
                 )}
                 <button
                   onClick={() => {
@@ -1950,7 +2212,9 @@ export function GameCombatUI({
                     setSelectedItemName(null);
                   }}
                   className="self-start rounded border border-white/15 px-2 py-0.5 text-[0.65rem] text-white/60 hover:bg-white/10 hover:text-white"
-                >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+                >
+                  {localizeUi("ui.noodle.noodlerframe.back")}
+                </button>
               </div>
             )}
 
@@ -1959,14 +2223,18 @@ export function GameCombatUI({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Backpack size={13} className="text-green-400" />
-                    <span className="text-[0.65rem] text-white/60">{localizeUi("ui.game.gamecombatui.pickAnItemToUseThisTurn")}</span>
+                    <span className="text-[0.65rem] text-white/60">
+                      {localizeUi("ui.game.gamecombatui.pickAnItemToUseThisTurn")}
+                    </span>
                   </div>
                   {onOpenInventory && (
                     <button
                       type="button"
                       onClick={onOpenInventory}
                       className="rounded border border-white/15 px-2 py-0.5 text-[0.6rem] text-white/60 hover:bg-white/10 hover:text-white"
-                    >{localizeUi("ui.game.gamecombatui.fullInventory")}</button>
+                    >
+                      {localizeUi("ui.game.gamecombatui.fullInventory")}
+                    </button>
                   )}
                 </div>
                 {inventoryItems.length > 0 ? (
@@ -1985,7 +2253,9 @@ export function GameCombatUI({
                               {item.name}
                             </span>
                             {item.quantity > 1 && (
-                              <span className="shrink-0 rounded-full bg-white/10 px-1.5 text-[0.55rem] tabular-nums text-white/60">{localizeUi("ui.panels.imagedimensionrow.x")}{item.quantity}
+                              <span className="shrink-0 rounded-full bg-white/10 px-1.5 text-[0.55rem] tabular-nums text-white/60">
+                                {localizeUi("ui.panels.imagedimensionrow.x")}
+                                {item.quantity}
                               </span>
                             )}
                           </div>
@@ -1997,7 +2267,9 @@ export function GameCombatUI({
                     })}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/45">{localizeUi("ui.game.gamecombatui.noItemsAreAvailableInYourInventory")}</div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/45">
+                    {localizeUi("ui.game.gamecombatui.noItemsAreAvailableInYourInventory")}
+                  </div>
                 )}
                 <button
                   onClick={() => {
@@ -2007,7 +2279,9 @@ export function GameCombatUI({
                     setSelectedItemName(null);
                   }}
                   className="self-start rounded border border-white/15 px-2 py-0.5 text-[0.65rem] text-white/60 hover:bg-white/10 hover:text-white"
-                >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+                >
+                  {localizeUi("ui.noodle.noodlerframe.back")}
+                </button>
               </div>
             )}
 
@@ -2015,7 +2289,9 @@ export function GameCombatUI({
               <div className="flex flex-col gap-2 p-2">
                 <div className="flex items-center gap-2">
                   <Zap size={13} className="text-violet-300" />
-                  <span className="text-[0.65rem] text-white/60">{localizeUi("ui.game.gamecombatui.describeWhatYouAttemptTheGmResolvesIt")}</span>
+                  <span className="text-[0.65rem] text-white/60">
+                    {localizeUi("ui.game.gamecombatui.describeWhatYouAttemptTheGmResolvesIt")}
+                  </span>
                 </div>
                 <textarea
                   value={customInstruction}
@@ -2042,7 +2318,9 @@ export function GameCombatUI({
                     onClick={submitCustomInstruction}
                     disabled={!customInstruction.trim() || !onCustomInstruction}
                     className="rounded-lg border border-violet-300/25 bg-violet-500/15 px-3 py-1.5 text-xs font-semibold text-violet-100 transition-colors hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-45"
-                  >{localizeUi("ui.game.gamecombatui.askGm")}</button>
+                  >
+                    {localizeUi("ui.game.gamecombatui.askGm")}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -2052,7 +2330,9 @@ export function GameCombatUI({
                       setCustomInstruction("");
                     }}
                     className="rounded border border-white/15 px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
-                  >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+                  >
+                    {localizeUi("ui.noodle.noodlerframe.back")}
+                  </button>
                 </div>
               </div>
             )}
@@ -2088,7 +2368,8 @@ export function GameCombatUI({
                         )}
                       >
                         <span className="min-w-0 truncate font-semibold">{member.name}</span>
-                        <span className="shrink-0 text-[0.6rem] tabular-nums text-white/55">{localizeUi("ui.game.gamecharactersheet.hp")} {member.hp}/{member.maxHp}
+                        <span className="shrink-0 text-[0.6rem] tabular-nums text-white/55">
+                          {localizeUi("ui.game.gamecharactersheet.hp")} {member.hp}/{member.maxHp}
                         </span>
                       </button>
                     ))}
@@ -2110,7 +2391,8 @@ export function GameCombatUI({
                         )}
                       >
                         <span className="min-w-0 truncate font-semibold">{enemy.name}</span>
-                        <span className="shrink-0 text-[0.6rem] tabular-nums text-white/55">{localizeUi("ui.game.gamecharactersheet.hp")} {enemy.hp}/{enemy.maxHp}
+                        <span className="shrink-0 text-[0.6rem] tabular-nums text-white/55">
+                          {localizeUi("ui.game.gamecharactersheet.hp")} {enemy.hp}/{enemy.maxHp}
                         </span>
                       </button>
                     ))}
@@ -2132,7 +2414,9 @@ export function GameCombatUI({
                     }
                   }}
                   className="self-start rounded border border-white/15 px-2 py-0.5 text-[0.65rem] text-white/60 hover:bg-white/10 hover:text-white"
-                >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+                >
+                  {localizeUi("ui.noodle.noodlerframe.back")}
+                </button>
               </div>
             )}
           </div>
@@ -2201,7 +2485,9 @@ export function GameCombatUI({
               {openDrawer === "log" && (
                 <div className="space-y-1 pr-1">
                   {combatLogEntries.length === 0 ? (
-                    <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[0.65rem] text-white/45">{localizeUi("ui.game.gamecombatui.noCombatEventsRecordedYet")}</div>
+                    <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[0.65rem] text-white/45">
+                      {localizeUi("ui.game.gamecombatui.noCombatEventsRecordedYet")}
+                    </div>
                   ) : (
                     combatLogEntries.map((entry) => (
                       <div
@@ -2330,7 +2616,9 @@ export function GameCombatUI({
           <div className="flex min-w-0 flex-wrap items-center gap-2">{combatControlsSlot}</div>
           {phase !== "intro" && (
             <div className="shrink-0 rounded-lg border border-white/10 bg-black/65 px-2.5 py-1 text-center shadow-lg backdrop-blur-md">
-              <div className="text-[0.55rem] font-semibold uppercase tracking-widest text-white/40">{localizeUi("ui.game.gamecombatui.round")}</div>
+              <div className="text-[0.55rem] font-semibold uppercase tracking-widest text-white/40">
+                {localizeUi("ui.game.gamecombatui.round")}
+              </div>
               <div className="text-lg font-bold leading-none tabular-nums text-white">{round}</div>
             </div>
           )}
@@ -2340,7 +2628,9 @@ export function GameCombatUI({
       {turnOrder.length > 0 && phase !== "intro" && (
         <div className="relative z-30 shrink-0 border-y border-white/10 bg-black/60 px-3 py-1.5 backdrop-blur-md sm:px-4">
           <div className="flex items-center gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="mr-1 shrink-0 text-[0.6rem] font-semibold uppercase tracking-widest text-white/50">{localizeUi("ui.game.gamesurfacecomponent.turn")}</span>
+            <span className="mr-1 shrink-0 text-[0.6rem] font-semibold uppercase tracking-widest text-white/50">
+              {localizeUi("ui.game.gamesurfacecomponent.turn")}
+            </span>
             {turnOrder.map((entry, i) => {
               const isParty = party.some((p) => p.id === entry.id);
               return (
@@ -2373,8 +2663,8 @@ export function GameCombatUI({
               <div className="flex items-center gap-2 text-sm text-white/60">
                 <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 {selectedAction === "custom"
-                  ?localizeUi("ui.game.gamecombatui.theGameMasterIsAdjudicatingYourManeuver")
-                  :localizeUi("ui.game.gamecombatui.resolvingActions")}
+                  ? localizeUi("ui.game.gamecombatui.theGameMasterIsAdjudicatingYourManeuver")
+                  : localizeUi("ui.game.gamecombatui.resolvingActions")}
               </div>
             )}
             {phase === "animating" && roundResult && animatingActionIndex >= 0 && (
@@ -2383,8 +2673,10 @@ export function GameCombatUI({
           </div>
         )}
 
+        {aiControls}
         {/* Player turn: action menu */}
-        {phase === "player-turn" && activePlayer && (
+        {phase === "player-turn" && rulesetMenu}
+        {phase === "player-turn" && activePlayer && !rulesetFight && (
           <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-end sm:gap-4">
             {/* Active character indicator */}
             <div className="mb-1 flex items-center gap-2 sm:mb-0 sm:min-w-[140px]">
@@ -2404,7 +2696,7 @@ export function GameCombatUI({
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-1.5">
-              {ACTION_MENU.map((action, i) => (
+              {actionMenu.map((action, i) => (
                 <button
                   key={action.id}
                   onClick={() => {
@@ -2416,7 +2708,7 @@ export function GameCombatUI({
                     playSfx(COMBAT_SFX.menuHover);
                   }}
                   className={cn(
-                    "group flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-150",
+                    "group flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all duration-150",
                     actionMenuIndex === i
                       ? "border-[var(--primary)]/50 bg-[var(--primary)]/20 text-white shadow-[0_0_12px_rgba(var(--primary-rgb),0.15)]"
                       : "border-white/10 bg-white/5 text-white/70 hover:border-white/20 hover:bg-white/10 hover:text-white",
@@ -2435,42 +2727,60 @@ export function GameCombatUI({
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-blue-400" />
               <div>
-                <div className="text-xs font-semibold text-white">{activePlayer.name}{localizeUi("ui.game.gamecombatui.sSkills")}</div>
-                <div className="text-[0.65rem] text-white/45">{localizeUi("ui.game.gamecombatui.chooseACombatAbilityThenPickATarget")}</div>
+                <div className="text-xs font-semibold text-white">
+                  {activePlayer.name}
+                  {localizeUi("ui.game.gamecombatui.sSkills")}
+                </div>
+                <div className="text-[0.65rem] text-white/45">
+                  {localizeUi("ui.game.gamecombatui.chooseACombatAbilityThenPickATarget")}
+                </div>
               </div>
             </div>
 
-            {activePlayer.skills && activePlayer.skills.length > 0 ? (
+            {activePlayer.skills && activePlayer.skills.some((skill) => !skill.reaction) ? (
               <div className="flex flex-wrap gap-2">
-                {activePlayer.skills.map((skill) => {
-                  const insufficientMp = (activePlayer.mp ?? 0) < skill.mpCost;
-                  return (
-                    <button
-                      key={skill.id}
-                      type="button"
-                      disabled={insufficientMp}
-                      onClick={() => {
-                        setSelectedAction("skill");
-                        setSelectedSkillId(skill.id);
-                        setSelectedItemName(null);
-                        setPhase("target-select");
-                      }}
-                      className={cn(
-                        "rounded-lg border px-3 py-2 text-left text-xs transition-all",
-                        insufficientMp
-                          ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30"
-                          : "border-blue-400/20 bg-blue-500/10 text-white/80 hover:border-blue-400/40 hover:bg-blue-500/15",
-                      )}
-                    >
-                      <div className="font-semibold text-white/90">{skill.name}</div>
-                      <div className="mt-0.5 text-[0.65rem] text-white/45">
-                        {skill.type === "heal" ?localizeUi("ui.game.gamecombatui.restoresHp") :localizeUi("ui.game.gamecombatui.specialAttack")} • {skill.mpCost} {localizeUi("ui.game.gamecombatui.mp")}</div>
-                    </button>
-                  );
-                })}
+                {activePlayer.skills
+                  .filter((s) => !s.reaction)
+                  .map((skill) => {
+                    const insufficientMp =
+                      (activePlayer.skillCooldowns?.[skill.id] ?? 0) > 0 ||
+                      (skill.slotLevel
+                        ? (activePlayer.spellSlots?.[String(skill.slotLevel)] ?? 0) <= 0
+                        : (activePlayer.mp ?? 0) < skill.mpCost);
+                    return (
+                      <button
+                        key={skill.id}
+                        type="button"
+                        disabled={insufficientMp}
+                        onClick={() => {
+                          setSelectedAction("skill");
+                          setSelectedSkillId(skill.id);
+                          setSelectedItemName(null);
+                          setPhase("target-select");
+                        }}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-left text-xs transition-all",
+                          insufficientMp
+                            ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30"
+                            : "border-blue-400/20 bg-blue-500/10 text-white/80 hover:border-blue-400/40 hover:bg-blue-500/15",
+                        )}
+                      >
+                        <div className="font-semibold text-white/90">{skill.name}</div>
+                        <div className="mt-0.5 text-[0.65rem] text-white/45">
+                          {localizeUi(combatSkillTypeLabelKey(skill.type))} ·{" "}
+                          {skill.description || localizeUi(combatSkillDescriptionKey(skill.type))} •{" "}
+                          {skill.slotLevel
+                            ? localizeUi("game.combat.director.slotCost", { level: skill.slotLevel })
+                            : localizeUi("game.combat.director.mpCost", { amount: skill.mpCost })}
+                        </div>
+                      </button>
+                    );
+                  })}
               </div>
             ) : (
-              <div className="text-xs text-white/45">{localizeUi("ui.game.gamecombatui.noCombatSkillsAreAvailableForThisCombatant")}</div>
+              <div className="text-xs text-white/45">
+                {localizeUi("ui.game.gamecombatui.noCombatSkillsAreAvailableForThisCombatant")}
+              </div>
             )}
 
             <div>
@@ -2482,7 +2792,9 @@ export function GameCombatUI({
                   setSelectedItemName(null);
                 }}
                 className="rounded border border-white/15 px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
-              >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+              >
+                {localizeUi("ui.noodle.noodlerframe.back")}
+              </button>
             </div>
           </div>
         )}
@@ -2493,8 +2805,13 @@ export function GameCombatUI({
               <div className="flex items-center gap-2">
                 <Backpack size={14} className="text-green-400" />
                 <div>
-                  <div className="text-xs font-semibold text-white">{activePlayer.name}{localizeUi("ui.game.gamecombatui.sItems")}</div>
-                  <div className="text-[0.65rem] text-white/45">{localizeUi("ui.game.gamecombatui.chooseAnItemToUseThisTurn")}</div>
+                  <div className="text-xs font-semibold text-white">
+                    {activePlayer.name}
+                    {localizeUi("ui.game.gamecombatui.sItems")}
+                  </div>
+                  <div className="text-[0.65rem] text-white/45">
+                    {localizeUi("ui.game.gamecombatui.chooseAnItemToUseThisTurn")}
+                  </div>
                 </div>
               </div>
               {onOpenInventory && (
@@ -2502,7 +2819,9 @@ export function GameCombatUI({
                   type="button"
                   onClick={onOpenInventory}
                   className="rounded border border-white/15 px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
-                >{localizeUi("ui.game.gamecombatui.openInventory")}</button>
+                >
+                  {localizeUi("ui.game.gamecombatui.openInventory")}
+                </button>
               )}
             </div>
 
@@ -2522,7 +2841,9 @@ export function GameCombatUI({
                           {item.name}
                         </span>
                         {item.quantity > 1 && (
-                          <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[0.6rem] tabular-nums text-white/60">{localizeUi("ui.panels.imagedimensionrow.x")}{item.quantity}
+                          <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[0.6rem] tabular-nums text-white/60">
+                            {localizeUi("ui.panels.imagedimensionrow.x")}
+                            {item.quantity}
                           </span>
                         )}
                       </div>
@@ -2534,7 +2855,9 @@ export function GameCombatUI({
                 })}
               </div>
             ) : (
-              <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-xs text-white/45">{localizeUi("ui.game.gamecombatui.noItemsAreAvailableInYourInventory")}</div>
+              <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-xs text-white/45">
+                {localizeUi("ui.game.gamecombatui.noItemsAreAvailableInYourInventory")}
+              </div>
             )}
 
             <div>
@@ -2546,7 +2869,9 @@ export function GameCombatUI({
                   setSelectedItemName(null);
                 }}
                 className="rounded border border-white/15 px-2 py-1 text-xs text-white/60 hover:bg-white/10 hover:text-white"
-              >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+              >
+                {localizeUi("ui.noodle.noodlerframe.back")}
+              </button>
             </div>
           </div>
         )}
@@ -2556,8 +2881,13 @@ export function GameCombatUI({
             <div className="flex items-center gap-2">
               <Zap size={14} className="text-violet-300" />
               <div>
-                <div className="text-xs font-semibold text-white">{activePlayer.name}{localizeUi("ui.game.gamecombatui.sSpecialManeuver")}</div>
-                <div className="text-[0.65rem] text-white/45">{localizeUi("ui.game.gamecombatui.describeWhatYouAttemptTheGmCanApplyStatuses")}</div>
+                <div className="text-xs font-semibold text-white">
+                  {activePlayer.name}
+                  {localizeUi("ui.game.gamecombatui.sSpecialManeuver")}
+                </div>
+                <div className="text-[0.65rem] text-white/45">
+                  {localizeUi("ui.game.gamecombatui.describeWhatYouAttemptTheGmCanApplyStatuses")}
+                </div>
               </div>
             </div>
 
@@ -2587,7 +2917,9 @@ export function GameCombatUI({
                 onClick={submitCustomInstruction}
                 disabled={!customInstruction.trim() || !onCustomInstruction}
                 className="rounded-lg border border-violet-300/25 bg-violet-500/15 px-3 py-1.5 text-xs font-semibold text-violet-100 transition-colors hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-45"
-              >{localizeUi("ui.game.gamecombatui.askGm")}</button>
+              >
+                {localizeUi("ui.game.gamecombatui.askGm")}
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -2597,7 +2929,9 @@ export function GameCombatUI({
                   setCustomInstruction("");
                 }}
                 className="rounded border border-white/15 px-2 py-1.5 text-xs text-white/60 hover:bg-white/10 hover:text-white"
-              >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+              >
+                {localizeUi("ui.noodle.noodlerframe.back")}
+              </button>
             </div>
           </div>
         )}
@@ -2634,7 +2968,8 @@ export function GameCombatUI({
                     )}
                   >
                     <div className="font-semibold text-white/90">{enemy.name}</div>
-                    <div className="mt-0.5 text-[0.65rem] tabular-nums text-white/45">{localizeUi("ui.game.gamecharactersheet.hp")} {enemy.hp}/{enemy.maxHp}
+                    <div className="mt-0.5 text-[0.65rem] tabular-nums text-white/45">
+                      {localizeUi("ui.game.gamecharactersheet.hp")} {enemy.hp}/{enemy.maxHp}
                     </div>
                   </button>
                 ))}
@@ -2656,7 +2991,8 @@ export function GameCombatUI({
                     )}
                   >
                     <div className="font-semibold text-white/90">{member.name}</div>
-                    <div className="mt-0.5 text-[0.65rem] tabular-nums text-white/45">{localizeUi("ui.game.gamecharactersheet.hp")} {member.hp}/{member.maxHp}
+                    <div className="mt-0.5 text-[0.65rem] tabular-nums text-white/45">
+                      {localizeUi("ui.game.gamecharactersheet.hp")} {member.hp}/{member.maxHp}
                     </div>
                   </button>
                 ))}
@@ -2678,7 +3014,9 @@ export function GameCombatUI({
                 }
               }}
               className="rounded border border-white/15 px-2 py-0.5 text-xs text-white/60 hover:bg-white/10 hover:text-white"
-            >{localizeUi("ui.noodle.noodlerframe.back")}</button>
+            >
+              {localizeUi("ui.noodle.noodlerframe.back")}
+            </button>
           </div>
         )}
 
@@ -2690,7 +3028,9 @@ export function GameCombatUI({
             <button
               onClick={() => onCombatEnd("victory", buildSummary("victory"))}
               className="mt-2 rounded-lg bg-amber-500/20 px-6 py-2 text-sm font-semibold text-amber-200 ring-1 ring-amber-400/30 transition-colors hover:bg-amber-500/30"
-            >{localizeUi("ui.noodle.wizardfooter.continue")}</button>
+            >
+              {localizeUi("ui.noodle.wizardfooter.continue")}
+            </button>
           </div>
         )}
 
@@ -2703,7 +3043,9 @@ export function GameCombatUI({
             <button
               onClick={() => onCombatEnd("defeat", buildSummary("defeat"))}
               className="mt-2 rounded-lg bg-red-500/20 px-6 py-2 text-sm font-semibold text-red-200 ring-1 ring-red-400/30 transition-colors hover:bg-red-500/30"
-            >{localizeUi("ui.noodle.wizardfooter.continue")}</button>
+            >
+              {localizeUi("ui.noodle.wizardfooter.continue")}
+            </button>
           </div>
         )}
 
@@ -2711,7 +3053,9 @@ export function GameCombatUI({
         {combatLogEntries.length > 0 && phase !== "victory" && phase !== "defeat" && (
           <div className="border-t border-white/5 px-3 py-2 sm:px-4">
             <div className="mb-1 flex items-center gap-1.5 text-[0.6rem] font-semibold uppercase tracking-wide text-white/40">
-              <ScrollText size={11} />{localizeUi("ui.game.gamecombatui.combatLog")}</div>
+              <ScrollText size={11} />
+              {localizeUi("ui.game.gamecombatui.combatLog")}
+            </div>
             <div className="max-h-24 space-y-1 overflow-y-auto pr-1 sm:max-h-32">
               {combatLogEntries.map((entry) => (
                 <div
@@ -2816,7 +3160,8 @@ function CombatMechanicsPanel({ mechanics, round }: { mechanics: CombatMechanic[
               <div className="flex items-center justify-between gap-2">
                 <span className="min-w-0 truncate font-semibold">{mechanic.name}</span>
                 {interval > 0 && (
-                  <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[0.55rem] text-white/50">{localizeUi("ui.game.combatmechanicspanel.every")} {interval}
+                  <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[0.55rem] text-white/50">
+                    {localizeUi("ui.game.combatmechanicspanel.every")} {interval}
                   </span>
                 )}
               </div>
@@ -3009,7 +3354,10 @@ function CombatantCard({
             {combatant.statusEffects.slice(0, 4).map((effect, i) => (
               <div
                 key={`${effect.name}-${effect.turnsLeft}-${i}`}
-                title={localizeUi("ui.game.combatantcard.value1Value2Turns", { value1: effect.name, value2: effect.turnsLeft })}
+                title={localizeUi("ui.game.combatantcard.value1Value2Turns", {
+                  value1: effect.name,
+                  value2: effect.turnsLeft,
+                })}
                 className={cn(
                   "relative flex h-5 min-w-5 items-center justify-center rounded-full border px-0.5 text-[0.65rem] shadow-[0_4px_12px_rgba(0,0,0,0.35)] backdrop-blur-sm",
                   effect.modifier > 0
@@ -3053,7 +3401,9 @@ function CombatantCard({
         >
           {combatant.name}
         </span>
-        <span className="rounded-full bg-white/10 px-1.5 py-0 text-[0.55rem] tabular-nums text-white/40">{localizeUi("ui.game.combatantcard.lv")}{combatant.level}
+        <span className="rounded-full bg-white/10 px-1.5 py-0 text-[0.55rem] tabular-nums text-white/40">
+          {localizeUi("ui.game.combatantcard.lv")}
+          {combatant.level}
         </span>
       </div>
 
@@ -3098,7 +3448,10 @@ function CombatantCard({
               backgroundColor: `${ELEMENT_AURA_COLORS[combatant.elementAura.element] ?? "#888"}20`,
               color: ELEMENT_AURA_COLORS[combatant.elementAura.element] ?? "#aaa",
             }}
-            title={localizeUi("ui.game.combatantcard.value1AuraGaugeValue2", { value1: combatant.elementAura.element, value2: combatant.elementAura.gauge })}
+            title={localizeUi("ui.game.combatantcard.value1AuraGaugeValue2", {
+              value1: combatant.elementAura.element,
+              value2: combatant.elementAura.gauge,
+            })}
           >
             {combatant.elementAura.element}
           </div>
@@ -3135,7 +3488,11 @@ function DamageNumber({ popup }: { popup: DamagePopup }) {
           {popup.reactionLabel}
         </div>
       )}
-      {popup.isMiss ?localizeUi("ui.game.damagenumber.miss") : popup.isCritical ?localizeUi("ui.game.damagenumber.value1", { value1: popup.amount }) : popup.amount}
+      {popup.isMiss
+        ? localizeUi("ui.game.damagenumber.miss")
+        : popup.isCritical
+          ? localizeUi("ui.game.damagenumber.value1", { value1: popup.amount })
+          : popup.amount}
     </div>
   );
 }
@@ -3147,7 +3504,9 @@ function formatCombatActionNarration(action: CombatAttackResult, allCombatants: 
   const defenderName = defender?.name ?? "???";
 
   let text: string;
-  if (action.isMiss) {
+  if (action.note) {
+    text = action.note;
+  } else if (action.isMiss) {
     text = action.skillName
       ? `${attackerName} uses ${action.skillName} on ${defenderName} — but it misses!`
       : `${attackerName} attacks ${defenderName} — but misses!`;

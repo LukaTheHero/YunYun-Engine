@@ -2,11 +2,12 @@
 // Routes: Character Sprite Upload, List & Serving
 // ──────────────────────────────────────────────
 import type { FastifyInstance } from "fastify";
+import { isOpenAIGptImageModel, isOpenAIGptImage2Model, supportsOpenAIImageCustomSize } from "@marinara-engine/shared";
 import AdmZip from "adm-zip";
 import { execFile } from "child_process";
 import { existsSync, mkdirSync, readdirSync, unlinkSync, statSync, readFileSync } from "fs";
 import { randomUUID } from "crypto";
-import { writeFile, mkdir, unlink, copyFile, rm, readFile, mkdtemp } from "fs/promises";
+import { writeFile, mkdir, unlink, copyFile, rm, readFile, mkdtemp, rename } from "fs/promises";
 import { tmpdir } from "os";
 import { delimiter, dirname, extname, isAbsolute, join, relative, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -23,8 +24,29 @@ import {
   spriteBackgroundContract,
   type SpriteChromaMatte,
 } from "../services/image/sprite-background.service.js";
+import { pixelizeImage, PixelizeInputError } from "../services/image/pixelize.service.js";
 import { clampByte, clampUnit, getSharp, type RgbColor } from "../services/image/sharp-runtime.js";
 import { logger } from "../lib/logger.js";
+import { SPRITE_RENAME_RATE_LIMIT } from "../middleware/rate-limit.js";
+
+const spriteRenameQueues = new Map<string, Promise<void>>();
+
+async function withSpriteRenameLock<T>(characterId: string, operation: () => Promise<T>): Promise<T> {
+  const previous = spriteRenameQueues.get(characterId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queuedTail = previous.then(() => current);
+  spriteRenameQueues.set(characterId, queuedTail);
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (spriteRenameQueues.get(characterId) === queuedTail) spriteRenameQueues.delete(characterId);
+  }
+}
 
 async function getSpriteCapabilities() {
   try {
@@ -156,6 +178,9 @@ type SpriteGenerateSheetBody = {
   neutralFullBodyReference?: string;
   expressionReferences?: SpriteExpressionReference[];
   promptOverrides?: SpritePromptOverride[];
+  /** Optional style-profile override for the bake (#5095); absent keeps the
+   *  active-profile resolution unchanged. */
+  styleProfileId?: string | null;
 };
 
 type SpriteGenerateAnimatedBody = Omit<
@@ -254,14 +279,6 @@ function ensureDir(dir: string) {
   }
 }
 
-function isOpenAIGptImageModel(model?: string): boolean {
-  return !!model && /^gpt-image-(?:1|1\.5|2)(?:$|-)/i.test(model.trim());
-}
-
-function isOpenAIGptImage2Model(model?: string): boolean {
-  return !!model && /^gpt-image-2(?:$|-)/i.test(model.trim());
-}
-
 export function resolveSpriteNativeTransparency(model: string | undefined, requested: boolean): boolean {
   return requested && !isOpenAIGptImage2Model(model);
 }
@@ -283,7 +300,7 @@ export function resolveSpriteSheetCanvas({
   const requestedSheetWidth = cols * preferredCellWidth;
   const requestedSheetHeight = rows * preferredCellHeight;
 
-  if (!isOpenAIGptImageModel(model) || (spriteType !== "full-body" && isOpenAIGptImage2Model(model))) {
+  if (!isOpenAIGptImageModel(model) || (spriteType !== "full-body" && supportsOpenAIImageCustomSize(model))) {
     return {
       sheetWidth: requestedSheetWidth,
       sheetHeight: requestedSheetHeight,
@@ -304,15 +321,24 @@ export function resolveSpriteSheetCanvas({
   };
 }
 
-function compileSpritePrompt(
+export function compileSpritePrompt(
   prompt: string,
   options: {
     negativePrompt?: string;
     appearance?: string;
     styleProfiles: ImageStyleProfileSettings;
     imageDefaults?: ImageGenerationDefaultsProfile | null;
+    /** Per-request style override (#5095). Absent → the compiler's existing
+     *  chain (connection image defaults ?? the user's default profile), i.e.
+     *  exactly today's behavior. Unknown ids degrade the same way the gallery
+     *  path degrades — findImageStyleProfile simply finds nothing. */
+    styleProfileId?: string | null;
   },
 ): SpriteCompiledPrompt {
+  const requestedStyleProfileId =
+    typeof options.styleProfileId === "string" && options.styleProfileId.trim()
+      ? options.styleProfileId.trim().slice(0, 120)
+      : undefined;
   const compiled = compileImagePrompt({
     kind: "sprite",
     prompt,
@@ -320,6 +346,7 @@ function compileSpritePrompt(
     userPositive: options.appearance,
     styleProfiles: options.styleProfiles,
     imageDefaults: options.imageDefaults,
+    styleProfileId: requestedStyleProfileId,
   });
   return {
     prompt: compiled.prompt,
@@ -366,7 +393,8 @@ function resolveVideoConnection(connection: VideoGenerationConnection) {
         : rawServiceHint;
   const isXaiVideo = source === "xai" || serviceHint === "xai";
   const isGoogleVeoVideo = source === "google_veo" || serviceHint === "google_veo";
-  const isOpenRouterVideo = source === "openrouter" || serviceHint === "openrouter";
+  const isNanoGptVideo = source === "nanogpt";
+  const isOpenRouterVideo = !isNanoGptVideo && (source === "openrouter" || serviceHint === "openrouter");
   const isAtlasVideo = source === "atlas" || serviceHint === "atlas";
   const isSeedanceVideo = source === "seedance" || serviceHint === "seedance";
   const isSwarmUiVideo = source === "swarmui" || serviceHint === "swarmui";
@@ -380,48 +408,57 @@ function resolveVideoConnection(connection: VideoGenerationConnection) {
         ? "https://api.x.ai/v1"
         : isGoogleVeoVideo
           ? "https://generativelanguage.googleapis.com/v1beta"
-          : isOpenRouterVideo
-            ? "https://openrouter.ai/api/v1"
-            : isAtlasVideo
-              ? "https://api.atlascloud.ai/api/v1"
-              : isSeedanceVideo
-                ? "https://api.seedance2.ai"
-                : isSwarmUiVideo
-                  ? "http://127.0.0.1:7801"
-                  : isComfyUiVideo
-                    ? "http://127.0.0.1:8188"
-                    : "https://generativelanguage.googleapis.com/v1beta"),
+          : isNanoGptVideo
+            ? "https://nano-gpt.com/api"
+            : isOpenRouterVideo
+              ? "https://openrouter.ai/api/v1"
+              : isAtlasVideo
+                ? "https://api.atlascloud.ai/api/v1"
+                : isSeedanceVideo
+                  ? "https://api.seedance2.ai"
+                  : isSwarmUiVideo
+                    ? "http://127.0.0.1:7801"
+                    : isComfyUiVideo
+                      ? "http://127.0.0.1:8188"
+                      : "https://generativelanguage.googleapis.com/v1beta"),
     model:
       connection.model ||
       (isXaiVideo
         ? "grok-imagine-video-1.5"
         : isGoogleVeoVideo
           ? "veo-3.1-generate-preview"
-          : isOpenRouterVideo
-            ? "google/veo-3.1"
-            : isAtlasVideo
-              ? "google/veo3.1/text-to-video"
-              : isSeedanceVideo
-                ? "seedance-2-0"
-                : isComfyUiVideo
-                  ? ""
-                  : "gemini-omni-flash-preview"),
+          : isNanoGptVideo
+            ? ""
+            : isOpenRouterVideo
+              ? "google/veo-3.1"
+              : isAtlasVideo
+                ? "google/veo3.1/text-to-video"
+                : isSeedanceVideo
+                  ? "seedance-2-0"
+                  : isComfyUiVideo
+                    ? ""
+                    : "gemini-omni-flash-preview"),
     resolution: isXaiVideo
       ? videoDefaults.xai.resolution
       : isGoogleVeoVideo
         ? videoDefaults.googleVeo.resolution
-        : isOpenRouterVideo
+        : isNanoGptVideo
           ? videoDefaults.openrouter.resolution
-          : isAtlasVideo
-            ? videoDefaults.atlas.resolution
-            : isSeedanceVideo
-              ? videoDefaults.seedance.resolution
-              : isComfyUiVideo
-                ? videoDefaults.comfyui.resolution
-                : undefined,
+          : isOpenRouterVideo
+            ? videoDefaults.openrouter.resolution
+            : isAtlasVideo
+              ? videoDefaults.atlas.resolution
+              : isSeedanceVideo
+                ? videoDefaults.seedance.resolution
+                : isComfyUiVideo
+                  ? videoDefaults.comfyui.resolution
+                  : undefined,
     comfyWorkflow: connection.comfyuiWorkflow || undefined,
     comfyLoras: isComfyUiVideo ? videoDefaults.comfyui.loras : [],
     comfyFps: isComfyUiVideo ? videoDefaults.comfyui.fps : undefined,
+    atlasModelOptions: isAtlasVideo
+      ? videoDefaults.atlas.modelOptions[connection.model?.trim() || "google/veo3.1/text-to-video"]
+      : undefined,
     publicReferenceUpload: resolveVideoReferencePublicUploadOptions(isSeedanceVideo, videoDefaults.seedance),
   };
 }
@@ -996,9 +1033,7 @@ function resolveReferenceImageBase64(input?: string): string | undefined {
 }
 
 export type FullBodyReferenceRole =
-  | { kind: "neutral-full-body" }
-  | { kind: "expression"; expression: string }
-  | { kind: "identity" };
+  { kind: "neutral-full-body" } | { kind: "expression"; expression: string } | { kind: "identity" };
 
 export function buildFullBodyReferenceContract(roles: FullBodyReferenceRole[]): string {
   if (roles.length === 0) return "";
@@ -1158,7 +1193,7 @@ async function buildSpritePromptPlan(
     body.spriteType !== "full-body" &&
     !singlePortrait &&
     isOpenAIGptImageModel(imgModel) &&
-    !isOpenAIGptImage2Model(imgModel);
+    !supportsOpenAIImageCustomSize(imgModel);
   if (generateExpressionsIndividually && expressions.length > MAX_INDIVIDUAL_SPRITE_EXPRESSIONS) {
     expressions = expressions.slice(0, MAX_INDIVIDUAL_SPRITE_EXPRESSIONS);
   }
@@ -1279,6 +1314,7 @@ async function buildIndividualFullBodyExpressionRequest({
     appearance: plan.appearance,
     styleProfiles,
     imageDefaults,
+    styleProfileId: body.styleProfileId,
   });
   const reviewedPrompt = resolveSpritePromptOverride(
     plan.promptOverrides.get(spritePromptReviewId("expression", plan.spriteType, expression)),
@@ -1314,8 +1350,11 @@ export async function spritesRoutes(app: FastifyInstance) {
    * GET /api/sprites/:characterId
    * List all sprite expressions for a character.
    */
-  app.get<{ Params: { characterId: string } }>("/:characterId", async (req) => {
+  app.get<{ Params: { characterId: string } }>("/:characterId", async (req, reply) => {
     const { characterId } = req.params;
+    if (characterId.includes("..") || characterId.includes("/") || characterId.includes("\\")) {
+      return reply.status(400).send({ error: "Invalid character ID" });
+    }
     return listSpriteInfos(characterId);
   });
 
@@ -1414,6 +1453,59 @@ export async function spritesRoutes(app: FastifyInstance) {
       filename,
       url: `/api/sprites/${characterId}/file/${encodeURIComponent(filename)}?v=${Math.floor(mtime)}`,
     };
+  });
+
+  /**
+   * POST /api/sprites/pixelize
+   * Deterministic pixel-art post-processing (#5096): nearest-kernel downscale to
+   * a target cell size, palette quantization against a caller-supplied ramp,
+   * binary alpha, and a wrap-around seam score for tileability. Standalone like
+   * the cleanup routes, so client-only capability packages can call it over REST.
+   * Body: { imageBase64, targetWidth, targetHeight?, palette?, alphaThreshold? }
+   * Returns: { imageBase64, report: { width, height, paletteSize, seamScoreX, seamScoreY, tileable } }
+   */
+  app.post("/pixelize", async (req, reply) => {
+    const body = req.body as {
+      imageBase64?: string;
+      targetWidth?: number;
+      targetHeight?: number;
+      palette?: string[];
+      alphaThreshold?: number;
+    };
+    const resolved = resolveReferenceImageBase64(body.imageBase64);
+    if (!resolved) {
+      return reply.status(400).send({ error: "imageBase64 is required (data URL or raw base64)" });
+    }
+    // ~24MB decoded cap before Buffer.from allocates; the service enforces the
+    // stricter pixel-dimension bounds from the image header.
+    if (resolved.length > 32 * 1024 * 1024) {
+      return reply.status(400).send({ error: "Image is too large to pixelize" });
+    }
+    if (!Number.isInteger(body.targetWidth)) {
+      return reply.status(400).send({ error: "targetWidth is required" });
+    }
+    if (body.palette !== undefined && !Array.isArray(body.palette)) {
+      return reply.status(400).send({ error: "palette must be an array of #rrggbb colors" });
+    }
+    try {
+      const result = await pixelizeImage(Buffer.from(resolved, "base64"), {
+        targetWidth: body.targetWidth as number,
+        targetHeight: body.targetHeight,
+        palette: body.palette?.map((entry) => String(entry)),
+        alphaThreshold: body.alphaThreshold,
+      });
+      return { imageBase64: result.png.toString("base64"), report: result.report };
+    } catch (error) {
+      if (error instanceof PixelizeInputError) {
+        return reply.status(400).send({ error: error.message });
+      }
+      if (error instanceof Error && error.message.includes("Image processing is unavailable")) {
+        // The documented sharp-unavailable answer (Android/Termux without a
+        // native prebuild) — an actionable 503, never a bare 500.
+        return reply.status(503).send({ error: error.message });
+      }
+      throw error;
+    }
   });
 
   /**
@@ -1613,6 +1705,64 @@ export async function spritesRoutes(app: FastifyInstance) {
   });
 
   /**
+   * PATCH /api/sprites/:characterId/:expression
+   * Rename a saved sprite without replacing its image.
+   * Body: { expression: string }
+   */
+  app.patch<{ Params: { characterId: string; expression: string } }>(
+    "/:characterId/:expression",
+    { config: { rateLimit: SPRITE_RENAME_RATE_LIMIT } },
+    async (req, reply) =>
+      withSpriteRenameLock(req.params.characterId, async () => {
+        const { characterId, expression } = req.params;
+        if (characterId.includes("..") || characterId.includes("/") || characterId.includes("\\")) {
+          return reply.status(400).send({ error: "Invalid character ID" });
+        }
+
+        const body = req.body;
+        const nextExpression =
+          body &&
+          typeof body === "object" &&
+          !Array.isArray(body) &&
+          typeof (body as { expression?: unknown }).expression === "string"
+            ? normalizeSpriteExpression((body as { expression: string }).expression)
+            : "";
+        if (!nextExpression) {
+          return reply.status(400).send({ error: "Expression label must include at least one letter or number" });
+        }
+
+        const dir = join(SPRITES_ROOT, characterId);
+        if (!existsSync(dir)) return reply.status(404).send({ error: "No sprites found" });
+
+        const files = readdirSync(dir);
+        const source = files.find((filename) => {
+          const ext = extname(filename);
+          return SPRITE_FILE_RE.test(filename) && filename.slice(0, -ext.length) === expression;
+        });
+        if (!source) return reply.status(404).send({ error: "Expression not found" });
+
+        const extension = extname(source);
+        const target = `${nextExpression}${extension}`;
+        const hasNameCollision = files.some((filename) => {
+          if (!SPRITE_FILE_RE.test(filename)) return false;
+          const filenameExpression = filename.slice(0, -extname(filename).length);
+          return filename !== source && filenameExpression.toLowerCase() === nextExpression.toLowerCase();
+        });
+        if (hasNameCollision) {
+          return reply.status(409).send({ error: "An expression with that name already exists" });
+        }
+
+        if (target !== source) await rename(join(dir, source), join(dir, target));
+        const mtime = statSync(join(dir, target)).mtimeMs;
+        return {
+          expression: nextExpression,
+          filename: target,
+          url: `/api/sprites/${characterId}/file/${encodeURIComponent(target)}?v=${Math.floor(mtime)}`,
+        };
+      }),
+  );
+
+  /**
    * DELETE /api/sprites/:characterId/:expression
    * Remove a sprite expression image.
    */
@@ -1769,6 +1919,7 @@ export async function spritesRoutes(app: FastifyInstance) {
             appearance: plan.appearance,
             styleProfiles: imageSettings.styleProfiles,
             imageDefaults,
+            styleProfileId: body.styleProfileId,
           });
           const reviewedPrompt = resolveSpritePromptOverride(
             plan.promptOverrides.get(spritePromptReviewId("expression", plan.spriteType, expression)),
@@ -1800,6 +1951,7 @@ export async function spritesRoutes(app: FastifyInstance) {
       appearance: plan.appearance,
       styleProfiles: imageSettings.styleProfiles,
       imageDefaults,
+      styleProfileId: body.styleProfileId,
     });
     const sheetPromptId = spritePromptReviewId(
       "sheet",
@@ -1991,6 +2143,7 @@ export async function spritesRoutes(app: FastifyInstance) {
                   comfyWorkflow: resolved.comfyWorkflow,
                   comfyLoras: resolved.comfyLoras,
                   fps: resolved.comfyFps,
+                  atlasModelOptions: resolved.atlasModelOptions,
                   referenceImage,
                   publicReferenceUpload: resolved.publicReferenceUpload,
                   fallback: videoFallback,
@@ -2090,6 +2243,7 @@ export async function spritesRoutes(app: FastifyInstance) {
       appearance: plan.appearance,
       styleProfiles: imageSettings.styleProfiles,
       imageDefaults,
+      styleProfileId: body.styleProfileId,
     });
     const reviewedSheetPrompt = resolveSpritePromptOverride(
       plan.promptOverrides.get(sheetPromptId),
@@ -2224,6 +2378,7 @@ export async function spritesRoutes(app: FastifyInstance) {
                   appearance: plan.appearance,
                   styleProfiles: imageSettings.styleProfiles,
                   imageDefaults,
+                  styleProfileId: body.styleProfileId,
                 });
                 const reviewedExpressionPrompt = resolveSpritePromptOverride(
                   plan.promptOverrides.get(spritePromptReviewId("expression", plan.spriteType, expression)),

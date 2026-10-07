@@ -23,8 +23,9 @@ export function ConversationAutonomousEffects({
   chatMeta,
 }: ConversationAutonomousEffectsProps) {
   const { t: localizeUi } = useUiTranslation();
-  const autonomousEnabled = !!chatMeta.autonomousMessages;
-  const exchangesEnabled = !!chatMeta.characterExchanges;
+  const roomOwnsActivity = !!chatMeta.multiplayerSetup || !!chatMeta.multiplayer;
+  const autonomousEnabled = !roomOwnsActivity && !!chatMeta.autonomousMessages;
+  const exchangesEnabled = !roomOwnsActivity && !!chatMeta.characterExchanges;
   const [notification, setNotification] = useState<{ name: string; id: string } | null>(null);
   const notificationTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -61,7 +62,7 @@ export function ConversationAutonomousEffects({
   }, [chatId]);
 
   useEffect(() => {
-    if (!messages) return;
+    if (!messages || roomOwnsActivity) return;
     const count = messages.length;
 
     // The first hydrated history load is not new activity and must not reset timers.
@@ -77,7 +78,7 @@ export function ConversationAutonomousEffects({
       }
     }
     prevMsgCountRef.current = count;
-  }, [messages, recordUserActivity]);
+  }, [messages, recordUserActivity, roomOwnsActivity]);
 
   useEffect(() => {
     return () => {
@@ -96,7 +97,9 @@ export function ConversationAutonomousEffects({
           key={notification.id}
           className="pointer-events-auto absolute right-4 top-14 z-20 flex animate-slide-in-right items-center gap-2 rounded-lg bg-[var(--primary)] px-3 py-2 text-sm font-medium text-white shadow-lg"
         >
-          <span>{notification.name} {localizeUi("ui.chat.conversationautonomouseffects.messagedYou")}</span>
+          <span>
+            {notification.name} {localizeUi("ui.chat.conversationautonomouseffects.messagedYou")}
+          </span>
           <button
             onClick={() => setNotification(null)}
             className="ml-1 rounded p-0.5 transition-colors hover:bg-foreground/20"

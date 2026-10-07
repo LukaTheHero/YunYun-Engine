@@ -16,14 +16,7 @@ import { useTranslation as useUiTranslation } from "react-i18next";
 
 // ─── Step definitions ─────────────────────────
 
-type TourPanel =
-  | "characters"
-  | "lorebooks"
-  | "presets"
-  | "connections"
-  | "agents"
-  | "personas"
-  | "settings";
+type TourPanel = "characters" | "lorebooks" | "presets" | "connections" | "agents" | "personas" | "settings";
 
 interface TourStep {
   /** data-tour attribute value of the element to highlight, or null for centered modal */
@@ -300,7 +293,7 @@ function computeTooltipStyle(rect: Rect, step: TourStep): React.CSSProperties {
     : Math.min(TUTORIAL_DESKTOP_WIDTH, vw - VIEWPORT_MARGIN * 2);
   const GAP = isMobile ? 8 : 16;
   const topOffset = getTutorialTopOffset();
-  const availableViewportHeight = Math.max(200, vh - topOffset - VIEWPORT_MARGIN);
+  const availableViewportHeight = Math.max(0, vh - topOffset - VIEWPORT_MARGIN);
   const side = step.side ?? "right";
   const available = {
     right: vw - (rect.left + rect.width + GAP + PAD) - VIEWPORT_MARGIN,
@@ -331,7 +324,7 @@ function computeTooltipStyle(rect: Rect, step: TourStep): React.CSSProperties {
       top,
       left,
       width: TOOLTIP_W,
-      maxHeight: `${Math.max(200, vh - top - VIEWPORT_MARGIN)}px`,
+      maxHeight: `${Math.max(0, vh - top - VIEWPORT_MARGIN)}px`,
       overflowY: "auto",
       overflowX: "hidden",
       overscrollBehavior: "contain",
@@ -361,14 +354,14 @@ function computeTooltipStyle(rect: Rect, step: TourStep): React.CSSProperties {
       top,
       left,
       width: TOOLTIP_W,
-      maxHeight: `${Math.max(200, vh - top - VIEWPORT_MARGIN)}px`,
+      maxHeight: `${Math.max(0, vh - top - VIEWPORT_MARGIN)}px`,
       overflowY: "auto",
       overflowX: "hidden",
       overscrollBehavior: "contain",
     };
   }
 
-  const minScrollableHeight = isMobile ? 220 : 340;
+  const minScrollableHeight = Math.min(340, availableViewportHeight);
   const preferredVerticalSide = available.bottom >= available.top ? "bottom" : "top";
   let placement = side;
 
@@ -390,7 +383,7 @@ function computeTooltipStyle(rect: Rect, step: TourStep): React.CSSProperties {
     placement = available.right >= available.left ? "right" : "left";
   }
 
-  let maxHeight = vh - VIEWPORT_MARGIN * 2;
+  let maxHeight: number;
 
   let top = 0;
   let left = 0;
@@ -455,12 +448,8 @@ function TourCardContent({
 }) {
   const { t: localizeUi } = useUiTranslation();
   const localize = useLocalizedUiText();
-  const localizedBody = currentStep.bodyKey
-    ? localizeUi(currentStep.bodyKey)
-    : localize(currentStep.body ?? "");
-  const localizedTitle = currentStep.titleKey
-    ? localizeUi(currentStep.titleKey)
-    : localize(currentStep.title ?? "");
+  const localizedBody = currentStep.bodyKey ? localizeUi(currentStep.bodyKey) : localize(currentStep.body ?? "");
+  const localizedTitle = currentStep.titleKey ? localizeUi(currentStep.titleKey) : localize(currentStep.title ?? "");
   return (
     <>
       {/* Professor YunYun sprite */}
@@ -478,9 +467,7 @@ function TourCardContent({
 
       {/* Header */}
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
-          {localizedTitle}
-        </h3>
+        <h3 className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">{localizedTitle}</h3>
       </div>
 
       {/* Body */}
@@ -706,7 +693,7 @@ function OnboardingTutorialInner() {
 
   const isCentered = isMobileViewport || currentStep.centerCard || !currentStep.target || !targetRect;
   const centeredTopOffset = getTutorialTopOffset();
-  const centeredCardMaxHeight = Math.max(220, getViewportHeight() - centeredTopOffset - 16);
+  const centeredCardMaxHeight = Math.max(0, getViewportHeight() - centeredTopOffset - 16);
 
   const pickerSlot = currentStep.docsLanguagePicker ? (
     <div className="mb-4 flex flex-col gap-3 text-left">
@@ -755,8 +742,7 @@ function OnboardingTutorialInner() {
               left: rect.left - PAD,
               width: rect.width + PAD * 2,
               height: rect.height + PAD * 2,
-              boxShadow:
-                "0 0 16px 4px color-mix(in srgb, var(--marinara-chat-chrome-focus-ring) 40%, transparent)",
+              boxShadow: "0 0 16px 4px color-mix(in srgb, var(--marinara-chat-chrome-focus-ring) 40%, transparent)",
             }}
           />
         ))}
@@ -779,7 +765,14 @@ function OnboardingTutorialInner() {
               data-component="OnboardingTutorial.Card"
               style={{ width: Math.min(380, getViewportWidth() - 32), maxHeight: centeredCardMaxHeight }}
             >
-              <TourCardContent step={step} currentStep={currentStep} isLast={isLast} onNext={next} onSkip={finish} pickerSlot={pickerSlot} />
+              <TourCardContent
+                step={step}
+                currentStep={currentStep}
+                isLast={isLast}
+                onNext={next}
+                onSkip={finish}
+                pickerSlot={pickerSlot}
+              />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -795,7 +788,14 @@ function OnboardingTutorialInner() {
             data-component="OnboardingTutorial.Card"
             style={computeTooltipStyle(targetRect!, currentStep)}
           >
-            <TourCardContent step={step} currentStep={currentStep} isLast={isLast} onNext={next} onSkip={finish} pickerSlot={pickerSlot} />
+            <TourCardContent
+              step={step}
+              currentStep={currentStep}
+              isLast={isLast}
+              onNext={next}
+              onSkip={finish}
+              pickerSlot={pickerSlot}
+            />
           </motion.div>
         </AnimatePresence>
       )}

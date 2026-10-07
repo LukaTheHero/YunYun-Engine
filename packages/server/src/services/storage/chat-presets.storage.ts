@@ -10,12 +10,17 @@ import { newId, now } from "../../utils/id-generator.js";
 import { withChatMetadataPatchQueue } from "./chats.storage.js";
 import {
   CHAT_PRESET_EXCLUDED_METADATA_KEYS,
+  TRANSLATOR_DEFAULTS_SETTINGS_KEY,
+  TRANSLATOR_SETTINGS_KEYS,
+  normalizeTranslatorSettings,
   isRetiredBuiltInAgentId,
   type ChatMode,
   type ChatPresetSettings,
   type CreateChatPresetInput,
   type UpdateChatPresetInput,
 } from "@marinara-engine/shared";
+
+import { createAppSettingsStorage } from "./app-settings.storage.js";
 
 const CHAT_MODES: ChatMode[] = ["conversation", "roleplay"];
 const EXCLUDED_METADATA_SET = new Set(CHAT_PRESET_EXCLUDED_METADATA_KEYS);
@@ -60,6 +65,7 @@ function sanitizePresetAgentMap(value: unknown) {
 }
 
 function sanitizePresetMetadataValue(key: string, value: unknown) {
+  if (key === "chatSettingsHintDismissed") return value === true;
   if (key === "activeAgentIds") return sanitizePresetAgentIds(value);
   if (key === "agentOverrides" || key === "agentPromptTemplateIds" || key === "customAgentImageSettings") {
     return sanitizePresetAgentMap(value);
@@ -218,9 +224,7 @@ export function createChatPresetsStorage(db: DB) {
           const fallbackRows = (await tx
             .select()
             .from(chatPresets)
-            .where(
-              and(eq(chatPresets.mode, existing.mode), eq(chatPresets.isDefault, "true")),
-            )) as ChatPresetRow[];
+            .where(and(eq(chatPresets.mode, existing.mode), eq(chatPresets.isDefault, "true")))) as ChatPresetRow[];
           const fallback = fallbackRows[0];
           if (fallback) {
             const ts = now();
@@ -250,10 +254,7 @@ export function createChatPresetsStorage(db: DB) {
           .set({ isActive: "false", updatedAt: ts })
           .where(and(eq(chatPresets.mode, target.mode), ne(chatPresets.id, id)));
         await tx.update(chatPresets).set({ isActive: "true", updatedAt: ts }).where(eq(chatPresets.id, id));
-        const updatedRows = (await tx
-          .select()
-          .from(chatPresets)
-          .where(eq(chatPresets.id, id))) as ChatPresetRow[];
+        const updatedRows = (await tx.select().from(chatPresets).where(eq(chatPresets.id, id))) as ChatPresetRow[];
         return updatedRows[0] ? rowToPreset(updatedRows[0]) : null;
       });
     },
@@ -296,6 +297,9 @@ export function createChatPresetsStorage(db: DB) {
         })();
 
         const presetMetadata = (sanitizePresetSettings(preset.settings).metadata ?? {}) as Record<string, unknown>;
+        const translatorSettings = normalizeTranslatorSettings(presetMetadata);
+        // Filter this application copy; keep the saved profile intact.
+        for (const key of TRANSLATOR_SETTINGS_KEYS) delete presetMetadata[key];
 
         // Preserve only chat-specific (non-profile) metadata keys.
         const preserved: Record<string, unknown> = {};
@@ -314,17 +318,27 @@ export function createChatPresetsStorage(db: DB) {
         if (!Object.prototype.hasOwnProperty.call(presetMetadata, "customAgentImageSettings")) {
           preserved.customAgentImageSettings = sanitizePresetAgentMap(currentMetadata.customAgentImageSettings);
         }
+        // Profiles saved before window layouts existed leave the chat's layout as it is.
+        if (
+          !Object.prototype.hasOwnProperty.call(presetMetadata, "windowLayout") &&
+          Object.prototype.hasOwnProperty.call(currentMetadata, "windowLayout")
+        ) {
+          preserved.windowLayout = currentMetadata.windowLayout;
+        }
 
         const baseDefaults: Record<string, unknown> = {
+          ...normalizeTranslatorSettings(await createAppSettingsStorage(db).get(TRANSLATOR_DEFAULTS_SETTINGS_KEY)),
           summary: null,
           tags: [],
           enableAgents: true,
           activeToolIds: [],
+          chatSettingsHintDismissed: false,
         };
 
         const newMetadata: Record<string, unknown> = {
           ...baseDefaults,
           ...presetMetadata,
+          ...translatorSettings,
           ...preserved,
           appliedChatPresetId: preset.id,
         };
@@ -354,9 +368,7 @@ export function createChatPresetsStorage(db: DB) {
           const defaultRows = (await tx
             .select()
             .from(chatPresets)
-            .where(
-              and(eq(chatPresets.mode, mode), eq(chatPresets.isDefault, "true")),
-            )) as ChatPresetRow[];
+            .where(and(eq(chatPresets.mode, mode), eq(chatPresets.isDefault, "true")))) as ChatPresetRow[];
           const canonicalDefault = [...defaultRows].sort(
             (left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id),
           )[0];
@@ -412,20 +424,12 @@ export function createChatPresetsStorage(db: DB) {
           const activeId =
             activeRows.length === 0
               ? defaultId
-              : [...activeRows].sort(
-                  (left, right) => right.updatedAt.localeCompare(left.updatedAt),
-                )[0]!.id;
+              : [...activeRows].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]!.id;
           if (!activeId) return;
 
           const ts = now();
-          await tx
-            .update(chatPresets)
-            .set({ isActive: "false", updatedAt: ts })
-            .where(eq(chatPresets.mode, mode));
-          await tx
-            .update(chatPresets)
-            .set({ isActive: "true", updatedAt: ts })
-            .where(eq(chatPresets.id, activeId));
+          await tx.update(chatPresets).set({ isActive: "false", updatedAt: ts }).where(eq(chatPresets.mode, mode));
+          await tx.update(chatPresets).set({ isActive: "true", updatedAt: ts }).where(eq(chatPresets.id, activeId));
         });
       }
     },

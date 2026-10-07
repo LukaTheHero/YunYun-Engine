@@ -1,5 +1,5 @@
 ; ──────────────────────────────────────────────
-; YunYun Engine — Windows Installer
+; Marinara Engine — Windows Installer
 ; Built in CI via NSIS (makensis)
 ; ──────────────────────────────────────────────
 
@@ -14,8 +14,8 @@
 ${StrTrimNewLines}
 
 ; ── App metadata ──
-!define APP_NAME "YunYun Engine"
-!define APP_VERSION "2.4.2"
+!define APP_NAME "Marinara Engine"
+!define APP_VERSION "2.5.0"
 !define APP_PUBLISHER "Pasta-Devs"
 !define APP_URL "https://github.com/Pasta-Devs/Marinara-Engine"
 !define REPO_URL "https://github.com/Pasta-Devs/Marinara-Engine.git"
@@ -27,12 +27,15 @@ ${StrTrimNewLines}
 ; Pin to known-good versions so the installer is deterministic and doesn't
 ; need PowerShell/GitHub API calls (a major AV false-positive trigger).
 !define GIT_DOWNLOAD_URL "https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.exe"
-!define NODE_DOWNLOAD_URL "https://nodejs.org/dist/v24.15.0/node-v24.15.0-x64.msi"
+!define NODE_DOWNLOAD_URL "https://nodejs.org/dist/v24.21.0/node-v24.21.0-x64.msi"
 !define GIT_SHA256 "2b96e7854f0520f0f6b709c21041d9801b1be44d5e1a0d9fa621b2fbc40f1983"
-!define NODE_SHA256 "feffb8e5cb5ac47f793666636d496ef3e975be82c84c4da5d20e6aa8fa4eb806"
-!define RELEASE_TAG "v2.4.2"
+!define NODE_SHA256 "bb0eaee134f9357f22aea915ee793343e627aefc1e66488164bac6915bce2cac"
+!define RELEASE_TAG "v2.5.0"
 !ifndef RELEASE_COMMIT
-!define RELEASE_COMMIT ""
+!error "RELEASE_COMMIT must pin the exact release commit"
+!endif
+!if "${RELEASE_COMMIT}" == ""
+!error "RELEASE_COMMIT must not be empty"
 !endif
 
 Name "${APP_NAME}"
@@ -73,7 +76,7 @@ Click Next to continue."
 ; ── Directory page ──
 !define MUI_DIRECTORYPAGE_TEXT_TOP "\
 Choose where to install ${APP_NAME}. About 2.5 GB of free space is recommended.$\r$\n$\r$\n\
-Upgrading? Choose the YunYun Engine folder that already has your data. Before reinstalling, back up packages\server\data, or the root data folder for older installs.$\r$\n$\r$\n\
+Upgrading? Choose the Marinara Engine folder that already has your data. Before reinstalling, back up packages\server\data, or the root data folder for older installs.$\r$\n$\r$\n\
 The installer will download app files and install dependencies."
 
 ; ── Finish page ──
@@ -189,7 +192,7 @@ Function WarnSameDirectoryReinstall
   MessageBox MB_YESNO|MB_ICONEXCLAMATION "\
 You are reinstalling ${APP_NAME} into the same folder:$\r$\n\
 $INSTDIR$\r$\n$\r$\n\
-Before continuing, copy the YunYun data folder(s) below to a backup location outside this install folder if you want to keep chats, characters, images, and settings:$\r$\n\
+Before continuing, copy the Marinara data folder(s) below to a backup location outside this install folder if you want to keep chats, characters, images, and settings:$\r$\n\
 $USER_DATA_PATHS$\r$\n$\r$\n\
 If a data folder contains marinara-engine.db, copy it together with marinara-engine.db-wal and marinara-engine.db-shm if present.$\r$\n$\r$\n\
 Continue anyway?" IDYES continueReinstallWarning
@@ -476,8 +479,7 @@ Please restart your computer and run this installer again."
       Abort
     ${EndIf}
 
-    ${If} "${RELEASE_COMMIT}" != ""
-    ${AndIf} $3 != "${RELEASE_COMMIT}"
+    ${If} $3 != "${RELEASE_COMMIT}"
       ${If} $5 == "1"
         nsExec::ExecToLog 'git stash apply -q'
         Pop $1
@@ -529,6 +531,8 @@ Please restart your computer and run this installer again."
     nsExec::ExecToStack 'git rev-parse HEAD'
     Pop $0
     Pop $2
+    ; ExecToStack keeps git's trailing newline, so the untrimmed HEAD never equaled the trimmed release commit (#6984).
+    ${StrTrimNewLines} $2 "$2"
     ${If} $2 != "$3"
       ${If} $5 == "1"
         nsExec::ExecToLog 'git stash apply -q'
@@ -662,8 +666,7 @@ ${APP_URL}"
       MessageBox MB_OK|MB_ICONSTOP "Downloaded release ${RELEASE_TAG} resolved to an empty commit.$\r$\n$\r$\nInstallation was stopped before publishing files."
       Abort
     ${EndIf}
-    ${If} "${RELEASE_COMMIT}" != ""
-    ${AndIf} $2 != "${RELEASE_COMMIT}"
+    ${If} $2 != "${RELEASE_COMMIT}"
       ${If} $CLONE_DIR_CREATED == "1"
         RMDir /r "$CLONE_DIR"
       ${EndIf}

@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { UI_PERSISTENCE } from "../../packages/client/src/lib/ui-persistence.js";
 import {
   getRoleplayTypewriterRevealCharsPerSecond,
   getStreamingCharsPerSecond,
   getTypewriterFrameBudget,
+  getTypewriterPaintIntervalMs,
   isGenerationSendBlocked,
   isGenerationStartBlocked,
   isMessageShadowedByLiveStream,
@@ -11,6 +13,7 @@ import {
   shouldKeepStreamLiveThroughPostProcessing,
   takeTypewriterCharacters,
 } from "../../packages/client/src/lib/generation-stream-policy.js";
+import { reconcilePersistedMessages } from "../../packages/client/src/lib/message-cache-reconciliation.js";
 import { resolveMessageRewriteVersions } from "../../packages/client/src/lib/message-rewrite-versions.js";
 import { resolveMessageReasoningDisplay } from "../../packages/client/src/lib/message-reasoning.js";
 import { shouldFormatTextareaQuotes } from "../../packages/client/src/lib/textarea-quotes.js";
@@ -19,14 +22,15 @@ import {
   getTTSAutoplayRevision,
   shouldAutoplayGeneratedTTS,
 } from "../../packages/client/src/lib/tts-autoplay.js";
+import { shouldUsePersistentTTSAudioCache } from "../../packages/client/src/lib/tts-audio-cache.js";
 import { getAgentBatchLane, type ResolvedAgent } from "../../packages/server/src/services/agents/agent-pipeline.js";
 import { mergePairedBuiltInRewriteAgents } from "../../packages/server/src/services/generation/prose-guardian-settings.js";
 import { estimateAgentLoadCost } from "../../packages/shared/src/utils/agent-cost.js";
 import {
-  ECHO_CHAMBER_MESSAGE_INTERVAL_MAX_MS,
-  ECHO_CHAMBER_MESSAGE_INTERVAL_MIN_MS,
+  DEFAULT_ECHO_CHAMBER_MESSAGE_DELAY_SECONDS,
   enqueueEchoChamberMessages,
   getEchoChamberMessageInterval,
+  normalizeEchoChamberMessageDelaySeconds,
   resolveEchoChamberPersistedBaseline,
 } from "../../packages/client/src/lib/echo-chamber-queue.js";
 import { useAgentStore } from "../../packages/client/src/stores/agent.store.js";
@@ -43,6 +47,10 @@ import {
 } from "../../packages/server/src/services/llm/base-provider.js";
 import type { AgentCallDebugEvent, AgentContext } from "../../packages/shared/src/types/agent.js";
 import { CSRF_HEADER, CSRF_HEADER_VALUE } from "../../packages/shared/src/constants/security.js";
+
+function readSourceText(url: URL, encoding: "utf8"): string {
+  return readFileSync(url, encoding).replace(/\r\n?/gu, "\n");
+}
 
 function extractCssBlock(source: string, prelude: string): string {
   const preludeIndex = source.indexOf(prelude);
@@ -80,17 +88,77 @@ assert.deepEqual(resolveMessageReasoningDisplay({ generationInfo: { tokensReason
   hasReasoning: false,
 });
 
-const retryAgentRouteSource = readFileSync(
+const retryAgentRouteSource = readSourceText(
   new URL("../../packages/server/src/routes/generate/retry-agents-route.ts", import.meta.url),
   "utf8",
 );
-const generateRouteSource = readFileSync(
+const generateRouteSource = readSourceText(
   new URL("../../packages/server/src/routes/generate.routes.ts", import.meta.url),
   "utf8",
 );
-const useGenerateSource = readFileSync(
+const useGenerateSource = readSourceText(
   new URL("../../packages/client/src/hooks/use-generate.ts", import.meta.url),
   "utf8",
+);
+assert.match(
+  generateRouteSource,
+  /const recordReasoningDuration = \(text: string\) => \{[\s\S]{0,300}text\.trim\(\)[\s\S]{0,300}reasoningDurationMs = Math\.max\(1, Date\.now\(\) - generationStartedAt\);[\s\S]{0,80}\};/u,
+  "The server must capture reasoning duration only when visible output begins",
+);
+assert.match(
+  generateRouteSource,
+  /const writeContentChunked = async \(text: string\) => \{\s*fullResponse \+= text;\s*if \(holdForTextRewrite\) \{\s*recordReasoningDuration\(text\);/u,
+  "Buffered text-rewrite responses must still capture reasoning duration",
+);
+assert.match(
+  generateRouteSource,
+  /fullResponse \+= chunk;\s*if \(holdForTextRewrite\) \{\s*recordReasoningDuration\(chunk\);/u,
+  "Tool-streamed text-rewrite responses must still capture reasoning duration",
+);
+assert.match(
+  generateRouteSource,
+  /const val = result\.value;\s*if \(holdForTextRewrite\) \{\s*recordReasoningDuration\(val\);/u,
+  "Generator-streamed text-rewrite responses must still capture reasoning duration",
+);
+const generationInfoPersistenceSource =
+  /const extraUpdate: Record<string, unknown> = \{[\s\S]*?generationInfo: \{[\s\S]*?\n\s*\},\s*\};/u.exec(
+    generateRouteSource,
+  )?.[0];
+assert.ok(generationInfoPersistenceSource, "The committed generation metadata block must remain available");
+assert.match(
+  generationInfoPersistenceSource,
+  /durationMs,\s*reasoningDurationMs,\s*finishReason: finishReason \?\? null,/u,
+  "Committed generation metadata must retain the reasoning-only duration",
+);
+assert.match(
+  generateRouteSource,
+  /const messagesById = new Map\(preMessages\.map[\s\S]{0,500}\(anchor\.activeSwipeIndex \?\? 0\) !== run\.swipeIndex[\s\S]{0,300}run\.abortController\.abort\(\)/u,
+  "Committing a Roleplay turn must cancel agent work anchored to an abandoned swipe",
+);
+assert.equal(
+  (generateRouteSource.match(/moveToActiveAgentRuns\([\s\S]{0,180}lastSavedSwipeIndex/gu) ?? []).length,
+  2,
+  "Both Roleplay reply-release paths must retain the generated message and swipe anchor",
+);
+assert.match(
+  generateRouteSource,
+  /const roomSignal = currentRoomGeneration\(\)\?\.signal;\s*const generationSignal = roomSignal\s*\? AbortSignal\.any\(\[abortController\.signal, roomSignal\]\)\s*: abortController\.signal;/u,
+  "room cancellation must compose with the primary response signal while ordinary generations retain their signal",
+);
+assert.match(
+  generateRouteSource,
+  /const agentAbortController = new AbortController\(\);\s*const agentSignal = AbortSignal\.any\(\[generationSignal, agentAbortController\.signal\]\)/u,
+  "normal generations must keep an agent-only cancellation signal alongside the primary response signal",
+);
+assert.match(
+  generateRouteSource,
+  /activeGeneration\?\.agentAbortController[\s\S]{0,300}agentRuns\.map\(\(run\) => run\.agentAbortController \?\? run\.abortController\)/u,
+  "Stop Agents must cancel both attached and detached agent work without aborting the primary generation",
+);
+assert.match(
+  generateRouteSource,
+  /const agentContext: AgentContext = \{[\s\S]{0,8000}signal: agentSignal,/u,
+  "automatic agents must receive the agent-only cancellation signal",
 );
 assert.match(
   generateRouteSource,
@@ -98,110 +166,292 @@ assert.match(
   "The durable user row must retain its client submission ID even when generation fails",
 );
 const upsertPersistedMessagesSource =
-  /export function upsertPersistedMessages\([\s\S]*?\n\}\n\nfunction appendMissingPersistedMessages/u.exec(
+  /export function upsertPersistedMessages\([\s\S]*?\n\}\s*function appendMissingPersistedMessages/u.exec(
     useGenerateSource,
   )?.[0];
-assert.ok(upsertPersistedMessagesSource, "The durable-message cache replacement helper must remain available");
-assert.match(upsertPersistedMessagesSource, /const persistedUserBySubmissionId = new Map/u);
+assert.ok(upsertPersistedMessagesSource, "The durable-message cache replacement wrapper must remain available");
 assert.match(
   upsertPersistedMessagesSource,
-  /msg\.id\.startsWith\("__optimistic_"\)[\s\S]*persistedUserBySubmissionId\.get\(submissionId\)/u,
-  "Durable-message reconciliation must replace the matching optimistic prompt inside the cache helper",
+  /reconcilePersistedMessages\(old, sortedIncoming\)/u,
+  "The durable-message cache replacement wrapper must delegate to the behaviorally proved reconciler",
 );
+const reconciledMessages = reconcilePersistedMessages(
+  {
+    pageParams: [undefined],
+    pages: [
+      [
+        {
+          id: "persisted-unrelated",
+          chatId: "chat-reconciliation-proof",
+          role: "assistant",
+          characterId: "character-1",
+          content: "Unrelated persisted response",
+          activeSwipeIndex: 0,
+          createdAt: "2026-08-14T12:00:00.000Z",
+          extra: {},
+        },
+        {
+          id: "__optimistic_matching",
+          chatId: "chat-reconciliation-proof",
+          role: "user",
+          characterId: null,
+          content: "Optimistic matching prompt",
+          activeSwipeIndex: 0,
+          createdAt: "2026-08-14T12:01:00.000Z",
+          extra: { submissionId: "submission-matching" },
+        },
+        {
+          id: "__optimistic_unmatched",
+          chatId: "chat-reconciliation-proof",
+          role: "user",
+          characterId: null,
+          content: "Optimistic unmatched prompt",
+          activeSwipeIndex: 0,
+          createdAt: "2026-08-14T12:02:00.000Z",
+          extra: { submissionId: "submission-unmatched" },
+        },
+      ],
+    ],
+  },
+  [
+    {
+      id: "durable-matching",
+      chatId: "chat-reconciliation-proof",
+      role: "user",
+      characterId: null,
+      content: "Earlier durable server content",
+      activeSwipeIndex: 0,
+      createdAt: "2026-08-14T12:01:00.000Z",
+      extra: { submissionId: "submission-matching" },
+    },
+    {
+      id: "durable-matching",
+      chatId: "chat-reconciliation-proof",
+      role: "user",
+      characterId: null,
+      content: "Literal durable server content",
+      activeSwipeIndex: 0,
+      createdAt: "2026-08-14T12:01:00.000Z",
+      extra: { submissionId: "submission-matching" },
+    },
+  ],
+).pages.flat();
+assert.deepEqual(
+  reconciledMessages.map((message) => message.id),
+  ["persisted-unrelated", "durable-matching", "__optimistic_unmatched"],
+  "The matching durable user row must replace only its optimistic submission in cache order",
+);
+assert.equal(
+  reconciledMessages.filter((message) => message.id === "durable-matching").length,
+  1,
+  "The durable replacement must appear exactly once",
+);
+assert.equal(
+  reconciledMessages.find((message) => message.id === "durable-matching")?.content,
+  "Literal durable server content",
+);
+assert.equal(
+  reconciledMessages.some((message) => message.id === "__optimistic_matching"),
+  false,
+);
+assert.equal(
+  reconciledMessages.some((message) => message.id === "__optimistic_unmatched"),
+  true,
+);
+
+const switchedSwipe = reconcilePersistedMessages(
+  {
+    pageParams: [undefined],
+    pages: [
+      [
+        {
+          id: "assistant-with-illustration",
+          chatId: "chat-reconciliation-proof",
+          role: "assistant",
+          characterId: "character-1",
+          content: "Previous swipe",
+          activeSwipeIndex: 0,
+          createdAt: "2026-08-14T12:02:30.000Z",
+          extra: { attachments: [{ type: "image", url: "/previous-swipe.png" }] },
+        },
+      ],
+    ],
+  },
+  [
+    {
+      id: "assistant-with-illustration",
+      chatId: "chat-reconciliation-proof",
+      role: "assistant",
+      characterId: "character-1",
+      content: "New swipe",
+      activeSwipeIndex: 1,
+      createdAt: "2026-08-14T12:02:30.000Z",
+      extra: { generationInfo: { model: "new-swipe-model" } },
+    },
+  ],
+).pages.flat()[0];
+assert.deepEqual(
+  switchedSwipe?.extra,
+  { generationInfo: { model: "new-swipe-model" } },
+  "A saved replacement swipe must not inherit illustration attachments from the previously active swipe",
+);
+const refreshedSameSwipe = reconcilePersistedMessages(
+  {
+    pageParams: [undefined],
+    pages: [[{ ...switchedSwipe!, extra: { attachments: [{ type: "image", url: "/current-swipe.png" }] } }]],
+  },
+  [{ ...switchedSwipe!, extra: { generationInfo: { model: "new-swipe-model" } } }],
+).pages.flat()[0];
+assert.deepEqual(
+  refreshedSameSwipe?.extra,
+  {
+    attachments: [{ type: "image", url: "/current-swipe.png" }],
+    generationInfo: { model: "new-swipe-model" },
+  },
+  "A same-swipe refresh must retain post-processing attachments that arrived after its saved snapshot",
+);
+
+const duplicateIncoming: Parameters<typeof reconcilePersistedMessages>[1] = [
+  {
+    id: "durable-duplicate",
+    chatId: "chat-reconciliation-proof",
+    role: "assistant",
+    characterId: "character-1",
+    content: "Earlier duplicate content",
+    activeSwipeIndex: 0,
+    createdAt: "2026-08-14T12:03:00.000Z",
+    extra: {},
+  },
+  {
+    id: "durable-between",
+    chatId: "chat-reconciliation-proof",
+    role: "assistant",
+    characterId: "character-1",
+    content: "Between duplicate snapshots",
+    activeSwipeIndex: 0,
+    createdAt: "2026-08-14T12:04:00.000Z",
+    extra: {},
+  },
+  {
+    id: "durable-duplicate",
+    chatId: "chat-reconciliation-proof",
+    role: "assistant",
+    characterId: "character-1",
+    content: "Latest duplicate content",
+    activeSwipeIndex: 0,
+    createdAt: "2026-08-14T12:03:00.000Z",
+    extra: {},
+  },
+];
+for (const old of [undefined, { pageParams: [undefined], pages: [[]] }]) {
+  const deduped = reconcilePersistedMessages(old, duplicateIncoming).pages.flat();
+  assert.deepEqual(
+    deduped.map((message) => message.id),
+    ["durable-duplicate", "durable-between"],
+    "Duplicate durable IDs must collapse without changing their first incoming position",
+  );
+  assert.equal(
+    deduped[0]?.content,
+    "Latest duplicate content",
+    "The latest snapshot for a duplicate durable ID must supply its reconciled value",
+  );
+}
+
 const confirmDurableSubmittedUserTurnSource =
   /const confirmDurableSubmittedUserTurn = async \(\) => \{[\s\S]*?\n      \};/u.exec(useGenerateSource)?.[0];
 assert.ok(confirmDurableSubmittedUserTurnSource, "The failed-generation recovery helper must remain available");
 assert.match(confirmDurableSubmittedUserTurnSource, /upsertPersistedMessages\(qc, params\.chatId, messages\)/u);
 assert.match(useGenerateSource, /return await confirmDurableSubmittedUserTurn\(\)/u);
-const chatInputSource = readFileSync(
+const chatInputSource = readSourceText(
   new URL("../../packages/client/src/components/chat/ChatInput.tsx", import.meta.url),
   "utf8",
 );
-const chatMessageSource = readFileSync(
+const chatMessageSource = readSourceText(
   new URL("../../packages/client/src/components/chat/ChatMessage.tsx", import.meta.url),
   "utf8",
 );
-const chatRoleplaySurfaceSource = readFileSync(
+const chatRoleplaySurfaceSource = readSourceText(
   new URL("../../packages/client/src/components/chat/ChatRoleplaySurface.tsx", import.meta.url),
   "utf8",
 );
-const pageActivitySource = readFileSync(
+const pageActivitySource = readSourceText(
   new URL("../../packages/client/src/hooks/use-page-activity.ts", import.meta.url),
   "utf8",
 );
-const appShellSource = readFileSync(
+const appShellSource = readSourceText(
   new URL("../../packages/client/src/components/layout/AppShell.tsx", import.meta.url),
   "utf8",
 );
-const appSource = readFileSync(new URL("../../packages/client/src/App.tsx", import.meta.url), "utf8");
-const peekPromptModalSource = readFileSync(
+const appSource = readSourceText(new URL("../../packages/client/src/App.tsx", import.meta.url), "utf8");
+const peekPromptModalSource = readSourceText(
   new URL("../../packages/client/src/components/chat/PeekPromptModal.tsx", import.meta.url),
   "utf8",
 );
-const chatAreaSource = readFileSync(
+const chatAreaSource = readSourceText(
   new URL("../../packages/client/src/components/chat/ChatArea.tsx", import.meta.url),
   "utf8",
 );
-const generateHookSource = readFileSync(
+const generateHookSource = readSourceText(
   new URL("../../packages/client/src/hooks/use-generate.ts", import.meta.url),
   "utf8",
 );
-const weatherEffectsSource = readFileSync(
+const weatherEffectsSource = readSourceText(
   new URL("../../packages/client/src/components/chat/WeatherEffects.tsx", import.meta.url),
   "utf8",
 );
-const weatherWorkerSource = readFileSync(
+const weatherWorkerSource = readSourceText(
   new URL("../../packages/client/src/workers/weather-effects.worker.ts", import.meta.url),
   "utf8",
 );
-const gameSurfaceSource = readFileSync(
+const gameSurfaceSource = readSourceText(
   new URL("../../packages/client/src/components/game/GameSurface.tsx", import.meta.url),
   "utf8",
 );
-const echoChamberPanelSource = readFileSync(
+const echoChamberPanelSource = readSourceText(
   new URL("../../packages/client/src/components/chat/EchoChamberPanel.tsx", import.meta.url),
   "utf8",
 );
-const uiStoreSource = readFileSync(new URL("../../packages/client/src/stores/ui.store.ts", import.meta.url), "utf8");
-const globalStylesSource = readFileSync(
+const uiStoreSource = readSourceText(new URL("../../packages/client/src/stores/ui.store.ts", import.meta.url), "utf8");
+const { normalizeConversationBackgroundImageOpacity } = await import("../../packages/client/src/stores/ui.store.js");
+const globalStylesSource = readSourceText(
   new URL("../../packages/client/src/styles/globals.css", import.meta.url),
   "utf8",
 );
 const firefoxSupportsSource = extractCssBlock(globalStylesSource, "@supports (-moz-appearance: none)");
-const conversationInputSource = readFileSync(
+const conversationInputSource = readSourceText(
   new URL("../../packages/client/src/components/chat/ConversationInput.tsx", import.meta.url),
   "utf8",
 );
-const presetEditorSource = readFileSync(
+const presetEditorSource = readSourceText(
   new URL("../../packages/client/src/components/presets/PresetEditor.tsx", import.meta.url),
   "utf8",
 );
-const useChatsSource = readFileSync(new URL("../../packages/client/src/hooks/use-chats.ts", import.meta.url), "utf8");
-const gameInputSource = readFileSync(
+const useChatsSource = readSourceText(new URL("../../packages/client/src/hooks/use-chats.ts", import.meta.url), "utf8");
+const gameInputSource = readSourceText(
   new URL("../../packages/client/src/components/game/GameInput.tsx", import.meta.url),
   "utf8",
 );
-const chatStoreSource = readFileSync(
+const chatStoreSource = readSourceText(
   new URL("../../packages/client/src/stores/chat.store.ts", import.meta.url),
   "utf8",
 );
-const summaryPopoverSource = readFileSync(
-  new URL("../../packages/client/src/components/chat/SummaryPopover.tsx", import.meta.url),
+const summaryPopoverSource = readSourceText(
+  new URL("../../packages/client/src/components/chat/ChatSummaryPanel.tsx", import.meta.url),
   "utf8",
 );
-const professorMariHomeSource = readFileSync(
+const professorMariHomeSource = readSourceText(
   new URL("../../packages/client/src/components/chat/HomeProfessorMariChat.tsx", import.meta.url),
   "utf8",
 );
-const personalExtensionsHookSource = readFileSync(
+const personalExtensionsHookSource = readSourceText(
   new URL("../../packages/client/src/hooks/use-personal-extensions.ts", import.meta.url),
   "utf8",
 );
-const chatSettingsDrawerSource = readFileSync(
+const chatSettingsDrawerSource = readSourceText(
   new URL("../../packages/client/src/components/chat/ChatSettingsDrawer.tsx", import.meta.url),
   "utf8",
 );
-const reducedAmbientEffectsHookSource = readFileSync(
+const reducedAmbientEffectsHookSource = readSourceText(
   new URL("../../packages/client/src/hooks/use-reduced-ambient-effects.ts", import.meta.url),
   "utf8",
 );
@@ -223,7 +473,8 @@ assert.match(
   "active Roleplay tracker agents should expose their saved prompt templates",
 );
 assert.match(reducedAmbientEffectsHookSource, /manualPreference \|\| systemPreference/u);
-assert.match(uiStoreSource, /version: 93/u);
+assert.match(uiStoreSource, /version: UI_PERSISTENCE.version/u);
+assert.ok(UI_PERSISTENCE.version >= 99, "the Roleplay persistence migration must remain applied");
 assert.match(globalStylesSource, /data-marinara-reduced-effects/u);
 const accentTransitionStyles =
   globalStylesSource.match(
@@ -248,6 +499,16 @@ assert.match(
   /function RoleplayLiveStreamText[\s\S]*?setText\(next\)[\s\S]*?requestAnimationFrame\(apply\)/u,
   "Roleplay live formatting should update at animation-frame cadence",
 );
+assert.match(
+  chatRoleplaySurfaceSource,
+  /const hasVisibleStreamText = \(text: string\) => \/\\S\/u\.test\(text\);[\s\S]*?hasVisibleStreamText\(s\.streamBuffers\.get\(activeChatId\)/u,
+  "Whitespace-only stream chunks must not collapse inline reasoning",
+);
+assert.match(
+  chatRoleplaySurfaceSource,
+  /\{!centerCompact && \(\s*<div\s*data-tracker-panel-anchor="roleplay-hud"/u,
+  "The expanded Roleplay toolbar must not render alongside its compact replacement",
+);
 assert.doesNotMatch(
   roleplayLiveStreamSource,
   /replaceChildren|textContent\s*=/u,
@@ -265,29 +526,27 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(pageActivitySource, /document\.hasFocus|addEventListener\(\s*["'](?:blur|focus)["']/u);
 assert.match(pageActivitySource, /document\.visibilityState === "visible"/u);
-const activeContextLinksButtonSource =
-  chatRoleplaySurfaceSource.match(/function ActiveContextLinksButton[\s\S]*?\nfunction SummaryButton/u)?.[0] ?? "";
-assert.match(
+const activeContextLinksPanelSource =
+  chatRoleplaySurfaceSource.match(/function ActiveContextLinksPanel[\s\S]*?\nfunction RoleplaySummaryPanel/u)?.[0] ??
+  "";
+assert.match(activeContextLinksPanelSource, /data-component="RoleplayActiveContextPanel"/u);
+// Both are drawers in the Chat Settings window now, so they render inline instead of portaling over the chat.
+assert.doesNotMatch(
   summaryPopoverSource,
-  /className="fixed z-\[9999\]"[\s\S]*?return createPortal\(content, document\.body\)/u,
-  "the Roleplay Chat Summary panel should portal above independent floating-panel stacking contexts",
-);
-assert.match(
-  activeContextLinksButtonSource,
-  /desktopAnchor &&[\s\S]*?createPortal\([\s\S]*?data-component="RoleplayActiveContextPanel"[\s\S]*?fixed z-\[9999\][\s\S]*?document\.body/u,
-  "the desktop Roleplay Active Context panel should portal above independent floating-panel stacking contexts",
+  /createPortal|fixed z-\[9999\]/u,
+  "the Roleplay Chat Summary drawer should render inline in Chat Settings",
 );
 assert.doesNotMatch(
-  activeContextLinksButtonSource,
-  /absolute right-0 top-full/u,
-  "the desktop Roleplay Active Context panel must not remain trapped in the toolbar stacking context",
+  activeContextLinksPanelSource,
+  /createPortal|fixed z-\[9999\]/u,
+  "the Roleplay Active Context drawer should render inline in Chat Settings",
 );
 const spatialTransitionEventSource =
   useGenerateSource.match(/case "spatial_transition_committed": \{[\s\S]*?case "token":/u)?.[0] ?? "";
 assert.match(
   spatialTransitionEventSource,
-  /dispatchCapabilityClientEvent\(\{[\s\S]*?packageId: "hierarchical-maps",[\s\S]*?type: event\.type,[\s\S]*?chatId: params\.chatId,[\s\S]*?data: event\.data,[\s\S]*?\}\)/u,
-  "the spatial transition SSE should immediately notify the downloaded Maps client cache",
+  /dispatchSpatialCapabilityEvent\(getGameExperiencePackageId\(qc, params\.chatId\), \{[\s\S]*?type: event\.type,[\s\S]*?chatId: params\.chatId,[\s\S]*?data: event\.data,[\s\S]*?\}\)/u,
+  "the spatial transition SSE should immediately notify the downloaded Maps client cache and the owning Experience",
 );
 assert.match(
   spatialTransitionEventSource,
@@ -303,8 +562,8 @@ const missedSpatialRefreshBlock =
 assert.notEqual(missedSpatialRefreshBlock, "", "generation cleanup should contain the missed spatial refresh block");
 assert.match(
   missedSpatialRefreshBlock,
-  /dispatchCapabilityClientEvent\(\{[\s\S]*?packageId: "hierarchical-maps",[\s\S]*?type: "spatial_context_refresh",[\s\S]*?chatId: params\.chatId,[\s\S]*?data: null,[\s\S]*?\}\)/u,
-  "missed spatial transition cleanup should notify the downloaded Maps client cache",
+  /dispatchSpatialCapabilityEvent\(getGameExperiencePackageId\(qc, params\.chatId\), \{[\s\S]*?type: "spatial_context_refresh",[\s\S]*?chatId: params\.chatId,[\s\S]*?data: null,[\s\S]*?\}\)/u,
+  "missed spatial transition cleanup should notify the downloaded Maps client cache and the owning Experience",
 );
 assert.match(
   missedSpatialRefreshBlock,
@@ -321,6 +580,39 @@ assert.match(
 assert.ok(
   generationCleanupSource.indexOf(missedSpatialRefreshBlock) < generationCleanupSource.indexOf(ownerCleanupBlock),
   "spatial reconciliation should be dispatched before generation-owner cleanup",
+);
+const capabilityClientEventsSource = readSourceText(
+  new URL("../../packages/client/src/lib/capability-client-events.ts", import.meta.url),
+  "utf8",
+);
+assert.match(
+  capabilityClientEventsSource,
+  /dispatchCapabilityClientEvent\(\{ packageId: "hierarchical-maps", \.\.\.detail \}\);\s*if \(experiencePackageId\) dispatchCapabilityClientEvent\(\{ packageId: experiencePackageId, \.\.\.detail \}\);/u,
+  "spatial capability events must dual-dispatch to World Maps and the game-owning Experience (capability API 1.12)",
+);
+assert.match(
+  useGenerateSource,
+  /setPendingSpatialTransitionStatus\(params\.chatId, "needs_review"\);[\s\S]{0,1400}?dispatchSpatialCapabilityEvent\(getGameExperiencePackageId\(qc, params\.chatId\), \{[\s\S]{0,200}?type: "spatial_transition_rejected",/u,
+  "an HTTP-rejected owner-turn transition must synthesize spatial_transition_rejected to BOTH audiences",
+);
+assert.match(
+  useGenerateSource,
+  /spatialErrorCode\?\.startsWith\("spatial_"\) && spatialErrorCode !== "spatial_transition_already_applied"/u,
+  "the synthesized reject must fire only on definitive evidence — never for already_applied or codeless failures",
+);
+const useSpatialContextSource = readSourceText(
+  new URL("../../packages/client/src/hooks/use-spatial-context.ts", import.meta.url),
+  "utf8",
+);
+assert.match(
+  useSpatialContextSource,
+  /rejectCode !== "spatial_transition_already_applied";[\s\S]{0,700}?dispatchSpatialCapabilityEvent\(getGameExperiencePackageId\(queryClient, variables\.chatId\), \{[\s\S]{0,200}?type: "spatial_transition_rejected",/u,
+  "the REST owner-turn commit must synthesize its reject to BOTH audiences, gated on definitive evidence",
+);
+assert.match(
+  useSpatialContextSource,
+  /type: "spatial_context_refresh",[\s\S]{0,120}?chatId: variables\.chatId,/u,
+  "inconclusive REST commit failures must fall back to the untyped refresh nudge",
 );
 assert.match(
   useGenerateSource,
@@ -388,29 +680,27 @@ assert.match(
 );
 assert.match(
   echoChamberPanelSource,
-  /if \(activeChatId\) setEchoChamberSizeForChat\(activeChatId, nextSize\);/u,
-  "Echo Chamber should persist a completed resize against the active chat",
+  /<FloatingWindow\s+id=\{ECHO_WINDOW_ID\}/u,
+  "Echo Chamber should reuse the shared window's drag and resize behavior",
 );
 assert.match(
   echoChamberPanelSource,
-  /onPointerCancel=\{handleResizeCancel\}/u,
-  "a canceled Echo Chamber resize should use its rollback path",
+  /useFloatingWindowStore\(\(s\) => s\.layouts\[ECHO_WINDOW_ID\]\)/u,
+  "Echo Chamber should read the shared per-chat layout before falling back to legacy dimensions",
 );
 assert.match(
   echoChamberPanelSource,
-  /onLostPointerCapture=\{handleResizeLostCapture\}/u,
-  "Echo Chamber should still commit a finished drag when the browser drops pointer capture",
-);
-assert.doesNotMatch(
-  echoChamberPanelSource,
-  /onPointerCancel=\{handleResizeEnd\}/u,
-  "pointer cancellation must not persist an incomplete Echo Chamber resize",
+  /const minimized = savedLayout\?\.minimized \?\? !echoChamberOpen/u,
+  "a saved Echo Chamber close should take precedence over the old global open preference",
 );
 assert.match(
   uiStoreSource,
   /echoChamberSizeByChatId: state\.echoChamberSizeByChatId/u,
   "per-chat Echo Chamber dimensions should survive UI-store rehydration",
 );
+assert.equal(normalizeConversationBackgroundImageOpacity(-10), 0);
+assert.equal(normalizeConversationBackgroundImageOpacity(140), 100);
+assert.equal(normalizeConversationBackgroundImageOpacity("invalid"), 45);
 assert.match(
   uiStoreSource,
   /previous\.echoChamberSizes !== next\.echoChamberSizes/u,
@@ -623,6 +913,48 @@ assert.match(
   /isStreaming=\{isTextStreaming\}[\s\S]{0,120}generationVisualsPaused=\{isStreaming \|\| agentProcessing\}/u,
   "Roleplay messages should remain editable while ambient rendering stays suspended for background work",
 );
+const earlyTTSReadyIndex = generateRouteSource.indexOf("if (activatedTextRewriteRunAgents.length === 0)");
+const parallelAgentWaitIndex = generateRouteSource.indexOf("const completedParallelResults = await parallelPromise");
+const textRewritePhaseIndex = generateRouteSource.indexOf("// ── Text rewrite/editing agents:");
+const rewrittenTTSReadyIndex = generateRouteSource.indexOf("if (activatedTextRewriteRunAgents.length > 0)");
+assert.ok(
+  earlyTTSReadyIndex > 0 && earlyTTSReadyIndex < parallelAgentWaitIndex,
+  "TTS-ready text without a rewrite agent must be released before parallel and post-generation agents finish",
+);
+assert.ok(
+  rewrittenTTSReadyIndex > textRewritePhaseIndex,
+  "TTS-ready text must wait for active message-rewriting agents to persist their final edit",
+);
+assert.match(
+  generateRouteSource,
+  /activatedTextRewriteRunAgents\.length === 0\) \{\s*await sendAssistantMessageReady\(currentIterationSavedMsg\)/u,
+  "TTS-ready text without a rewrite agent should use the saved row without another storage lookup",
+);
+assert.match(
+  generateRouteSource,
+  /activatedTextRewriteRunAgents\.length > 0\) \{\s*await sendAssistantMessageReady\(\)/u,
+  "TTS-ready text after rewrite agents must reload the persisted edited row",
+);
+assert.match(
+  generateRouteSource,
+  /while \(true\) \{[\s\S]{0,700}let currentIterationSavedMsg: typeof lastSavedMsg = null/u,
+  "Each Mari follow-up iteration must reset the assistant message eligible for TTS",
+);
+assert.match(
+  generateRouteSource,
+  /const messageId = \(currentIterationSavedMsg as \{ id\?: unknown \} \| null\)\?\.id/u,
+  "TTS readiness must use only the assistant message saved in the current follow-up iteration",
+);
+assert.match(
+  generateHookSource,
+  /case "assistant_message_ready": \{[\s\S]{0,500}TTS_AUTOPLAY_MESSAGE_READY_EVENT/u,
+  "the generation stream must forward finalized assistant text to TTS autoplay immediately",
+);
+assert.match(
+  chatAreaSource,
+  /addEventListener\(TTS_AUTOPLAY_MESSAGE_READY_EVENT, handleMessageReady\)/u,
+  "TTS autoplay must listen for finalized text without waiting for the full agent stream to close",
+);
 const galleryCreateIndex = generateRouteSource.indexOf("const galleryEntry = await galleryStore.create");
 const illustrationMessageLookupIndex = generateRouteSource.indexOf(
   "const msgRow = await chats.getMessage(messageId)",
@@ -772,8 +1104,8 @@ assert.match(
 );
 assert.match(
   firefoxSupportsSource,
-  /(?:^|\})\s*\[data-chat-mode="roleplay"\] \.marinara-chat-input-shell\s*\{[^{}]*background:\s*linear-gradient\(var\(--card\), var\(--card\)\),\s*var\(--background\) !important;[^{}]*\}/u,
-  "Firefox should use an opaque Roleplay composer surface after disabling backdrop blur",
+  /(?:^|\})\s*\[data-chat-mode="roleplay"\] \.marinara-chat-input-shell\s*\{[^{}]*--mari-chat-existing-bg:\s*linear-gradient\(var\(--card\), var\(--card\)\),\s*var\(--background\);[^{}]*background:\s*var\(--mari-chat-surface-paint,\s*var\(--mari-chat-existing-bg\)\) !important;[^{}]*\}/u,
+  "Firefox should retain the opaque Roleplay composer fallback while allowing the selected chat surface paint",
 );
 assert.doesNotMatch(
   chatInputSource,
@@ -817,8 +1149,8 @@ assert.match(
 );
 assert.match(
   chatRoleplaySurfaceSource,
-  /paddingBottom: "var\(--mari-roleplay-content-padding-bottom, 16px\)"/u,
-  "Roleplay transcript padding should consume the imperatively measured composer inset",
+  /paddingBottom:\s*"calc\(var\(--mari-roleplay-content-padding-bottom, 16px\) \+ var\(--mari-message-editor-scroll-space, 0px\)\)"/u,
+  "Roleplay transcript padding should combine the measured composer inset with editor scroll space",
 );
 assert.match(
   chatMessageSource,
@@ -874,12 +1206,12 @@ assert.match(
   "additional messages sent during a Conversation presence delay should persist without starting another generator",
 );
 assert.equal(
-  isGenerationStartBlocked({ setupLocked: false, activeController: true, backgroundIllustration: false }),
+  isGenerationStartBlocked({ activeController: true, backgroundIllustration: false }),
   true,
   "ordinary same-chat generations must remain exclusive",
 );
 assert.equal(
-  isGenerationStartBlocked({ setupLocked: false, activeController: true, backgroundIllustration: true }),
+  isGenerationStartBlocked({ activeController: true, backgroundIllustration: true }),
   false,
   "the next same-chat generation should be allowed while Illustrator finishes",
 );
@@ -987,6 +1319,48 @@ assert.ok(
   delayedFrameBudget.maxCharacters <= 3,
   "a delayed frame must not dump its entire reveal debt as one chunky typewriter burst",
 );
+assert.equal(
+  getTypewriterPaintIntervalMs(
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15",
+    "iPhone",
+    5,
+  ),
+  50,
+  "iPhone WebKit should batch stream paints to 20 FPS",
+);
+assert.equal(
+  getTypewriterPaintIntervalMs("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)", "MacIntel", 5),
+  50,
+  "desktop-mode iPadOS should receive the same stream paint protection",
+);
+assert.equal(
+  getTypewriterPaintIntervalMs("Mozilla/5.0 (Linux; Android 16)", "Linux armv8l", 5),
+  0,
+  "non-iOS browsers should retain the native animation cadence",
+);
+assert.equal(
+  shouldUsePersistentTTSAudioCache(
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 26_6 like Mac OS X) AppleWebKit/605.1.15 CriOS/151 Mobile/15E148",
+    "iPhone",
+    5,
+  ),
+  false,
+  "iOS TTS must avoid persistent IndexedDB Blob writes that can stall WebKit",
+);
+assert.equal(
+  shouldUsePersistentTTSAudioCache("Mozilla/5.0 (Linux; Android 16)", "Linux armv8l", 5),
+  true,
+  "non-iOS TTS should retain the persistent cache",
+);
+let simulatedIosRemainder = 0;
+let simulatedIosCharacters = 0;
+for (let frame = 0; frame < 20; frame += 1) {
+  const budget = getTypewriterFrameBudget(90, 50, simulatedIosRemainder, 50);
+  const revealedCharacters = Math.min(Math.floor(budget.accruedCharacters), budget.maxCharacters);
+  simulatedIosRemainder = budget.accruedCharacters - revealedCharacters;
+  simulatedIosCharacters += revealedCharacters;
+}
+assert.equal(simulatedIosCharacters, 90, "batched iOS paints must preserve the selected reveal speed");
 assert.match(
   echoChamberPanelSource,
   /behavior: streamingChatId === activeChatId \? "auto" : "smooth"/u,
@@ -1078,11 +1452,44 @@ assert.equal(
   "regeneration owns the existing row in place and must not hide it",
 );
 const messageSavedHandlerSource =
-  useGenerateSource.match(/case "message_saved": \{[\s\S]*?case "schedule_updated":/u)?.[0] ?? "";
+  useGenerateSource.match(/case "message_saved": \{[\s\S]*?case "assistant_message_ready":/u)?.[0] ?? "";
 assert.match(
   messageSavedHandlerSource,
-  /if \(!keepStreamLiveThroughPostProcessing\) \{[\s\S]*?rememberContinuedMessageContent\(savedMessage\);[\s\S]*?\}[\s\S]*?upsertPersistedMessages\(qc, params\.chatId, \[savedMessage\]\);/u,
-  "a saved Roleplay reply must remain cached while its live presentation is shadowing it",
+  /if \(!keepStreamLiveThroughPostProcessing\) \{[\s\S]*?rememberContinuedMessageContent\(savedMessage\);[\s\S]*?\}/u,
+  "saved Roleplay replies should retain their continuation handoff",
+);
+const messageSavedCacheUpdateCount = (messageSavedHandlerSource.match(/upsertPersistedMessages\(/gu) ?? []).length;
+assert.equal(
+  messageSavedCacheUpdateCount,
+  2,
+  "saved Roleplay replies should enter the cache while Game replies wait for the final scene handoff",
+);
+assert.equal(
+  (
+    messageSavedHandlerSource.match(
+      /if \(!isGameGeneration(?: && \(!streamingEnabled \|\| !shouldDisplayRawStream\))?\) (?:\{\s*)?upsertPersistedMessages\(qc, params\.chatId, \[(?:heldMessage|savedMessage)\]\);/gu,
+    ) ?? []
+  ).length,
+  messageSavedCacheUpdateCount,
+  "every message_saved cache update should remain behind a Game-mode guard",
+);
+const selfieHandlerSource = useGenerateSource.match(/case "selfie": \{[\s\S]*?case "selfie_error":/u)?.[0] ?? "";
+assert.match(
+  selfieHandlerSource,
+  /if \(!streamingEnabled && !isGameGeneration\) \{[\s\S]*?refreshMessagesAuthoritatively/u,
+  "selfies should not refresh the visible cache during Game generation",
+);
+const illustrationHandlerSource =
+  useGenerateSource.match(/case "illustration": \{[\s\S]*?case "illustration_queued":/u)?.[0] ?? "";
+assert.match(
+  illustrationHandlerSource,
+  /if \(!isGameGeneration && canRefreshCurrentMessagesNow\(\)\) \{[\s\S]*?refreshMessagesAuthoritatively/u,
+  "illustrations refresh after the live presentation hands off, but never during Game generation",
+);
+assert.match(
+  useGenerateSource,
+  /if \(isGameGeneration(?: \|\| \(receivedContent && persistedForRefresh\.length === 0\))?\) \{\s*await refreshMessagesAuthoritatively\(qc, params\.chatId, persistedForRefresh\);[\s\S]*?setStreaming\(false\);/u,
+  "Game generation should publish the authoritative scene before releasing its presentation stream",
 );
 const updateMessageHookSource =
   useChatsSource.match(/export function useUpdateMessage[\s\S]*?export function useUpdateMessageExtra/u)?.[0] ?? "";
@@ -1128,6 +1535,23 @@ assert.equal(merged.length, 2, "the three built-in rewrite agents should share o
 assert.match(merged[0]!.name, /prose-guardian.*continuity.*html/u);
 assert.equal(getAgentBatchLane(merged[0]!), "rewrite");
 assert.equal(getAgentBatchLane(trackerAgent), "standard");
+// #6977: a rewrite agent with sharing turned off keeps its own editor request.
+const soloContinuity = {
+  ...rewriteAgents[1]!,
+  settings: { ...rewriteAgents[1]!.settings, batchWithOtherAgents: false },
+};
+const partlyMerged = mergePairedBuiltInRewriteAgents([
+  rewriteAgents[0]!,
+  soloContinuity,
+  rewriteAgents[2]!,
+  trackerAgent,
+]);
+assert.deepEqual(
+  partlyMerged.map((agent) => agent.name),
+  ["prose-guardian + html", "continuity", "world-state"],
+  "a rewrite agent that may not share runs on its own beside the merged editor",
+);
+assert.doesNotMatch(partlyMerged[0]!.promptTemplate, /continuity prompt/u, "the merged editor leaves out its tasks");
 assert.equal(
   estimateAgentLoadCost(
     [
@@ -1150,6 +1574,20 @@ assert.equal(
   ).extraCalls,
   2,
   "rewrite editors should count as one call separate from the tracker call",
+);
+assert.equal(
+  estimateAgentLoadCost(
+    ["notes-a", "notes-b", "notes-solo"].map((type) => ({
+      type,
+      phase: "post_processing" as const,
+      connectionId: "connection-1",
+      promptTemplate: `${type} prompt`,
+      ownRequest: type === "notes-solo",
+    })),
+    null,
+  ).extraCalls,
+  2,
+  "#6977: an agent with its own request counts as a call of its own",
 );
 
 class CountingTrackerBatchProvider extends BaseLLMProvider {
@@ -1264,6 +1702,45 @@ assert.deepEqual(
   "tracker batch debug output should describe the real combined request",
 );
 
+// Agent output and persisted history are untrusted even when the API is typed.
+const malformedEchoReactions = [
+  null,
+  "not a reaction",
+  { reaction: "Missing name" },
+  { characterName: 42, reaction: "Wrong name type" },
+  { characterName: "   ", reaction: "Empty name" },
+  { characterName: "Watcher", reaction: { text: "Wrong reaction type" } },
+  { characterName: "Watcher", reaction: "  " },
+  { characterName: "Watcher", reaction: "A valid reaction" },
+];
+useAgentStore.getState().clearEchoMessages();
+useAgentStore.getState().enqueueEchoMessages(malformedEchoReactions);
+assert.deepEqual(
+  useAgentStore.getState().echoMessages.map(({ characterName, reaction }) => ({ characterName, reaction })),
+  [{ characterName: "Watcher", reaction: "A valid reaction" }],
+  "a malformed reaction must not enter the UI queue or hide valid siblings",
+);
+useAgentStore
+  .getState()
+  .setEchoMessages([
+    ...malformedEchoReactions,
+    { characterName: "Reader", reaction: "Valid saved reaction", timestamp: 12 },
+  ]);
+assert.equal(useAgentStore.getState().echoMessages.length, 2);
+assert.equal(useAgentStore.getState().echoMessages[0]?.timestamp, 7);
+assert.equal(useAgentStore.getState().echoMessages[1]?.timestamp, 12);
+for (const value of [null, {}, "malformed", 7]) {
+  useAgentStore.getState().enqueueEchoMessages(value);
+  assert.equal(useAgentStore.getState().echoMessages.length, 2);
+  useAgentStore.getState().setEchoMessages(value);
+  assert.equal(useAgentStore.getState().echoMessages.length, 0);
+  useAgentStore.getState().setEchoMessages([
+    { characterName: "A", reaction: "A" },
+    { characterName: "B", reaction: "B" },
+  ]);
+}
+useAgentStore.getState().clearEchoMessages();
+
 const queuedEchoBatch = enqueueEchoChamberMessages(
   {
     messages: [{ characterName: "Watcher", reaction: "The old reaction.", timestamp: 1 }],
@@ -1280,10 +1757,12 @@ const queuedEchoBatch = enqueueEchoChamberMessages(
 assert.equal(queuedEchoBatch.messages.length, 4);
 assert.equal(queuedEchoBatch.visibleCount, 1, "a fresh Echo result must remain behind the reveal cursor");
 assert.equal(queuedEchoBatch.baseline, 1);
-assert.equal(getEchoChamberMessageInterval(0), ECHO_CHAMBER_MESSAGE_INTERVAL_MIN_MS);
-assert.equal(getEchoChamberMessageInterval(0.5), 20_000);
-assert.ok(getEchoChamberMessageInterval(0.999999) < ECHO_CHAMBER_MESSAGE_INTERVAL_MAX_MS);
-assert.equal(getEchoChamberMessageInterval(1), ECHO_CHAMBER_MESSAGE_INTERVAL_MAX_MS);
+assert.equal(getEchoChamberMessageInterval(12), 12_000);
+assert.equal(normalizeEchoChamberMessageDelaySeconds(undefined), DEFAULT_ECHO_CHAMBER_MESSAGE_DELAY_SECONDS);
+assert.equal(normalizeEchoChamberMessageDelaySeconds(null), DEFAULT_ECHO_CHAMBER_MESSAGE_DELAY_SECONDS);
+assert.equal(normalizeEchoChamberMessageDelaySeconds("  "), DEFAULT_ECHO_CHAMBER_MESSAGE_DELAY_SECONDS);
+assert.equal(normalizeEchoChamberMessageDelaySeconds(0), 1);
+assert.equal(normalizeEchoChamberMessageDelaySeconds(999), 300);
 
 const staleEchoCursor = enqueueEchoChamberMessages(
   { messages: [], visibleCount: 99, baseline: 99 },

@@ -47,6 +47,11 @@ export interface GameState {
   /** JSON object of tracker field keys hidden from the UI. */
   hiddenTrackerFields?: TrackerHiddenFields | null;
 
+  /** Live ruleset sheet state per party card, keyed by normalized card name. Only games that
+   *  pinned a ruleset carry it. It is part of the snapshot so a swipe or a regenerated turn
+   *  rewinds it: sheet commands are relative, and a regenerated turn must not spend twice. */
+  rulesetLive?: import("../features/rulesets/live-state.js").RulesetLiveStates | null;
+
   createdAt: string;
 }
 
@@ -104,6 +109,16 @@ export interface CustomTrackerField {
   locked?: boolean;
 }
 
+/** A concise row maintained by the dedicated roleplay Inventory Tracker. */
+export interface InventoryTrackerRow {
+  name: string;
+  /** Omitted when the quantity is one. */
+  qty?: number;
+  description?: string;
+  /** Where this item is kept, such as a backpack pocket or a storage chest. */
+  location?: string;
+}
+
 /** Player-specific stats and inventory. */
 export interface PlayerStats {
   /** Custom stat bars */
@@ -120,6 +135,12 @@ export interface PlayerStats {
   status: string;
   /** User-defined custom tracker fields */
   customTrackerFields?: CustomTrackerField[];
+  /** Money and other currencies maintained by the Inventory Tracker agent. */
+  inventoryTrackerCurrencies?: InventoryTrackerRow[];
+  /** Items currently equipped, maintained by the Inventory Tracker agent. */
+  inventoryTrackerEquipped?: InventoryTrackerRow[];
+  /** Carried non-equipped items maintained by the Inventory Tracker agent. */
+  inventoryTrackerInventory?: InventoryTrackerRow[];
 }
 
 /** Classic D&D-style attributes. */
@@ -134,6 +155,9 @@ export interface RPGAttributes {
 
 /** An item in the player's inventory. */
 export interface InventoryItem {
+  /** Which item of Game Mode's inventory this entry follows (see `gameInventoryItemId`), stamped the
+   *  first time the Engine moves it. Entries written without one are matched by name. */
+  item?: string;
   name: string;
   description: string;
   quantity: number;

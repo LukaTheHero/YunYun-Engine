@@ -19,6 +19,8 @@ dist/
 
 # Environment (may contain encryption keys)
 .env
+.env.timeouts.json
+.env.timeouts.json.*.tmp
 .env.local
 .env.production
 
@@ -68,3 +70,8 @@ win/installer/*.exe
 # Local docker compose overrides (per-machine dev config)
 docker-compose.override.yml
 docker-compose.override.yaml
+
+# MCP
+.playwright-mcp
+# Dev MCP local state (journal, logs, lock)
+.dev-mcp/

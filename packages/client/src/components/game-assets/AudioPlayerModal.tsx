@@ -36,7 +36,7 @@ export function AudioPlayerModal({ path, name, onClose }: { path: string; name: 
       role="dialog"
       aria-modal="true"
       aria-label={localizeUi("ui.gameAssets.audioplayermodal.audioPlayerValue1", { value1: name })}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-sm sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 pb-[max(var(--mari-safe-area-inset-bottom,env(safe-area-inset-bottom)),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)] backdrop-blur-sm sm:p-4"
       onClick={onClose}
     >
       <div
@@ -45,21 +45,30 @@ export function AudioPlayerModal({ path, name, onClose }: { path: string; name: 
       >
         <h3 className="mb-4 text-sm font-semibold text-(--foreground)">{name}</h3>
         <audio controls className="w-full" autoPlay onError={() => setPlayError(true)}>
-          <source src={assetUrl} type={mime} />{localizeUi("ui.gameAssets.audioplayermodal.yourBrowserDoesNotSupportTheAudioElement")}</audio>
+          <source src={assetUrl} type={mime} />
+          {localizeUi("ui.gameAssets.audioplayermodal.yourBrowserDoesNotSupportTheAudioElement")}
+        </audio>
         {playError && (
-          <p className="mt-2 text-xs text-[var(--primary)]">{localizeUi("ui.gameAssets.audioplayermodal.yourBrowserCanTPlay")} {ext || "this"} {localizeUi("ui.gameAssets.audioplayermodal.fileUseTheDownloadButtonBelow")}</p>
+          <p className="mt-2 text-xs text-[var(--primary)]">
+            {localizeUi("ui.gameAssets.audioplayermodal.yourBrowserCanTPlay")} {ext || "this"}{" "}
+            {localizeUi("ui.gameAssets.audioplayermodal.fileUseTheDownloadButtonBelow")}
+          </p>
         )}
         <div className="mt-4 flex justify-end gap-2">
           <a
             href={assetUrl}
             download={name}
             className="rounded-lg border border-(--border) bg-(--background) px-4 py-2 text-xs font-medium text-(--foreground) transition-colors hover:bg-(--accent)"
-          >{localizeUi("ui.characters.charactergallerytab.download")}</a>
+          >
+            {localizeUi("ui.characters.charactergallerytab.download")}
+          </a>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg border border-(--border) bg-(--background) px-4 py-2 text-xs font-medium text-(--foreground) transition-colors hover:bg-(--accent)"
-          >{localizeUi("capabilities.actions.close")}</button>
+          >
+            {localizeUi("capabilities.actions.close")}
+          </button>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { execFileSync } from "node:child_process";
 import path from "path";
+import { delegateDirectAndroidBuild } from "./scripts/build-heap.mjs";
 
 const ENABLE_SOURCE_MAPS = process.env.VITE_ENABLE_SOURCEMAP === "true";
 const PWA_DISABLED = Boolean(process.env.SKIP_PWA);
@@ -40,7 +41,21 @@ function resolveBuildCommit() {
 const BUILD_COMMIT = resolveBuildCommit();
 
 function manualChunks(id: string) {
-  if (!id.includes("node_modules")) return undefined;
+  if (id.endsWith("/components/game/game-narration-format.ts")) return "game-narration-format";
+  if (id.endsWith("/components/game/GameNarrationVisuals.tsx")) return "game-narration-visuals";
+  if (id.endsWith("/lib/game-tag-parser.ts")) return "game-tag-parser";
+  // The inventory screen grows with every kind of item a ruleset can describe, so it is its own chunk
+  // rather than weight on GameSurface's budget.
+  if (id.endsWith("/components/game/GameInventory.tsx") || id.endsWith("/components/game/RulesetItemPicker.tsx"))
+    return "game-inventory";
+  // So is the book the inventory reads a ruleset's items through, and the items the Game Master
+  // invents, rather than weight on the game tag parser's chunk, which takes the rest of the shared code.
+  if (/\/shared\/(?:dist|src)\/features\/rulesets\/(?:item-book|invented-items)\.(?:js|ts)$/u.test(id))
+    return "ruleset-items";
+  if (!id.includes("/node_modules/")) return undefined;
+  // Ignore checkout names, but keep pnpm peer suffixes so React and its consumers stay together.
+  // Removing those suffixes splits eager React imports across chunks and creates startup cycles.
+  id = id.slice(id.search(/\/(?:\.pnpm|node_modules)\//u));
 
   // Keep dynamically selected Lucide glyphs in small alphabetical chunks
   // instead of pulling the complete icon catalog into one eager vendor file.
@@ -86,6 +101,8 @@ function bundleBudget(): Plugin {
         );
       }
 
+      // Keep lazy feature chunks below the 500 KiB bundle limit. Game narration's
+      // reusable HTML formatter has its own boundary so GameSurface does not absorb it.
       const oversizedChunks = chunks.filter((chunk) => chunk.sizeKb > 500);
       if (oversizedChunks.length > 0) {
         this.error(
@@ -96,6 +113,11 @@ function bundleBudget(): Plugin {
       }
     },
   };
+}
+
+/** Hands a direct Android `vite build` that lacks heap to scripts/build.mjs (see build-heap.mjs). */
+function androidBuildHeap(): Plugin {
+  return { name: "android-build-heap", apply: "build", config: () => delegateDirectAndroidBuild() };
 }
 
 /** Stub for virtual:pwa-register when the real PWA plugin is skipped (e.g. Termux). */
@@ -118,6 +140,7 @@ export default defineConfig({
     __MARINARA_BUILD_COMMIT__: JSON.stringify(BUILD_COMMIT),
   },
   plugins: [
+    androidBuildHeap(),
     react({
       babel: {
         // Keep Babel from auto-compacting large components and printing a noisy
@@ -130,10 +153,11 @@ export default defineConfig({
     !PWA_DISABLED
       ? VitePWA({
           injectRegister: false,
-          registerType: "autoUpdate",
+          registerType: "prompt",
           devOptions: { enabled: false },
           manifest: false, // We use the static manifest.json in public/
           workbox: {
+            importScripts: ["notification-events.js"],
             // Intentionally exclude html so index.html is not precached and does not interfere with the PWA stale-version/update flow.
             globPatterns: ["**/*.{js,css,json,png,svg,ico,woff2}"],
             navigateFallback: null,
@@ -168,8 +192,11 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    manifest: true,
     target: "es2020",
     cssTarget: "safari14",
+    // Vite reports decimal kB; 512 kB matches the bundle plugin's enforced 500 KiB ceiling.
+    chunkSizeWarningLimit: 512,
     sourcemap: ENABLE_SOURCE_MAPS,
     rollupOptions: {
       output: {

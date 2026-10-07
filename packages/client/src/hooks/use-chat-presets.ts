@@ -3,7 +3,7 @@
 // ──────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api-client";
-import { chatKeys, syncCachedChat } from "./use-chats";
+import { captureChatMetadataVersion, chatKeys, guardServerChatSnapshot, syncCachedChat } from "./use-chats";
 import type { Chat, ChatMode, ChatPreset, ChatPresetSettings } from "@marinara-engine/shared";
 
 export const chatPresetKeys = {
@@ -74,13 +74,22 @@ export function useImportChatPreset() {
 export function useApplyChatPreset() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ presetId, chatId, connectionId }: { presetId: string; chatId: string; connectionId?: string | null }) =>
+    mutationFn: ({
+      presetId,
+      chatId,
+      connectionId,
+    }: {
+      presetId: string;
+      chatId: string;
+      connectionId?: string | null;
+    }) =>
       api.post<Chat>(
         `/chat-presets/${presetId}/apply/${chatId}`,
         connectionId !== undefined ? { connectionId } : undefined,
       ),
-    onSuccess: (data, variables) => {
-      if (data) syncCachedChat(qc, data);
+    onMutate: ({ chatId }) => ({ metadataVersion: captureChatMetadataVersion(chatId) }),
+    onSuccess: (data, variables, context) => {
+      if (data) syncCachedChat(qc, guardServerChatSnapshot(qc, data, context?.metadataVersion ?? 0));
       qc.invalidateQueries({ queryKey: chatKeys.detail(variables.chatId) });
       qc.invalidateQueries({ queryKey: chatKeys.list() });
       qc.invalidateQueries({ queryKey: [...chatKeys.all, "group"] });

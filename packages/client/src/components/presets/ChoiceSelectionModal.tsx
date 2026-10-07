@@ -18,7 +18,9 @@ interface ChoiceSelectionModalProps {
   open: boolean;
   onClose: () => void;
   presetId: string | null;
-  chatId: string;
+  chatId?: string;
+  /** Draft setup has no chat yet; return choices without writing chat metadata. */
+  onConfirm?: (choices: Record<string, string | string[]>) => void;
   /** Existing selections to pre-populate (variableName → value or values) */
   existingChoices?: Record<string, string | string[]>;
   chatFloatingPanel?: boolean;
@@ -82,14 +84,22 @@ function sanitizeChoiceSelection(
 
 function fallbackChoiceSelection(variable: VariableData): string | string[] | undefined {
   if (variable.multiSelect) return [];
+  if (variable.randomPick && variable.options.length > 0) {
+    return variable.options[Math.floor(Math.random() * variable.options.length)].value;
+  }
   return variable.options[0]?.value;
 }
 
-export function ChoiceSelectionModal({
+export function ChoiceSelectionModal(props: ChoiceSelectionModalProps) {
+  return <ChatChoiceSelectionModal key={`${props.chatId}:${props.presetId}`} {...props} />;
+}
+
+function ChatChoiceSelectionModal({
   open,
   onClose,
   presetId,
   chatId,
+  onConfirm,
   existingChoices = {},
   chatFloatingPanel = false,
 }: ChoiceSelectionModalProps) {
@@ -135,6 +145,12 @@ export function ChoiceSelectionModal({
     }
   }, [data?.preset]);
 
+  const fallbackSelections = useMemo(
+    () =>
+      Object.fromEntries(variables.map((variable) => [variable.variableName, fallbackChoiceSelection(variable) ?? ""])),
+    [variables],
+  );
+
   // Base selections derived from existing choices / defaults / first option.
   // Pure derivation — no setState, no flicker on open.
   const baseSelections = useMemo<Record<string, string | string[]>>(() => {
@@ -144,17 +160,17 @@ export function ChoiceSelectionModal({
       const existing = existingChoices[v.variableName];
       const saved = defaultChoices[v.variableName];
       if (existing !== undefined) {
-        initial[v.variableName] = sanitizeChoiceSelection(v, existing) ?? fallbackChoiceSelection(v) ?? "";
-      } else if (saved !== undefined) {
-        initial[v.variableName] = sanitizeChoiceSelection(v, saved) ?? fallbackChoiceSelection(v) ?? "";
+        initial[v.variableName] = sanitizeChoiceSelection(v, existing) ?? fallbackSelections[v.variableName] ?? "";
+      } else if (saved !== undefined && !(v.randomPick && !v.multiSelect)) {
+        initial[v.variableName] = sanitizeChoiceSelection(v, saved) ?? fallbackSelections[v.variableName] ?? "";
       } else if (v.multiSelect) {
         initial[v.variableName] = [];
-      } else if (v.options.length > 0) {
-        initial[v.variableName] = v.options[0].value;
+      } else {
+        initial[v.variableName] = fallbackSelections[v.variableName] ?? "";
       }
     }
     return initial;
-  }, [variables, existingChoices, defaultChoices]);
+  }, [variables, existingChoices, defaultChoices, fallbackSelections]);
 
   // User overrides (only written when user clicks an option).
   // Reset when modal re-opens so stale overrides don't persist.
@@ -167,12 +183,20 @@ export function ChoiceSelectionModal({
     prevOpenRef.current = open;
   }, [open]);
 
+  const autoClosedRef = useRef(false);
   useEffect(() => {
-    if (!open || isLoading || !presetId) return;
-    if (variables.length === 0) {
-      onClose();
+    if (!open) {
+      autoClosedRef.current = false;
+      return;
     }
-  }, [open, isLoading, onClose, presetId, variables.length]);
+    if (isLoading || autoClosedRef.current) return;
+    if (!presetId || variables.length === 0) {
+      // Closing can advance the setup wizard; do it only once, including StrictMode effects.
+      autoClosedRef.current = true;
+      if (onConfirm) onConfirm({});
+      else onClose();
+    }
+  }, [open, isLoading, onClose, onConfirm, presetId, variables.length]);
 
   // Merged view: base + user overrides
   const selections = useMemo(() => ({ ...baseSelections, ...overrides }), [baseSelections, overrides]);
@@ -181,12 +205,13 @@ export function ChoiceSelectionModal({
 
   const handleConfirm = useCallback(() => {
     // Save selections to chat metadata
-    updateMetadata.mutate({ id: chatId, presetChoices: selections }, { onSuccess: () => onClose() });
+    if (onConfirm) onConfirm(selections);
+    else if (chatId) updateMetadata.mutate({ id: chatId, presetChoices: selections }, { onSuccess: () => onClose() });
     // Optionally save as default for this preset
     if (saveAsDefault && presetId) {
       updatePreset.mutate({ id: presetId, defaultChoices: selections });
     }
-  }, [chatId, presetId, selections, saveAsDefault, updateMetadata, updatePreset, onClose]);
+  }, [chatId, presetId, selections, saveAsDefault, updateMetadata, updatePreset, onClose, onConfirm]);
 
   // Toggle a single option in a multi-select variable
   const toggleMulti = useCallback(
@@ -211,6 +236,7 @@ export function ChoiceSelectionModal({
       title={localizeUi("ui.presets.choiceselectionmodal.configurePresetVariables")}
       width="max-w-lg"
       chatFloatingPanel={chatFloatingPanel}
+      closeDisabled={updateMetadata.isPending}
     >
       {variables.length === 0 ? (
         isLoading ? (
@@ -219,65 +245,75 @@ export function ChoiceSelectionModal({
           </div>
         ) : null
       ) : (
-        <div className="space-y-4 p-4">
-          <p className="text-xs text-[var(--muted-foreground)]">{localizeUi("ui.presets.choiceselectionmodal.thisPresetHasConfigurableVariablesSelectOptionSFor")}</p>
+        <fieldset disabled={updateMetadata.isPending} className="min-w-0 space-y-4 p-4">
+          <p className="text-xs text-[var(--muted-foreground)]">
+            {localizeUi("ui.presets.choiceselectionmodal.thisPresetHasConfigurableVariablesSelectOptionSFor")}
+          </p>
 
           {variables.map((v) => {
             const presentedOptions = getPresentedOptions(v);
             const listboxMode = shouldUseListbox(v);
             return (
               <div key={v.id} className="rounded-xl border border-[var(--border)] bg-[var(--secondary)] p-3">
-              <h4 className="mb-1 text-xs font-semibold text-[var(--foreground)]">{v.question}</h4>
-              <div className="mb-2 flex items-center gap-2">
-                <p className="text-[0.625rem] text-[var(--muted-foreground)]">{localizeUi("ui.presets.choiceselectionmodal.variable")} <code className="text-[var(--foreground)]">{`{{${v.variableName}}}`}</code>
-                </p>
-                {v.options.length === 1 && !v.multiSelect && (
-                  <span className="flex items-center gap-0.5 rounded bg-[var(--accent)] px-1.5 py-0.5 text-[0.5625rem] font-medium text-[var(--foreground)]">{localizeUi("ui.presets.choiceselectionmodal.booleanToggle")}</span>
-                )}
-                {v.multiSelect && (
-                  <span className="flex items-center gap-0.5 rounded bg-[var(--accent)] px-1.5 py-0.5 text-[0.5625rem] font-medium text-[var(--foreground)]">
-                    {v.randomPick ? (
-                      <>
-                        <Shuffle size="0.5625rem" /> {localizeUi("ui.presets.choiceselectionmodal.randomPick")}</>
-                    ) : (
-                      <>
-                        <ListChecks size="0.5625rem" /> {localizeUi("ui.presets.choiceselectionmodal.multiSelect")}</>
-                    )}
-                  </span>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                {listboxMode && v.multiSelect ? (
-                  <select
-                    multiple
-                    value={Array.isArray(selections[v.variableName]) ? (selections[v.variableName] as string[]) : []}
-                    onChange={(e) => {
-                      const next = Array.from(e.currentTarget.selectedOptions, (option) => option.value);
-                      setOverrides((prev) => ({ ...prev, [v.variableName]: next }));
-                    }}
-                    size={Math.min(8, Math.max(4, presentedOptions.length))}
-                    className="mari-preset-native-select min-h-28 w-full rounded-lg bg-[var(--background)] px-2 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                  >
-                    {presentedOptions.map((opt) => (
-                      <option key={opt.id} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : listboxMode ? (
-                  <select
-                    value={typeof selections[v.variableName] === "string" ? (selections[v.variableName] as string) : ""}
-                    onChange={(e) => setOverrides((prev) => ({ ...prev, [v.variableName]: e.target.value }))}
-                    className="mari-preset-native-select w-full rounded-lg bg-[var(--background)] px-3 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                  >
-                    {presentedOptions.map((opt) => (
-                      <option key={opt.id} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : v.multiSelect
-                  ? // ── Multi-select: checkboxes ──
+                <h4 className="mb-1 text-xs font-semibold text-[var(--foreground)]">{v.question}</h4>
+                <div className="mb-2 flex items-center gap-2">
+                  <p className="text-[0.625rem] text-[var(--muted-foreground)]">
+                    {localizeUi("ui.presets.choiceselectionmodal.variable")}{" "}
+                    <code className="text-[var(--foreground)]">{`{{${v.variableName}}}`}</code>
+                  </p>
+                  {v.options.length === 1 && !v.multiSelect && (
+                    <span className="flex items-center gap-0.5 rounded bg-[var(--accent)] px-1.5 py-0.5 text-[0.5625rem] font-medium text-[var(--foreground)]">
+                      {localizeUi("ui.presets.choiceselectionmodal.booleanToggle")}
+                    </span>
+                  )}
+                  {(v.multiSelect || v.randomPick) && (
+                    <span className="flex items-center gap-0.5 rounded bg-[var(--accent)] px-1.5 py-0.5 text-[0.5625rem] font-medium text-[var(--foreground)]">
+                      {v.randomPick ? (
+                        <>
+                          <Shuffle size="0.5625rem" /> {localizeUi("ui.presets.choiceselectionmodal.randomPick")}
+                        </>
+                      ) : (
+                        <>
+                          <ListChecks size="0.5625rem" /> {localizeUi("ui.presets.choiceselectionmodal.multiSelect")}
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {listboxMode && v.multiSelect ? (
+                    <select
+                      multiple
+                      value={Array.isArray(selections[v.variableName]) ? (selections[v.variableName] as string[]) : []}
+                      onChange={(e) => {
+                        const next = Array.from(e.currentTarget.selectedOptions, (option) => option.value);
+                        setOverrides((prev) => ({ ...prev, [v.variableName]: next }));
+                      }}
+                      size={Math.min(8, Math.max(4, presentedOptions.length))}
+                      className="mari-preset-native-select min-h-28 w-full rounded-lg bg-[var(--background)] px-2 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    >
+                      {presentedOptions.map((opt) => (
+                        <option key={opt.id} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : listboxMode ? (
+                    <select
+                      value={
+                        typeof selections[v.variableName] === "string" ? (selections[v.variableName] as string) : ""
+                      }
+                      onChange={(e) => setOverrides((prev) => ({ ...prev, [v.variableName]: e.target.value }))}
+                      className="mari-preset-native-select w-full rounded-lg bg-[var(--background)] px-3 py-2 text-xs text-[var(--foreground)] ring-1 ring-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                    >
+                      {presentedOptions.map((opt) => (
+                        <option key={opt.id} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : v.multiSelect ? (
+                    // ── Multi-select: checkboxes ──
                     presentedOptions.map((opt) => {
                       const selected = Array.isArray(selections[v.variableName])
                         ? (selections[v.variableName] as string[])
@@ -286,6 +322,7 @@ export function ChoiceSelectionModal({
                       return (
                         <button
                           key={opt.id}
+                          aria-pressed={isSelected}
                           onClick={() => toggleMulti(v.variableName, opt.value)}
                           className={cn(
                             "flex w-full items-start gap-2.5 rounded-lg p-2.5 text-left transition-all",
@@ -313,88 +350,82 @@ export function ChoiceSelectionModal({
                         </button>
                       );
                     })
-                  : presentedOptions.length === 1
-                    ? // ── Boolean toggle: single option ──
-                      (() => {
-                        const opt = presentedOptions[0];
-                        if (!opt) return null;
-                        const isOn = selections[v.variableName] === opt.value;
-                        return (
-                          <button
-                            onClick={() =>
-                              setOverrides((prev) => ({
-                                ...prev,
-                                [v.variableName]: isOn ? "" : opt.value,
-                              }))
-                            }
-                            className={cn(
-                              "flex w-full items-center justify-between gap-2.5 rounded-lg p-2.5 text-left transition-all",
-                              isOn
-                                ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
-                                : "hover:bg-[var(--accent)]",
-                            )}
-                          >
-                            <div className="min-w-0 flex-1">
+                  ) : presentedOptions.length === 1 ? (
+                    // ── Boolean toggle: single option ──
+                    (() => {
+                      const opt = presentedOptions[0];
+                      if (!opt) return null;
+                      const isOn = selections[v.variableName] === opt.value;
+                      return (
+                        <SettingsSwitch
+                          checked={isOn}
+                          onChange={(checked) =>
+                            setOverrides((prev) => ({
+                              ...prev,
+                              [v.variableName]: checked ? opt.value : "",
+                            }))
+                          }
+                          label={
+                            <span className="min-w-0 flex-1">
                               <span className={cn("text-xs font-medium", isOn && "text-[var(--primary)]")}>
                                 {opt.label}
                               </span>
                               {opt.value && (
-                                <p className="mt-0.5 line-clamp-2 text-[0.625rem] text-[var(--muted-foreground)]">
+                                <span className="mt-0.5 block line-clamp-2 text-[0.625rem] text-[var(--muted-foreground)]">
                                   {opt.value.slice(0, 150)}
                                   {opt.value.length > 150 ? "…" : ""}
-                                </p>
+                                </span>
                               )}
-                            </div>
-                            <div
-                              className={cn(
-                                "relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors",
-                                isOn ? "bg-[var(--primary)]" : "bg-[var(--border)]",
-                              )}
-                            >
-                              <span
-                                className={cn(
-                                  "pointer-events-none inline-block h-3 w-3 translate-y-0.5 rounded-full bg-white shadow transition-transform",
-                                  isOn ? "translate-x-3.5" : "translate-x-0.5",
-                                )}
-                              />
-                            </div>
-                          </button>
-                        );
-                      })()
-                    : // ── Single-select: radio-style ──
-                      presentedOptions.map((opt) => {
-                        const isSelected = selections[v.variableName] === opt.value;
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => setOverrides((prev) => ({ ...prev, [v.variableName]: opt.value }))}
-                            className={cn(
-                              "flex w-full items-start gap-2.5 rounded-lg p-2.5 text-left transition-all",
-                              isSelected
-                                ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
-                                : "hover:bg-[var(--accent)]",
+                            </span>
+                          }
+                          labelPosition="start"
+                          className={cn(
+                            "w-full justify-between gap-2.5 rounded-lg p-2.5 text-left transition-all",
+                            isOn
+                              ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
+                              : "hover:bg-[var(--accent)]",
+                          )}
+                          labelClassName="min-w-0 flex-1"
+                        />
+                      );
+                    })()
+                  ) : (
+                    // ── Single-select: radio-style ──
+                    presentedOptions.map((opt) => {
+                      const isSelected = selections[v.variableName] === opt.value;
+                      return (
+                        <button
+                          key={opt.id}
+                          aria-pressed={isSelected}
+                          onClick={() => setOverrides((prev) => ({ ...prev, [v.variableName]: opt.value }))}
+                          className={cn(
+                            "flex w-full items-start gap-2.5 rounded-lg p-2.5 text-left transition-all",
+                            isSelected
+                              ? "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/30"
+                              : "hover:bg-[var(--accent)]",
+                          )}
+                        >
+                          {isSelected ? (
+                            <CheckCircle2 size="0.875rem" className="mt-0.5 shrink-0 text-[var(--primary)]" />
+                          ) : (
+                            <Circle size="0.875rem" className="mt-0.5 shrink-0 text-[var(--muted-foreground)]" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className={cn("text-xs font-medium", isSelected && "text-[var(--primary)]")}>
+                              {opt.label}
+                            </span>
+                            {opt.value && (
+                              <p className="mt-0.5 line-clamp-2 text-[0.625rem] text-[var(--muted-foreground)]">
+                                {opt.value.slice(0, 150)}
+                                {opt.value.length > 150 ? "…" : ""}
+                              </p>
                             )}
-                          >
-                            {isSelected ? (
-                              <CheckCircle2 size="0.875rem" className="mt-0.5 shrink-0 text-[var(--primary)]" />
-                            ) : (
-                              <Circle size="0.875rem" className="mt-0.5 shrink-0 text-[var(--muted-foreground)]" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <span className={cn("text-xs font-medium", isSelected && "text-[var(--primary)]")}>
-                                {opt.label}
-                              </span>
-                              {opt.value && (
-                                <p className="mt-0.5 line-clamp-2 text-[0.625rem] text-[var(--muted-foreground)]">
-                                  {opt.value.slice(0, 150)}
-                                  {opt.value.length > 150 ? "…" : ""}
-                                </p>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-              </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             );
           })}
@@ -407,22 +438,29 @@ export function ChoiceSelectionModal({
                 onChange={setSaveAsDefault}
                 className="p-0 hover:bg-transparent"
               />
-              <Save size="0.75rem" />{localizeUi("ui.presets.choiceselectionmodal.saveAsDefault")}</div>
+              <Save size="0.75rem" />
+              {localizeUi("ui.presets.choiceselectionmodal.saveAsDefault")}
+            </div>
             <div className="flex gap-2">
               <button
-                onClick={onClose}
+                onClick={() => (onConfirm ? onConfirm(baseSelections) : onClose())}
+                disabled={updateMetadata.isPending}
                 className="rounded-xl px-4 py-2 text-xs font-medium text-[var(--muted-foreground)] hover:bg-[var(--accent)]"
-              >{localizeUi("onboarding.actions.skip")}</button>
+              >
+                {localizeUi("onboarding.actions.skip")}
+              </button>
               <button
                 onClick={handleConfirm}
                 disabled={!allSelected || updateMetadata.isPending}
                 className="rounded-xl bg-[var(--primary)] px-4 py-2 text-xs font-medium text-[var(--primary-foreground)] shadow-md transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
               >
-                {updateMetadata.isPending ?localizeUi("chat.settings.inlineEditor.saving") :localizeUi("ui.presets.choiceselectionmodal.confirmChoices")}
+                {updateMetadata.isPending
+                  ? localizeUi("chat.settings.inlineEditor.saving")
+                  : localizeUi("ui.presets.choiceselectionmodal.confirmChoices")}
               </button>
             </div>
           </div>
-        </div>
+        </fieldset>
       )}
     </Modal>
   );

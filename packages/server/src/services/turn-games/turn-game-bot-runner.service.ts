@@ -1,3 +1,4 @@
+import type { GenerationOutput } from "../../routes/generate/sse.js";
 // ──────────────────────────────────────────────
 // Turn-Game Bot Runner (LLM narration + auto-play)
 // ──────────────────────────────────────────────
@@ -13,14 +14,14 @@
 //
 // Invoked from the /api/generate handler ONLY when input.turnGameBots is set,
 // so it can never affect a normal conversation/roleplay generation.
-import type { FastifyReply } from "fastify";
 import { BUILT_IN_THINKING_TAG_PAIRS, extractLeadingThinkingBlocks } from "@marinara-engine/shared";
 import type { DB } from "../../db/connection.js";
 import { logDebugOverride, logger } from "../../lib/logger.js";
+import { logSuppressed } from "../../lib/best-effort.js";
 import { isDebugAgentsEnabled } from "../../config/runtime-config.js";
 import type { BaseLLMProvider, ChatMessage, LLMToolDefinition } from "../llm/base-provider.js";
 import { createLLMProvider } from "../llm/provider-registry.js";
-import { trySendSseEvent } from "../../routes/generate/sse.js";
+import { sendSseEvent } from "../../routes/generate/sse.js";
 import { createCharactersStorage } from "../storage/characters.storage.js";
 import { createChatsStorage } from "../storage/chats.storage.js";
 import { createGameEngineStateStorage } from "../storage/game-engine-state.storage.js";
@@ -40,7 +41,7 @@ interface RunBotTurnsArgs {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   conn?: any;
   baseUrl?: string;
-  reply: FastifyReply;
+  reply: GenerationOutput;
   signal?: AbortSignal;
   debugLog?: (message: string, ...args: unknown[]) => void;
   /** Test/override hooks — production passes conn+baseUrl and builds the provider here. */
@@ -109,7 +110,7 @@ async function buildRecentContext(
     const tail = messages.slice(-4);
     const lines = tail
       .map((m: { role: string; characterId: string | null; content: string }) => {
-        const who = m.role === "user" ? "You" : seatNames[m.characterId ?? ""] ?? "Someone";
+        const who = m.role === "user" ? "You" : (seatNames[m.characterId ?? ""] ?? "Someone");
         const text = truncate(m.content, 200);
         return text ? `${who}: ${text}` : "";
       })
@@ -155,11 +156,12 @@ async function drainAndVoiceAnnouncements(args: {
   engineStorage: ReturnType<typeof createGameEngineStateStorage>;
   provider: BaseLLMProvider;
   model: string;
-  reply: FastifyReply;
+  reply: GenerationOutput;
   turnIndex: number;
   signal?: AbortSignal;
 }): Promise<{ state: unknown } | null> {
-  const { chatId, active, humanSeatId, chats, characters, engineStorage, provider, model, reply, turnIndex, signal } = args;
+  const { chatId, active, humanSeatId, chats, characters, engineStorage, provider, model, reply, turnIndex, signal } =
+    args;
   const { engine, state } = active;
 
   if (typeof engine.drainAnnouncements !== "function") return null;
@@ -193,7 +195,7 @@ async function drainAndVoiceAnnouncements(args: {
 
     // Whose-turn marker before the voiced dealer line, matching the loop's
     // existing group_turn marker for bot moves.
-    trySendSseEvent(reply, {
+    sendSseEvent(reply, {
       type: "group_turn",
       data: { characterId: dealerCharId, characterName: fallbackName, index: turnIndex },
     });
@@ -204,7 +206,12 @@ async function drainAndVoiceAnnouncements(args: {
   if (!dealerLine) dealerLine = eventSummary;
 
   if (dealerCharId && dealerLine) {
-    const saved = await chats.createMessage({ chatId, role: "assistant", characterId: dealerCharId, content: dealerLine });
+    const saved = await chats.createMessage({
+      chatId,
+      role: "assistant",
+      characterId: dealerCharId,
+      content: dealerLine,
+    });
     if (saved) {
       await engineStorage.create({
         chatId,
@@ -215,7 +222,7 @@ async function drainAndVoiceAnnouncements(args: {
         state: JSON.stringify(nextState),
         committed: true,
       });
-      trySendSseEvent(reply, { type: "message_saved", data: saved });
+      sendSseEvent(reply, { type: "message_saved", data: saved });
     } else {
       // Persistence of the dealer message failed — still advance engine state so
       // the queue doesn't grow unbounded and the game keeps moving.
@@ -245,7 +252,7 @@ async function drainAndVoiceAnnouncements(args: {
 
   // Push the redacted human-perspective board so the client clears
   // hasPendingAnnouncements and sees the drained state live.
-  trySendSseEvent(reply, { type: "turn_game_state_patch", data: engine.publicView(nextState, humanSeatId) });
+  sendSseEvent(reply, { type: "turn_game_state_patch", data: engine.publicView(nextState, humanSeatId) });
   return { state: nextState };
 }
 
@@ -327,7 +334,11 @@ export async function runTurnGameBotTurns(args: RunBotTurnsArgs): Promise<void> 
     // Break rather than spin the rest of the cap on a stuck seat.
     const signature = JSON.stringify(state);
     if (signature === lastSignature) {
-      logger.warn("[turn-game] board not advancing for chat %s (seat %s still to act); stopping bot loop", chatId, seatId);
+      logger.warn(
+        "[turn-game] board not advancing for chat %s (seat %s still to act); stopping bot loop",
+        chatId,
+        seatId,
+      );
       break;
     }
     lastSignature = signature;
@@ -335,15 +346,19 @@ export async function runTurnGameBotTurns(args: RunBotTurnsArgs): Promise<void> 
     const seatName = state.seatNames?.[seatId] ?? seatId;
 
     // Announce whose turn it is (reuses the established multi-actor marker).
-    // Non-critical marker — use the swallowing variant so a client disconnect
-    // can't throw and abort the bot-turn loop (matches the other emits below).
-    trySendSseEvent(reply, { type: "group_turn", data: { characterId: seatId, characterName: seatName, index: turn } });
+    // Non-critical marker — the canonical guarded emitter keeps a disconnect
+    // from throwing and aborting the bot-turn loop (matches the other emits below).
+    sendSseEvent(reply, { type: "group_turn", data: { characterId: seatId, characterName: seatName, index: turn } });
 
     // ── Ask the bot for a move ──
     const view = engine.describeForModel(state, seatId);
     const tools: LLMToolDefinition[] = engine.toolManifests().map((t) => ({
       type: "function",
-      function: { name: t.name, description: t.description, parameters: t.parameters as unknown as Record<string, unknown> },
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters as unknown as Record<string, unknown>,
+      },
     }));
     const persona = await buildPersonaBlock(characters, seatId, seatName);
     const recent = await buildRecentContext(chats, chatId, state.seatNames ?? {});
@@ -424,10 +439,19 @@ export async function runTurnGameBotTurns(args: RunBotTurnsArgs): Promise<void> 
       .join(" ");
 
     if (SILENT_BOT_MOVE_GAME_TYPES.has(engine.gameType)) {
-      await engineStorage.updateStateById(active.row.id, JSON.stringify(nextState), true);
+      await engineStorage.updateStateById(active.row.id, JSON.stringify(nextState), true, active.row.chatId);
     } else {
       // ── Narration: a natural in-character turn — may banter with the table AND flavor the move ──
-      let narration = await narrateOutcome(provider, model, persona, seatName, engine.label, eventSummary, recent, signal);
+      let narration = await narrateOutcome(
+        provider,
+        model,
+        persona,
+        seatName,
+        engine.label,
+        eventSummary,
+        recent,
+        signal,
+      );
       if (!narration) narration = eventSummary || `${seatName} makes a move.`;
 
       // ── Persist narration message + per-message engine snapshot ──
@@ -442,7 +466,7 @@ export async function runTurnGameBotTurns(args: RunBotTurnsArgs): Promise<void> 
           state: JSON.stringify(nextState),
           committed: true,
         });
-        trySendSseEvent(reply, { type: "message_saved", data: saved });
+        sendSseEvent(reply, { type: "message_saved", data: saved });
       } else {
         // Persistence of the message failed — still advance engine state so the game continues.
         await engineStorage.create({
@@ -458,7 +482,7 @@ export async function runTurnGameBotTurns(args: RunBotTurnsArgs): Promise<void> 
     }
 
     // Push the redacted human-perspective board so the client updates live.
-    trySendSseEvent(reply, { type: "turn_game_state_patch", data: engine.publicView(nextState, humanSeatId) });
+    sendSseEvent(reply, { type: "turn_game_state_patch", data: engine.publicView(nextState, humanSeatId) });
   }
 
   // Final drain: a showdown/game_over (or any other) announcement queued by the
@@ -529,7 +553,9 @@ async function narrateOutcome(
   recent: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const did = eventSummary.startsWith(`${name} `) ? eventSummary.slice(name.length + 1) : eventSummary || "made your move";
+  const did = eventSummary.startsWith(`${name} `)
+    ? eventSummary.slice(name.length + 1)
+    : eventSummary || "made your move";
   try {
     const messages: ChatMessage[] = [
       {
@@ -546,9 +572,15 @@ async function narrateOutcome(
     ];
     // maxTokens leaves headroom for reasoning models that think before the line;
     // stripInlineThinking removes what they emit inline.
-    const res = await provider.chatComplete(messages, { model, temperature: 0.9, maxTokens: 300, ...(signal ? { signal } : {}) });
+    const res = await provider.chatComplete(messages, {
+      model,
+      temperature: 0.9,
+      maxTokens: 300,
+      ...(signal ? { signal } : {}),
+    });
     return stripInlineThinking(res.content ?? "");
-  } catch {
+  } catch (error) {
+    logSuppressed(error, { event: "turn-game.narration", stage: "outcome", level: signal?.aborted ? "debug" : "warn" });
     return "";
   }
 }
@@ -588,7 +620,12 @@ async function narrateAnnouncements(
       ...(signal ? { signal } : {}),
     });
     return stripInlineThinking(res.content ?? "");
-  } catch {
+  } catch (error) {
+    logSuppressed(error, {
+      event: "turn-game.narration",
+      stage: "dealer-announcement",
+      level: signal?.aborted ? "debug" : "warn",
+    });
     return "";
   }
 }

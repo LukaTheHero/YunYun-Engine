@@ -18,11 +18,12 @@ import {
   extractProtocolLines,
   resolveSandboxPollDelay,
   SANDBOX_HEARTBEAT_STALE_MS,
+  shouldGrantSandboxResumeGrace,
   SANDBOX_HOST_IDLE_POLL_MS,
   SANDBOX_HOT_POLL_MS,
   SANDBOX_WATCHDOG_INTERVAL_MS,
 } from "./sandbox-protocol.js";
-import type { PersonalExtension } from "@marinara-engine/shared";
+import { getSerializedTextTokenEstimator, type PersonalExtension } from "@marinara-engine/shared";
 
 type ActiveExtension = {
   id: string;
@@ -97,30 +98,38 @@ export class PersonalServerExtensionRuntime {
   }
 
   reloadAll() {
-    this.queue = this.queue.then(() => this.reloadAllNow()).catch((error) => {
-      logger.error(error, "[personal-extensions] Server sandbox reload failed");
-    });
+    this.queue = this.queue
+      .then(() => this.reloadAllNow())
+      .catch((error) => {
+        logger.error(error, "[personal-extensions] Server sandbox reload failed");
+      });
     return this.queue;
   }
 
   enforceExternalPolicy() {
-    this.queue = this.queue.then(() => this.enforceExternalPolicyNow()).catch((error) => {
-      logger.error(error, "[personal-extensions] Failed to enforce the External Extensions gate");
-    });
+    this.queue = this.queue
+      .then(() => this.enforceExternalPolicyNow())
+      .catch((error) => {
+        logger.error(error, "[personal-extensions] Failed to enforce the External Extensions gate");
+      });
     return this.queue;
   }
 
   reloadExtension(id: string) {
-    this.queue = this.queue.then(() => this.reloadExtensionNow(id)).catch((error) => {
-      logger.error(error, "[personal-extensions] Server extension reload failed for %s", id);
-    });
+    this.queue = this.queue
+      .then(() => this.reloadExtensionNow(id))
+      .catch((error) => {
+        logger.error(error, "[personal-extensions] Server extension reload failed for %s", id);
+      });
     return this.queue;
   }
 
   unloadExtension(id: string) {
-    this.queue = this.queue.then(() => this.unloadExtensionNow(id)).catch((error) => {
-      logger.error(error, "[personal-extensions] Server extension unload failed for %s", id);
-    });
+    this.queue = this.queue
+      .then(() => this.unloadExtensionNow(id))
+      .catch((error) => {
+        logger.error(error, "[personal-extensions] Server extension unload failed for %s", id);
+      });
     return this.queue;
   }
 
@@ -264,17 +273,14 @@ export class PersonalServerExtensionRuntime {
     await extension.finalize?.({ drain: exitedLate });
   }
 
-  private async handleStorageMessage(
-    extension: PersonalExtension,
-    active: ActiveExtension,
-    message: RunnerMessage,
-  ) {
+  private async handleStorageMessage(extension: PersonalExtension, active: ActiveExtension, message: RunnerMessage) {
     if (!this.db || !message.requestId) return;
     const settings = createPersonalExtensionSettingsStorage(createAppSettingsStorage(this.db));
     try {
       let value: unknown;
       if (message.action === "get") value = await settings.get(extension.id);
-      else if (message.action === "patch") value = await settings.patch(extension.id, message.payload as Record<string, unknown>);
+      else if (message.action === "patch")
+        value = await settings.patch(extension.id, message.payload as Record<string, unknown>);
       else if (message.action === "delete") {
         await settings.remove(extension.id);
         value = {};
@@ -294,9 +300,7 @@ export class PersonalServerExtensionRuntime {
 
   private send(active: ActiveExtension, message: unknown) {
     const serialized = `${JSON.stringify(message)}\n`;
-    active.inputQueue = active.inputQueue.then(() =>
-      appendFile(active.sandbox.protocol.inputPath, serialized, "utf8"),
-    );
+    active.inputQueue = active.inputQueue.then(() => appendFile(active.sandbox.protocol.inputPath, serialized, "utf8"));
     // Host->runner traffic predicts a reply on the output file; flip the
     // adaptive output poll back to the hot cadence so it lands fast (#4706).
     active.onTraffic?.();
@@ -353,6 +357,8 @@ export class PersonalServerExtensionRuntime {
     let pollChainStopped = false;
     let closing = false;
     let lastHeartbeat = Date.now();
+    let lastWatchdogTickAt = Date.now();
+    let watchdogTickGeneration = 0;
     let messageWindowStartedAt = Date.now();
     let messageCount = 0;
     let outputHandle: Awaited<ReturnType<typeof open>>;
@@ -368,8 +374,13 @@ export class PersonalServerExtensionRuntime {
     }
     active.watchdog = setInterval(() => {
       if (active.expectedStop) return;
+      const watchdogTickAt = Date.now();
+      const tickGeneration = ++watchdogTickGeneration;
+      const resumedAfterPause = shouldGrantSandboxResumeGrace(watchdogTickAt, lastWatchdogTickAt);
+      lastWatchdogTickAt = watchdogTickAt;
       void Promise.all([stat(sandbox.protocol.heartbeatPath), stat(sandbox.protocol.errorPath)])
         .then(([heartbeatStats, errorStats]) => {
+          if (tickGeneration !== watchdogTickGeneration || active.expectedStop) return;
           if (heartbeatStats.size > MAX_HEARTBEAT_BYTES || errorStats.size > MAX_ERROR_LOG_BYTES) {
             active.expectedStop = true;
             this.statuses.set(extension.id, {
@@ -380,6 +391,7 @@ export class PersonalServerExtensionRuntime {
             return;
           }
           if (heartbeatStats.mtimeMs > lastHeartbeat) lastHeartbeat = heartbeatStats.mtimeMs;
+          if (resumedAfterPause) lastHeartbeat = Math.max(lastHeartbeat, watchdogTickAt);
           // Five missed heartbeats at the 5s cadence — the same missed-beat
           // multiple the old 1s/5s pair allowed (#4706).
           if (Date.now() - lastHeartbeat <= SANDBOX_HEARTBEAT_STALE_MS) return;
@@ -478,7 +490,11 @@ export class PersonalServerExtensionRuntime {
               });
             } else if (message.type === "log" && message.level && LOG_LEVELS.has(message.level)) {
               logger[message.level](
-                { extensionId: extension.id, extensionName: extension.name, args: Array.isArray(message.args) ? message.args : [] },
+                {
+                  extensionId: extension.id,
+                  extensionName: extension.name,
+                  args: Array.isArray(message.args) ? message.args : [],
+                },
                 "[personal-extension] %s",
                 extension.name,
               );
@@ -598,9 +614,13 @@ export class PersonalServerExtensionRuntime {
       name: extension.name,
       contentHash: extension.contentHash,
       source: extension.serverJs,
+      tokenEstimatorSource: getSerializedTextTokenEstimator(),
     });
     const timeout = new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => reject(new Error("Personal extension sandbox startup timed out")), STARTUP_TIMEOUT_MS);
+      const timer = setTimeout(
+        () => reject(new Error("Personal extension sandbox startup timed out")),
+        STARTUP_TIMEOUT_MS,
+      );
       timer.unref?.();
     });
     try {
@@ -611,9 +631,7 @@ export class PersonalServerExtensionRuntime {
       // sandbox into the active set: its input file is gone, and a later
       // stop would fail and disrupt shutdown of the healthy extensions.
       if (active.expectedStop || child.exitCode !== null || child.signalCode !== null) {
-        throw new Error(
-          this.statuses.get(extension.id)?.error ?? "Extension sandbox exited during startup",
-        );
+        throw new Error(this.statuses.get(extension.id)?.error ?? "Extension sandbox exited during startup");
       }
       this.active.set(extension.id, active);
       logger.info(

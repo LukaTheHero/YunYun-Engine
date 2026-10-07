@@ -2,11 +2,13 @@
 // Modal: Import Persona (JSON / YunYun export)
 // ──────────────────────────────────────────────
 import { useState, useRef } from "react";
+import { createDecisionImportTracker } from "../../lib/decision-import-notice";
 import { Modal } from "../ui/Modal";
 import { Download, FileJson, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { characterKeys } from "../../hooks/use-characters";
 import { api, formatFirstApiValidationIssue } from "../../lib/api-client";
+import { isOversizedMarinaraJson } from "../../lib/character-import";
 import { useTranslation as useUiTranslation } from "react-i18next";
 
 interface Props {
@@ -34,22 +36,28 @@ export function ImportPersonaModal({ open, onClose }: Props) {
     setResults([]);
 
     const nextResults: Array<{ filename: string; success: boolean; message: string }> = [];
+
+    const decisionImports = createDecisionImportTracker();
     for (const file of files) {
       try {
         // YunYun native packages are .marinara files (zip with data.json +
         // avatar binary). Detect via the zip signature so a renamed file
-        // still works.
-        if (await isZipFile(file)) {
+        // still works. A native .marinara.json too large for a JSON request
+        // is uploaded the same way.
+        if ((await isZipFile(file)) || (await isOversizedMarinaraJson(file))) {
           const form = new FormData();
           form.append("file", file, file.name);
           form.append(
             "timestampOverrides",
             JSON.stringify({ createdAt: file.lastModified, updatedAt: file.lastModified }),
           );
-          const data = await api.upload<{ success: boolean; name?: string; error?: string }>(
-            "/import/marinara-package",
-            form,
-          );
+          const data = await api.upload<{
+            success: boolean;
+            name?: string;
+            error?: string;
+            usesDecisions?: boolean;
+          }>("/import/marinara-package", form);
+          decisionImports.mark(file.name, data.usesDecisions);
           nextResults.push({
             filename: file.name,
             success: data.success,
@@ -60,6 +68,7 @@ export function ImportPersonaModal({ open, onClose }: Props) {
 
         const text = await file.text();
         const json = JSON.parse(text) as Record<string, unknown>;
+        decisionImports.note(file.name, json);
 
         const isMarinaraEnvelope =
           json.version === 1 && typeof json.type === "string" && (json.type as string).startsWith("marinara_");
@@ -102,6 +111,7 @@ export function ImportPersonaModal({ open, onClose }: Props) {
     }
 
     setResults(nextResults);
+    decisionImports.notify(nextResults, localizeUi);
     setStatus("done");
     if (nextResults.some((result) => result.success)) {
       qc.invalidateQueries({ queryKey: characterKeys.personas });
@@ -149,14 +159,20 @@ export function ImportPersonaModal({ open, onClose }: Props) {
             className={`transition-colors ${dragOver ? "text-[var(--primary)]" : "text-[var(--muted-foreground)]"}`}
           />
           <div className="text-center">
-            <p className="text-sm font-medium">{localizeUi("ui.modals.importcharactermodal.dropOneOrMoreFilesHereOrClickTo")}</p>
-            <p className="mt-1 text-xs text-[var(--muted-foreground)]">{localizeUi("ui.modals.importpersonamodal.supportsJsonAndMarinaraPersonaExports")}</p>
+            <p className="text-sm font-medium">
+              {localizeUi("ui.modals.importcharactermodal.dropOneOrMoreFilesHereOrClickTo")}
+            </p>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+              {localizeUi("ui.modals.importpersonamodal.supportsJsonAndMarinaraPersonaExports")}
+            </p>
           </div>
           <div className="flex gap-2">
             <span className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-2.5 py-1 text-xs text-[var(--muted-foreground)]">
-              <FileJson size="0.75rem" /> {localizeUi("ui.modals.importcharactermodal.json")}</span>
+              <FileJson size="0.75rem" /> {localizeUi("ui.modals.importcharactermodal.json")}
+            </span>
             <span className="flex items-center gap-1 rounded-full bg-[var(--secondary)] px-2.5 py-1 text-xs text-[var(--muted-foreground)]">
-              <FileJson size="0.75rem" /> {localizeUi("ui.modals.importcharactermodal.marinara")}</span>
+              <FileJson size="0.75rem" /> {localizeUi("ui.modals.importcharactermodal.marinara")}
+            </span>
           </div>
         </div>
 
@@ -175,7 +191,9 @@ export function ImportPersonaModal({ open, onClose }: Props) {
         {/* Status */}
         {status === "loading" && (
           <div className="flex items-center gap-2 rounded-lg bg-[var(--secondary)] p-3 text-xs">
-            <Loader2 size="0.875rem" className="animate-spin text-[var(--primary)]" />{localizeUi("ui.modals.importconnectionmodal.importing")}</div>
+            <Loader2 size="0.875rem" className="animate-spin text-[var(--primary)]" />
+            {localizeUi("ui.modals.importconnectionmodal.importing")}
+          </div>
         )}
         {status === "done" && results.length > 0 && (
           <div className="flex flex-col gap-2">
@@ -187,8 +205,10 @@ export function ImportPersonaModal({ open, onClose }: Props) {
               }`}
             >
               {results.some((result) => result.success) ? <CheckCircle size="0.875rem" /> : <XCircle size="0.875rem" />}
-              {results.filter((result) => result.success).length} {localizeUi("ui.modals.importcharactermodal.succeeded")}{" "}
-              {results.filter((result) => !result.success).length} {localizeUi("ui.modals.importcharactermodal.failed")}</div>
+              {results.filter((result) => result.success).length}{" "}
+              {localizeUi("ui.modals.importcharactermodal.succeeded")}{" "}
+              {results.filter((result) => !result.success).length} {localizeUi("ui.modals.importcharactermodal.failed")}
+            </div>
             <div className="max-h-52 overflow-y-auto rounded-lg border border-[var(--border)]">
               {results.map((result) => (
                 <div
@@ -219,7 +239,9 @@ export function ImportPersonaModal({ open, onClose }: Props) {
               onClose();
             }}
             className="rounded-lg px-4 py-2 text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)]"
-          >{localizeUi("capabilities.actions.close")}</button>
+          >
+            {localizeUi("capabilities.actions.close")}
+          </button>
         </div>
       </div>
     </Modal>

@@ -1,6 +1,6 @@
 # Supported AI Providers
 
-This guide lists every AI provider YunYun Engine can connect to. For each one it tells you where to get an API key, the default base URL, and any quirks to know. An API key is a secret password from a provider that lets YunYun talk to their AI service.
+This guide lists every AI provider Marinara Engine can connect to. For each one it tells you where to get an API key, the default base URL, and any quirks to know. An API key is a secret password from a provider that lets Marinara talk to their AI service.
 
 To learn the general steps for adding a connection, read [Connecting to an AI Provider](connecting-to-a-provider.md) first. This page is a reference you can search when you want details on one specific provider.
 
@@ -12,7 +12,7 @@ Most providers on this page are cloud services that host the AI for you. You mak
 
 You will see two terms often:
 
-- Base URL: the web address YunYun sends requests to. Most providers fill this in for you. You only change it for local or custom servers.
+- Base URL: the web address Marinara sends requests to. Most providers fill this in for you. You only change it for local or custom servers.
 - Model: the specific AI model you pick after choosing a provider. Available models change often, so this page does not list them. Use the **Model** dropdown or the **Fetch Models from API** button in the connection editor to see the current list.
 
 ## OpenAI
@@ -29,7 +29,7 @@ You will see two terms often:
 
 **Anthropic** runs the Claude models. It supports prompt caching, which can lower the cost of long chats. You can turn this on with the **Enable prompt caching** toggle in the connection editor.
 
-**Anthropic** does not offer embeddings. Embeddings turn text into number lists so YunYun can search lorebooks and memory. For those features, use a separate embedding connection (see the Embeddings section below).
+**Anthropic** does not offer embeddings. Embeddings turn text into number lists so Marinara can search lorebooks and memory. For those features, use a separate embedding connection (see the Embeddings section below).
 
 ## Google Gemini
 
@@ -45,7 +45,7 @@ You will see two terms often:
 
 **Google Vertex AI** runs Gemini models through a Google Cloud project. It needs more setup than **Google Gemini**. You must edit the **Base URL** and replace `YOUR_PROJECT_ID` with your real project ID. Also change the region if it is not `us-central1`.
 
-The **API Key** field accepts any one of these three credential types, and YunYun detects which one you pasted:
+The **API Key** field accepts any one of these three credential types, and Marinara detects which one you pasted:
 
 1. A service-account JSON key.
 2. An OAuth access token, for example from `gcloud auth print-access-token`.
@@ -63,7 +63,7 @@ The **API Key** field accepts any one of these three credential types, and YunYu
 - Where to get a key: `https://dashboard.cohere.com/api-keys`
 - Default base URL: `https://api.cohere.ai/compatibility/v1`
 
-**Cohere** uses its OpenAI-compatible endpoint by default. If you paste an older Cohere v2 URL, YunYun switches it to the compatibility endpoint for you. Requests still work.
+**Cohere** uses its OpenAI-compatible endpoint by default. If you paste an older Cohere v2 URL, Marinara switches it to the compatibility endpoint for you. Requests still work.
 
 ## OpenRouter
 
@@ -82,18 +82,52 @@ The **API Key** field accepts any one of these three credential types, and YunYu
 
 **NanoGPT** is also an aggregator. It has no built-in model list, so the **Model** dropdown starts empty. After you paste your key, click **Fetch Models from API** to load the models your account can use.
 
+Marinara reads NanoGPT's detailed model catalog, so the dropdown marks which models your subscription covers and which cost more of it:
+
+- A model included in your subscription shows an **input-token multiplier** pill: `1x` in green when it consumes quota at the normal rate, or a higher value such as `2x` when each token sent costs that many input tokens from your quota. A model that is *not* included shows a **Paid** pill, because its usage bills to your paid balance instead. A model with no pill had no subscription data to report.
+
+### Subscription usage
+
+If you have a NanoGPT subscription, this connection can show your live quota:
+
+1. Turn on **Show subscription usage** in the connection editor and save.
+2. Optionally paste a **Management Token** first.
+
+The widget reads NanoGPT's usage endpoint and shows your weekly and daily input-token quotas. Two credentials can read it:
+
+- **Management Token** (recommended): create one at `https://nano-gpt.com/settings#management-api-tokens` with the **Usage only** scope. It can read your quotas but cannot run models or spend your balance, so it is the safer choice for a quota display. Marinara stores it encrypted and sends it only to NanoGPT's management endpoint.
+- **Your API key**: used automatically when no management token is saved. This works, but it means quota reads use the same credential that can spend your balance.
+
+A quota NanoGPT cannot report right now shows as **unknown** rather than as unused, and an inactive subscription is called out instead of being drawn as full quota. The widget refreshes on demand with its refresh button.
+
+The same meter appears under the context indicator in a chat's connection picker and in the chat's **Connection** settings, so you can watch your quota without leaving a chat. It follows the active connection: it shows only when that connection is a NanoGPT one with **Show subscription usage** turned on, and it does not appear for **Random**, which has no single connection to read. In the picker it is drawn to match the context bar above it, and it reads the same way — used against the weekly allowance, for example `8.9M / 60M tokens`.
+
 ## xAI / Grok
 
 - Where to get a key: `https://console.x.ai`
 - Default base URL: `https://api.x.ai/v1`
 
-**xAI / Grok** runs the Grok models. When you pick this provider in the **Create Connection** modal, YunYun prefills the model with Grok 4.5. You can change the model afterward.
+**xAI / Grok** runs the Grok models. When you pick this provider in the **Create Connection** modal, Marinara prefills the model with Grok 4.5. You can change the model afterward. Grok 4.6 and 4.7 are available with a 500,000-token context window and reasoning up to **Maximum** (`xhigh`). They support the existing chat tools, including **Web Search**, so search results can feed the completed reply.
+
+## Arli AI
+
+- Where to get a key: `https://www.arliai.com/account`
+- Default base URL: `https://api.arliai.com/v1`
+
+**Arli AI** is a hosted chat service. It has no built-in model list, so the **Model** dropdown starts empty. After you paste your key, click **Fetch Models from API** to load its current models. For Arli AI images, use the **Image Generation** provider and its **Arli AI** service instead.
+
+## Z.AI
+
+- Where to get a key: `https://z.ai/manage-apikey/apikey-list`
+- Default base URL: `https://api.z.ai/api/paas/v4`
+
+**Z.AI** serves the GLM models (GLM 5.3, GLM 5.3 Flash, and earlier) on their own API. The **Model** dropdown lists the current GLM models, and **Fetch Models from API** refreshes it from your account. GLM 5.3 models always reason: the **Reasoning Effort** in your preset is mapped onto the three levels Z.AI accepts (Low, High, Maximum), and leaving it unset uses Z.AI's default (Maximum). The default base URL is the pay-as-you-go endpoint. Z.AI's Coding Plan uses a different endpoint that their usage policy reserves for the tools on their list, so a Coding Plan key is not expected to work here.
 
 ## Claude (Subscription)
 
 - API key: none. You sign in to a local tool instead.
 
-**Claude (Subscription)** uses your Anthropic Pro or Max plan through the Claude Code tool. The tool runs on the computer that hosts the YunYun server, and you sign in once. The **API Key** and **Base URL** fields are hidden for this provider. It does not offer embeddings (see the Embeddings section below).
+**Claude (Subscription)** uses your Anthropic Pro or Max plan through the Claude Code tool. The tool runs on the computer that hosts the Marinara server, and you sign in once. The **API Key** and **Base URL** fields are hidden for this provider. It does not offer embeddings (see the Embeddings section below).
 
 Install and login steps are in [Claude, ChatGPT, and Grok Subscription Connections](subscription-clis.md).
 
@@ -101,7 +135,7 @@ Install and login steps are in [Claude, ChatGPT, and Grok Subscription Connectio
 
 - API key: none. You sign in to a local tool instead.
 
-**OpenAI (ChatGPT)** uses your ChatGPT account through the Codex tool. The tool runs on the computer that hosts the YunYun server, and you sign in once. The **API Key** and **Base URL** fields are hidden for this provider. It does not offer embeddings (see the Embeddings section below).
+**OpenAI (ChatGPT)** uses your ChatGPT account through the Codex tool. The tool runs on the computer that hosts the Marinara server, and you sign in once. The **API Key** and **Base URL** fields are hidden for this provider. It does not offer embeddings (see the Embeddings section below). Its thinking level is the **Reasoning Effort** in the connection's or the chat's parameters; until you pick one, Codex uses its own default for the model.
 
 Install and login steps are in [Claude, ChatGPT, and Grok Subscription Connections](subscription-clis.md).
 
@@ -109,7 +143,7 @@ Install and login steps are in [Claude, ChatGPT, and Grok Subscription Connectio
 
 - API key: none. You sign in to a local tool instead.
 
-**Grok CLI (Subscription)** uses your SuperGrok or X Premium+ account through the Grok CLI tool. The tool runs on the computer that hosts the YunYun server, and you sign in once. The **API Key** and **Base URL** fields are hidden for this provider. It does not offer embeddings (see the Embeddings section below).
+**Grok CLI (Subscription)** uses your SuperGrok or X Premium+ account through the Grok CLI tool. The tool runs on the computer that hosts the Marinara server, and you sign in once. The **API Key** and **Base URL** fields are hidden for this provider. It does not offer embeddings (see the Embeddings section below).
 
 Install and login steps are in [Claude, ChatGPT, and Grok Subscription Connections](subscription-clis.md).
 
@@ -119,7 +153,7 @@ Install and login steps are in [Claude, ChatGPT, and Grok Subscription Connectio
 
 Pick **Custom (OAI-Compatible)** to connect a local or self-hosted model server, such as Ollama, LM Studio, or KoboldCpp. It also works for any hosted proxy that speaks the OpenAI chat format. The **API Key** can be left empty for most local servers. You set the **Base URL** to your server address.
 
-For step-by-step setup and the **Treat as local/custom endpoint** toggle, read [Connecting a Local or Self-Hosted Model](local-self-hosted.md). For the small model that ships inside YunYun, read [Local Model Setup](local-model.md).
+For step-by-step setup and the **Treat as local/custom endpoint** toggle, read [Connecting a Local or Self-Hosted Model](local-self-hosted.md). For the small model that ships inside Marinara, read [Local Model Setup](local-model.md).
 
 ## Image Generation
 
@@ -129,13 +163,34 @@ The full list of image services, their setup, and generation settings lives in [
 
 ## Video Generation
 
-**Video Generation** is also a special provider with its own **Video Service** picker. Game Mode uses it to make short MP4 scene videos. The services are **Google AI Studio**, **xAI Imagine**, **OpenRouter Video**, and **Seedance 2.0**. Each service needs an API key.
+**Video Generation** is also a special provider with its own **Video Service** picker. Marinara uses it to make short MP4 scene videos. The services are **Google AI Studio**, **xAI Imagine**, **OpenRouter Video**, **NanoGPT**, **Atlas Cloud**, **Seedance 2.0**, **ComfyUI**, and **SwarmUI**. The cloud services need an API key. **ComfyUI** and **SwarmUI** run on your own computer and normally do not.
 
 The full setup and limits for each video service live in [Scene Video Generation](../media/scene-video.md).
 
+## Decision
+
+- Default base URL: `https://api.typesafe.ai` for the **TypeSafe** source.
+
+**Decision** is an optional special provider for a model that answers yes-or-no questions about your chat. For example, it can decide whether a custom agent should run. Its answers steer Marinara and are not posted in the chat. After you pick it, choose a source: **TypeSafe**, **OpenRouter**, **Custom System One endpoint**, or **OpenAI-compatible chat model**. Hosted sources need an API key.
+
+What a decision model does, how to choose one, and the full setup live in [Decision Models](decision-models.md).
+
+## Audio
+
+**Audio** is a special provider for voices and generated sound. After you pick it, choose an **Audio Source**:
+
+- **ElevenLabs**: speech, sound effects, and music.
+- **OpenAI-compatible**: OpenAI, or any server that copies OpenAI's speech format.
+- **PocketTTS**: a free voice server you run on your own computer.
+- **xAI Voice**: xAI's voice service.
+
+Each source fills in a default base URL and model. **Default Voice** is the voice used when nothing more specific, such as a per-character voice, is set. To pick which audio connection Marinara uses by default, open the **Connections** panel, expand **Defaults**, and choose it under **Audio**.
+
+With the **ElevenLabs** source, two more switches appear: **Game sound effects** and **Game music**. They let Game Mode make sound effects and music with this connection. See [Generated sound effects and music](../game/game-assets.md#generated-sound-effects-and-music). For voices and reading messages aloud, see [Text to Speech (TTS) Setup](../media/tts-setup.md).
+
 ## Embeddings
 
-Embeddings power lorebook semantic search and Memory Recall. They turn text into number lists so YunYun can find related entries. Most chat providers let you set an **Embedding Model** and an optional **Embedding Endpoint URL** in the connection editor.
+Embeddings power lorebook semantic search and Memory Recall. They turn text into number lists so Marinara can find related entries. Most chat providers let you set an **Embedding Model** and an optional **Embedding Endpoint URL** in the connection editor.
 
 Some providers cannot make embeddings. **Anthropic**, **Claude (Subscription)**, **OpenAI (ChatGPT)**, and **Grok CLI (Subscription)** do not offer them. For those, use the **Embedding Connection** dropdown to borrow another connection, such as an OpenAI-compatible one, **Google Gemini**, or the built-in **Local Model**.
 
@@ -146,3 +201,5 @@ Some providers cannot make embeddings. **Anthropic**, **Claude (Subscription)**,
 - [Connecting a Local or Self-Hosted Model](local-self-hosted.md)
 - [Image Generation Providers and Setup](../media/image-providers.md)
 - [Scene Video Generation](../media/scene-video.md)
+- [Decision Models](decision-models.md)
+- [Text to Speech (TTS) Setup](../media/tts-setup.md)

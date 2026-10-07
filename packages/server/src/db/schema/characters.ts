@@ -50,6 +50,8 @@ export const personas = fileTable("personas", {
   creator: text("creator").notNull().default(""),
   /** Human-visible persona card version string */
   personaVersion: text("persona_version").notNull().default("1.0"),
+  /** Whether edits retain snapshots and automatically advance the card version. */
+  versioningEnabled: text("versioning_enabled").notNull().default("true"),
   /** Private notes about intended use, quirks, or recommended settings */
   creatorNotes: text("creator_notes").notNull().default(""),
   /** Pronunciation override used when sending this persona name to TTS */
@@ -59,6 +61,10 @@ export const personas = fileTable("personas", {
   scenario: text("scenario").notNull().default(""),
   backstory: text("backstory").notNull().default(""),
   appearance: text("appearance").notNull().default(""),
+  /** Whether image prompts use `imageAppearance` instead of `appearance` (text boolean, like versioningEnabled). */
+  imageAppearanceEnabled: text("image_appearance_enabled").notNull().default("false"),
+  /** Appearance text used for image prompts while the override is enabled. Empty = fall back to `appearance`. */
+  imageAppearance: text("image_appearance").notNull().default(""),
   avatarPath: text("avatar_path"),
   /** Persona gallery image selected as the optional visual identity sheet. */
   characterSheetImageId: text("character_sheet_image_id"),

@@ -59,7 +59,7 @@ One rule: critique code and contracts only. Never personalize or address the aut
 3. Load only guidance that matches touched areas:
    - Package boundaries or architecture changes: `docs/development/architecture-map.md`.
    - Frontend (`packages/client`) changes: `packages/client/.instructions.md` and `docs/development/frontend.md`.
-   - Server (`packages/server`) changes, including logging and route/service boundaries: `CLAUDE.md` and `CONTRIBUTING.md`.
+   - Server (`packages/server`) changes, including logging and route/service boundaries: `AGENTS.md` and `CONTRIBUTING.md`.
    - Chat, roleplay, or game mode changes: `docs/development/architecture-map.md` (Mode Ownership), `docs/game/getting-started.md`, `docs/roleplay/getting-started.md`, `docs/conversation/getting-started.md`.
    - Storage, migration, or import/export changes: `docs/development/file-storage-migration.md`.
    - Build, container, or CI changes: `docs/installation/containers.md` and `CONTRIBUTING.md`.
@@ -101,7 +101,7 @@ Treat these as high-signal YunYun review concerns:
 - Client code calling the server with raw `fetch()` instead of the `@/lib/api-client` wrapper, putting async logic in Zustand stores, or adding barrel/index files.
 - Server code using `console.*` instead of the shared Pino logger, logging errors without the error object first, or putting domain logic in route handlers instead of services.
 - Chat, roleplay, and game mode behavior crossing ownership boundaries, or shared generation/prompt changes silently altering an unrelated mode.
-- SSE/streaming changes that break the token or event contract between `api.stream`/`streamEvents` and the server generate route.
+- SSE/streaming changes that break the token or event contract between `api.streamEvents` and the server generate route.
 - Fake success states, silent catches, broad fallbacks, or UI-only guards over broken contracts.
 - Changes without tests or focused manual proof when the touched behavior has realistic regression risk.
 

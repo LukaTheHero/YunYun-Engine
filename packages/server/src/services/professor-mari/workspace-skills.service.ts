@@ -128,10 +128,7 @@ function firstBodyLine(content: string) {
 function normalizeDescription(value: string | null | undefined, content: string) {
   const frontmatter = parseFrontmatter(content);
   const candidate =
-    value?.trim() ||
-    frontmatter.description?.trim() ||
-    firstBodyLine(content) ||
-    "User-defined Professor YunYun skill.";
+    value?.trim() || frontmatter.description?.trim() || firstBodyLine(content) || "User-defined Professor Mari skill.";
   return candidate.slice(0, MAX_SKILL_DESCRIPTION_LENGTH);
 }
 
@@ -139,7 +136,7 @@ function buildSkillContent(input: { name: string; description: string; content: 
   const body = skillInstructions(input.content);
   const fallbackBody = `# ${input.name}
 
-Add focused instructions for when Professor YunYun should use this skill.`;
+Add focused instructions for when Professor Mari should use this skill.`;
   return [
     "---",
     `name: ${JSON.stringify(input.name)}`,
@@ -193,7 +190,10 @@ export class ProfessorMariWorkspaceSkillsService {
     this.assertContent(input.content);
     const records = await this.readRecords();
     const frontmatter = parseFrontmatter(input.content);
-    const name = normalizeSkillName(input.name ?? frontmatter.name, titleFromBody(input.content) || titleFromFileName(input.fileName));
+    const name = normalizeSkillName(
+      input.name ?? frontmatter.name,
+      titleFromBody(input.content) || titleFromFileName(input.fileName),
+    );
     const id = this.uniqueId(name, records);
     const description = normalizeDescription(input.description, input.content);
     const timestamp = now();
@@ -223,7 +223,10 @@ export class ProfessorMariWorkspaceSkillsService {
     const previousContent = await readFile(skillFilePath(current.id), "utf8");
     const nextContentSource = input.content ?? skillInstructions(previousContent);
     if (input.content !== undefined && input.content !== null) this.assertContent(input.content);
-    const name = normalizeSkillName(input.name ?? parseFrontmatter(nextContentSource).name ?? current.name, current.name);
+    const name = normalizeSkillName(
+      input.name ?? parseFrontmatter(nextContentSource).name ?? current.name,
+      current.name,
+    );
     const description = normalizeDescription(input.description ?? current.description, nextContentSource);
     const nextRecord: SkillRecord = {
       ...current,
@@ -261,7 +264,9 @@ export class ProfessorMariWorkspaceSkillsService {
       if (!Array.isArray(parsed)) return [];
       const records: SkillRecord[] = [];
       const usedIds = new Set<string>();
-      for (const entry of parsed.filter((entry): entry is Partial<SkillRecord> => !!entry && typeof entry === "object")) {
+      for (const entry of parsed.filter(
+        (entry): entry is Partial<SkillRecord> => !!entry && typeof entry === "object",
+      )) {
         const baseId = normalizeSkillId(typeof entry.id === "string" ? entry.id : entry.name, "skill");
         let id = baseId;
         let suffix = 2;
@@ -276,7 +281,7 @@ export class ProfessorMariWorkspaceSkillsService {
           description:
             typeof entry.description === "string" && entry.description.trim()
               ? entry.description.slice(0, MAX_SKILL_DESCRIPTION_LENGTH)
-              : "User-defined Professor YunYun skill.",
+              : "User-defined Professor Mari skill.",
           enabled: entry.enabled !== false,
           createdAt: typeof entry.createdAt === "string" ? entry.createdAt : now(),
           updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : now(),
@@ -284,7 +289,7 @@ export class ProfessorMariWorkspaceSkillsService {
       }
       return records;
     } catch (err) {
-      logger.warn(err, "[Professor YunYun] failed to read workspace skill index");
+      logger.warn(err, "[Professor Mari] failed to read workspace skill index");
       return [];
     }
   }
