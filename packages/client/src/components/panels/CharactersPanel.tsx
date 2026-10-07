@@ -1029,7 +1029,8 @@ export function CharactersPanel() {
               (characterOrder.get(a) ?? sortedCharacters.length) - (characterOrder.get(b) ?? sortedCharacters.length),
           );
           if (folderFilterActive && folderMemberIds.length === 0) return null;
-          const isExpanded = (folderFilterActive && folderMemberIds.length > 0) || expandedCharacterGroupIds.includes(group.id);
+          const isExpanded =
+            (folderFilterActive && folderMemberIds.length > 0) || expandedCharacterGroupIds.includes(group.id);
           const isEditing = editingGroupId === group.id;
 
           return (

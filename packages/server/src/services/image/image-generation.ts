@@ -1324,9 +1324,7 @@ export async function generateChatGPTImage(
     { allowLocal: false, allowLoopback: false, allowedOrigins: [OPENAI_CHATGPT_CODEX_BASE_URL] },
   );
   if (resp.status === 401) {
-    throw new Error(
-      "ChatGPT did not accept the Codex login. Run `codex login` again on the computer running YunYun.",
-    );
+    throw new Error("ChatGPT did not accept the Codex login. Run `codex login` again on the computer running YunYun.");
   }
   return readOpenAIImageResult(resp, request, endpoint === "edits" ? "edit" : "generation", "ChatGPT");
 }

@@ -23,8 +23,13 @@ export function ProfessorMariWorkingWindow({ visible, onDismiss, className }: Pr
       role="status"
       aria-live="polite"
     >
-      <Loader2 size="1.5rem" className={cn("shrink-0 text-[var(--muted-foreground)]", !reduceAmbientEffects && "animate-spin")} />
-      <p className={cn("min-w-0 text-xs font-medium leading-relaxed text-[var(--foreground)]", onDismiss && "pr-6")}>{localizeUi("ui.ui.professormariworkingwindow.profMariIsWorking")}</p>
+      <Loader2
+        size="1.5rem"
+        className={cn("shrink-0 text-[var(--muted-foreground)]", !reduceAmbientEffects && "animate-spin")}
+      />
+      <p className={cn("min-w-0 text-xs font-medium leading-relaxed text-[var(--foreground)]", onDismiss && "pr-6")}>
+        {localizeUi("ui.ui.professormariworkingwindow.profMariIsWorking")}
+      </p>
       {onDismiss && (
         <button
           type="button"

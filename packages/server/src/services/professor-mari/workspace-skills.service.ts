@@ -128,7 +128,10 @@ function firstBodyLine(content: string) {
 function normalizeDescription(value: string | null | undefined, content: string) {
   const frontmatter = parseFrontmatter(content);
   const candidate =
-    value?.trim() || frontmatter.description?.trim() || firstBodyLine(content) || "User-defined Professor YunYun skill.";
+    value?.trim() ||
+    frontmatter.description?.trim() ||
+    firstBodyLine(content) ||
+    "User-defined Professor YunYun skill.";
   return candidate.slice(0, MAX_SKILL_DESCRIPTION_LENGTH);
 }
 

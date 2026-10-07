@@ -754,7 +754,8 @@ export function PersonasPanel() {
               : [...group.memberIds]
           ).sort((a, b) => (personaOrder.get(a) ?? list.length) - (personaOrder.get(b) ?? list.length));
           if (folderFilterActive && folderMemberIds.length === 0) return null;
-          const isExpanded = (folderFilterActive && folderMemberIds.length > 0) || expandedPersonaGroupIds.includes(group.id);
+          const isExpanded =
+            (folderFilterActive && folderMemberIds.length > 0) || expandedPersonaGroupIds.includes(group.id);
           const isEditing = editingGroupId === group.id;
           return (
             <div

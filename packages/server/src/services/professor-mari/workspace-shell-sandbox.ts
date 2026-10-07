@@ -94,7 +94,11 @@ export function getWorkspaceShellSandboxStatus(): WorkspaceShellSandboxStatus {
   if (process.platform === "linux") {
     const status = getBubblewrapRuntimeStatus();
     if (status.available) return { available: true, backend: "linux-bubblewrap" };
-    return { available: false, backend: null, reason: `Professor YunYun shell commands are disabled. ${status.reason}` };
+    return {
+      available: false,
+      backend: null,
+      reason: `Professor YunYun shell commands are disabled. ${status.reason}`,
+    };
   }
   return {
     available: false,

@@ -602,7 +602,9 @@ export async function spotifyAuthRoutes(app: FastifyInstance) {
         return reply.status(err.status).send({ error: err.message });
       }
       logger.error(err, "DJ YunYun playlist creation failed");
-      return reply.status(500).send({ error: err instanceof Error ? err.message : "DJ YunYun playlist creation failed" });
+      return reply
+        .status(500)
+        .send({ error: err instanceof Error ? err.message : "DJ YunYun playlist creation failed" });
     }
   });
 

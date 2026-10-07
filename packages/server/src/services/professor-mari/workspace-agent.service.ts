@@ -2458,7 +2458,9 @@ export function workspaceMutationTargetForPath(
   const canonicalPolicy = workspacePathAccessPolicy(canonicalRoot, canonicalTarget);
   const effectivePolicy = workspacePathAccessPolicy(canonicalRoot, effectiveTarget);
   if (requestedPolicy === "forbidden" || canonicalPolicy === "forbidden" || effectivePolicy === "forbidden") {
-    throw new Error("Professor YunYun cannot access secret files (.env files and the encryption key) or Git internals.");
+    throw new Error(
+      "Professor YunYun cannot access secret files (.env files and the encryption key) or Git internals.",
+    );
   }
   // #6984: refused unless the caller only reads, so a new write path cannot forget it. The real paths count:
   // a link elsewhere in the workspace, or node_modules/@marinara-engine/<pkg>, can lead into a dist folder.
@@ -3166,7 +3168,8 @@ export class ProfessorMariWorkspaceService {
         messages.push({ role: "user", content: formatCommandResultForPrompt(commandResults), contextKind: "history" });
 
         if (round === MAX_COMMAND_ROUNDS - 1) {
-          const content = "Command round limit reached; asking Professor YunYun to summarize with the evidence she has.";
+          const content =
+            "Command round limit reached; asking Professor YunYun to summarize with the evidence she has.";
           appendTraceStatus(workspaceTrace, content);
           args.onEvent({ type: "status", data: { content, kind: "info", level: "warning" } });
           messages.push({
