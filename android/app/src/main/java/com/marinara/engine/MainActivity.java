@@ -1594,7 +1594,7 @@ public class MainActivity extends Activity {
             Intent confirmationIntent = intent.getParcelableExtra(Intent.EXTRA_INTENT);
             if (confirmationIntent != null) {
                 pauseConnectionRetryLoop();
-                showBootstrap("Approve the Termux install prompt.\nMarinara will continue setup afterward.", false);
+                showBootstrap("Approve the Termux install prompt.\nYunYun will continue setup afterward.", false);
                 startActivity(confirmationIntent);
             }
             return;

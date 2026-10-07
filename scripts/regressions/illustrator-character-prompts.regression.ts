@@ -456,7 +456,7 @@ assert.equal(
     ["Aster", "Briar", "YunYun"],
     [{ name: "Aster", prompt: "girl, red hair, new dress", position: { x: 0.5, y: 0.5 } }],
   ),
-  "Briar's Appearance: blue hair\nMari's Appearance: silver hair",
+  "Briar's Appearance: blue hair\nYunYun's Appearance: silver hair",
   "partial captions retain only uncovered visible appearances, including ensemble segments and the persona",
 );
 

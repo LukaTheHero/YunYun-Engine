@@ -86,6 +86,22 @@ const RULES = [
   [/\bmari-primogem\.svg/g, "chibi-yunyun.png"],
   [/\bchat-ui-mari\.jpg/g, "chibi-yunyun.png"],
   [/\bprofessor-mari-memories\.png/g, "chibi-yunyun.png"],
+
+  // Zero-width and soft-hyphen lookalikes of the assistant's name, used by the
+  // multiplayer identity-conflict guard to prove an impersonating persona is
+  // refused. The \uXXXX escapes sit inside the word, so rule 3's \b boundary
+  // cannot match them: the fixture's real persona name gets rebranded while the
+  // lookalikes keep spelling the old one, leaving them resembling nobody and the
+  // guard passing vacuously. Rewrite the lookalikes to match.
+  [/Ma(\\u[0-9A-Fa-f]{4})ri/g, "Yun$1Yun"],
+
+  // A literal \n / \r / \t escape inside a string makes the character before
+  // the name a word character, so rules 2 and 3 find no \b boundary and skip it
+  // — which silently desynchronised a regression's expected output from its
+  // already-rebranded input. The trailing \b is kept so this still cannot touch
+  // longer names that merely start with it, such as the character "Marisol".
+  [/(\\[nrt])Marinara\b(?!-)/g, "$1YunYun"],
+  [/(\\[nrt])Mari\b/g, "$1YunYun"],
   [/\/illustrations\/professor-mari-whats-new\.webp/g, "/illustrations/yunyun-whats-new.webp"],
   [/"\/logo\.png"/g, '"/yunyun-logo.png"'],
   [/"\/logo-splash\.gif"/g, '"/yunyun-logo-splash.gif"'],

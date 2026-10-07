@@ -280,7 +280,7 @@ try {
     ],
     characters: [{ id: "guide_fixture", name: "Guide", role: "character" }],
   } as unknown as MultiplayerStoredRoom;
-  for (const lookalike of ["Ma\u200Bri", "Ma\u2060ri", "Ma\u00ADri", "Ma\uFEFFri", "Gu\u200Bide"])
+  for (const lookalike of ["Yun\u200BYun", "Yun\u2060Yun", "Yun\u00ADYun", "Yun\uFEFFYun", "Gu\u200Bide"])
     assert.throws(
       () => assertRoomPersonaName(named, lookalike, "guest_fixture"),
       (error: { code?: string }) => error.code === "identity-conflict",
