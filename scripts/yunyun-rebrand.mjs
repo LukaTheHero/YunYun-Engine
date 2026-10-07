@@ -92,6 +92,17 @@ const RULES = [
   [/"\/favicon\.png"/g, '"/yunyun-favicon.png"'],
   [/"\/icon-192\.png"/g, '"/yunyun-icon-192.png"'],
   [/"\/icon-512\.png"/g, '"/yunyun-icon-512.png"'],
+  // The rules above are anchored to a quoted absolute URL, so they miss the
+  // branding files when they are referenced as a path on disk instead — which
+  // is how the Playwright fixtures load them, e.g.
+  // readFileSync(new URL("../packages/client/public/icon-512.png", ...)).
+  // Those reads throw at import time and take the whole spec file down with
+  // them, so match the public/ form too.
+  [/public\/logo\.png/g, "public/yunyun-logo.png"],
+  [/public\/logo-splash\.gif/g, "public/yunyun-logo-splash.gif"],
+  [/public\/favicon\.png/g, "public/yunyun-favicon.png"],
+  [/public\/icon-192\.png/g, "public/yunyun-icon-192.png"],
+  [/public\/icon-512\.png/g, "public/yunyun-icon-512.png"],
   // Upstream's community links. These are Marinara's own Discord and donation
   // page, so every merge that adds a new reference must be repointed at ours.
   [/https:\/\/discord\.com\/invite\/KdAkTg94ME/g, "https://discord.gg/canalpa"],

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { seedUIState } from "./ui-state-fixture";
 
 const version = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
-const pixel = readFileSync(new URL("../packages/client/public/icon-512.png", import.meta.url));
+const pixel = readFileSync(new URL("../packages/client/public/yunyun-icon-512.png", import.meta.url));
 
 test("Game NPC portraits survive a same-name library card and reload over LAN", async ({ page, request }) => {
   const created = await request.post("/api/chats", {

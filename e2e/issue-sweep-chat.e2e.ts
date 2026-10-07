@@ -121,7 +121,7 @@ for (const mode of ["conversation", "roleplay"] as const) {
     const persona = (await personaResponse.json()) as { id: string };
     const avatarResponse = await request.post(`/api/characters/personas/${persona.id}/avatar`, {
       data: {
-        avatar: readFileSync(new URL("../packages/client/public/icon-512.png", import.meta.url)).toString("base64"),
+        avatar: readFileSync(new URL("../packages/client/public/yunyun-icon-512.png", import.meta.url)).toString("base64"),
       },
     });
     expect(avatarResponse.ok(), await avatarResponse.text()).toBeTruthy();

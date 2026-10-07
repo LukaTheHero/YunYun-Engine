@@ -9,7 +9,7 @@ import { openChatSettingsTool } from "./chat-settings-tools.js";
 const version = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 test("standalone stories render avatars and included reasoning offline in print", async ({ page }, testInfo) => {
-  const avatar = `data:image/png;base64,${readFileSync(new URL("../packages/client/public/icon-192.png", import.meta.url)).toString("base64")}`;
+  const avatar = `data:image/png;base64,${readFileSync(new URL("../packages/client/public/yunyun-icon-192.png", import.meta.url)).toString("base64")}`;
   const reasoningParagraphs = ["The road is safest in daylight.", "We should rest before the journey."];
   const html = renderTranscriptHtml({
     title: "Moon Road",
