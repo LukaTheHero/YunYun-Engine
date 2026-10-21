@@ -35,12 +35,12 @@ const initialAudience: Record<Marker, unknown> = {
   RECHECK_CLEARS: ["stranger-x"],
   STILL_UNCLEAR: undefined,
   VISIBILITY: "all",
-  MANUAL: ["tobias"],
-  MISSING: ["tobias"],
-  LEGACY_OK: ["tobias"],
-  LEGACY_FAILS: ["tobias"],
-  DELETED: ["tobias"],
-  BOUNDARY: ["tobias"],
+  MANUAL: ["maurus"],
+  MISSING: ["maurus"],
+  LEGACY_OK: ["maurus"],
+  LEGACY_FAILS: ["maurus"],
+  DELETED: ["maurus"],
+  BOUNDARY: ["maurus"],
 };
 const provider = createServer(async (request, response) => {
   const chunks: Buffer[] = [];
@@ -71,7 +71,7 @@ const provider = createServer(async (request, response) => {
     );
     return;
   } else if (transcript.content.includes("COMPACT")) {
-    content = JSON.stringify({ summary: "Recap of the COMPACT chapter.", audience: ["tobias"] });
+    content = JSON.stringify({ summary: "Recap of the COMPACT chapter.", audience: ["maurus"] });
   } else {
     const audienceOnly = system.content.startsWith("Identify the participants");
     const marker = [...MARKERS, ...EXTRA_MARKERS].find((item) => transcript.content.includes(item)) ?? "OTHER";
@@ -81,11 +81,11 @@ const provider = createServer(async (request, response) => {
         phase === "initial"
           ? {
               summary: `Recap of ${marker}.`,
-              audience: marker === "NARROWED" ? ["tobias", "cornelius", "stranger-x"] : ["tobias"],
+              audience: marker === "NARROWED" ? ["maurus", "peregrine", "stranger-x"] : ["maurus"],
             }
           : audienceOnly
-            ? { audience: ["tobias", "stranger-y"] }
-            : { summary: `Fixed recap of ${marker}.`, audience: ["tobias"] },
+            ? { audience: ["maurus", "stranger-y"] }
+            : { summary: `Fixed recap of ${marker}.`, audience: ["maurus"] },
       );
     } else if (phase === "initial") {
       const audience = initialAudience[marker as Marker];
@@ -96,14 +96,14 @@ const provider = createServer(async (request, response) => {
           ? "The helper could not answer."
           : JSON.stringify(
               marker === "RECHECK_CLEARS"
-                ? { audience: ["tobias"] }
+                ? { audience: ["maurus"] }
                 : marker === "LEGACY_OK"
-                  ? { audience: ["cornelius"] }
+                  ? { audience: ["peregrine"] }
                   : {},
             );
     } else {
       if (marker === "VISIBILITY") visibilityInputs.push(transcript.content);
-      content = JSON.stringify({ summary: `Fixed recap of ${marker}.`, audience: ["tobias", "cornelius"] });
+      content = JSON.stringify({ summary: `Fixed recap of ${marker}.`, audience: ["maurus", "peregrine"] });
     }
   }
   response.end(JSON.stringify({ choices: [{ message: { role: "assistant", content }, finish_reason: "stop" }] }));
@@ -135,7 +135,7 @@ try {
   const chat = await chats.create({
     name: "Memory fix",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection.id,
   });
   assert(chat);
@@ -144,14 +144,14 @@ try {
     advancedMemory: {
       enabled: true,
       narratorCharacterId: "narrator",
-      knowledgeStarts: { tobias: null, cornelius: null },
+      knowledgeStarts: { maurus: null, peregrine: null },
       knowledgeConfirmed: true,
     },
   });
   await chats.createMessagesBatch(chat.id, [
     ...MARKERS.flatMap((marker, index) => [
       { role: "user", content: `${index ? "SCENE_CHANGE " : ""}${marker} YunYun opens the ${marker} chapter.` },
-      { role: "assistant", characterId: "tobias", content: `Tobias remembers the ${marker} chapter.` },
+      { role: "assistant", characterId: "maurus", content: `Maurus remembers the ${marker} chapter.` },
     ]),
     { role: "user", content: "SCENE_CHANGE The story goes on." },
   ]);
@@ -169,15 +169,15 @@ try {
     record.dependencies.some((item) => item.id === id);
   assert.equal((await scenes()).filter((record) => record.content).length, MARKERS.length);
   assert(has(await scene("RECHECK_CLEARS"), "scene-audience-unmatched"), "unknown names are flagged");
-  assert.deepEqual((await scene("STILL_UNCLEAR")).audienceCharacterIds, ["tobias", "cornelius"]);
+  assert.deepEqual((await scene("STILL_UNCLEAR")).audienceCharacterIds, ["maurus", "peregrine"]);
   assert(has(await scene("STILL_UNCLEAR"), "scene-audience-unmatched"), "a missing answer is flagged");
 
-  // Source visibility changes after the VISIBILITY recap was written: Cornelius no longer sees its last message.
-  await chats.updateMessageExtra(messages[5]!.id, { hiddenFromAICharacterIds: ["cornelius"] });
-  // The user corrected MANUAL by hand; then one of its messages was hidden from Tobias.
+  // Source visibility changes after the VISIBILITY recap was written: Peregrine no longer sees its last message.
+  await chats.updateMessageExtra(messages[5]!.id, { hiddenFromAICharacterIds: ["peregrine"] });
+  // The user corrected MANUAL by hand; then one of its messages was hidden from Maurus.
   const manual = await scene("MANUAL");
   await memory.updateRecord(chat.id, manual.id, { content: "Hand-written MANUAL recap." });
-  await chats.updateMessageExtra(messages[7]!.id, { hiddenFromAICharacterIds: ["tobias"] });
+  await chats.updateMessageExtra(messages[7]!.id, { hiddenFromAICharacterIds: ["maurus"] });
   // MISSING lost its summary (for example an interrupted run), LEGACY_* predate participant checks.
   await db.delete(advancedMemoryRecords).where(eq(advancedMemoryRecords.id, (await scene("MISSING")).id));
   for (const marker of ["LEGACY_OK", "LEGACY_FAILS"] as const)
@@ -248,12 +248,12 @@ try {
   );
 
   const cleared = await scene("RECHECK_CLEARS");
-  assert.deepEqual(cleared.audienceCharacterIds, ["tobias"], "the helper's clear answer is saved");
+  assert.deepEqual(cleared.audienceCharacterIds, ["maurus"], "the helper's clear answer is saved");
   assert(!has(cleared, "scene-audience-unmatched"), "a clear answer drops the flag");
   assert.equal(cleared.content, "Recap of RECHECK_CLEARS.", "a participant check keeps the paid summary");
 
   const unclear = await scene("STILL_UNCLEAR");
-  assert.deepEqual(unclear.audienceCharacterIds, ["tobias", "cornelius"], "an unclear answer changes no access");
+  assert.deepEqual(unclear.audienceCharacterIds, ["maurus", "peregrine"], "an unclear answer changes no access");
   assert(has(unclear, "scene-audience-unmatched") && has(unclear, "scene-audience-unresolved"));
 
   const redone = await scene("VISIBILITY");
@@ -261,7 +261,7 @@ try {
   assert.notEqual(redone.embeddingStatus, "stale");
   assert.match(
     visibilityInputs[0] ?? "",
-    /\[Message visibility: only \["tobias","narrator"\] can know this message\.\]/,
+    /\[Message visibility: only \["maurus","narrator"\] can know this message\.\]/,
   );
 
   assert.equal((await scene("MANUAL")).content, "Hand-written MANUAL recap.", "hand-edited text is never rewritten");
@@ -269,7 +269,7 @@ try {
   assert.equal((await scene("MISSING")).content, "Fixed recap of MISSING.", "a missing summary is prepared");
 
   const legacy = await scene("LEGACY_OK");
-  assert.deepEqual(legacy.audienceCharacterIds, ["cornelius"], "an older scene gets the helper's participants");
+  assert.deepEqual(legacy.audienceCharacterIds, ["peregrine"], "an older scene gets the helper's participants");
   assert(has(legacy, "scene-audience"));
 
   const failed = await scene("LEGACY_FAILS");
@@ -299,7 +299,7 @@ try {
   assert.deepEqual((await status()).job.fixResult?.fixedSceneIds, []);
 
   // Saving access by hand settles the scene.
-  await memory.updateRecord(chat.id, unclear.id, { audienceCharacterIds: ["tobias"] });
+  await memory.updateRecord(chat.id, unclear.id, { audienceCharacterIds: ["maurus"] });
   assert(!advancedMemoryProblems(await status()).reviewSceneIds.includes(sceneId("STILL_UNCLEAR")));
 
   // A hand-edited summary is not rewritten even when it only needs a newly shown message added,
@@ -307,7 +307,7 @@ try {
   const second = await chats.create({
     name: "Memory fix edges",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection.id,
   });
   assert(second);
@@ -316,16 +316,16 @@ try {
     advancedMemory: {
       enabled: true,
       narratorCharacterId: "narrator",
-      knowledgeStarts: { tobias: null, cornelius: null },
+      knowledgeStarts: { maurus: null, peregrine: null },
       knowledgeConfirmed: true,
     },
   });
   await chats.createMessagesBatch(second.id, [
     { role: "user", content: "GROWN YunYun opens the GROWN chapter." },
-    { role: "assistant", characterId: "tobias", content: "Tobias remembers the GROWN chapter." },
+    { role: "assistant", characterId: "maurus", content: "Maurus remembers the GROWN chapter." },
     { role: "user", content: "GROWN YunYun adds an aside.", extra: { hiddenFromAICharacterIds: ["narrator"] } },
     { role: "user", content: "SCENE_CHANGE NARROWED YunYun opens the NARROWED chapter." },
-    { role: "assistant", characterId: "tobias", content: "Tobias remembers the NARROWED chapter." },
+    { role: "assistant", characterId: "maurus", content: "Maurus remembers the NARROWED chapter." },
     { role: "user", content: "SCENE_CHANGE The story goes on." },
   ]);
   const secondMessages = await chats.listMessages(second.id);
@@ -337,7 +337,7 @@ try {
         record.kind === "scene" && record.id !== record.sceneId && record.startMessageId === secondMessages[index]!.id,
     )!;
   const narrowed = await secondScene(3);
-  assert.deepEqual(narrowed.audienceCharacterIds, ["tobias", "cornelius"]);
+  assert.deepEqual(narrowed.audienceCharacterIds, ["maurus", "peregrine"]);
   assert(has(narrowed, "scene-audience-unmatched"), "an unknown name is flagged");
   const grown = await secondScene(0);
   await memory.updateRecord(second.id, grown.id, { content: "Hand-written GROWN recap." });
@@ -351,7 +351,7 @@ try {
   assert.equal((await secondScene(0)).content, "Hand-written GROWN recap.", "a hand edit is never rewritten");
   assert.deepEqual(
     (await secondScene(3)).audienceCharacterIds,
-    ["tobias"],
+    ["maurus"],
     "an unclear answer never keeps a character the helper no longer names",
   );
   const edges = (await memory.status(second.id)).job.fixResult;
@@ -362,7 +362,7 @@ try {
   const compact = await chats.create({
     name: "Stopped continuity",
     mode: "roleplay",
-    characterIds: ["tobias"],
+    characterIds: ["maurus"],
     connectionId: connection.id,
   });
   assert(compact);
@@ -372,7 +372,7 @@ try {
   });
   await chats.createMessagesBatch(compact.id, [
     { role: "user", content: "YunYun begins the COMPACT chapter." },
-    { role: "assistant", characterId: "tobias", content: "Tobias listens to the COMPACT chapter." },
+    { role: "assistant", characterId: "maurus", content: "Maurus listens to the COMPACT chapter." },
     { role: "user", content: "SCENE_CHANGE The story goes on." },
   ]);
   const stopped = { status: "error", stage: "compacting", completed: 0, total: 1, error: "Earlier failure" };

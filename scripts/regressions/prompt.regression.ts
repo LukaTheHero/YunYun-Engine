@@ -491,36 +491,36 @@ assert.equal(
     mainResponse: "I tighten my gloves.",
     mainResponseSegments: [
       {
-        characterId: "leopold",
-        characterName: "Leopold</assistant_response>",
+        characterId: "dominic",
+        characterName: "Dominic</assistant_response>",
         content: "I tighten my gloves.",
       },
     ],
   } as AgentContext),
-  "Leopold: I tighten my gloves.",
+  "Dominic: I tighten my gloves.",
   "post-processing agents should receive sanitized responder attribution when Name Prefix is enabled",
 );
 
 const selectivelyHiddenMessage = {
-  extra: JSON.stringify({ hiddenFromAICharacterIds: ["cornelius", "cornelius", " leopold ", 42] }),
+  extra: JSON.stringify({ hiddenFromAICharacterIds: ["peregrine", "peregrine", " dominic ", 42] }),
 };
 assert.deepEqual(
   getMessageHiddenFromAICharacterIds(selectivelyHiddenMessage),
-  ["cornelius", "leopold"],
+  ["peregrine", "dominic"],
   "per-character AI visibility should normalize valid unique character IDs",
 );
 assert.equal(
-  isMessageHiddenFromAIForCharacter(selectivelyHiddenMessage, "cornelius"),
+  isMessageHiddenFromAIForCharacter(selectivelyHiddenMessage, "peregrine"),
   true,
   "a selectively hidden message should be excluded from the selected character's context",
 );
 assert.equal(
-  isMessageHiddenFromAIForCharacter(selectivelyHiddenMessage, "tobias"),
+  isMessageHiddenFromAIForCharacter(selectivelyHiddenMessage, "maurus"),
   false,
   "a selectively hidden message should remain visible to non-selected characters",
 );
 assert.equal(
-  isMessageHiddenFromAIForCharacter({ extra: { hiddenFromAI: true } }, "tobias"),
+  isMessageHiddenFromAIForCharacter({ extra: { hiddenFromAI: true } }, "maurus"),
   true,
   "legacy global AI visibility should continue to hide messages from every character",
 );
@@ -533,21 +533,21 @@ const audienceScopedHistory: ChatMLMessage[] = [
   },
   {
     role: "assistant",
-    content: "<last_message>\nCornelius's private clue\n</last_message>",
+    content: "<last_message>\nPeregrine's private clue\n</last_message>",
     contextKind: "history",
-    characterId: "leopold",
-    hiddenFromAICharacterIds: ["cornelius"],
+    characterId: "dominic",
+    hiddenFromAICharacterIds: ["peregrine"],
   },
 ];
-const corneliusHistory = filterPromptMessagesForCharacterAudience(audienceScopedHistory, ["cornelius"]);
-assert.equal(corneliusHistory.length, 1, "the selected character should not receive the restricted history message");
+const peregrineHistory = filterPromptMessagesForCharacterAudience(audienceScopedHistory, ["peregrine"]);
+assert.equal(peregrineHistory.length, 1, "the selected character should not receive the restricted history message");
 assert.match(
-  corneliusHistory[0]!.content,
+  peregrineHistory[0]!.content,
   /^<last_message>[\s\S]*Visible setup[\s\S]*<\/last_message>$/,
   "history wrappers should be repaired after a restricted message is removed",
 );
 assert.equal(
-  filterPromptMessagesForCharacterAudience(audienceScopedHistory, ["leopold"]).length,
+  filterPromptMessagesForCharacterAudience(audienceScopedHistory, ["dominic"]).length,
   2,
   "other group characters should keep the restricted message in context",
 );
@@ -555,21 +555,21 @@ const characterStartHistory: ChatMLMessage[] = [
   { role: "user", content: "Shared opening", contextKind: "history" },
   {
     role: "assistant",
-    content: "Tobias enters",
+    content: "Maurus enters",
     contextKind: "history",
-    characterId: "tobias",
-    conversationStartForCharacterIds: ["tobias"],
+    characterId: "maurus",
+    conversationStartForCharacterIds: ["maurus"],
   },
-  { role: "user", content: "Welcome, Tobias", contextKind: "history" },
+  { role: "user", content: "Welcome, Maurus", contextKind: "history" },
 ];
 assert.deepEqual(
-  filterPromptMessagesForCharacterAudience(characterStartHistory, ["tobias"]).map((message) => message.content),
-  ["Tobias enters", "Welcome, Tobias"],
+  filterPromptMessagesForCharacterAudience(characterStartHistory, ["maurus"]).map((message) => message.content),
+  ["Maurus enters", "Welcome, Maurus"],
   "a character-specific New Start should exclude earlier history only for that character",
 );
 assert.deepEqual(
-  filterPromptMessagesForCharacterAudience(characterStartHistory, ["leopold"]).map((message) => message.content),
-  ["Shared opening", "Tobias enters", "Welcome, Tobias"],
+  filterPromptMessagesForCharacterAudience(characterStartHistory, ["dominic"]).map((message) => message.content),
+  ["Shared opening", "Maurus enters", "Welcome, Maurus"],
   "other characters should retain history before another character's New Start",
 );
 assert.equal(
@@ -584,7 +584,7 @@ assert.equal(
       role: "user",
       content: "Private",
       contextKind: "history",
-      hiddenFromAICharacterIds: ["cornelius"],
+      hiddenFromAICharacterIds: ["peregrine"],
     },
   ]).length,
   2,
@@ -595,25 +595,25 @@ const mergedRestrictedHistory = mergeAdjacentMessages([
     role: "user",
     content: "First private detail",
     contextKind: "history",
-    hiddenFromAICharacterIds: ["cornelius"],
+    hiddenFromAICharacterIds: ["peregrine"],
   },
   {
     role: "user",
     content: "Second private detail",
     contextKind: "history",
-    hiddenFromAICharacterIds: ["cornelius"],
+    hiddenFromAICharacterIds: ["peregrine"],
   },
 ]);
 assert.equal(mergedRestrictedHistory.length, 1, "messages with the same restricted audience may still merge");
 assert.deepEqual(
   mergedRestrictedHistory[0]!.hiddenFromAICharacterIds,
-  ["cornelius"],
+  ["peregrine"],
   "merged messages should retain their restricted audience",
 );
 assert.equal(
   mergeAdjacentMessages([
-    { role: "user", content: "First shared secret", hiddenFromAICharacterIds: ["cornelius", "leopold"] },
-    { role: "user", content: "Second shared secret", hiddenFromAICharacterIds: ["leopold", "cornelius"] },
+    { role: "user", content: "First shared secret", hiddenFromAICharacterIds: ["peregrine", "dominic"] },
+    { role: "user", content: "Second shared secret", hiddenFromAICharacterIds: ["dominic", "peregrine"] },
   ]).length,
   1,
   "equivalent character audiences should merge regardless of selection order",
@@ -621,7 +621,7 @@ assert.equal(
 assert.equal(
   squashLeadingSystemMessages([
     { role: "system", content: "Visible system context" },
-    { role: "system", content: "Private event", hiddenFromAICharacterIds: ["cornelius"] },
+    { role: "system", content: "Private event", hiddenFromAICharacterIds: ["peregrine"] },
   ]).length,
   2,
   "system-message squashing should not combine different character audiences",
@@ -629,8 +629,8 @@ assert.equal(
 const audienceScopedSystemMessages = squashLeadingSystemMessages([
   { role: "system", content: "Public setup A" },
   { role: "system", content: "Public setup B" },
-  { role: "system", content: "Private setup A", hiddenFromAICharacterIds: ["cornelius", "leopold"] },
-  { role: "system", content: "Private setup B", hiddenFromAICharacterIds: ["leopold", "cornelius"] },
+  { role: "system", content: "Private setup A", hiddenFromAICharacterIds: ["peregrine", "dominic"] },
+  { role: "system", content: "Private setup B", hiddenFromAICharacterIds: ["dominic", "peregrine"] },
   { role: "user", content: "Continue" },
 ]);
 assert.deepEqual(
@@ -640,26 +640,26 @@ assert.deepEqual(
 );
 assert.deepEqual(
   audienceScopedSystemMessages[1]!.hiddenFromAICharacterIds,
-  ["cornelius", "leopold"],
+  ["peregrine", "dominic"],
   "squashed system runs should retain their character audience",
 );
-const tobiasRestrictedRun: ChatMLMessage[] = [
+const maurusRestrictedRun: ChatMLMessage[] = [
   { role: "user", content: "Visible before private run", contextKind: "history" },
   ...Array.from({ length: 16 }, (_, index) => ({
     role: index % 2 === 0 ? ("user" as const) : ("assistant" as const),
     content: `Private run message ${index + 1}`,
     contextKind: "history" as const,
-    hiddenFromAICharacterIds: ["tobias"],
+    hiddenFromAICharacterIds: ["maurus"],
   })),
   { role: "user", content: "Visible after private run", contextKind: "history" },
 ];
 assert.deepEqual(
-  filterPromptMessagesForCharacterAudience(tobiasRestrictedRun, ["powers-that-be"]).map((message) => message.content),
-  tobiasRestrictedRun.map((message) => message.content),
+  filterPromptMessagesForCharacterAudience(maurusRestrictedRun, ["powers-that-be"]).map((message) => message.content),
+  maurusRestrictedRun.map((message) => message.content),
   "every message in a character-scoped run should remain visible to other responding characters",
 );
 assert.deepEqual(
-  filterPromptMessagesForCharacterAudience(tobiasRestrictedRun, ["tobias"]).map((message) => message.content),
+  filterPromptMessagesForCharacterAudience(maurusRestrictedRun, ["maurus"]).map((message) => message.content),
   ["Visible before private run", "Visible after private run"],
   "every message in a character-scoped run should be removed for the restricted character",
 );
@@ -944,7 +944,7 @@ function makeRegressionAgentContext(overrides: Partial<AgentContext> = {}): Agen
     ],
     mainResponse: null,
     gameState: null,
-    characters: [{ id: "char-leopold", name: "Leopold", description: "A precise researcher." }],
+    characters: [{ id: "char-dominic", name: "Dominic", description: "A precise researcher." }],
     persona: { name: "YunYun", description: "The active user persona." },
     memory: {},
     writableLorebookIds: null,
@@ -1527,15 +1527,15 @@ const cases: RegressionCase[] = [
     run() {
       const candidates = [
         {
-          id: "leopold",
-          name: "Leopold",
+          id: "dominic",
+          name: "Dominic",
           talkativeness: 70,
           status: "online",
           personality: "Core Traits:\n- precise\n- merciless",
         },
         {
-          id: "cornelius",
-          name: "Cornelius",
+          id: "peregrine",
+          name: "Peregrine",
           talkativeness: 45,
           activity: "Reviewing the ledgers",
         },
@@ -1545,8 +1545,8 @@ const cases: RegressionCase[] = [
         formatSmartGroupCandidates(candidates, true),
         [
           "<candidate>",
-          "id: leopold",
-          "name: Leopold",
+          "id: dominic",
+          "name: Dominic",
           "talkativeness: 70%",
           "current status: online",
           "personality: Core Traits:",
@@ -1555,8 +1555,8 @@ const cases: RegressionCase[] = [
           "</candidate>",
           "",
           "<candidate>",
-          "id: cornelius",
-          "name: Cornelius",
+          "id: peregrine",
+          "name: Peregrine",
           "talkativeness: 45%",
           "current activity: Reviewing the ledgers",
           "</candidate>",
@@ -1565,16 +1565,16 @@ const cases: RegressionCase[] = [
       assert.equal(
         formatSmartGroupCandidates(candidates, false),
         [
-          "- id: leopold",
-          "  name: Leopold",
+          "- id: dominic",
+          "  name: Dominic",
           "  talkativeness: 70%",
           "  current status: online",
           "  personality: Core Traits:",
           "- precise",
           "- merciless",
           "",
-          "- id: cornelius",
-          "  name: Cornelius",
+          "- id: peregrine",
+          "  name: Peregrine",
           "  talkativeness: 45%",
           "  current activity: Reviewing the ledgers",
         ].join("\n"),
@@ -1782,16 +1782,16 @@ const cases: RegressionCase[] = [
     run() {
       const messages: SimpleMessage[] = [
         { role: "system", content: "base system" },
-        { role: "assistant", content: '<speaker="Leopold">"An older line."</speaker>' },
+        { role: "assistant", content: '<speaker="Dominic">"An older line."</speaker>' },
         { role: "user", content: '<speaker="YunYun">"A user-authored tag."</speaker>' },
-        { role: "assistant", content: '<speaker="Cornelius">"The latest example."</speaker>' },
+        { role: "assistant", content: '<speaker="Peregrine">"The latest example."</speaker>' },
       ];
 
       stripSpeakerTagsExceptLastAssistant(messages);
 
       assert.equal(messages[1]?.content, '"An older line."');
       assert.equal(messages[2]?.content, '"A user-authored tag."');
-      assert.equal(messages[3]?.content, '<speaker="Cornelius">"The latest example."</speaker>');
+      assert.equal(messages[3]?.content, '<speaker="Peregrine">"The latest example."</speaker>');
     },
   },
   {
@@ -1810,12 +1810,12 @@ const cases: RegressionCase[] = [
             content: "A decree from the old Persona.",
             personaSnapshotName: historicalPersonaName,
           },
-          { role: "assistant" as const, content: "An answer.", characterId: "leopold" },
+          { role: "assistant" as const, content: "An answer.", characterId: "dominic" },
           { role: "user" as const, content: "A question from the current Persona." },
         ],
         {
           personaName: "YunYun",
-          characterNamesById: new Map([["leopold", "Leopold"]]),
+          characterNamesById: new Map([["dominic", "Dominic"]]),
         },
       );
 
@@ -1823,7 +1823,7 @@ const cases: RegressionCase[] = [
         messages.map((message) => message.content),
         [
           "Powers That Be: A decree from the old Persona.",
-          "Leopold: An answer.",
+          "Dominic: An answer.",
           "YunYun: A question from the current Persona.",
         ],
       );
@@ -1839,11 +1839,11 @@ const cases: RegressionCase[] = [
             content: "A decree from the old Persona.",
             personaSnapshotName: reassignedPersonaName,
           },
-          { role: "assistant" as const, content: "An answer.", characterId: "leopold" },
+          { role: "assistant" as const, content: "An answer.", characterId: "dominic" },
         ],
         {
           personaName: "YunYun",
-          characterNamesById: new Map([["leopold", "Leopold"]]),
+          characterNamesById: new Map([["dominic", "Dominic"]]),
         },
       );
       assert.equal(updatedMessages[0]?.content, "Reassigned Hero: A decree from the old Persona.");
@@ -2719,19 +2719,19 @@ const cases: RegressionCase[] = [
   {
     name: "TTS dialogue extraction ignores HTML and CSS attributes",
     run() {
-      const htmlCard = `<div style="max-width:340px;font-family:Georgia,'Times New Roman',serif;color:#3a2f1e;"><div class="label">read a hundred times</div><div>Your name is <span style="font-weight:bold">Tobias</span>.</div></div>`;
-      const utterances = extractDialogueUtterances(`${htmlCard}\nLeopold said, "Stay behind me."`, "Leopold");
+      const htmlCard = `<div style="max-width:340px;font-family:Georgia,'Times New Roman',serif;color:#3a2f1e;"><div class="label">read a hundred times</div><div>Your name is <span style="font-weight:bold">Maurus</span>.</div></div>`;
+      const utterances = extractDialogueUtterances(`${htmlCard}\nDominic said, "Stay behind me."`, "Dominic");
 
-      assert.deepEqual(utterances, [{ text: "Stay behind me.", speaker: "Leopold" }]);
+      assert.deepEqual(utterances, [{ text: "Stay behind me.", speaker: "Dominic" }]);
       const cleaned = cleanTTSInputText(`<style>.note { color: red; }</style>${htmlCard}`);
       assert.equal(cleaned.includes("max-width"), false);
       assert.equal(cleaned.includes("font-family"), false);
       assert.equal(cleaned.includes("color: red"), false);
-      assert.match(cleaned, /Your name is Tobias\./);
+      assert.match(cleaned, /Your name is Maurus\./);
 
       assert.deepEqual(
-        extractDialogueUtterances('<div class="frame"></div><speaker="Leopold">"Do not move."</speaker>', "Narrator"),
-        [{ text: "Do not move.", speaker: "Leopold" }],
+        extractDialogueUtterances('<div class="frame"></div><speaker="Dominic">"Do not move."</speaker>', "Narrator"),
+        [{ text: "Do not move.", speaker: "Dominic" }],
       );
     },
   },
@@ -2787,8 +2787,8 @@ const cases: RegressionCase[] = [
     run() {
       const resolved = resolveMacros("{{lastGenerationType}} | {{idle_duration}} | {{timezone}} | {{input}}", {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
         lastInput: "Continue the experiment.",
         lastGenerationType: "regenerate",
@@ -2806,8 +2806,8 @@ const cases: RegressionCase[] = [
       const unknownId = "A1StGXR8_Z5jdHi6BmyTX";
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: { [unknownId]: "Variable collision" },
         characterReferences: { [referencedId]: "Susie" },
       };
@@ -2827,8 +2827,8 @@ const cases: RegressionCase[] = [
       const unknownId = "Q1StGXR8_Z5jdHi6B-myT";
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
         personaReferences: { [referencedId]: "Professor YunYun" },
       };
@@ -2842,7 +2842,7 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveCharacterScopedMacros(
           `{{#if {{persona-${referencedId}}} == "Professor YunYun"}}known{{else}}unknown{{/if}}`,
-          { name: "Leopold" },
+          { name: "Dominic" },
           0,
           context,
         ),
@@ -2875,8 +2875,8 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacros("Before\n{{outlet:: rules }}\nAfter", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           outlets: processed.outlets,
         }),
@@ -2885,8 +2885,8 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacros("{{outlet::RULES}}", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           outlets: processed.outlets,
         }),
@@ -2895,8 +2895,8 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacros("{{outlet::toString}}", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           outlets: processed.outlets,
         }),
@@ -2905,8 +2905,8 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacros("{{outlet::nested}}", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           outlets: { nested: "{{outlet::rules}}" },
         }),
@@ -2919,8 +2919,8 @@ const cases: RegressionCase[] = [
     run() {
       const context: MacroContext = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
         lorebookEntryCounts: { "V1StGXR8_Z5jdHi6B-myT": 151 },
       };
@@ -2936,9 +2936,9 @@ const cases: RegressionCase[] = [
         resolveMacros("{{userNamePhonetic}} calls {{charNamePhonetic}}.", {
           user: "YunYun",
           userPhonetic: "Mah-ree",
-          char: "Leopold",
+          char: "Dominic",
           charPhonetic: "Doctor-ray",
-          characters: ["Leopold"],
+          characters: ["Dominic"],
           variables: {},
         }),
         "Mah-ree calls Doctor-ray.",
@@ -2947,11 +2947,11 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacros("{{userNamePhonetic}} calls {{charNamePhonetic}}.", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
         }),
-        "YunYun calls Leopold.",
+        "YunYun calls Dominic.",
       );
     },
   },
@@ -2960,8 +2960,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
 
@@ -2977,8 +2977,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {} as Record<string, string>,
         personaFields: {
           description: "{{setvar::personaTouched::yes}}Unused persona description",
@@ -2998,8 +2998,8 @@ const cases: RegressionCase[] = [
       const resolve = (template: string) =>
         resolveMacros(template, {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
         });
 
@@ -3025,8 +3025,8 @@ const cases: RegressionCase[] = [
       const resolvePrototypeName = (template: string) =>
         resolveMacros(template, {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           localVariables: prototypeNamedVariables,
         });
@@ -3040,8 +3040,8 @@ const cases: RegressionCase[] = [
       const firstChatVariables: Record<string, string> = {};
       resolveMacros("{{setvar::remembered::across turns}}", {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
         localVariables: firstChatVariables,
       });
@@ -3049,8 +3049,8 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacros("{{getvar::remembered}}", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           localVariables: reloadedFirstChatVariables,
         }),
@@ -3060,8 +3060,8 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacros("{{getvar::remembered}}", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           localVariables: {},
         }),
@@ -3074,8 +3074,8 @@ const cases: RegressionCase[] = [
       const typedMessageVariables: Record<string, string> = { char1: "Mary" };
       const typedMessageContext = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
         localVariables: typedMessageVariables,
       };
@@ -3107,8 +3107,8 @@ const cases: RegressionCase[] = [
       assert.equal(
         resolveMacrosForPreview("{{setvar::char1::Anna}}{{char1}}", {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
           localVariables: previewVariables,
         }),
@@ -3119,8 +3119,8 @@ const cases: RegressionCase[] = [
       const conditionalVariables = { score: "10" };
       resolveMacros("{{#if addnumvar::score::5}}unchanged{{/if}}", {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: conditionalVariables,
       });
       assert.equal(conditionalVariables.score, "10", "conditional operands must not execute numeric writes");
@@ -3137,8 +3137,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
 
@@ -3152,8 +3152,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
 
@@ -3170,37 +3170,37 @@ const cases: RegressionCase[] = [
     run() {
       const baseContext = {
         user: "YunYun",
-        char: "Cornelius",
-        characters: ["Tobias", "Cornelius", "Leopold"],
+        char: "Peregrine",
+        characters: ["Maurus", "Peregrine", "Dominic"],
         variables: {},
         characterFields: { scenario: "Moonlit lake" },
       };
 
       assert.equal(
-        resolveMacros('{{#if character == "Tobias" || "Cornelius"}}selected{{else}}other{{/if}}', baseContext),
+        resolveMacros('{{#if character == "Maurus" || "Peregrine"}}selected{{else}}other{{/if}}', baseContext),
         "selected",
       );
       assert.equal(
-        resolveMacros("{{#if character == “Tobias” || “Cornelius”}}selected{{else}}other{{/if}}", baseContext),
+        resolveMacros("{{#if character == “Maurus” || “Peregrine”}}selected{{else}}other{{/if}}", baseContext),
         "selected",
       );
       assert.equal(
         resolveMacros(
-          '{{#if characters contains "Tobias" && characters contains "Cornelius"}}together{{/if}}',
+          '{{#if characters contains "Maurus" && characters contains "Peregrine"}}together{{/if}}',
           baseContext,
         ),
         "together",
       );
       assert.equal(
         resolveMacros(
-          '{{#if (character == "Tobias" || character == "Cornelius") && scenario contains "lake"}}lake party{{/if}}',
+          '{{#if (character == "Maurus" || character == "Peregrine") && scenario contains "lake"}}lake party{{/if}}',
           baseContext,
         ),
         "lake party",
       );
       assert.equal(
         resolveMacros(
-          '{{#if character == "Tobias" || character == "Cornelius" && scenario contains "palace"}}selected{{else}}other{{/if}}',
+          '{{#if character == "Maurus" || character == "Peregrine" && scenario contains "palace"}}selected{{else}}other{{/if}}',
           { ...baseContext, characterFields: { scenario: "Empty road" } },
         ),
         "other",
@@ -3214,13 +3214,13 @@ const cases: RegressionCase[] = [
       );
 
       const deferred = resolveMacros(
-        '{{#if character == "Tobias" || "Cornelius"}}selected{{else}}other{{/if}}',
-        { ...baseContext, char: "Leopold" },
+        '{{#if character == "Maurus" || "Peregrine"}}selected{{else}}other{{/if}}',
+        { ...baseContext, char: "Dominic" },
         { deferCharacterMacros: "names" },
       );
       assert.equal(hasDeferredCharacterMacros(deferred), true);
-      assert.equal(resolveDeferredCharacterMacros(deferred, { name: "Cornelius" }, baseContext), "selected");
-      assert.equal(resolveDeferredCharacterMacros(deferred, { name: "Leopold" }, baseContext), "other");
+      assert.equal(resolveDeferredCharacterMacros(deferred, { name: "Peregrine" }, baseContext), "selected");
+      assert.equal(resolveDeferredCharacterMacros(deferred, { name: "Dominic" }, baseContext), "other");
     },
   },
   {
@@ -3228,8 +3228,8 @@ const cases: RegressionCase[] = [
     run() {
       const initialContext = {
         user: "YunYun",
-        char: "Cornelius",
-        characters: ["Cornelius", "Leopold"],
+        char: "Peregrine",
+        characters: ["Peregrine", "Dominic"],
         variables: {},
         convoFields: {
           charDisplayName: "Regrator",
@@ -3246,24 +3246,24 @@ const cases: RegressionCase[] = [
 
       assert.equal(hasDeferredCharacterMacros(deferred), true);
       assert.equal(
-        resolveDeferredCharacterMacros(deferred, { name: "Cornelius" }, initialContext),
+        resolveDeferredCharacterMacros(deferred, { name: "Peregrine" }, initialContext),
         "Regrator|Runs the Northland Bank.|AI engineer.|Keep the tone formal.|formal",
       );
       assert.equal(
         resolveDeferredCharacterMacros(
           deferred,
-          { name: "Leopold" },
+          { name: "Dominic" },
           {
             ...initialContext,
             convoFields: {
-              charDisplayName: "Leopold",
+              charDisplayName: "Dominic",
               charAbout: "A researcher from Snezhnaya.",
               personaAbout: "AI engineer.",
               convoBehavior: "Be playful with YunYun.",
             },
           },
         ),
-        "Leopold|A researcher from Snezhnaya.|AI engineer.|Be playful with YunYun.|playful",
+        "Dominic|A researcher from Snezhnaya.|AI engineer.|Be playful with YunYun.|playful",
       );
     },
   },
@@ -3272,44 +3272,44 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "Powers That Be",
-        char: "Cornelius",
-        characters: ["Cornelius"],
-        groupCharacters: ["Powers That Be", "Tobias", "Cornelius"],
+        char: "Peregrine",
+        characters: ["Peregrine"],
+        groupCharacters: ["Powers That Be", "Maurus", "Peregrine"],
         variables: {},
       };
 
-      assert.equal(resolveMacros("{{group}}", context), "Powers That Be, Tobias");
+      assert.equal(resolveMacros("{{group}}", context), "Powers That Be, Maurus");
       assert.equal(
         resolveMacros("The other players are {{group}}, and {{user}}.", context),
-        "The other players are Powers That Be, Tobias, and Powers That Be.",
+        "The other players are Powers That Be, Maurus, and Powers That Be.",
       );
-      assert.equal(resolveMacros("{{characters}}", context), "Cornelius");
-      assert.equal(resolveMacros("{{user}} / {{char}}", context), "Powers That Be / Cornelius");
+      assert.equal(resolveMacros("{{characters}}", context), "Peregrine");
+      assert.equal(resolveMacros("{{user}} / {{char}}", context), "Powers That Be / Peregrine");
       assert.equal(
         resolveMacros("{{group}}", {
           ...context,
-          groupCharacters: ["Powers That Be", "Tobias", "  cornelius  "],
+          groupCharacters: ["Powers That Be", "Maurus", "  peregrine  "],
         }),
-        "Powers That Be, Tobias",
+        "Powers That Be, Maurus",
       );
       assert.equal(
-        resolveMacros("{{group}}", { user: "YunYun", char: "Leopold", characters: ["Leopold"], variables: {} }),
+        resolveMacros("{{group}}", { user: "YunYun", char: "Dominic", characters: ["Dominic"], variables: {} }),
         "",
       );
 
       const deferred = resolveMacros("{{char}} sees {{group}}", context, { deferCharacterMacros: "names" });
       assert.equal(hasDeferredCharacterMacros(deferred), true);
       assert.equal(
-        resolveDeferredCharacterMacros(deferred, { name: "Cornelius" }, context),
-        "Cornelius sees Powers That Be, Tobias",
+        resolveDeferredCharacterMacros(deferred, { name: "Peregrine" }, context),
+        "Peregrine sees Powers That Be, Maurus",
       );
 
-      const conditional = resolveMacros('{{#if group contains "Tobias"}}together{{else}}apart{{/if}}', context, {
+      const conditional = resolveMacros('{{#if group contains "Maurus"}}together{{else}}apart{{/if}}', context, {
         deferCharacterMacros: "names",
       });
       assert.equal(hasDeferredCharacterMacros(conditional), true);
-      assert.equal(resolveDeferredCharacterMacros(conditional, { name: "Cornelius" }, context), "together");
-      assert.equal(resolveDeferredCharacterMacros(conditional, { name: "Tobias" }, context), "apart");
+      assert.equal(resolveDeferredCharacterMacros(conditional, { name: "Peregrine" }, context), "together");
+      assert.equal(resolveDeferredCharacterMacros(conditional, { name: "Maurus" }, context), "apart");
 
       const assemblerSource = readFileSync(
         new URL("../../packages/server/src/services/prompt/assembler.ts", import.meta.url),
@@ -3339,8 +3339,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
       const deferred = resolveMacros(
@@ -3373,8 +3373,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
 
@@ -3391,8 +3391,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
 
@@ -3415,8 +3415,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
 
@@ -3444,7 +3444,7 @@ const cases: RegressionCase[] = [
   {
     name: "macro output limits preserve authored text while bounding generated expansion",
     run() {
-      const context: MacroContext = { user: "YunYun", char: "Leopold", characters: ["Leopold"], variables: {} };
+      const context: MacroContext = { user: "YunYun", char: "Dominic", characters: ["Dominic"], variables: {} };
       const literal = "Preserved summary detail. ".repeat(10_000);
       const options = { trimResult: false };
       assert.ok(
@@ -3452,7 +3452,7 @@ const cases: RegressionCase[] = [
         "literal content must survive beyond 200k characters",
       );
       assert.ok(
-        resolveMacros(`${literal}${literal}{{char}}`, context, options) === `${literal}${literal}Leopold`,
+        resolveMacros(`${literal}${literal}{{char}}`, context, options) === `${literal}${literal}Dominic`,
         "reusing options must size each authored template independently",
       );
       assert.equal(
@@ -3472,15 +3472,15 @@ const cases: RegressionCase[] = [
     run() {
       const resolved = resolveMacros("Profile: {{description}}", {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
         characterFields: {
           description: "{{char}} keeps notes for {{user}}.",
         },
       });
 
-      assert.equal(resolved, "Profile: Leopold keeps notes for YunYun.");
+      assert.equal(resolved, "Profile: Dominic keeps notes for YunYun.");
     },
   },
   {
@@ -3490,15 +3490,15 @@ const cases: RegressionCase[] = [
         buildNarratorInstructionMessage("Steer the scene toward {{char}} reassuring {{user}}."),
         {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold"],
+          char: "Dominic",
+          characters: ["Dominic"],
           variables: {},
         },
       );
 
       assert.ok(instruction);
       assert.match(instruction, /^Take the following into special consideration for your next message:/);
-      assert.match(instruction, /Leopold reassuring YunYun/);
+      assert.match(instruction, /Dominic reassuring YunYun/);
       assert.equal(instruction.includes("{{user}}"), false);
       assert.equal(instruction.includes("{{char}}"), false);
     },
@@ -3509,21 +3509,21 @@ const cases: RegressionCase[] = [
       const baseContext = {
         user: "YunYun",
         char: "Wrong responder",
-        characters: ["Leopold", "Cornelius"],
+        characters: ["Dominic", "Peregrine"],
         variables: {},
       };
-      const leopoldProfile = {
-        name: "Leopold",
+      const dominicProfile = {
+        name: "Dominic",
         description: "A precise researcher.",
       };
-      const profilesById = new Map([["char-leopold", leopoldProfile]]);
-      const providerContext = scopePromptMacroContextToCharacter(baseContext, leopoldProfile);
+      const profilesById = new Map([["char-dominic", dominicProfile]]);
+      const providerContext = scopePromptMacroContextToCharacter(baseContext, dominicProfile);
       const resolved = resolvePromptMessageMacros(
         [
           {
             id: "opening-greeting",
             role: "assistant" as const,
-            characterId: "char-leopold",
+            characterId: "char-dominic",
             content: "Welcome, {{user}}. I am {{char}}.",
           },
           {
@@ -3536,8 +3536,8 @@ const cases: RegressionCase[] = [
         profilesById,
       );
 
-      assert.equal(resolved[0]?.content, "Welcome, YunYun. I am Leopold.");
-      assert.match(resolved[1]?.content ?? "", /Let Leopold reassure YunYun/);
+      assert.equal(resolved[0]?.content, "Welcome, YunYun. I am Dominic.");
+      assert.match(resolved[1]?.content ?? "", /Let Dominic reassure YunYun/);
       assert.equal(
         resolved.some((message) => /\{\{(?:user|char)\}\}/i.test(message.content)),
         false,
@@ -3560,8 +3560,8 @@ const cases: RegressionCase[] = [
     run() {
       const context = {
         user: "YunYun",
-        char: "Leopold",
-        characters: ["Leopold"],
+        char: "Dominic",
+        characters: ["Dominic"],
         variables: {},
       };
       const messages = buildLorebookScanMessagesWithGenerationGuide(
@@ -3573,7 +3573,7 @@ const cases: RegressionCase[] = [
         (value) => resolveMacros(value, context, { trimResult: false }),
       );
 
-      assert.match(messages.at(-1)?.content ?? "", /Have Leopold answer YunYun/);
+      assert.match(messages.at(-1)?.content ?? "", /Have Dominic answer YunYun/);
       assert.equal(messages.at(-1)?.content.includes("{{user}}"), false);
       assert.equal(messages.at(-1)?.content.includes("{{char}}"), false);
     },
@@ -3635,7 +3635,7 @@ const cases: RegressionCase[] = [
       const source = [
         "<!DOCTYPE html>",
         '<section class="immersive-frame"><div data-speaker="Albedo">A rendered memory.</div></section>',
-        '<speaker="Leopold">"Observe the result."</speaker>',
+        '<speaker="Dominic">"Observe the result."</speaker>',
         '<font color="#f0f">Keep font markup.</font>',
         "<lie>Keep lie markup.</lie>",
         "<filter>Keep filter markup.</filter>",
@@ -4675,7 +4675,7 @@ const cases: RegressionCase[] = [
       const comicPrompt = [
         "colored comic page, five panels, cinematic nighttime thriller flow",
         "Caption: 'The drone tows them deeper into the reeds.'",
-        "Speech bubble (Tobias, whisper): 'Stay with me.'",
+        "Speech bubble (Maurus, whisper): 'Stay with me.'",
         "SFX: 'SNAP'",
         "Expressive lettering and clean readable speech bubbles.",
       ].join(" ");
@@ -5031,7 +5031,7 @@ const cases: RegressionCase[] = [
     async run() {
       let sheetLoads = 0;
       const activeSheet = await readPreferredCharacterReferenceImage({
-        characterId: "character-tobias",
+        characterId: "character-maurus",
         characterSheetImageId: "sheet-1",
         useCharacterSheetAsReference: true,
         loaders: {
@@ -5047,7 +5047,7 @@ const cases: RegressionCase[] = [
       assert.equal(sheetLoads, 1);
 
       const disabledSheet = await readPreferredCharacterReferenceImage({
-        characterId: "character-tobias",
+        characterId: "character-maurus",
         characterSheetImageId: "sheet-1",
         useCharacterSheetAsReference: false,
         loaders: {
@@ -5063,7 +5063,7 @@ const cases: RegressionCase[] = [
       assert.equal(sheetLoads, 1);
 
       const missingSheetUsesAvatar = await readPreferredCharacterReferenceImage({
-        characterId: "character-tobias",
+        characterId: "character-maurus",
         characterSheetImageId: "missing-sheet",
         useCharacterSheetAsReference: true,
         loaders: {
@@ -5075,7 +5075,7 @@ const cases: RegressionCase[] = [
       assert.deepEqual(missingSheetUsesAvatar, { base64: "avatar-bytes", source: "avatar" });
 
       const missingSheet = await readPreferredCharacterReferenceImage({
-        characterId: "character-tobias",
+        characterId: "character-maurus",
         characterSheetImageId: "missing-sheet",
         useCharacterSheetAsReference: true,
         loaders: {
@@ -5156,28 +5156,28 @@ const cases: RegressionCase[] = [
         charactersStore: {
           list: async () => [
             {
-              id: "character-tobias",
-              data: { name: "Tobias", extensions: { appearance: "Wet brown hair." } },
+              id: "character-maurus",
+              data: { name: "Maurus", extensions: { appearance: "Wet brown hair." } },
               avatarPath: null,
             },
             {
-              id: "character-leopold",
-              data: { name: "Leopold", extensions: { appearance: "A masked scientist." } },
+              id: "character-dominic",
+              data: { name: "Dominic", extensions: { appearance: "A masked scientist." } },
               avatarPath: null,
             },
           ],
         },
         chatCharacters: [
-          { id: "character-tobias", name: "Tobias", avatarPath: null, appearance: "Wet brown hair." },
-          { id: "character-leopold", name: "Leopold", avatarPath: null, appearance: "A masked scientist." },
+          { id: "character-maurus", name: "Maurus", avatarPath: null, appearance: "Wet brown hair." },
+          { id: "character-dominic", name: "Dominic", avatarPath: null, appearance: "A masked scientist." },
         ],
         persona: { id: "persona-mari", name: "YunYun", avatarPath: null, appearance: "Chubby woman." },
-        requestedNames: ["Tobias", "Leopold", "YunYun"],
-        promptText: "Tobias and Leopold carry YunYun through the reeds.",
+        requestedNames: ["Maurus", "Dominic", "YunYun"],
+        promptText: "Maurus and Dominic carry YunYun through the reeds.",
         includeReferenceImages: false,
         maxReferences: 1,
       });
-      assert.deepEqual(resolution.characterIds, ["character-tobias", "character-leopold"]);
+      assert.deepEqual(resolution.characterIds, ["character-maurus", "character-dominic"]);
       assert.equal(resolution.personaId, "persona-mari");
       assert.deepEqual(resolution.referenceImages, []);
 
@@ -5186,33 +5186,33 @@ const cases: RegressionCase[] = [
           list: async () => [],
         },
         chatCharacters: [
-          { id: "character-tobias", name: "Tobias", avatarPath: null, appearance: "Wet brown hair." },
-          { id: "character-leopold", name: "Leopold", avatarPath: null, appearance: "A masked scientist." },
+          { id: "character-maurus", name: "Maurus", avatarPath: null, appearance: "Wet brown hair." },
+          { id: "character-dominic", name: "Dominic", avatarPath: null, appearance: "A masked scientist." },
         ],
         persona: { id: "persona-mari", name: "YunYun", avatarPath: null, appearance: "Chubby woman." },
         requestedNames: [],
-        promptText: "A group selfie of Tobias and Leopold, seen from YunYun's point of view.",
+        promptText: "A group selfie of Maurus and Dominic, seen from YunYun's point of view.",
         includeReferenceImages: false,
         includePersonaWhenMentionedInPrompt: false,
       });
-      assert.deepEqual(groupSelfieResolution.characterIds, ["character-tobias", "character-leopold"]);
+      assert.deepEqual(groupSelfieResolution.characterIds, ["character-maurus", "character-dominic"]);
       assert.equal(groupSelfieResolution.personaId, null);
       assert.deepEqual(
         resolveConversationSelfieRequestedNames({
-          speakerName: "Tobias",
-          chatCharacters: [{ name: "Tobias" }, { name: "Leopold" }],
+          speakerName: "Maurus",
+          chatCharacters: [{ name: "Maurus" }, { name: "Dominic" }],
           generationGuide: buildNarratorInstructionMessage("group selfie"),
           imagePrompt: "Two friends crowd into the frame.",
         }),
-        ["Tobias", "Leopold"],
+        ["Maurus", "Dominic"],
       );
       assert.deepEqual(
         resolveConversationSelfieRequestedNames({
-          speakerName: "Tobias",
-          chatCharacters: [{ name: "Tobias" }, { name: "Leopold" }],
-          imagePrompt: "Tobias takes a casual selfie at home.",
+          speakerName: "Maurus",
+          chatCharacters: [{ name: "Maurus" }, { name: "Dominic" }],
+          imagePrompt: "Maurus takes a casual selfie at home.",
         }),
-        ["Tobias"],
+        ["Maurus"],
       );
     },
   },
@@ -5223,35 +5223,35 @@ const cases: RegressionCase[] = [
         formatSentSelfieNotes([
           {
             type: "image",
-            filename: "selfie_tobias_1.png",
-            prompt: "Tobias grins at the camera,\n  holding a coffee\n\nAppearance notes: auburn hair",
+            filename: "selfie_maurus_1.png",
+            prompt: "Maurus grins at the camera,\n  holding a coffee\n\nAppearance notes: auburn hair",
           },
           { type: "image", filename: "illustration_1.png", prompt: "A dark forest." },
           { type: "image/png", filename: "selfie_upload.png", prompt: null },
         ]),
-        "\n[Sent a selfie: Tobias grins at the camera, holding a coffee]",
+        "\n[Sent a selfie: Maurus grins at the camera, holding a coffee]",
       );
-      assert.equal(formatSentSelfieNotes([{ type: "image", filename: "selfie_tobias_2.png" }]), "\n[Sent a selfie]");
+      assert.equal(formatSentSelfieNotes([{ type: "image", filename: "selfie_maurus_2.png" }]), "\n[Sent a selfie]");
       // Merged group replies hold several speakers, so the note names who sent each selfie.
       assert.equal(
         formatSentSelfieNotes([
-          { type: "image", filename: "selfie_tobias_1.png", prompt: "A mirror selfie.", characterName: "Tobias" },
-          { type: "image", filename: "selfie_leopold_1.png", prompt: "A lab selfie.", characterName: "Leopold" },
+          { type: "image", filename: "selfie_maurus_1.png", prompt: "A mirror selfie.", characterName: "Maurus" },
+          { type: "image", filename: "selfie_dominic_1.png", prompt: "A lab selfie.", characterName: "Dominic" },
         ]),
-        "\n[Tobias sent a selfie: A mirror selfie.]\n[Leopold sent a selfie: A lab selfie.]",
+        "\n[Maurus sent a selfie: A mirror selfie.]\n[Dominic sent a selfie: A lab selfie.]",
       );
       assert.equal(formatSentSelfieNotes(undefined), "");
       assert.equal(
         formatSentSelfieNotes([
           {
             type: "image",
-            filename: "selfie_tobias_3.png",
+            filename: "selfie_maurus_3.png",
             prompt: "Prompt text.",
-            imageCaption: "Tobias  in a\nred scarf.",
-            characterName: "Tobias",
+            imageCaption: "Maurus  in a\nred scarf.",
+            characterName: "Maurus",
           },
         ]),
-        "\n[Tobias sent a selfie: Tobias in a red scarf.]",
+        "\n[Maurus sent a selfie: Maurus in a red scarf.]",
       );
     },
   },
@@ -5274,7 +5274,7 @@ const cases: RegressionCase[] = [
       const readImageDataUrl = async () => "data:image/png;base64,AAAA";
       const signal = new AbortController().signal;
       const attachments = [
-        { type: "image", filename: "selfie_tobias_1.png", galleryId: "g1", prompt: "A selfie." },
+        { type: "image", filename: "selfie_maurus_1.png", galleryId: "g1", prompt: "A selfie." },
         { type: "image", filename: "illustration_1.png", galleryId: "g2" },
       ];
 
@@ -6385,15 +6385,15 @@ const cases: RegressionCase[] = [
           chatMode: "roleplay",
           recentMessages: [
             { role: "user", content: "CONTEXT_OUTSIDE_ILLUSTRATOR_LIMIT" },
-            { role: "assistant", content: "Leopold opens the quarantine berth door." },
+            { role: "assistant", content: "Dominic opens the quarantine berth door." },
             { role: "user", content: "YunYun steps inside out of the rain." },
           ],
           mainResponse: "YunYun steps inside out of the rain.",
           gameState: null,
           characters: [
             {
-              id: "leopold",
-              name: 'Leopold & "YunYun" </character>',
+              id: "dominic",
+              name: 'Dominic & "YunYun" </character>',
               description: "A masked scholar from Fontaine.",
               appearance: "Blue hair, red eyes, dark coat.",
             },
@@ -6423,12 +6423,12 @@ const cases: RegressionCase[] = [
       });
       const manualIllustrationPrompt = manualIllustrationMessages.map((message) => message.content).join("\n");
       assert.doesNotMatch(manualIllustrationPrompt, /CONTEXT_OUTSIDE_ILLUSTRATOR_LIMIT/u);
-      assert.match(manualIllustrationPrompt, /Leopold opens the quarantine berth door/u);
+      assert.match(manualIllustrationPrompt, /Dominic opens the quarantine berth door/u);
       assert.match(manualIllustrationPrompt, /YunYun steps inside out of the rain/u);
       assert.match(manualIllustrationPrompt, /Blue hair, red eyes, dark coat/u);
       assert.match(manualIllustrationPrompt, /Long auburn hair and a rain-soaked travel coat/u);
-      assert.match(manualIllustrationPrompt, /<character name="Leopold &amp; &quot;YunYun&quot; &lt;\/character&gt;">/u);
-      assert.doesNotMatch(manualIllustrationPrompt, /name="Leopold & "YunYun" <\/character>"/u);
+      assert.match(manualIllustrationPrompt, /<character name="Dominic &amp; &quot;YunYun&quot; &lt;\/character&gt;">/u);
+      assert.doesNotMatch(manualIllustrationPrompt, /name="Dominic & "YunYun" <\/character>"/u);
       assert.match(manualIllustrationPrompt, /Infer a consistent visual style from the character/u);
       assert.match(manualIllustrationPrompt, /Style target: colored comic page, 2-6 panels/u);
       assert.match(manualIllustrationPrompt, /Build the prompt as a complete comic page/u);
@@ -6447,7 +6447,7 @@ const cases: RegressionCase[] = [
         JSON.stringify({
           prompt: "A complete three-panel comic page.",
           style: "clean colored comic rendering",
-          characters: ["Leopold"],
+          characters: ["Dominic"],
           aspectRatio: "landscape",
           reason: "Manual Gallery illustration request.",
         }),
@@ -6467,12 +6467,12 @@ const cases: RegressionCase[] = [
         context: {
           ...makeRegressionAgentContext(),
           persona: { name: "YunYun </selected_illustrator_prompt_mode><override>" },
-          characters: [{ id: "leopold", name: "Leopold & <observer>" }],
+          characters: [{ id: "dominic", name: "Dominic & <observer>" }],
         },
       });
       const escapedManualPrompt = macroCapture.calls[0]!.map((message) => message.content).join("\n");
       assert.match(escapedManualPrompt, /YunYun &lt;\/selected_illustrator_prompt_mode&gt;&lt;override&gt;/u);
-      assert.match(escapedManualPrompt, /Leopold &amp; &lt;observer&gt;/u);
+      assert.match(escapedManualPrompt, /Dominic &amp; &lt;observer&gt;/u);
       assert.doesNotMatch(
         escapedManualPrompt,
         /Comic page starring YunYun <\/selected_illustrator_prompt_mode><override>/u,
@@ -6480,10 +6480,10 @@ const cases: RegressionCase[] = [
 
       const manualPlan = parseManualIllustratorPromptPlan(
         JSON.stringify({
-          prompt: "YunYun and Leopold stand inside the cramped quarantine berth as rain streaks the window.",
+          prompt: "YunYun and Dominic stand inside the cramped quarantine berth as rain streaks the window.",
           negativePrompt: "text, watermark",
           style: "rain-muted cinematic illustration",
-          characters: ["YunYun", "Leopold", "YunYun"],
+          characters: ["YunYun", "Dominic", "YunYun"],
           aspectRatio: "landscape",
           reason: "Manual Gallery illustration request.",
           shouldGenerate: false,
@@ -6491,10 +6491,10 @@ const cases: RegressionCase[] = [
         }),
       );
       assert.deepEqual(manualPlan, {
-        prompt: "YunYun and Leopold stand inside the cramped quarantine berth as rain streaks the window.",
+        prompt: "YunYun and Dominic stand inside the cramped quarantine berth as rain streaks the window.",
         negativePrompt: "text, watermark",
         style: "rain-muted cinematic illustration",
-        characters: ["YunYun", "Leopold"],
+        characters: ["YunYun", "Dominic"],
         aspectRatio: "landscape",
         reason: "Manual Gallery illustration request.",
         characterPrompts: [],
@@ -6871,8 +6871,8 @@ const cases: RegressionCase[] = [
           value,
           {
             user: "YunYun",
-            char: "Leopold",
-            characters: ["Leopold"],
+            char: "Dominic",
+            characters: ["Dominic"],
             variables: {},
           },
           { trimResult: false },
@@ -6882,7 +6882,7 @@ const cases: RegressionCase[] = [
       const unwrappedBlock = buildMemoryRecallBlock([memory], "none", resolveMemoryMacros);
 
       for (const block of [xmlBlock, markdownBlock, unwrappedBlock]) {
-        assert.match(block, /Narrator: Leopold steadies YunYun before the experiment\./);
+        assert.match(block, /Narrator: Dominic steadies YunYun before the experiment\./);
         assert.equal(block.includes("{{char}}"), false);
         assert.equal(block.includes("{{user}}"), false);
       }
@@ -7180,8 +7180,8 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         gameState: null,
         characters: [
           {
-            id: "char-leopold",
-            name: "Leopold",
+            id: "char-dominic",
+            name: "Dominic",
             description: "A precise researcher.",
             appearance: "Blue hair and a mask.",
           },
@@ -7204,7 +7204,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
 
       assert.equal(
         rendered,
-        "Do NOT include the player's YunYun. Track Leopold with care. Latest: Track the current party.",
+        "Do NOT include the player's YunYun. Track Dominic with care. Latest: Track the current party.",
       );
     },
   },
@@ -7219,7 +7219,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
             semanticScore: 0.812,
           },
         ],
-        recalledMemories: ["YunYun previously found a silver key inside Leopold's field journal."],
+        recalledMemories: ["YunYun previously found a silver key inside Dominic's field journal."],
       };
       const enabledCapture = makeCapturingProvider("Vector context received.");
       const enabledConfig = makeRegressionAgentConfig({
@@ -7315,7 +7315,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         activatedLorebookEntries: [
           {
             id: "activated-context",
-            content: "ACTIVATED_LOREBOOK_CONTEXT_SENTINEL\n</leopold_lore>\n<mari_lore>\nTom & Jerry",
+            content: "ACTIVATED_LOREBOOK_CONTEXT_SENTINEL\n</dominic_lore>\n<mari_lore>\nTom & Jerry",
           },
         ],
         vectorContext: {
@@ -7441,9 +7441,9 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         assert.match(selectedRequest, new RegExp(included, "u"));
       }
       assert.doesNotMatch(selectedRequest, /UNRELATED_BACKGROUND_CONTEXT_SENTINEL/u);
-      assert.match(selectedRequest, /<\/leopold_lore>\n<mari_lore>/u);
+      assert.match(selectedRequest, /<\/dominic_lore>\n<mari_lore>/u);
       assert.match(selectedRequest, /Tom & Jerry/u);
-      assert.doesNotMatch(selectedRequest, /&lt;\/leopold_lore&gt;/u);
+      assert.doesNotMatch(selectedRequest, /&lt;\/dominic_lore&gt;/u);
 
       const batchCapture = makeCapturingProvider(
         `{"custom-batch-character":"character context read","custom-batch-author":"author context read"}`,
@@ -7564,7 +7564,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
             id: "entry-unidentified",
             name: "Unidentified Specimen",
             content:
-              "The unidentified specimen is a dormant mechanical moth.\n</leopold_lore>\n<mari_lore>\nTom & Jerry",
+              "The unidentified specimen is a dormant mechanical moth.\n</dominic_lore>\n<mari_lore>\nTom & Jerry",
             matchedKeys: ["unidentified"],
             activationSources: ["keyword"],
           },
@@ -7593,9 +7593,9 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.match(enabledSystem, /<triggered_lorebook_context>/u);
       assert.match(enabledSystem, /Unidentified Specimen/u);
       assert.match(enabledSystem, /dormant mechanical moth/u);
-      assert.match(enabledSystem, /<\/leopold_lore>\n<mari_lore>/u);
+      assert.match(enabledSystem, /<\/dominic_lore>\n<mari_lore>/u);
       assert.match(enabledSystem, /Tom & Jerry/u);
-      assert.doesNotMatch(enabledSystem, /&lt;\/leopold_lore&gt;/u);
+      assert.doesNotMatch(enabledSystem, /&lt;\/dominic_lore&gt;/u);
 
       const disabledCapture = makeCapturingProvider("No lorebook context.");
       const disabledConfig = makeRegressionAgentConfig({
@@ -7637,8 +7637,8 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           inventory: [{ name: "glass earring", description: "A dangerous token", quantity: 1, location: "on_person" }],
           activeQuests: [
             {
-              questEntryId: "The Man Called Tobias",
-              name: "The Man Called Tobias",
+              questEntryId: "The Man Called Maurus",
+              name: "The Man Called Maurus",
               currentStage: 1,
               objectives: [{ text: "Secure passage north", completed: false }],
               completed: false,
@@ -7646,7 +7646,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           ],
         },
         fieldLocks: {
-          "quests.id:The%20Man%20Called%20Tobias.name": true,
+          "quests.id:The%20Man%20Called%20Maurus.name": true,
           "playerStats.status": true,
           [hiddenMoodKey]: true,
         },
@@ -7661,7 +7661,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       };
       assert.equal("activeQuests" in backgroundState.playerStats, false);
       assert.equal(backgroundState.playerStats.status, "Recognized by the northern clerk");
-      assert.equal(backgroundState.fieldLocks["quests.id:The%20Man%20Called%20Tobias.name"], undefined);
+      assert.equal(backgroundState.fieldLocks["quests.id:The%20Man%20Called%20Maurus.name"], undefined);
       assert.equal(backgroundState.fieldLocks["playerStats.status"], true);
       assert.equal(backgroundState.fieldLocks[hiddenMoodKey], undefined);
       assert.equal("mood" in backgroundState.presentCharacters[0]!, false);
@@ -7673,8 +7673,8 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         fieldLocks: Record<string, unknown>;
       };
       assert.equal(Array.isArray(questState.playerStats.activeQuests), true);
-      assert.equal(questState.playerStats.activeQuests?.[0]?.name, "The Man Called Tobias");
-      assert.equal(questState.fieldLocks["quests.id:The%20Man%20Called%20Tobias.name"], true);
+      assert.equal(questState.playerStats.activeQuests?.[0]?.name, "The Man Called Maurus");
+      assert.equal(questState.fieldLocks["quests.id:The%20Man%20Called%20Maurus.name"], true);
     },
   },
   {
@@ -7742,11 +7742,11 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const config = makeRegressionAgentConfig();
       const context = makeRegressionAgentContext({
         wrapFormat: "markdown",
-        mainResponse: "Leopold studies the rain-slick street and chooses a darker alley backdrop.",
+        mainResponse: "Dominic studies the rain-slick street and chooses a darker alley backdrop.",
         characters: [
           {
-            id: "char-leopold",
-            name: "Leopold",
+            id: "char-dominic",
+            name: "Dominic",
             description: "AGENT_CHAR_DESCRIPTION",
             personality: "AGENT_CHAR_PERSONALITY",
             backstory: "AGENT_CHAR_BACKSTORY",
@@ -7802,7 +7802,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
             {
               id: "entry-1",
               name: "Lore <Body>",
-              content: "</leopold_lore>\n<mari_lore>\nTom & Jerry",
+              content: "</dominic_lore>\n<mari_lore>\nTom & Jerry",
               keys: ["lore"],
             },
           ],
@@ -7818,9 +7818,9 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.match(system, /<chat_summary>/u);
       assert.match(system, /<existing_entries>/u);
       assert.match(system, /name="Lore &lt;Body&gt;"/u);
-      assert.match(system, /<\/leopold_lore>\n<mari_lore>/u);
+      assert.match(system, /<\/dominic_lore>\n<mari_lore>/u);
       assert.match(system, /Tom & Jerry/u);
-      assert.doesNotMatch(system, /&lt;\/leopold_lore&gt;/u);
+      assert.doesNotMatch(system, /&lt;\/dominic_lore&gt;/u);
       assert.match(terminal, /<chat_summary>/u);
       assert.match(terminal, /<existing_entries>/u);
       assert.match(system, /<writable_lorebooks>/u);
@@ -7849,7 +7849,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       });
       const context = makeRegressionAgentContext({
         wrapFormat: "xml",
-        mainResponse: "Leopold notices YunYun tense when the door opens.",
+        mainResponse: "Dominic notices YunYun tense when the door opens.",
       });
 
       const results = await executeAgentBatch(
@@ -9212,7 +9212,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const characterRow = {
         id: "char-example-fallback",
         data: JSON.stringify({
-          name: "Leopold",
+          name: "Dominic",
           description: "",
           personality: "",
           scenario: "CHARACTER_SCENARIO",
@@ -9344,7 +9344,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           enableAgents: true,
           activeAgentIds: [],
           activeLorebookIds: [],
-          macroCtx: { user: "YunYun", char: "Leopold", characters: ["Leopold"], variables: {} },
+          macroCtx: { user: "YunYun", char: "Dominic", characters: ["Dominic"], variables: {} },
         },
       );
 
@@ -9877,10 +9877,10 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           deferMessagePostProcessing: true,
           sections: characterSections,
           preset: { ...input.preset, sectionOrder: JSON.stringify(characterSections.map((section) => section.id)) },
-          groups: input.groups.map((group) => (group.id === "memory" ? { ...group, name: "Leopold" } : group)),
+          groups: input.groups.map((group) => (group.id === "memory" ? { ...group, name: "Dominic" } : group)),
         });
         const characterScoped = scopeIndividualGroupMessagesForTarget(characterGrouped.messages, "visitor", [
-          { id: "leopold", name: "Leopold" },
+          { id: "dominic", name: "Dominic" },
           { id: "visitor", name: "Visitor" },
         ]);
         const scopedText = resolveAdvancedMemoryPrompt(
@@ -10080,7 +10080,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         /Powers-only memory\./,
       );
       assert.doesNotMatch(
-        resolveDeferredCharacterMacros(firstMessage.content, { name: "Leopold" }),
+        resolveDeferredCharacterMacros(firstMessage.content, { name: "Dominic" }),
         /Powers-only memory\./,
       );
       assert.equal(
@@ -10165,7 +10165,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const fitted = fitMessagesForModelAccess({
         messages: result.messages.map((message) => ({
           ...message,
-          content: resolveDeferredCharacterMacros(message.content, { name: "Leopold" }),
+          content: resolveDeferredCharacterMacros(message.content, { name: "Dominic" }),
         })),
         policy: { suppressModelParameters: false, effectiveMaxContext: 1_000_000 },
         maxTokens: 4096,
@@ -10174,7 +10174,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const text = fitted.messages.map((message) => message.content).join("\n");
       for (let index = 1; index <= 95; index += 1) {
         assert.ok(
-          text.includes(`SUMMARY_${index} Leopold remembered`),
+          text.includes(`SUMMARY_${index} Dominic remembered`),
           `summary ${index} and its character macro survive`,
         );
         assert.ok(text.includes(`END_${index}`), `summary ${index} keeps its complete ending`);
@@ -10207,7 +10207,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       ];
       const result = appendFallbackChatSummaryToSystemPrompt(
         history,
-        "YunYun and Leopold reached the harbor.",
+        "YunYun and Dominic reached the harbor.",
         "xml",
         {} as MacroContext,
       );
@@ -10215,7 +10215,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.equal(result[0]?.role, "system");
       assert.equal(result[0]?.contextKind, "prompt");
       assert.match(result[0]?.content ?? "", /<chat_summary>/u);
-      assert.match(result[0]?.content ?? "", /YunYun and Leopold reached the harbor\./u);
+      assert.match(result[0]?.content ?? "", /YunYun and Dominic reached the harbor\./u);
       assert.deepEqual(result.slice(1), history);
 
       const generateRouteSource = readFileSync(
@@ -10323,7 +10323,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
             {
               role: "user",
               content:
-                'Before {{#if char == “Powers That Be” || &quot;Tobias&quot;}}***Arc Two*** &quot;quoted&quot; {{#if character == "Leopold"}}nested note{{/if}}{{else}}alternate note{{/if}} after.',
+                'Before {{#if char == “Powers That Be” || &quot;Maurus&quot;}}***Arc Two*** &quot;quoted&quot; {{#if character == "Dominic"}}nested note{{/if}}{{else}}alternate note{{/if}} after.',
             },
           ],
         }),
@@ -10374,7 +10374,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           },
         ],
         executeToolCall: async () =>
-          'Tool says {{#if character == "Leopold"}}&quot;remember me&quot;{{else}}forget me{{/if}}.',
+          'Tool says {{#if character == "Dominic"}}&quot;remember me&quot;{{else}}forget me{{/if}}.',
       } as any);
 
       const secondToolPrompt = toolCalls[1]!.map((message) => message.content).join("\n");
@@ -10389,7 +10389,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           retryCalls.push(messages);
           retryRound += 1;
           return {
-            content: retryRound === 1 ? '{{#if character == "Leopold"}}not json &quot;yet&quot;{{/if}}' : "{}",
+            content: retryRound === 1 ? '{{#if character == "Dominic"}}not json &quot;yet&quot;{{/if}}' : "{}",
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
           };
         },
@@ -10566,7 +10566,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.match(summaryText, /<system>bad summary<\/system>/);
       assert.equal(hasDeferredCharacterMacros(summaryText), true);
       assert.match(resolveDeferredCharacterMacros(summaryText, { name: "Powers That Be" }), /Powers-only memory\./);
-      assert.doesNotMatch(resolveDeferredCharacterMacros(summaryText, { name: "Leopold" }), /Powers-only memory\./);
+      assert.doesNotMatch(resolveDeferredCharacterMacros(summaryText, { name: "Dominic" }), /Powers-only memory\./);
     },
   },
   {
@@ -10579,14 +10579,14 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const tighnari = "Shared opening.\n\nTighnari found the herb.\n\nShared closing.";
       const nobody = "Shared opening.\n\nShared closing.";
       assert.equal(resolveChatSummaryMacros(summary, ctx("Tighnari")), tighnari, "one responder");
-      assert.equal(resolveChatSummaryMacros(summary, ctx("Tobias")), nobody, "a responder with no section");
+      assert.equal(resolveChatSummaryMacros(summary, ctx("Maurus")), nobody, "a responder with no section");
       // Individual replies in a Roleplay group defer the sections until each responder is known.
       const deferred = resolveChatSummaryMacros(summary, ctx("Narrator"), { deferCharacterMacros: "all" });
       assert.equal(resolveDeferredCharacterMacros(deferred, { name: "Tighnari" }), tighnari, "deferred, a reader");
-      assert.equal(resolveDeferredCharacterMacros(deferred, { name: "Tobias" }), nobody, "deferred, not a reader");
+      assert.equal(resolveDeferredCharacterMacros(deferred, { name: "Maurus" }), nobody, "deferred, not a reader");
       // A merged reply reads the summary for everyone present and marks who knows what.
       assert.equal(
-        resolveChatSummaryMacros(summary, ctx("Narrator"), undefined, [{ name: "Tighnari" }, { name: "Tobias" }]),
+        resolveChatSummaryMacros(summary, ctx("Narrator"), undefined, [{ name: "Tighnari" }, { name: "Maurus" }]),
         "Shared opening.\n\n[Known only to Tighnari: Tighnari found the herb.]\n\nShared closing.",
         "merged readers",
       );
@@ -10605,45 +10605,45 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const nested = `A\n\n{{#if char == "Cyno" || char == "Tighnari"}}\nBoth know.\n${section("Tighnari", "Tighnari more.")}\n{{/if}}\n\nB`;
       const list = `List:\n  {{#if char == "Cyno"}}- c{{/if}}\n  {{#if char == "Tighnari"}}- t{{/if}}\n  {{#if char == "Cyno"}}\n  - standalone\n  {{/if}}\nEnd`;
       const cases: Array<[string, Record<string, string>]> = [
-        [summary, { Cyno: "Shared opening.\n\nCyno alone saw the ruins.\n\nShared closing.", Tobias: nobody }],
+        [summary, { Cyno: "Shared opening.\n\nCyno alone saw the ruins.\n\nShared closing.", Maurus: nobody }],
         // Sections written inline on lines of their own.
         [
           `A\n{{#if char == "Cyno"}}x{{/if}}\n{{#if char == "Tighnari"}}y{{/if}}\nB`,
-          { Tighnari: "A\ny\nB", Tobias: "A\nB" },
+          { Tighnari: "A\ny\nB", Maurus: "A\nB" },
         ],
         // Tags on lines of their own, in a paragraph that goes on after a blank line.
-        [`A\n${section("Cyno", "x")}\n\nB`, { Cyno: "A\nx\n\nB", Tobias: "A\n\nB" }],
+        [`A\n${section("Cyno", "x")}\n\nB`, { Cyno: "A\nx\n\nB", Maurus: "A\n\nB" }],
         // Hidden at the start and at the end of the text, where deferred sections are filled in after the trim.
         [
           `${section("Cyno", "x")}\n\nMiddle.\n\n${section("Tighnari", "y")}`,
-          { Cyno: "x\n\nMiddle.", Tighnari: "Middle.\n\ny", Tobias: "Middle." },
+          { Cyno: "x\n\nMiddle.", Tighnari: "Middle.\n\ny", Maurus: "Middle." },
         ],
-        [elseChain, { Cyno: "A\nc\nB", Tighnari: "A\nt\nB", Tobias: "A\no\nB" }],
-        [`A\n{{#if char == "Cyno"}}{{else}}Not Cyno.{{/if}}\nB`, { Cyno: "A\nB", Tobias: "A\nNot Cyno.\nB" }],
-        [nested, { Cyno: "A\n\nBoth know.\n\nB", Tighnari: "A\n\nBoth know.\nTighnari more.\n\nB", Tobias: "A\n\nB" }],
+        [elseChain, { Cyno: "A\nc\nB", Tighnari: "A\nt\nB", Maurus: "A\no\nB" }],
+        [`A\n{{#if char == "Cyno"}}{{else}}Not Cyno.{{/if}}\nB`, { Cyno: "A\nB", Maurus: "A\nNot Cyno.\nB" }],
+        [nested, { Cyno: "A\n\nBoth know.\n\nB", Tighnari: "A\n\nBoth know.\nTighnari more.\n\nB", Maurus: "A\n\nB" }],
         [list, { Cyno: "List:\n  - c\n  - standalone\nEnd", Tighnari: "List:\n  - t\nEnd" }],
         // A section that starts with a blank line keeps it.
-        [`P\n\n{{#if char == "Cyno"}}\n\nx\n{{/if}}\n\nQ`, { Cyno: "P\n\n\nx\n\nQ", Tobias: "P\n\nQ" }],
+        [`P\n\n{{#if char == "Cyno"}}\n\nx\n{{/if}}\n\nQ`, { Cyno: "P\n\n\nx\n\nQ", Maurus: "P\n\nQ" }],
         // A section at the top of another that is not a paragraph keeps the blank line written after it.
         [
           `A\n{{#if char == "Cyno" || char == "Tighnari"}}\n${section("Tighnari", "Tighnari note.")}\n\nShared by both.\n{{/if}}\nB`,
-          { Cyno: "A\n\nShared by both.\nB", Tighnari: "A\nTighnari note.\n\nShared by both.\nB", Tobias: "A\nB" },
+          { Cyno: "A\n\nShared by both.\nB", Tighnari: "A\nTighnari note.\n\nShared by both.\nB", Maurus: "A\nB" },
         ],
         // A section that is all another one holds goes with that one's line break.
         [`A\n{{#if char == "Cyno" || char == "Tighnari"}}\n${section("Tighnari", "t")}\n{{/if}}\nB`, { Cyno: "A\nB" }],
         [
           `A\n{{#if char == "Cyno"}}\nx\n{{#if char == "Tighnari"}}\nt\n{{else}}\n\no\n{{/if}}\n{{/if}}\nB`,
-          { Cyno: "A\nx\n\no\nB", Tobias: "A\nB" },
+          { Cyno: "A\nx\n\no\nB", Maurus: "A\nB" },
         ],
         // A comment line reads the same now and deferred.
-        [`A\n\n${section("Cyno", "c")}\n{{// note}}\n\nB`, { Cyno: "A\n\nc\n\n\nB", Tobias: "A\n\n\nB" }],
+        [`A\n\n${section("Cyno", "c")}\n{{// note}}\n\nB`, { Cyno: "A\n\nc\n\n\nB", Maurus: "A\n\n\nB" }],
         // A group block keeps its `[` and `]` lines, and the sections around and in it lose their lines too.
         [
           `A\n\n${section("Cyno", "c")}\n\n[\n{{char}}:\n${section("Cyno", "g")}\n]\nB`,
-          { Cyno: "A\n\nc\n\n[\nCyno:\ng\n]\nB", Tobias: "A\n\n[\nTobias:\n]\nB" },
+          { Cyno: "A\n\nc\n\n[\nCyno:\ng\n]\nB", Maurus: "A\n\n[\nMaurus:\n]\nB" },
         ],
         // A section sharing its line with other text stays as written.
-        [`A {{#if char == "Cyno"}}x{{/if}} B\nC`, { Cyno: "A x B\nC", Tobias: "A  B\nC" }],
+        [`A {{#if char == "Cyno"}}x{{/if}} B\nC`, { Cyno: "A x B\nC", Maurus: "A  B\nC" }],
       ];
       for (const [template, expected] of cases) {
         for (const [who, text] of Object.entries(expected))
@@ -10658,25 +10658,25 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         [`Shared.\n\n${section("Cyno", "Cyno alone saw the ruins.")}\n\nEnd.`, "Cyno"],
         [`A\n  {{#if char == "Cyno"}}\n  x\n  {{/if}}\nB`, "Cyno"],
         [`P\n\n{{#if char == "Cyno"}}\n\nx\n{{/if}}\n\nQ`, "Cyno"],
-        ...["Cyno", "Tighnari", "Tobias"].map((who) => [elseChain, who]),
+        ...["Cyno", "Tighnari", "Maurus"].map((who) => [elseChain, who]),
         [nested, "Tighnari"],
       ])
         assert.equal(read(template!, who!), resolveMacros(template!, ctx(who!), { trimResult: false }), template);
       const merged = (template: string) =>
-        resolveChatSummaryMacros(template, ctx("Narrator"), undefined, [{ name: "Cyno" }, { name: "Tobias" }]);
+        resolveChatSummaryMacros(template, ctx("Narrator"), undefined, [{ name: "Cyno" }, { name: "Maurus" }]);
       assert.equal(
         merged(elseChain),
-        "A\n[Known only to Cyno: c]\n[Known only to Tobias: o]\nB",
+        "A\n[Known only to Cyno: c]\n[Known only to Maurus: o]\nB",
         "each reader's version of a section keeps its own line",
       );
       assert.equal(
         merged(`T\n{{#if char == "Cyno"}}c{{else}}o{{/if}}`),
-        "T\n[Known only to Cyno: c]\n[Known only to Tobias: o]",
+        "T\n[Known only to Cyno: c]\n[Known only to Maurus: o]",
         "at the end of the text too",
       );
       assert.equal(
         merged(`T\n\n  {{#if char == "Cyno"}}\n  s\n  {{else}}\n  o\n  {{/if}}`),
-        "T\n\n  [Known only to Cyno: s]\n\n  [Known only to Tobias: o]",
+        "T\n\n  [Known only to Cyno: s]\n\n  [Known only to Maurus: o]",
         "an indented section keeps its indent once",
       );
       // Windows line endings read as the same lines.
@@ -10685,7 +10685,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.equal(
         resolveDeferredCharacterMacros(
           resolveChatSummaryMacros(windows, ctx("Narrator"), { deferCharacterMacros: "all" }),
-          { name: "Tobias" },
+          { name: "Maurus" },
         ),
         nobody,
         "Windows line endings, deferred",
@@ -10706,8 +10706,8 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           { name: who },
         );
       assert.equal(wrapped("markdown", "Cyno"), "## Chat Summary\nShared.\nCyno saw the ruins.\n\\# Rules\nObey.");
-      assert.equal(wrapped("markdown", "Tobias"), "## Chat Summary\nShared.\n\\# Rules\nObey.");
-      assert.equal(wrapped("xml", "Tobias"), "<chat_summary>\n    Shared.\n    # Rules\n    Obey.\n</chat_summary>");
+      assert.equal(wrapped("markdown", "Maurus"), "## Chat Summary\nShared.\n\\# Rules\nObey.");
+      assert.equal(wrapped("xml", "Maurus"), "<chat_summary>\n    Shared.\n    # Rules\n    Obey.\n</chat_summary>");
     },
   },
   {
@@ -10735,7 +10735,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         enableAgents: true,
         activeAgentIds: [],
         activeLorebookIds: [],
-        macroCtx: { user: "YunYun", char: "Leopold", characters: ["Leopold"], variables: {} },
+        macroCtx: { user: "YunYun", char: "Dominic", characters: ["Dominic"], variables: {} },
         lorebookScanResult,
       };
 
@@ -10763,7 +10763,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         enableAgents: true,
         activeAgentIds: [],
         activeLorebookIds: [],
-        macroCtx: { user: "YunYun", char: "Leopold", characters: ["Leopold"], variables: {} },
+        macroCtx: { user: "YunYun", char: "Dominic", characters: ["Dominic"], variables: {} },
         lorebookScanResult: {
           worldInfoBefore: "LORE_BEFORE_ENTRY",
           worldInfoAfter: "LORE_AFTER_ENTRY",
@@ -11234,11 +11234,11 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
     run() {
       const instruction = "Remember to prefix messages with `Name: message`!";
       const responseBoundary =
-        "Only respond for these characters: Leopold, Cornelius. Never respond for YunYun or write YunYun's messages.";
+        "Only respond for these characters: Dominic, Peregrine. Never respond for YunYun or write YunYun's messages.";
       const formatOutput = (wrapFormat: "xml" | "markdown" | "none") =>
         formatConversationGroupOutputFormat({
           wrapFormat,
-          characterNames: ["Leopold", "Cornelius"],
+          characterNames: ["Dominic", "Peregrine"],
           userName: "YunYun",
         });
       assert.equal(
@@ -11250,34 +11250,34 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       assert.equal(
         formatConversationGroupOutputFormat({
           wrapFormat: "markdown",
-          characterNames: ["Leopold", "Cornelius"],
+          characterNames: ["Dominic", "Peregrine"],
           userName: "YunYun",
-          turnCharacterName: "Leopold",
+          turnCharacterName: "Dominic",
         }),
-        `## Output Format\nRespond only as Leopold.`,
+        `## Output Format\nRespond only as Dominic.`,
       );
 
       const individualOutput = formatConversationGroupOutputFormat({
         wrapFormat: "xml",
-        characterNames: ["Leopold", "Cornelius"],
+        characterNames: ["Dominic", "Peregrine"],
         userName: "YunYun",
-        turnCharacterName: "Leopold",
+        turnCharacterName: "Dominic",
       });
-      assert.match(individualOutput, /Respond only as Leopold\./u);
-      assert.doesNotMatch(individualOutput, /prefix messages|Cornelius|Never respond for YunYun/u);
+      assert.match(individualOutput, /Respond only as Dominic\./u);
+      assert.doesNotMatch(individualOutput, /prefix messages|Peregrine|Never respond for YunYun/u);
 
       const contextCharacters = [
         {
-          charId: "leopold",
-          name: "Leopold",
-          displayName: "Leopold",
+          charId: "dominic",
+          name: "Dominic",
+          displayName: "Dominic",
           status: "online",
           activity: "",
         },
         {
-          charId: "cornelius",
-          name: "Cornelius",
-          displayName: "Cornelius",
+          charId: "peregrine",
+          name: "Peregrine",
+          displayName: "Peregrine",
           status: "online",
           activity: "",
         },
@@ -11289,41 +11289,41 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         finalMessages: [{ role: "user" }],
         personaName: "YunYun",
         userStatus: "active",
-        mentionedCharacterNames: ["Leopold"],
+        mentionedCharacterNames: ["Dominic"],
         wrapFormat: "none",
       });
-      const leopoldContext = buildConversationCurrentContextBlock({
+      const dominicContext = buildConversationCurrentContextBlock({
         nowInstant: new Date("2026-07-21T13:58:00.000Z"),
         promptTimeZone: "Europe/Warsaw",
         convoCharInfo: contextCharacters,
         finalMessages: [{ role: "user" }],
         personaName: "YunYun",
         userStatus: "active",
-        mentionedCharacterNames: ["Leopold"],
-        primaryCharacterId: "leopold",
+        mentionedCharacterNames: ["Dominic"],
+        primaryCharacterId: "dominic",
         wrapFormat: "none",
       });
-      assert.match(sharedContext, /Your current status: Leopold: online; Cornelius: online\./u);
-      assert.match(leopoldContext, /^Your current status: Leopold: online\.\nCornelius's status: online\./u);
-      assert.doesNotMatch(leopoldContext, /Your current status:.*Cornelius/u);
-      assert.match(leopoldContext, /YunYun @mentioned: Leopold/u);
+      assert.match(sharedContext, /Your current status: Dominic: online; Peregrine: online\./u);
+      assert.match(dominicContext, /^Your current status: Dominic: online\.\nPeregrine's status: online\./u);
+      assert.doesNotMatch(dominicContext, /Your current status:.*Peregrine/u);
+      assert.match(dominicContext, /YunYun @mentioned: Dominic/u);
       assert.equal(
-        replaceConversationContextBlockForTarget(`Before\n${sharedContext}\nAfter`, sharedContext, leopoldContext),
-        `Before\n${leopoldContext}\nAfter`,
+        replaceConversationContextBlockForTarget(`Before\n${sharedContext}\nAfter`, sharedContext, dominicContext),
+        `Before\n${dominicContext}\nAfter`,
       );
 
       const deferredIdentity = resolveMacros(
         "You are {{charName}}.",
         {
           user: "YunYun",
-          char: "Leopold",
-          characters: ["Leopold", "Cornelius"],
-          groupCharacters: ["Leopold", "Cornelius"],
+          char: "Dominic",
+          characters: ["Dominic", "Peregrine"],
+          groupCharacters: ["Dominic", "Peregrine"],
           variables: {},
         },
         { deferCharacterMacros: "names" },
       );
-      assert.equal(resolveDeferredCharacterMacros(deferredIdentity, { name: "Cornelius" }), "You are Cornelius.");
+      assert.equal(resolveDeferredCharacterMacros(deferredIdentity, { name: "Peregrine" }), "You are Peregrine.");
 
       const contextSource = readFileSync(
         new URL("../../packages/server/src/routes/generate/conversation-context-block.ts", import.meta.url),
@@ -11355,8 +11355,8 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           { role: "user", content: "*thought*", contextKind: "history", files },
           { role: "user", content: "*thought*", contextKind: "history" },
         ],
-        "tobias",
-        [{ id: "tobias", name: "Tobias" }],
+        "maurus",
+        [{ id: "maurus", name: "Maurus" }],
         (history) =>
           history.forEach((message) => {
             message.content = "";
@@ -11375,29 +11375,29 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           {
             role: "system",
             content: [
-              "<Leopold>\n<description>Leopold card only.</description>\n</Leopold>",
-              "<Cornelius>\n<description>Cornelius card only.</description>\n</Cornelius>",
+              "<Dominic>\n<description>Dominic card only.</description>\n</Dominic>",
+              "<Peregrine>\n<description>Peregrine card only.</description>\n</Peregrine>",
             ].join("\n"),
             contextKind: "prompt",
           },
           {
             role: "assistant",
-            content: "Cornelius spoke earlier and remains visible as shared history.",
+            content: "Peregrine spoke earlier and remains visible as shared history.",
             contextKind: "history",
-            characterId: "cornelius",
+            characterId: "peregrine",
           },
         ],
-        "leopold",
+        "dominic",
         [
-          { id: "leopold", name: "Leopold", description: "Leopold card only." },
-          { id: "cornelius", name: "Cornelius", description: "Cornelius card only." },
+          { id: "dominic", name: "Dominic", description: "Dominic card only." },
+          { id: "peregrine", name: "Peregrine", description: "Peregrine card only." },
         ],
       );
 
-      assert.match(scoped[0]?.content ?? "", /Leopold card only\./u);
-      assert.doesNotMatch(scoped[0]?.content ?? "", /Cornelius card only\./u);
+      assert.match(scoped[0]?.content ?? "", /Dominic card only\./u);
+      assert.doesNotMatch(scoped[0]?.content ?? "", /Peregrine card only\./u);
       assert.equal(scoped[1]?.role, "user");
-      assert.match(scoped[1]?.content ?? "", /Cornelius spoke earlier/u);
+      assert.match(scoped[1]?.content ?? "", /Peregrine spoke earlier/u);
     },
   },
   {
@@ -11968,9 +11968,9 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
     name: "Game portrait lookup reuses only unambiguous character-library avatars",
     async run() {
       const avatars = new Map<string, string>();
-      addNameLookupEntry(avatars, "Leopold", "/api/avatars/file/leopold.png");
-      assert.equal(findCharAvatarFuzzy("Leopold", avatars), "/api/avatars/file/leopold.png");
-      assert.equal(findCharAvatarFuzzy("Leopold", avatars), "/api/avatars/file/leopold.png");
+      addNameLookupEntry(avatars, "Dominic", "/api/avatars/file/dominic.png");
+      assert.equal(findCharAvatarFuzzy("Dominic", avatars), "/api/avatars/file/dominic.png");
+      assert.equal(findCharAvatarFuzzy("Dominic", avatars), "/api/avatars/file/dominic.png");
 
       addNameLookupEntry(avatars, "John Smith", "/api/avatars/file/john-smith.png");
       addNameLookupEntry(avatars, "John Doe", "/api/avatars/file/john-doe.png");
@@ -13149,14 +13149,14 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
               right_arm: { wounds: [{ text: "shallow cut", severity: "minor", bleeding: true }] },
             },
           },
-          { name: "Leopold", body: { head: { bare: true } } },
+          { name: "Dominic", body: { head: { bare: true } } },
         ],
       });
       assert.ok(previousState);
       const requestContext = formatBeholderRequestContext(previousState, "YunYun");
       assert.match(requestContext, /^Persona: YunYun\nCurrent state:/u);
       assert.match(requestContext, /"self": \{/u);
-      assert.match(requestContext, /"Leopold": \{/u);
+      assert.match(requestContext, /"Dominic": \{/u);
 
       const unchanged = resolveBeholderStateResponse({ changed: false }, previousState, "YunYun");
       assert.equal(unchanged.valid, true);
@@ -13179,7 +13179,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
                 },
               },
             },
-            Leopold: { species: "human", body: { left_eye: { bare: true } } },
+            Dominic: { species: "human", body: { left_eye: { bare: true } } },
             Columbina: { species: "seer", body: { neck: { bare: true } } },
           },
         },
@@ -13205,7 +13205,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
           { text: "ignored wound", severity: "critical", bleeding: true },
         ],
       });
-      assert.equal(merged.state.characters.find((character) => character.name === "Leopold")?.species, "human");
+      assert.equal(merged.state.characters.find((character) => character.name === "Dominic")?.species, "human");
       assert.equal(
         merged.state.characters.some((character) => character.name === "Columbina"),
         true,
@@ -14048,13 +14048,13 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
       const legacyAction = parseAssistantWorkspaceAction(
         JSON.stringify({
           say: "",
-          authorization: "Set Leopold's appearance to a white coat.",
+          authorization: "Set Dominic's appearance to a white coat.",
           commands: [
             {
               name: "app_data",
               arguments: {
                 action: "character.update",
-                characterId: "leopold-id",
+                characterId: "dominic-id",
                 patch: { appearance: "A white coat." },
                 apply: true,
               },

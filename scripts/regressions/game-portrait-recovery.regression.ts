@@ -3,11 +3,11 @@ import { buildMissingSceneAssetGenerationPayload } from "../../packages/client/s
 
 const chatId = "game-chat";
 const npc = {
-  name: "Leopold",
+  name: "Dominic",
   description: "A familiar character with an existing portrait.",
 };
-const libraryAvatar = "/api/avatars/file/leopold.png";
-const generatedAvatar = `/api/avatars/npc/${chatId}/il-leopold.png?v=1`;
+const libraryAvatar = "/api/avatars/file/dominic.png";
+const generatedAvatar = `/api/avatars/npc/${chatId}/il-dominic.png?v=1`;
 const baseInput = {
   gameImageGenerationEnabled: true,
   activeChatId: chatId,
@@ -21,7 +21,7 @@ const baseInput = {
 assert.equal(
   buildMissingSceneAssetGenerationPayload({
     ...baseInput,
-    npcAvatarLookup: new Map([["leopold", libraryAvatar]]),
+    npcAvatarLookup: new Map([["dominic", libraryAvatar]]),
     failedNpcAvatarNames: [npc.name],
   }),
   null,
@@ -33,7 +33,7 @@ const libraryBackgroundRecovery = buildMissingSceneAssetGenerationPayload({
   currentBackground: null,
   savedSceneBackground: "backgrounds:generated:missing-scene",
   assetMap: {},
-  npcAvatarLookup: new Map([["leopold", libraryAvatar]]),
+  npcAvatarLookup: new Map([["dominic", libraryAvatar]]),
 });
 assert.equal(libraryBackgroundRecovery?.backgroundTag, "backgrounds:generated:missing-scene");
 assert.equal(
@@ -60,7 +60,7 @@ for (const recovery of [
   const result = buildMissingSceneAssetGenerationPayload({
     ...baseInput,
     ...recovery.input,
-    npcAvatarLookup: new Map([["leopold", generatedAvatar]]),
+    npcAvatarLookup: new Map([["dominic", generatedAvatar]]),
   });
   assert.deepEqual(result?.npcsNeedingAvatars, [{ ...npc, gender: null, pronouns: null }], `${recovery.label} payload`);
   assert.deepEqual(result?.forceNpcAvatarNames, [npc.name], `${recovery.label} force list`);

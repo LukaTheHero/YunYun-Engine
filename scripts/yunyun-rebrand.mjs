@@ -146,23 +146,24 @@ const RULES = [
 
   // Upstream's recurring example cast. Their prompts, docs, help text and test
   // fixtures name these characters; the fork ships none of them, so every
-  // mention is renamed to a neutral stand-in of the same length and gender
-  // (so fixed-width and token-count fixtures keep lining up). The rules have
+  // mention is renamed to a neutral stand-in of the same length, gender and
+  // opening letters (Do-, Mau-, P-), so fixed-width, token-count, sort-order
+  // and partial-name fixtures keep lining up. The rules have
   // no word boundary on purpose: ids and camelCase identifiers ("dottoreId")
   // must be renamed together with the display names they pair with.
   // NB: this also renames upstream's "dottore" chat-widget preset id if a merge
   // brings it back. The fork removed that style; drop it again by hand.
-  [/\bIl Dottore\b/g, "Leopold"],
-  [/\bil dottore\b/g, "leopold"],
-  [/Dottore/g, "Leopold"],
-  [/dottore/g, "leopold"],
-  [/DOTTORE/g, "LEOPOLD"],
-  [/Maukie/g, "Tobias"],
-  [/maukie/g, "tobias"],
-  [/MAUKIE/g, "TOBIAS"],
-  [/Pantalone/g, "Cornelius"],
-  [/pantalone/g, "cornelius"],
-  [/PANTALONE/g, "CORNELIUS"],
+  [/\bIl Dottore\b/g, "Dominic"],
+  [/\bil dottore\b/g, "dominic"],
+  [/Dottore/g, "Dominic"],
+  [/dottore/g, "dominic"],
+  [/DOTTORE/g, "DOMINIC"],
+  [/Maukie/g, "Maurus"],
+  [/maukie/g, "maurus"],
+  [/MAUKIE/g, "MAURUS"],
+  [/Pantalone/g, "Peregrine"],
+  [/pantalone/g, "peregrine"],
+  [/PANTALONE/g, "PEREGRINE"],
 ];
 
 // Phrases that must survive verbatim even though they contain the old name.

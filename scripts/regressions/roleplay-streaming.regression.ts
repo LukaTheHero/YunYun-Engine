@@ -1506,7 +1506,7 @@ assert.deepEqual(
   "leading-whitespace cleanup must not dump the complete response when tracker work starts",
 );
 assert.deepEqual(
-  reconcileTypewriterReplacement("Leopold: The response", "The response is already complete."),
+  reconcileTypewriterReplacement("Dominic: The response", "The response is already complete."),
   {
     visibleText: "The response is alrea",
     pendingText: "dy complete.",

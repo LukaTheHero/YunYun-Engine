@@ -75,7 +75,7 @@ export function cleanGeneratedReply(
           .trim();
         changed = true;
       }
-      // Strip plain name prefixes: "Leopold: text" or "Leopold\ntext".
+      // Strip plain name prefixes: "Dominic: text" or "Dominic\ntext".
       const beforeNamePrefixStrip = fullResponse;
       const targetPrefix = new RegExp(`^\\s*${escapedName}\\s*:\\s*`, "i");
       const targetLinePrefix = new RegExp(`^\\s*${escapedName}\\s*\\n+`, "i");

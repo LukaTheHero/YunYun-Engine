@@ -291,16 +291,16 @@ assert.deepEqual(
 // shared block's framing is covered by this test and not only the Noodle-side template.
 const noodleImageReferences = await resolveIllustratorCharacterReferences({
   charactersStore: { list: async () => [] },
-  chatCharacters: [{ id: "leopold", name: "Leopold", avatarPath: null, appearance: "blue hair and a white mask" }],
+  chatCharacters: [{ id: "dominic", name: "Dominic", avatarPath: null, appearance: "blue hair and a white mask" }],
   persona: null,
-  requestedNames: ["Leopold"],
-  promptText: "Leopold",
+  requestedNames: ["Dominic"],
+  promptText: "Dominic",
   includeReferenceImages: false,
 });
-assert.equal(noodleImageReferences.appearanceBlock, "Leopold's Appearance: blue hair and a white mask");
+assert.equal(noodleImageReferences.appearanceBlock, "Dominic's Appearance: blue hair and a white mask");
 
 const defaultNoodleImagePrompt = NOODLE_IMAGE_POST.defaultBuilder({
-  authorName: "Leopold",
+  authorName: "Dominic",
   postContent: "This entire post must not be sent to ComfyUI.",
   draftPrompt: "cel-shaded laboratory selfie",
   userInstructions: "Create a social-media-ready character image. Mention build, clothing, pose, lighting.",
@@ -309,7 +309,7 @@ const defaultNoodleImagePrompt = NOODLE_IMAGE_POST.defaultBuilder({
   characterImageInstructions: "stark lab photography with cold lighting",
 });
 assert.match(defaultNoodleImagePrompt, /^cel-shaded laboratory selfie/u);
-assert.match(defaultNoodleImagePrompt, /Leopold's Appearance: blue hair and a white mask/u);
+assert.match(defaultNoodleImagePrompt, /Dominic's Appearance: blue hair and a white mask/u);
 assert.doesNotMatch(defaultNoodleImagePrompt, /Character appearance notes:/u);
 assert.doesNotMatch(defaultNoodleImagePrompt, /This entire post/u);
 assert.doesNotMatch(defaultNoodleImagePrompt, /Output only|Draft image idea|Post text/u);

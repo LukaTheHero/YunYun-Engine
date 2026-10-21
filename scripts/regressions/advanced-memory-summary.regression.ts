@@ -25,7 +25,7 @@ let embeddingRequests = 0;
 let beforeSummary: (() => Promise<void>) | undefined;
 let partial = false;
 let sceneNeedsReasoningBudget = true;
-const summary = "Tobias promised to return the compass before dawn.";
+const summary = "Maurus promised to return the compass before dawn.";
 let summaryResponse = summary;
 const server = createServer(async (request, response) => {
   const chunks: Buffer[] = [];
@@ -62,7 +62,7 @@ const server = createServer(async (request, response) => {
     incomplete = partial || (body.max_output_tokens ?? 0) < 2048;
     content = incomplete
       ? partial
-        ? '{"summary":"Tobias promised to return'
+        ? '{"summary":"Maurus promised to return'
         : ""
       : JSON.stringify({ summary: summaryResponse, audience: "all" });
   }
@@ -145,31 +145,31 @@ async function createChat(name: string, hardCap?: number, omitReasoning = false)
     {
       role: "user",
       content:
-        "At dusk by the lotus-filled river, I lent Tobias the brass compass. The frogs sang in the thickets and he promised that he would return it to me before dawn.",
+        "At dusk by the lotus-filled river, I lent Maurus the brass compass. The frogs sang in the thickets and he promised that he would return it to me before dawn.",
     },
     { role: "assistant", content: "The following morning, we arrived at the market." },
   ]);
   return chat;
 }
 try {
-  const readers = ["Tobias", "Cornelius"];
-  const guarded = '{{#if char == "Tobias"}}River{{/if}}\n{{#if char == "Cornelius"}}Bank{{/if}}';
+  const readers = ["Maurus", "Peregrine"];
+  const guarded = '{{#if char == "Maurus"}}River{{/if}}\n{{#if char == "Peregrine"}}Bank{{/if}}';
   assert.equal(scopeCharacterSummary(guarded, readers), guarded);
   assert.equal(scopeCharacterSummary(scopeCharacterSummary(guarded, readers), readers), guarded);
   assert.equal(
-    scopeCharacterSummary(`{{#if char == "Tobias" || "Cornelius"}}${guarded}{{/if}}`, readers),
+    scopeCharacterSummary(`{{#if char == "Maurus" || "Peregrine"}}${guarded}{{/if}}`, readers),
     guarded,
     "existing redundant nesting is flattened without combining private POVs",
   );
-  const branching = scopeCharacterSummary('{{#if char == "Tobias"}}River{{else}}Bank{{/if}} Shared.', readers);
+  const branching = scopeCharacterSummary('{{#if char == "Maurus"}}River{{else}}Bank{{/if}} Shared.', readers);
   const render = (text: string, char: string, variables: Record<string, string> = {}) =>
     resolveMacros(text, { user: "YunYun", char, characters: [char], variables });
-  assert.equal(render(branching, "Tobias"), "River Shared.");
-  assert.equal(render(branching, "Cornelius"), "Bank Shared.");
+  assert.equal(render(branching, "Maurus"), "River Shared.");
+  assert.equal(render(branching, "Peregrine"), "Bank Shared.");
   assert.equal(render(branching, "Uninvited"), "");
   const dynamic = scopeCharacterSummary('{{#if getvar::revealed == "yes"}}Secret{{/if}}', readers);
-  assert.equal(render(dynamic, "Tobias", { revealed: "yes" }), "Secret");
-  assert.equal(render(dynamic, "Tobias", { revealed: "no" }), "");
+  assert.equal(render(dynamic, "Maurus", { revealed: "yes" }), "Secret");
+  assert.equal(render(dynamic, "Maurus", { revealed: "no" }), "");
   assert.equal(render(dynamic, "Uninvited", { revealed: "yes" }), "");
   const descriptionGuard = '{{#if description == "Alchemist"}}A character fact{{/if}}';
   assert(
@@ -179,7 +179,7 @@ try {
   const quotedName = 'The "Doctor"';
   const quoted = scopeCharacterSummary("Private", [quotedName]);
   assert.equal(render(quoted, quotedName), "Private");
-  assert.equal(render(quoted, "Tobias"), "");
+  assert.equal(render(quoted, "Maurus"), "");
   assert.throws(
     () => scopeCharacterSummary("Private", ["{{user}}"]),
     /character names must not contain macro delimiters/u,
@@ -220,10 +220,10 @@ try {
     "only historical excerpts retain verbatim source text",
   );
   const sharedChat = await createChat("Two characters remember the same history");
-  await chats.update(sharedChat.id, { characterIds: ["tobias", "powers"] });
+  await chats.update(sharedChat.id, { characterIds: ["maurus", "powers"] });
   await chats.patchMetadata(sharedChat.id, {
     groupChatMode: "individual",
-    advancedMemory: { ...settings, knowledgeStarts: { tobias: null, powers: null } },
+    advancedMemory: { ...settings, knowledgeStarts: { maurus: null, powers: null } },
   });
   const beforeShared = requests.length;
   await memory.initialize(sharedChat.id);
@@ -231,7 +231,7 @@ try {
     (record) => record.kind === "scene" && record.status === "closed" && record.audienceCharacterIds.length,
   );
   assert.equal(sharedScenes.length, 1, "characters with identical sources share one scene record");
-  assert.deepEqual(sharedScenes[0]!.audienceCharacterIds, ["tobias", "powers"]);
+  assert.deepEqual(sharedScenes[0]!.audienceCharacterIds, ["maurus", "powers"]);
   assert.equal(
     requests.slice(beforeShared).filter((item) => !item.instructions?.startsWith("Identify scene transitions")).length,
     1,
@@ -240,7 +240,7 @@ try {
   const sharedRow = (
     await db.select().from(advancedMemoryRecords).where(eq(advancedMemoryRecords.id, sharedScenes[0]!.id))
   )[0]!;
-  for (const character of ["tobias", "powers"]) {
+  for (const character of ["maurus", "powers"]) {
     await db.insert(advancedMemoryRecords).values({
       ...sharedRow,
       id: `legacy-${character}`,
@@ -259,21 +259,21 @@ try {
     "A shared manual correction.",
   );
   const sharedSource = await chats.listMessages(sharedChat.id);
-  await chats.updateMessageExtra(sharedSource[0]!.id, { hiddenFromAICharacterIds: ["tobias"] });
+  await chats.updateMessageExtra(sharedSource[0]!.id, { hiddenFromAICharacterIds: ["maurus"] });
   await memory.initialize(sharedChat.id);
   const restrictedRecall = await memory.prepare({
     chatId: sharedChat.id,
     messages: await chats.listMessages(sharedChat.id),
-    audienceCharacterIds: ["tobias"],
+    audienceCharacterIds: ["maurus"],
     budgetTokens: 50_000,
     readOnly: true,
   });
   assert.equal(restrictedRecall.recalledScenes, null, "source hiding still prevents recall after a saved assignment");
   const characters = createCharactersStorage(db);
-  const borrower = await characters.create(characterDataSchema.parse({ name: "Tobias" }));
+  const borrower = await characters.create(characterDataSchema.parse({ name: "Maurus" }));
   const narratorActor = await characters.create(characterDataSchema.parse({ name: "Narrator" }));
   assert(borrower && narratorActor);
-  const otherPov = await characters.create(characterDataSchema.parse({ name: "Cornelius" }));
+  const otherPov = await characters.create(characterDataSchema.parse({ name: "Peregrine" }));
   assert(otherPov);
   for (const [mode, characterIds] of [
     ["merged", [borrower.id, otherPov.id]],
@@ -297,8 +297,8 @@ try {
   const correctionChat = await createChat("Archive preserves corrections across separate POVs");
   await chats.update(correctionChat.id, { characterIds: [borrower.id, otherPov.id, narratorActor.id] });
   const correctionSource = await chats.listMessages(correctionChat.id);
-  await chats.updateMessageContent(correctionSource[0]!.id, "Tobias privately visits the river: TOBIAS_SOURCE.");
-  await chats.updateMessageContent(correctionSource[1]!.id, "Cornelius is alone at the bank: CORNELIUS_SOURCE.");
+  await chats.updateMessageContent(correctionSource[0]!.id, "Maurus privately visits the river: MAURUS_SOURCE.");
+  await chats.updateMessageContent(correctionSource[1]!.id, "Peregrine is alone at the bank: PEREGRINE_SOURCE.");
   await chats.updateMessageExtra(correctionSource[0]!.id, { hiddenFromAICharacterIds: [otherPov.id] });
   await chats.updateMessageExtra(correctionSource[1]!.id, { hiddenFromAICharacterIds: [borrower.id] });
   await chats.createMessage({
@@ -308,7 +308,7 @@ try {
     extra: { isConversationStart: true },
   });
   const correctedPovs =
-    '{{#if char == "Tobias"}}TOBIAS_CORRECTION{{/if}}\n{{#if char == "Cornelius"}}CORNELIUS_CORRECTION{{/if}}';
+    '{{#if char == "Maurus"}}MAURUS_CORRECTION{{/if}}\n{{#if char == "Peregrine"}}PEREGRINE_CORRECTION{{/if}}';
   await chats.patchMetadata(correctionChat.id, {
     groupChatMode: "individual",
     advancedMemory: {
@@ -332,7 +332,7 @@ try {
     .slice(correctionStart)
     .find((request) => !request.instructions?.startsWith("Identify scene transitions"))!;
   const correctionInput = JSON.stringify(correctionRequest.input);
-  for (const expected of ["TOBIAS_SOURCE", "CORNELIUS_SOURCE", "TOBIAS_CORRECTION", "CORNELIUS_CORRECTION"])
+  for (const expected of ["MAURUS_SOURCE", "PEREGRINE_SOURCE", "MAURUS_CORRECTION", "PEREGRINE_CORRECTION"])
     assert(
       correctionInput.includes(expected),
       `the archive helper receives ${expected}, regardless of the current POV`,
@@ -357,7 +357,7 @@ try {
   const povSource = await chats.listMessages(povChat.id);
   await chats.updateMessageContent(
     povSource[1]!.id,
-    "Elsewhere, Cornelius privately visits the bank: CORNELIUS_SOURCE.",
+    "Elsewhere, Peregrine privately visits the bank: PEREGRINE_SOURCE.",
   );
   await chats.createMessage({
     chatId: povChat.id,
@@ -366,7 +366,7 @@ try {
     extra: { isConversationStart: true },
   });
   const povSummary =
-    '{{#if char == "Tobias" || "Narrator"}}Tobias privately remembers the brass compass promise: TOBIAS_SECRET.{{/if}}\n{{#if char == "Cornelius" || "Narrator"}}Cornelius privately remembers the brass compass promise: CORNELIUS_SECRET.{{/if}}';
+    '{{#if char == "Maurus" || "Narrator"}}Maurus privately remembers the brass compass promise: MAURUS_SECRET.{{/if}}\n{{#if char == "Peregrine" || "Narrator"}}Peregrine privately remembers the brass compass promise: PEREGRINE_SECRET.{{/if}}';
   summaryResponse = povSummary;
   const povRequestStart = requests.length;
   await memory.initialize(povChat.id);
@@ -377,17 +377,17 @@ try {
   assert(povRequest.instructions?.startsWith("Keep character knowledge separate when POVs switch."));
   assert.match(povRequest.instructions!, /\{\{#if char == "Exact Name"\}\}/u);
   assert.match(povRequest.instructions!, /The narrator is "Narrator"/u);
-  assert(JSON.stringify(povRequest.input).includes("CORNELIUS_SOURCE"), "the cutoff recap includes the second POV");
+  assert(JSON.stringify(povRequest.input).includes("PEREGRINE_SOURCE"), "the cutoff recap includes the second POV");
   await memory.checkScenesAfterGeneration(povChat.id);
   const povStored = JSON.parse((await chats.getById(povChat.id))!.metadata).summaryEntries;
   assert.equal(
-    povStored.find((entry: { content: string }) => entry.content.includes("TOBIAS_SECRET"))?.content,
+    povStored.find((entry: { content: string }) => entry.content.includes("MAURUS_SECRET"))?.content,
     povSummary,
     "new constants keep each POV condition once without an extra enclosing character guard",
   );
   for (const [id, own, hidden] of [
-    [borrower.id, "TOBIAS_SECRET", "CORNELIUS_SECRET"],
-    [otherPov.id, "CORNELIUS_SECRET", "TOBIAS_SECRET"],
+    [borrower.id, "MAURUS_SECRET", "PEREGRINE_SECRET"],
+    [otherPov.id, "PEREGRINE_SECRET", "MAURUS_SECRET"],
   ]) {
     const recalled = await memory.prepare({
       chatId: povChat.id,
@@ -416,7 +416,7 @@ try {
     budgetTokens: 12000,
     readOnly: true,
   });
-  assert(allPovs.recalledScenes?.includes("TOBIAS_SECRET") && allPovs.recalledScenes.includes("CORNELIUS_SECRET"));
+  assert(allPovs.recalledScenes?.includes("MAURUS_SECRET") && allPovs.recalledScenes.includes("PEREGRINE_SECRET"));
   assert(allPovs.receipt.recalledMessageIds.length > 0, "the narrator can still recall the source excerpt");
   const povRecord = (await memory.status(povChat.id)).records.find(
     (record) => record.kind === "scene" && record.status === "closed" && record.content,
@@ -429,7 +429,7 @@ try {
     budgetTokens: 12000,
     readOnly: true,
   });
-  assert(sameRecap.recalledScenes?.includes("TOBIAS_SECRET"));
+  assert(sameRecap.recalledScenes?.includes("MAURUS_SECRET"));
   assert.deepEqual(
     sameRecap.receipt.recalledMessageIds,
     povSource.slice(0, 2).map((message) => message.id),
@@ -450,7 +450,7 @@ try {
   const partialSource = await chats.listMessages(partialChat.id);
   await chats.updateMessageContent(
     partialSource[1]!.id,
-    "Date: June 12\nOutside the room, Cornelius discusses PRIVATE_LEDGER.",
+    "Date: June 12\nOutside the room, Peregrine discusses PRIVATE_LEDGER.",
   );
   await chats.updateMessageExtra(partialSource[0]!.id, { hiddenFromAI: true });
   await chats.updateMessageExtra(partialSource[1]!.id, {
@@ -464,7 +464,7 @@ try {
     extra: { isConversationStart: true },
   });
   summaryResponse =
-    'Everyone shared the brass compass promise. {{#if character == "Cornelius" || "Narrator"}}Outside the room, Cornelius discussed PRIVATE_LEDGER.{{/if}}';
+    'Everyone shared the brass compass promise. {{#if character == "Peregrine" || "Narrator"}}Outside the room, Peregrine discussed PRIVATE_LEDGER.{{/if}}';
   const partialStart = requests.length;
   await memory.initialize(partialChat.id);
   summaryResponse = summary;
@@ -478,7 +478,7 @@ try {
   assert(partialInput.includes("PRIVATE_LEDGER"), "globally hidden private messages reach the summarizer");
   assert(
     partialInput.includes(
-      JSON.stringify('[Message visibility: only ["Cornelius","Narrator"] can know this message.]').slice(1, -1),
+      JSON.stringify('[Message visibility: only ["Peregrine","Narrator"] can know this message.]').slice(1, -1),
     ),
   );
   const partialRecord = (await memory.status(partialChat.id)).records.find(
@@ -533,7 +533,7 @@ try {
     // A constant's range and story dates come only from messages its reader can see (#7454). June 12 is in the
     // message hidden from the borrower, so his constants don't show it, though his recalled scene above does.
     assert.equal(/June 12/u.test(prepared.chatSummary!), id !== borrower.id);
-    // An entry with nothing for this reader keeps its range header only for a story date they can see: Cornelius
+    // An entry with nothing for this reader keeps its range header only for a story date they can see: Peregrine
     // gets no bare "#1–#1" header from the borrower's entry (#7250). The narrator reads every section (#7454),
     // but the borrower's copy of the scene repeats its own, so it reads the scene once.
     assert.equal(prepared.chatSummary!.includes("Messages #1–#1;"), id === borrower.id);
@@ -721,7 +721,7 @@ try {
     },
   });
   const changedVisibilitySource = await chats.listMessages(changedVisibilityChat.id);
-  await chats.updateMessageContent(changedVisibilitySource[1]!.id, "Cornelius discussed PRIVATE_VAULT by the compass.");
+  await chats.updateMessageContent(changedVisibilitySource[1]!.id, "Peregrine discussed PRIVATE_VAULT by the compass.");
   await chats.createMessage({
     chatId: changedVisibilityChat.id,
     role: "user",
@@ -764,7 +764,7 @@ try {
     ),
   );
   summaryResponse =
-    'They shared the brass compass promise. {{#if character == "Cornelius" || "Narrator"}}Cornelius discussed PRIVATE_VAULT.{{/if}}';
+    'They shared the brass compass promise. {{#if character == "Peregrine" || "Narrator"}}Peregrine discussed PRIVATE_VAULT.{{/if}}';
   await memory.initialize(changedVisibilityChat.id, { sceneId: changedVisibilityRecord.sceneId, detectScenes: false });
   summaryResponse = summary;
   const repairedVisibility = await prepareChangedVisibility(borrower.id);
@@ -781,7 +781,7 @@ try {
     "renaming a reader marks name-based scene conditions for preparation",
   );
   summaryResponse =
-    '{{#if character == "Renamed Borrower"}}They shared the brass compass promise.{{/if}} {{#if character == "Cornelius" || "Narrator"}}Cornelius discussed PRIVATE_VAULT.{{/if}}';
+    '{{#if character == "Renamed Borrower"}}They shared the brass compass promise.{{/if}} {{#if character == "Peregrine" || "Narrator"}}Peregrine discussed PRIVATE_VAULT.{{/if}}';
   await memory.initialize(changedVisibilityChat.id, { sceneId: changedVisibilityRecord.sceneId, detectScenes: false });
   summaryResponse = summary;
   const beforeRenamedRecall = requests.length;
@@ -789,7 +789,7 @@ try {
   assert.match(renamedRecall.recalledScenes!, /brass compass promise/u);
   assert(!renamedRecall.recalledScenes!.includes("PRIVATE_VAULT"));
   assert.equal(requests.length, beforeRenamedRecall, "a renamed reader's recall adds no helper calls");
-  await characters.update(borrower.id, { name: "Tobias" });
+  await characters.update(borrower.id, { name: "Maurus" });
   // #7245: a character who joins later changes nothing the earlier readers may know,
   // so recaps of scenes with messages hidden from one of them stay current.
   const newcomer = await characters.create(characterDataSchema.parse({ name: "Cara" }));
@@ -805,11 +805,11 @@ try {
     };
     await chats.patchMetadata(joinChat.id, { groupChatMode: mode, advancedMemory: joinSettings });
     const opening = await chats.listMessages(joinChat.id);
-    await chats.updateMessageContent(opening[1]!.id, "Tobias whispered JOIN_SECRET by the compass.");
+    await chats.updateMessageContent(opening[1]!.id, "Maurus whispered JOIN_SECRET by the compass.");
     for (const content of [
-      "Cornelius polished the compass case.",
-      "The following morning, Cornelius counted the bridge stones.",
-      "Tobias hid LEGACY_SECRET under the bridge.",
+      "Peregrine polished the compass case.",
+      "The following morning, Peregrine counted the bridge stones.",
+      "Maurus hid LEGACY_SECRET under the bridge.",
     ])
       await chats.createMessage({ chatId: joinChat.id, role: "user", content });
     await chats.createMessage({
@@ -819,11 +819,11 @@ try {
       extra: { isConversationStart: true },
     });
     const joinSource = await chats.listMessages(joinChat.id);
-    // Hidden from Cornelius before the summaries, so each recap keeps that part to Tobias.
+    // Hidden from Peregrine before the summaries, so each recap keeps that part to Maurus.
     for (const index of [1, 4])
       await chats.updateMessageExtra(joinSource[index]!.id, { hiddenFromAICharacterIds: [otherPov.id] });
     summaryResponse =
-      'They shared the brass compass promise. {{#if character == "Tobias" || "Narrator"}}Tobias kept JOIN_SECRET.{{/if}}';
+      'They shared the brass compass promise. {{#if character == "Maurus" || "Narrator"}}Maurus kept JOIN_SECRET.{{/if}}';
     await memory.initialize(joinChat.id);
     summaryResponse = summary;
     const joinScenes = (await memory.status(joinChat.id)).records.filter(
@@ -836,8 +836,8 @@ try {
       assert.deepEqual(record.audienceCharacterIds, [borrower.id, otherPov.id].sort());
     // A recap saved before #7245 holds only this hash of what every chat character could see.
     const legacyReaders = [
-      [borrower.id, "Tobias", [true, true]],
-      [otherPov.id, "Cornelius", [true, false]],
+      [borrower.id, "Maurus", [true, true]],
+      [otherPov.id, "Peregrine", [true, false]],
       [narratorActor.id, "Narrator", [true, true]],
     ].sort((a, b) => String(a[0]).localeCompare(String(b[0])));
     const legacyRevision = createHash("sha256").update(JSON.stringify(legacyReaders)).digest("hex");
@@ -861,7 +861,7 @@ try {
       new Set((await recallJoin(audienceCharacterIds)).receipt.recalledSceneIds);
     const flagged = async () =>
       new Set((await memory.status(joinChat.id)).unpreparedScenes?.map((scene) => scene.sceneId));
-    // Cornelius alone (his individual reply, or a merged reply pinned to him) and the whole merged group.
+    // Peregrine alone (his individual reply, or a merged reply pinned to him) and the whole merged group.
     const partialReaders = [
       [otherPov.id],
       ...(mode === "merged" ? [[borrower.id, otherPov.id, narratorActor.id]] : []),
@@ -886,7 +886,7 @@ try {
     const beforeJoinRecall = requests.length;
     for (const audience of partialReaders)
       assert((await recalled(audience)).has(current.sceneId), `${mode}: a character who joins later keeps the recap`);
-    // Per-character merged recall (#7239) can still recall a scene through Tobias alone, so check Cornelius's view.
+    // Per-character merged recall (#7239) can still recall a scene through Maurus alone, so check Peregrine's view.
     assert.deepEqual(
       await recalled([otherPov.id]),
       new Set([current.sceneId]),
@@ -907,12 +907,12 @@ try {
       assert((await flagged()).has(current.sceneId), `${mode}: ${change} sends the recap to Fix`);
     };
     await chats.updateMessageExtra(joinSource[2]!.id, { hiddenFromAICharacterIds: [otherPov.id] });
-    await withheld("hiding another message from Cornelius");
+    await withheld("hiding another message from Peregrine");
     await chats.updateMessageExtra(joinSource[2]!.id, { hiddenFromAICharacterIds: [] });
     assert((await recalled([otherPov.id])).has(current.sceneId));
-    await characters.update(otherPov.id, { name: "Renamed Cornelius" });
-    await withheld("renaming Cornelius");
-    await characters.update(otherPov.id, { name: "Cornelius" });
+    await characters.update(otherPov.id, { name: "Renamed Peregrine" });
+    await withheld("renaming Peregrine");
+    await characters.update(otherPov.id, { name: "Peregrine" });
     assert((await recalled([otherPov.id])).has(current.sceneId));
     // The recap never accounted for the newcomer, so it is withheld while they may see only part of it.
     await chats.updateMessageExtra(joinSource[0]!.id, { hiddenFromAICharacterIds: [newcomer.id] });
@@ -1246,10 +1246,10 @@ try {
   assert.deepEqual(await chats.listMessages(dependentTimelineChat.id), dependentSource);
 
   const deletedChat = await createChat("Delete one shared scene summary");
-  await chats.update(deletedChat.id, { characterIds: ["tobias", "powers"] });
+  await chats.update(deletedChat.id, { characterIds: ["maurus", "powers"] });
   await chats.patchMetadata(deletedChat.id, {
     groupChatMode: "individual",
-    advancedMemory: { ...settings, knowledgeStarts: { tobias: null, powers: null } },
+    advancedMemory: { ...settings, knowledgeStarts: { maurus: null, powers: null } },
   });
   await memory.initialize(deletedChat.id);
   const deletionStatus = await memory.status(deletedChat.id);
@@ -1376,7 +1376,7 @@ try {
     summaryMaxTokens: 12_000,
   });
   const sceneOnlySource = await chats.listMessages(sceneOnly.id);
-  const wholeScene = `SCENE_START ${"Tobias explored the coast and returned the compass. ".repeat(1500)} SCENE_END`;
+  const wholeScene = `SCENE_START ${"Maurus explored the coast and returned the compass. ".repeat(1500)} SCENE_END`;
   await chats.updateMessageContent(sceneOnlySource[0]!.id, wholeScene);
   await chats.updateMessageContent(sceneOnlySource[1]!.id, "The following morning, ONGOING_SCENE_ONLY.");
   summaryResponse = `${summary} `.repeat(100);

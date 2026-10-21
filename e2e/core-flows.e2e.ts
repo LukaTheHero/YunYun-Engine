@@ -1654,7 +1654,7 @@ test("Author's Notes keeps its expand and full macro guide inside the field", as
     await expect(macroReference.getByText("{{charPostHistory}}", { exact: true })).toBeVisible();
     await expect(macroReference.getByText("{{agent::TYPE}}", { exact: true })).toBeVisible();
     await expect(macroReference.getByText(/Conditional block with/)).toBeVisible();
-    const negationSyntax = '{{#if character != "Tobias"}}...{{/if}}';
+    const negationSyntax = '{{#if character != "Maurus"}}...{{/if}}';
     await expect(macroReference.getByText(negationSyntax, { exact: true })).toBeVisible();
     await expect(macroReference.getByText(/"is not", "not contains", and "not includes"/u)).toBeVisible();
     const macroHelp = await page.evaluate(async () => {
@@ -13136,7 +13136,7 @@ test("new Professor YunYun Home widgets receive a movable layout slot immediatel
 });
 
 test("Professor YunYun opens a named character directly in its editor", async ({ page }, testInfo) => {
-  const resourceName = `Tobias Navigator ${Date.now()}`;
+  const resourceName = `Maurus Navigator ${Date.now()}`;
   const characterResponse = await page.request.post("/api/characters", {
     data: { data: { name: resourceName } },
   });

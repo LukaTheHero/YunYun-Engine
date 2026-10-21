@@ -24,14 +24,14 @@ try {
     spec_version: "2.0",
     data: { name, description: "", personality: "", scenario: "", first_mes: "", mes_example: "" },
   });
-  writeFileSync(join(dataDir, "characters", "Doctor_Leopold.json"), JSON.stringify(characterCard("Leopold")));
+  writeFileSync(join(dataDir, "characters", "Doctor_Dominic.json"), JSON.stringify(characterCard("Dominic")));
   writeFileSync(join(dataDir, "characters", "Professor_Mari.json"), JSON.stringify(characterCard("Professor YunYun")));
   writeFileSync(
     join(dataDir, "groups", "lab-group.JSON"),
     JSON.stringify({
       id: "lab-group",
       name: "The Laboratory",
-      members: ["Doctor_Leopold.png", "Professor_Mari.png"],
+      members: ["Doctor_Dominic.png", "Professor_Mari.png"],
       chat_id: "current-chat",
       chats: ["past-chat", "current-chat"],
     }),
@@ -43,7 +43,7 @@ try {
       { name: "YunYun", is_user: true, mes: "Begin the experiment." },
       {
         name: "The Doctor",
-        original_avatar: "Doctor_Leopold.png",
+        original_avatar: "Doctor_Dominic.png",
         is_user: false,
         mes: "Naturally.",
       },
@@ -75,7 +75,7 @@ try {
   assert.equal(scan.groupChats.length, 2);
   for (const groupChat of scan.groupChats) {
     assert.equal(groupChat.groupName, "The Laboratory");
-    assert.deepEqual(groupChat.members, ["Doctor_Leopold", "Professor_Mari"]);
+    assert.deepEqual(groupChat.members, ["Doctor_Dominic", "Professor_Mari"]);
   }
 
   const result = await runSTBulkImport(
@@ -109,7 +109,7 @@ try {
   const importedMessages = new Map((await db.select().from(messages)).map((message) => [message.content, message]));
   assert.equal(importedMessages.get("Begin the experiment.")?.role, "user");
   assert.equal(importedMessages.get("Begin the experiment.")?.characterId, null);
-  assert.equal(importedMessages.get("Naturally.")?.characterId, characterIdsByName.get("Leopold"));
+  assert.equal(importedMessages.get("Naturally.")?.characterId, characterIdsByName.get("Dominic"));
   assert.equal(importedMessages.get("I have the notes.")?.characterId, characterIdsByName.get("Professor YunYun"));
 } finally {
   await db?._fileStore.close();

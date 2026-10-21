@@ -36,7 +36,7 @@ async function captureThemes(page: Page, info: TestInfo, name: string, target?: 
 
 async function createFixture(request: APIRequestContext) {
   const characters: Array<{ id: string }> = [];
-  for (const name of ["Leopold", "Narrator"]) {
+  for (const name of ["Dominic", "Narrator"]) {
     const response = await request.post("/api/characters", { data: { data: { name, first_mes: "" } } });
     expect(response.ok()).toBeTruthy();
     characters.push(await response.json());
@@ -260,7 +260,7 @@ for (const mode of ["roleplay", "conversation"] as const) {
     try {
       expect((await request.patch(`/api/chats/${fixture.chat.id}`, { data: { mode } })).ok()).toBeTruthy();
       const cachedPrompt = [
-        { role: "system", content: "You are Leopold. SAVED_CONSTANT. Character-only commands: [note]." },
+        { role: "system", content: "You are Dominic. SAVED_CONSTANT. Character-only commands: [note]." },
         { role: "user", content: "Keep the laboratory promise." },
       ];
       const savedExtra = {
@@ -520,7 +520,7 @@ test("Advanced Memory scene timeframes save independently, survive reloads and c
             endMessageId: message.id,
             messageIds: [message.id],
             audienceCharacterIds: fixture.characters.map(({ id }) => id),
-            content: index === 0 ? "Leopold promises to preserve the blue notebook." : "",
+            content: index === 0 ? "Dominic promises to preserve the blue notebook." : "",
             title: index === 0 ? "The laboratory promise" : "The experiment",
             timeline: index === 0 ? "Before the experiment" : null,
             enabled: true,
@@ -854,8 +854,8 @@ test("Advanced Memory stays in Chat Settings with confirmed knowledge, resumable
     await expect(confirm).toBeDisabled();
     await expect(confirmation).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(confirmation.getByRole("combobox", { name: "Leopold", exact: true })).toBeFocused();
-    await confirmation.getByRole("combobox", { name: "Leopold", exact: true }).selectOption("beginning");
+    await expect(confirmation.getByRole("combobox", { name: "Dominic", exact: true })).toBeFocused();
+    await confirmation.getByRole("combobox", { name: "Dominic", exact: true }).selectOption("beginning");
     await expect(confirmation).toContainText("Showing messages 55–104");
     await expect(confirmation.getByRole("option", { name: "#55 — Historical message 55", exact: true })).toHaveCount(1);
     await expect(confirmation.locator("option")).toHaveCount(52);
@@ -864,9 +864,9 @@ test("Advanced Memory stays in Chat Settings with confirmed knowledge, resumable
     await confirmation.getByRole("button", { name: "Older messages", exact: true }).click();
     await expect(confirmation).toContainText("Showing messages 1–4");
     await expect(confirmation.getByRole("button", { name: "Older messages", exact: true })).toBeDisabled();
-    await confirmation.getByRole("combobox", { name: "Leopold", exact: true }).selectOption("historical-2");
+    await confirmation.getByRole("combobox", { name: "Dominic", exact: true }).selectOption("historical-2");
     await confirmation.getByRole("button", { name: "Newer messages", exact: true }).click();
-    await expect(confirmation.getByRole("combobox", { name: "Leopold", exact: true })).toHaveValue("historical-2");
+    await expect(confirmation.getByRole("combobox", { name: "Dominic", exact: true })).toHaveValue("historical-2");
     await expect(confirmation.getByRole("option", { name: "Saved selection (outside this page)" })).toHaveCount(1);
     expect(knowledgeRequests.every((url) => url.searchParams.get("limit") === "50")).toBe(true);
     expect(knowledgeRequests.some((url) => url.searchParams.has("before"))).toBe(true);
@@ -967,9 +967,9 @@ test("Advanced Memory stays in Chat Settings with confirmed knowledge, resumable
     const progressWidth = await progress.evaluate((element) => element.getBoundingClientRect().width);
     expect(Math.abs(toggleWidth - progressWidth)).toBeLessThan(2);
     await settings.getByRole("button", { name: "Review character knowledge", exact: true }).click();
-    await expect(confirmation.getByRole("combobox", { name: "Leopold", exact: true })).toHaveValue("historical-2");
+    await expect(confirmation.getByRole("combobox", { name: "Dominic", exact: true })).toHaveValue("historical-2");
     await expect(confirmation.getByRole("combobox", { name: "Narrator", exact: true })).toHaveValue("historical-0");
-    await confirmation.getByRole("combobox", { name: "Leopold", exact: true }).selectOption(lastMessage.id);
+    await confirmation.getByRole("combobox", { name: "Dominic", exact: true }).selectOption(lastMessage.id);
     await confirm.click();
     await expect.poll(() => initializeBodies.length).toBe(3);
     expect(status.settings.knowledgeStarts[character.id]).toBe(lastMessage.id);
@@ -1014,7 +1014,7 @@ test("Advanced Memory stays in Chat Settings with confirmed knowledge, resumable
     await expect(inspector).toContainText("No matching scenes or memories.");
     await search.fill("");
     await expect(inspector.locator("ul > li")).toHaveCount(2);
-    await expect(inspector.getByRole("button", { name: /Scene #1/ })).toContainText("Leopold, Narrator");
+    await expect(inspector.getByRole("button", { name: /Scene #1/ })).toContainText("Dominic, Narrator");
     const cardBounds = await inspector.locator("ul > li > button").evaluateAll((buttons) =>
       buttons.map((button) => {
         const { y, height } = button.getBoundingClientRect();
@@ -1055,7 +1055,7 @@ test("Advanced Memory stays in Chat Settings with confirmed knowledge, resumable
     await inspector.getByRole("button", { name: "Save correction", exact: true }).click();
     await expect.poll(() => status.records[0]?.audienceCharacterIds).toEqual([character.id, narrator.id]);
     expect(initializeBodies).toHaveLength(3);
-    await access.getByText("Leopold", { exact: true }).click();
+    await access.getByText("Dominic", { exact: true }).click();
     await access.getByText("Narrator", { exact: true }).click();
     await expect(access).toContainText("No characters selected: only the narrator can recall this scene.");
     await inspector.getByRole("button", { name: "Save correction", exact: true }).click();
@@ -1645,7 +1645,7 @@ for (const deleted of [false, true])
         completed: 52,
         total: 54,
         error:
-          "The manually corrected memory for messages #943–#947 (Leopold) has changed sources or supporting summaries.",
+          "The manually corrected memory for messages #943–#947 (Dominic) has changed sources or supporting summaries.",
         reviewRecordId: record.id,
       },
       missingKnowledgeCharacterIds: [],
@@ -1696,7 +1696,7 @@ for (const deleted of [false, true])
       await expect(inspector).toContainText(
         deleted ? "Other scenes and corrections stay unchanged" : "Reindexing alone cannot create a missing summary.",
       );
-      await inspector.getByRole("button", { name: "Review Scene #1: Messages 943–947 · Leopold", exact: true }).click();
+      await inspector.getByRole("button", { name: "Review Scene #1: Messages 943–947 · Dominic", exact: true }).click();
       await expect(inspector.getByRole("textbox", { name: "Summary text", exact: true })).toHaveValue(savedCorrection);
       await expect(inspector.getByRole("button", { name: "Save correction", exact: true })).toBeEnabled();
       await inspector.getByRole("button", { name: "Save correction", exact: true }).click();
@@ -1852,7 +1852,7 @@ test("Character recollections switch saves for its chat and recollections are ed
   const endpoint = `/api/chats/${fixture.chat.id}/advanced-memory`;
   const drawer = page.locator(".mari-chat-settings-drawer");
   const status = async () => (await (await request.get(endpoint)).json()) as AdvancedMemoryStatus;
-  const summary = "Leopold promises to preserve the blue notebook.";
+  const summary = "Dominic promises to preserve the blue notebook.";
   const generated = "I remember the weight of that notebook and how carefully I wrote the promise down.";
   const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
   // Its owner could read both scene messages when it was written.
@@ -1913,12 +1913,12 @@ test("Character recollections switch saves for its chat and recollections are ed
             valid: true,
             record: {
               ...scene,
-              id: "recollection-proof-leopold",
+              id: "recollection-proof-dominic",
               kind: "recollection",
               audienceCharacterIds: [fixture.character.id],
               content: generated,
               title: "Recollection",
-              // Written with this summary text and what Leopold could read, so it is current.
+              // Written with this summary text and what Dominic could read, so it is current.
               dependencies: [{ id: "recollection-summary", revision: digest(summary) }, access],
             },
           },
@@ -1940,7 +1940,7 @@ test("Character recollections switch saves for its chat and recollections are ed
     });
     expect(imported.ok()).toBeTruthy();
     expect(((await imported.json()) as { imported: number }).imported).toBe(4);
-    const leopold = async () =>
+    const dominic = async () =>
       (await status()).records.find(
         (item) => item.kind === "recollection" && item.audienceCharacterIds[0] === fixture.character.id,
       );
@@ -1984,7 +1984,7 @@ test("Character recollections switch saves for its chat and recollections are ed
 
     const recollections = await openScene();
     await expect(recollections.getByRole("heading", { name: "Character recollections" })).toBeVisible();
-    const text = recollections.getByRole("textbox", { name: "Leopold's recollection", exact: true });
+    const text = recollections.getByRole("textbox", { name: "Dominic's recollection", exact: true });
     await expect(text).toHaveValue(generated);
     await expect(recollections.getByText("Generated", { exact: true })).toBeVisible();
     // Nothing was written for the other character: an empty field to write one in.
@@ -1997,14 +1997,14 @@ test("Character recollections switch saves for its chat and recollections are ed
     await expect(
       recollections.getByRole("button", { name: "Save Narrator's recollection", exact: true }),
     ).toBeDisabled();
-    const save = recollections.getByRole("button", { name: "Save Leopold's recollection", exact: true });
+    const save = recollections.getByRole("button", { name: "Save Dominic's recollection", exact: true });
     await expect(save).toBeDisabled();
     await text.fill("I wrote the promise in blue ink so I could never pretend I forgot it.");
     await expect(save).toBeEnabled();
     await save.click();
     await expect
       .poll(async () => {
-        const record = await leopold();
+        const record = await dominic();
         return [record?.content, record?.manualOverride];
       })
       .toEqual(["I wrote the promise in blue ink so I could never pretend I forgot it.", true]);
@@ -2012,7 +2012,7 @@ test("Character recollections switch saves for its chat and recollections are ed
     await expect(save).toBeDisabled();
     await captureThemes(page, info, "character-recollections-inspector", recollections);
 
-    // Once Leopold can no longer read part of the scene, the edited recollection waits for a review: saving the
+    // Once Dominic can no longer read part of the scene, the edited recollection waits for a review: saving the
     // same text puts it back into prompts.
     expect(
       (
@@ -2021,7 +2021,7 @@ test("Character recollections switch saves for its chat and recollections are ed
         })
       ).ok(),
     ).toBeTruthy();
-    await expect.poll(async () => (await leopold())?.embeddingStatus).toBe("stale");
+    await expect.poll(async () => (await dominic())?.embeddingStatus).toBe("stale");
     // The hidden message also asks for a check of the scene's summary.
     await openSettings("Advanced Memory found a problem in 1 scene.");
     const review = await openScene();
@@ -2031,21 +2031,21 @@ test("Character recollections switch saves for its chat and recollections are ed
         { exact: true },
       ),
     ).toBeVisible();
-    const reviewSave = review.getByRole("button", { name: "Save Leopold's recollection", exact: true });
+    const reviewSave = review.getByRole("button", { name: "Save Dominic's recollection", exact: true });
     await expect(reviewSave).toBeEnabled();
     await reviewSave.click();
-    await expect.poll(async () => (await leopold())?.embeddingStatus).not.toBe("stale");
+    await expect.poll(async () => (await dominic())?.embeddingStatus).not.toBe("stale");
     await expect(review.getByText("Manually edited", { exact: true })).toBeVisible();
     await expect(reviewSave).toBeDisabled();
 
     // Delete asks first, and Cancel keeps the recollection.
     const content = async () => {
-      const record = await leopold();
+      const record = await dominic();
       return [record?.content, record?.manualOverride];
     };
-    const deleteButton = review.getByRole("button", { name: "Delete Leopold's recollection", exact: true });
+    const deleteButton = review.getByRole("button", { name: "Delete Dominic's recollection", exact: true });
     await deleteButton.click();
-    const deleteDialog = page.getByRole("dialog", { name: "Delete Leopold's recollection", exact: true });
+    const deleteDialog = page.getByRole("dialog", { name: "Delete Dominic's recollection", exact: true });
     await expect(deleteDialog).toContainText("It won't be used or written again, but you can write a new one here.");
     await captureThemes(page, info, "character-recollections-delete-confirm", deleteDialog);
     await deleteDialog.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -2055,7 +2055,7 @@ test("Character recollections switch saves for its chat and recollections are ed
     await deleteButton.click();
     await deleteDialog.getByRole("button", { name: "Delete", exact: true }).click();
     await expect.poll(content).toEqual(["", true]);
-    const reviewText = review.getByRole("textbox", { name: "Leopold's recollection", exact: true });
+    const reviewText = review.getByRole("textbox", { name: "Dominic's recollection", exact: true });
     await expect(reviewText).toHaveValue("");
     await expect(
       review.getByText("Deleted. It won't be written again, but you can write one here.", { exact: true }),

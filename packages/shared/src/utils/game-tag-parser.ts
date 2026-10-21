@@ -638,7 +638,7 @@ export function parseGmTags(content: string): ParsedGmTags {
   // applied, so the bookkeeping is never narration.
   text = stripClockCommandTags(stripSheetCommandTags(text));
 
-  // [combat: enemies="Goblin:5:40:8:5:6, Skeleton:3:25:6:3:4" allies="Leopold, Nasira"]
+  // [combat: enemies="Goblin:5:40:8:5:6, Skeleton:3:25:6:3:4" allies="Dominic, Nasira"]
   // Format: Name:Level:HP:ATK:DEF:SPD — comma separated for multiple enemies
   // Simplified format: [combat: enemies="Goblin, Skeleton"] (auto-generates stats from level)
   const combatTags = extractFlatTags(text, /\[combat:/gi, true);

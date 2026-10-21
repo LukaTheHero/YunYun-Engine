@@ -3,12 +3,12 @@ import { performance } from "node:perf_hooks";
 import { parseGmTags } from "../../packages/client/src/lib/game-tag-parser.js";
 
 for (const attributes of [
-  `enemies="Goblin:2:30:8:5:5" allies="YunYun|Leopold"`,
-  `ENEMIES = 'Goblin:2:30:8:5:5' ALLIES = 'YunYun,Leopold'`,
+  `enemies="Goblin:2:30:8:5:5" allies="YunYun|Dominic"`,
+  `ENEMIES = 'Goblin:2:30:8:5:5' ALLIES = 'YunYun,Dominic'`,
 ]) {
   const encounter = parseGmTags(`[combat: ${attributes}]`).combatEncounter;
   assert.equal(encounter?.enemies[0]?.name, "Goblin");
-  assert.deepEqual(encounter?.allies, ["YunYun", "Leopold"]);
+  assert.deepEqual(encounter?.allies, ["YunYun", "Dominic"]);
 }
 assert.equal(parseGmTags(`[combat: enemies="Goblin" allies=none]`).combatEncounter?.allies, null);
 assert.equal(parseGmTags(`[combat: Goblin:2]`).combatEncounter?.enemies[0]?.level, 2);

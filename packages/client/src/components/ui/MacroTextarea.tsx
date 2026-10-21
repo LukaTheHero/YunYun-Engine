@@ -300,7 +300,7 @@ function MacrosReferenceModal({ open, onClose }: MacrosReferenceModalProps) {
                   </p>
                   <code className="mt-1 block whitespace-pre-wrap text-[var(--primary)]">
                     {
-                      '{{#if character == "Leopold"}}\nWrite this for Leopold.\n{{else}}\nWrite this for anyone else.\n{{/if}}'
+                      '{{#if character == "Dominic"}}\nWrite this for Dominic.\n{{else}}\nWrite this for anyone else.\n{{/if}}'
                     }
                   </code>
                 </div>
@@ -310,7 +310,7 @@ function MacrosReferenceModal({ open, onClose }: MacrosReferenceModalProps) {
                   </p>
                   <code className="mt-1 block whitespace-pre-wrap text-[var(--primary)]">
                     {
-                      '{{#if character == "Tobias" || "Cornelius"}}\n...\n{{/if}}\n{{#if scenario && user contains "YunYun"}}\n...\n{{/if}}'
+                      '{{#if character == "Maurus" || "Peregrine"}}\n...\n{{/if}}\n{{#if scenario && user contains "YunYun"}}\n...\n{{/if}}'
                     }
                   </code>
                 </div>

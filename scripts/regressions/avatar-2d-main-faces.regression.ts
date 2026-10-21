@@ -62,7 +62,7 @@ try {
       (label) => `full_${label}`,
     ),
     ...["neutral", "sad", "scared", "sleepy", "smirk", "surprised", "thinking"].map((label) => `full_${label}`),
-  ].map((expression) => ({ expression, url: `/api/sprites/tobias/file/${expression}.png?v=1` }));
+  ].map((expression) => ({ expression, url: `/api/sprites/maurus/file/${expression}.png?v=1` }));
   const fromSprites = layers.buildPngtuberLayersFromSprites(sprites);
   assert.ok(fromSprites);
   const labelFor = (key: string) => key;

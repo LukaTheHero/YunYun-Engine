@@ -1355,7 +1355,7 @@ assert.ok(!("mariDetailId" in mariSession));
     fallback.replace(/\{\{(\w+)\}\}/g, (_, name) => String(values?.[name] ?? ""))) as never;
   const characters = [
     { id: "c1", name: "Shrek" },
-    { id: "c2", name: "Leopold" },
+    { id: "c2", name: "Dominic" },
     { id: "c3", name: "Donkey" },
   ];
   const created = buildOmnibarIntentShortcuts({ query: "new character Bob the Builder", characters, t });

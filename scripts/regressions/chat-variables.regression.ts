@@ -15,8 +15,8 @@ import {
 
 const baseContext = (overrides: Partial<MacroContext> = {}): MacroContext => ({
   user: "Kentaro",
-  char: "Cornelius",
-  characters: ["Cornelius"],
+  char: "Peregrine",
+  characters: ["Peregrine"],
   variables: {},
   ...overrides,
 });
@@ -38,7 +38,7 @@ assert.equal(
 assert.equal(resolveMacros("{{nope}}", baseContext({ localVariables: { char1: "Mary" } }), {}), "{{nope}}");
 
 // Built-in macros run first, so a chat variable cannot shadow one.
-assert.equal(resolveMacros("{{char}}", baseContext({ localVariables: { char: "Wrong" } }), {}), "Cornelius");
+assert.equal(resolveMacros("{{char}}", baseContext({ localVariables: { char: "Wrong" } }), {}), "Peregrine");
 
 // Prototype members are not variables. Before the own-property guard these
 // rendered native-code source text into the prompt.
@@ -126,7 +126,7 @@ assert.equal(decoded, "PRESET", "the decoded branch reads the preset value");
 // Each character's bracket block must retain the pending preset claim too.
 const characterBlocks = resolveMacros(
   '[\n{{char}}: {{#if char1 == "Anna"}}PRESET{{else}}CHAT{{/if}}\n]',
-  { ...pendingPresetContext, characterProfiles: [{ name: "Cornelius" }, { name: "Leopold" }] },
+  { ...pendingPresetContext, characterProfiles: [{ name: "Peregrine" }, { name: "Dominic" }] },
 );
 assert.ok(hasDeferredRelocationConditionals(characterBlocks), "character blocks must defer pending preset values");
 const decodedBlocks = characterBlocks.replace(DEFERRED_RELOCATION_CONDITIONAL_TOKEN_RE, (_match, encoded: string) => {
@@ -134,8 +134,8 @@ const decodedBlocks = characterBlocks.replace(DEFERRED_RELOCATION_CONDITIONAL_TO
   assert.ok(payload);
   return selectConditionalPayloadBranch(payload, mergedContext, { trimResult: false });
 });
-assert.ok(decodedBlocks.includes("Cornelius: PRESET"));
-assert.ok(decodedBlocks.includes("Leopold: PRESET"));
+assert.ok(decodedBlocks.includes("Peregrine: PRESET"));
+assert.ok(decodedBlocks.includes("Dominic: PRESET"));
 assert.ok(!decodedBlocks.includes("CHAT"));
 
 // The operand may also name the variable inside braces, on either side of the

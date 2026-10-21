@@ -140,7 +140,7 @@ test("Import VRM explains a VRoid Studio project file and never uploads it", asy
     expect(await chooser.element().getAttribute("accept")).toBe(".vrm,.vroid");
     // VRoid Studio saves projects as ZIP archives.
     await chooser.setFiles({
-      name: "Tobias.vroid",
+      name: "Maurus.vroid",
       mimeType: "application/octet-stream",
       buffer: Buffer.from("PK\u0003\u0004VRoid Studio project"),
     });
@@ -173,7 +173,7 @@ test("dropping a VRoid project anywhere in 3D Avatars explains it before choosin
     element.dispatchEvent(otherDrag);
     element.dispatchEvent(otherDrop);
     const files = new DataTransfer();
-    files.items.add(new File(["VRoid Studio project"], "Tobias.VROID", { type: "application/octet-stream" }));
+    files.items.add(new File(["VRoid Studio project"], "Maurus.VROID", { type: "application/octet-stream" }));
     const drag = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: files });
     const drop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: files });
     element.dispatchEvent(drag);
@@ -200,18 +200,18 @@ test("dropping a VRoid project anywhere in 3D Avatars explains it before choosin
 });
 
 test("A model made earlier with Tripo still loads in setup as body only", async ({ page, request }, info) => {
-  const characterResponse = await request.post("/api/characters", { data: { data: { name: "Tobias fixture" } } });
+  const characterResponse = await request.post("/api/characters", { data: { data: { name: "Maurus fixture" } } });
   expect(characterResponse.ok(), await characterResponse.text()).toBeTruthy();
   const character = (await characterResponse.json()) as { id: string };
   try {
     const imported = await request.post(`/api/avatar-models/character/${character.id}/import`, {
-      multipart: { file: { name: "Tobias.vrm", mimeType: "model/gltf-binary", buffer: tripoMadeVrm() } },
+      multipart: { file: { name: "Maurus.vrm", mimeType: "model/gltf-binary", buffer: tripoMadeVrm() } },
     });
     expect(imported.ok(), await imported.text()).toBeTruthy();
 
     const tripoRequests = watchTripoRequests(page);
     const setup = await openSetup(page, character.id);
-    await expect(setup.getByText("Tobias", { exact: true })).toBeVisible({ timeout: FIRST_LOAD_TIMEOUT_MS });
+    await expect(setup.getByText("Maurus", { exact: true })).toBeVisible({ timeout: FIRST_LOAD_TIMEOUT_MS });
     await expect(setup.getByText("VRM 1.0 by Tripo AI", { exact: true })).toBeVisible();
     await expect(setup.locator("[data-vrm-body-only]")).toHaveText("Body only, the face doesn't move.");
     await expect(setup.getByLabel("Mouth: A", { exact: true })).toHaveCount(0);
@@ -228,7 +228,7 @@ test("A model made earlier with Tripo still loads in setup as body only", async 
       setup.getByRole("button", { name: "Replace model", exact: true }).click(),
     ]);
     await chooser.setFiles({
-      name: "Tobias.vroid",
+      name: "Maurus.vroid",
       mimeType: "application/octet-stream",
       buffer: Buffer.from("project"),
     });
@@ -246,7 +246,7 @@ test("A model made earlier with Tripo still loads in setup as body only", async 
     };
     expect(saved.activeKind).toBe("vrm");
     expect(saved.kinds.vrm.expressionNames).toEqual([]);
-    expect(saved.kinds.vrm.meta.title).toBe("Tobias");
+    expect(saved.kinds.vrm.meta.title).toBe("Maurus");
   } finally {
     await request.delete(`/api/characters/${character.id}`).catch(() => undefined);
   }

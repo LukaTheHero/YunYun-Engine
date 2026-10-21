@@ -46,7 +46,7 @@ for (const hasSceneModel of [false, true]) {
     gameActiveState: "dialogue" as const,
     sessionNumber: 1,
     map: null,
-    partyNames: ["Leopold"],
+    partyNames: ["Dominic"],
     playerName: "YunYun",
     hasSceneModel,
   };
@@ -59,7 +59,7 @@ for (const hasSceneModel of [false, true]) {
 }
 
 const partyContext = {
-  partyCards: [{ name: "Leopold", card: "A sardonic scholar." }],
+  partyCards: [{ name: "Dominic", card: "A sardonic scholar." }],
   playerName: "YunYun",
   gameActiveState: "dialogue",
 };

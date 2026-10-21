@@ -100,7 +100,7 @@ try {
   assert(connection);
   const characters = createCharactersStorage(db);
   const participants = await Promise.all(
-    ["Leopold", "Visitor", "Witness"].map((name) => characters.create(characterDataSchema.parse({ name }))),
+    ["Dominic", "Visitor", "Witness"].map((name) => characters.create(characterDataSchema.parse({ name }))),
   );
   assert(participants.every(Boolean));
   const [first, second, third] = participants;
@@ -157,7 +157,7 @@ try {
   };
   const original = 'YunYun cries. "And I really hate myself! I want to just finish myself already!"';
   const cut = 'YunYun cries. "And I really hate myself—"';
-  const interruption = '[interrupt: part="I really hate myself!"] Leopold interrupts her.';
+  const interruption = '[interrupt: part="I really hate myself!"] Dominic interrupts her.';
   const chat = await createChat();
   const older = await chats.createMessage({
     chatId: chat.id,
@@ -175,7 +175,7 @@ try {
   assert(!reply.content.includes("[interrupt"));
   assert.equal(getRoleplayCommandActivity(JSON.parse(reply.extra))[0]!.interruption!.originalContent, original);
 
-  await generate(chat.id, "Leopold listens without interrupting.", { regenerateMessageId: reply.id });
+  await generate(chat.id, "Dominic listens without interrupting.", { regenerateMessageId: reply.id });
   assert(
     prompts.at(-1)!.includes("I want to just finish myself already!"),
     "rerolls receive the complete original input",
@@ -291,7 +291,7 @@ try {
   });
   const groupSource = await chats.createMessage({ chatId: group.id, role: "user", content: original });
   outputs = [
-    '[interrupt: part="I really hate myself!"] Leopold reaches for the lever. DISCARDED_ASSISTANT_TAIL.',
+    '[interrupt: part="I really hate myself!"] Dominic reaches for the lever. DISCARDED_ASSISTANT_TAIL.',
     '[interrupt: part="reaches for the lever."] Visitor stops his hand.',
     "Witness sees both interruptions.",
   ];
@@ -308,7 +308,7 @@ try {
   assert(!prompts[start + 2]!.includes("DISCARDED_ASSISTANT_TAIL"), "later characters see a cut character reply");
   assert.equal((await chats.getMessage(groupSource!.id))!.content, cut);
   const groupMessages = await chats.listMessages(group.id);
-  assert.equal(groupMessages[1]!.content, "Leopold reaches for the lever—");
+  assert.equal(groupMessages[1]!.content, "Dominic reaches for the lever—");
 
   console.log(
     "Roleplay interrupt generation regression passed (literal cuts, full reroll context, recovery, edits, visibility and group continuation).",

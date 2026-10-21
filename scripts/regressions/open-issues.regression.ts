@@ -5163,7 +5163,7 @@ assert.equal(
 assert.equal(
   isAutonomousDailyBudgetExhausted("third-character", autonomousSchedule(70, 2), {
     groupChatMode: "individual",
-    autonomousDailyBudget: { date: dateKey, counts: { tartaglia: 1, leopold: 1 } },
+    autonomousDailyBudget: { date: dateKey, counts: { tartaglia: 1, dominic: 1 } },
   }),
   true,
   "individual Conversation groups should share one daily check-in count across their characters",
@@ -5193,7 +5193,7 @@ assert.equal(isAllowedResponseContentType("text/html; charset=utf-8", ["applicat
 
 const searchableCharacter = parseCharacterDisplayData({
   data: JSON.stringify({
-    name: "Leopold",
+    name: "Dominic",
     description: "A Fatui researcher from Snezhnaya.",
     creator: "Pasta Devs",
     tags: ["scientist", "villain"],
@@ -7000,16 +7000,16 @@ assert.equal(
     [
       {
         role: "assistant",
-        characterId: "leopold",
+        characterId: "dominic",
         content: "The experiment remains stable after every measured interval.",
       },
       {
         role: "assistant",
-        characterId: "leopold",
+        characterId: "dominic",
         content: "A different observation separates the two matching responses.",
       },
     ],
-    "leopold",
+    "dominic",
     "The experiment remains stable after every measured interval.",
   ),
   true,
@@ -7027,15 +7027,15 @@ assert.equal(
 );
 assert.equal(
   collapseDuplicateConversationSpeakerPrefixes(
-    "Leopold: Leopold: The procedure is complete.\nCornelius: Cornelius: At what cost?",
-    ["Leopold", " Cornelius ", "Leopold"],
+    "Dominic: Dominic: The procedure is complete.\nPeregrine: Peregrine: At what cost?",
+    ["Dominic", " Peregrine ", "Dominic"],
   ),
-  "Leopold: The procedure is complete.\nCornelius: At what cost?",
+  "Dominic: The procedure is complete.\nPeregrine: At what cost?",
 );
 assert.equal(
-  stripConversationResponseEnvelope("Leopold: Leopold: The procedure is complete.", {
-    speakerName: "Leopold",
-    speakerNames: ["Leopold", "Cornelius"],
+  stripConversationResponseEnvelope("Dominic: Dominic: The procedure is complete.", {
+    speakerName: "Dominic",
+    speakerNames: ["Dominic", "Peregrine"],
   }),
   "The procedure is complete.",
 );
@@ -7485,7 +7485,7 @@ assert.deepEqual(
   filterCustomEmojisByName(
     [
       { name: "MariWave", id: "wave" },
-      { name: "leopold_stare", id: "stare" },
+      { name: "dominic_stare", id: "stare" },
     ],
     "mari",
   ),
@@ -8107,7 +8107,7 @@ assert.deepEqual(parseTargetedHideArguments("34-40", "roleplay"), {
 assert.deepEqual(
   parseTargetedHideArguments('"Lady Maria" 12,18-20', "roleplay", [
     { id: "maria", name: "Lady Maria" },
-    { id: "tobias", name: "Tobias" },
+    { id: "maurus", name: "Maurus" },
   ]),
   {
     kind: "targeted",
@@ -8117,7 +8117,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   parseTargetedHideArguments("mau 34", "roleplay", [
-    { id: "tobias", name: "Tobias" },
+    { id: "maurus", name: "Maurus" },
     { id: "maurice", name: "Maurice" },
   ]),
   { kind: "error", reason: "ambiguous", targetName: "mau" },

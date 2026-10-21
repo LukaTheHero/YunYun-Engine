@@ -101,7 +101,7 @@ try {
   });
   const characters = createCharactersStorage(db);
   const first = await characters.create(characterDataSchema.parse({ name: "Powers That Be" }));
-  const second = await characters.create(characterDataSchema.parse({ name: "Tobias" }));
+  const second = await characters.create(characterDataSchema.parse({ name: "Maurus" }));
   assert.ok(first && second);
   const presets = createPromptsStorage(db);
   const preset = await presets.create({
@@ -173,7 +173,7 @@ try {
     });
   const summarySource = (await chats.listMessages(chat.id)).slice(1, 3);
   const conditionalEntries = [
-    '{{#if char == "Powers That Be" || "Tobias"}}SHARED_CONSTANT_FOR_{{char}}{{/if}}\n{{#if char == "Cornelius"}}CORNELIUS_ONLY_SECTION{{/if}}',
+    '{{#if char == "Powers That Be" || "Maurus"}}SHARED_CONSTANT_FOR_{{char}}{{/if}}\n{{#if char == "Peregrine"}}PEREGRINE_ONLY_SECTION{{/if}}',
     '{{#if char == "Powers That Be"}}NARRATOR_ONLY_CONSTANT{{/if}}',
   ].map((content, index) => ({
     id: `conditional-constant-${index}`,
@@ -218,9 +218,9 @@ try {
   assert.ok(generated.body.includes('"type":"advanced_memory_receipt"'));
   const sent = prompts.at(-1)!;
   assert.ok(sent.includes("MANDATORY_FIXTURE"));
-  assert.ok(sent.includes("SHARED_CONSTANT_FOR_Tobias"), "conditional constants reach Tobias's actual request");
-  assert.ok(!sent.includes("NARRATOR_ONLY_CONSTANT"), "narrator-only constants stay out of Tobias's request");
-  assert.ok(!sent.includes("CORNELIUS_ONLY_SECTION"), "another character's section stays out of Tobias's constant");
+  assert.ok(sent.includes("SHARED_CONSTANT_FOR_Maurus"), "conditional constants reach Maurus's actual request");
+  assert.ok(!sent.includes("NARRATOR_ONLY_CONSTANT"), "narrator-only constants stay out of Maurus's request");
+  assert.ok(!sent.includes("PEREGRINE_ONLY_SECTION"), "another character's section stays out of Maurus's constant");
   assert.ok(sent.includes("Earlier context omitted"), "an oversized ongoing scene retains bounded source excerpts");
   assert(!modelCallKinds.includes("summary"), "main generation never invokes the summary helper");
   assert.ok(sent.includes("HISTORY_9"), `recent actual history stays in context: ${sent.slice(-1800)}`);
@@ -233,12 +233,12 @@ try {
   await chats.updateMessageExtra(personalStart.id, { conversationStartForCharacterIds: [second.id] });
   await generate();
   assert.ok(
-    prompts.at(-1)!.includes("SHARED_CONSTANT_FOR_Tobias"),
+    prompts.at(-1)!.includes("SHARED_CONSTANT_FOR_Maurus"),
     "enabled Chat Summaries follow their character conditions, not source-message visibility or personal cutoffs",
   );
   assert.doesNotMatch(
     prompts.at(-1)!,
-    /CORNELIUS_ONLY_SECTION|NARRATOR_ONLY_CONSTANT|PRIVATE_SCENE_SECRET|HISTORY_[0-3]:/u,
+    /PEREGRINE_ONLY_SECTION|NARRATOR_ONLY_CONSTANT|PRIVATE_SCENE_SECRET|HISTORY_[0-3]:/u,
   );
   await chats.updateMessageExtra(summarySource[0]!.id, { hiddenFromAI: false });
   await chats.updateMessageExtra(summarySource[1]!.id, { hiddenFromAICharacterIds: [] });
@@ -252,7 +252,7 @@ try {
   assert(JSON.parse((await chats.getMessage(summarySource[0]!.id))!.extra).hiddenFromAI);
   await generate();
   assert.ok(
-    prompts.at(-1)!.includes("SHARED_CONSTANT_FOR_Tobias"),
+    prompts.at(-1)!.includes("SHARED_CONSTANT_FOR_Maurus"),
     "hiding summarized source messages must retain their enabled constants",
   );
   assert.ok(!prompts.at(-1)!.includes("HISTORY_0:"), "summary-owned hiding still excludes the raw source message");
@@ -316,7 +316,7 @@ try {
   assert.equal(cachedPeek.statusCode, 200, cachedPeek.body);
   assert.equal(cachedPeek.json().source, "cached");
   // #7264: Decision diagnostics follow whose saved prompt is shown, not the chat's first character.
-  assert.equal(cachedPeek.json().characterId, second.id, "Peek Prompt names Tobias as the prompt's character");
+  assert.equal(cachedPeek.json().characterId, second.id, "Peek Prompt names Maurus as the prompt's character");
   assert.ok(!cachedPeek.body.includes("PRIVATE_SCENE_SECRET"));
   const savedRequest = cachedPeek.json().messages;
   await chats.updateMessageExtra(summarySource[0]!.id, {

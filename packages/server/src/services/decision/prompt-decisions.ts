@@ -179,7 +179,7 @@ export function collectTurnDecisionTexts(sources: TurnDecisionSources): string[]
 
 /**
  * The statements `texts` can reach this turn, as written and as resolved. A statement
- * behind a condition already settled without it, like `char == "Leopold"` while the
+ * behind a condition already settled without it, like `char == "Dominic"` while the
  * character is Mira, is left out; anything that could still matter is kept.
  */
 export function reachableDecisionStatements(texts: readonly string[], ctx: MacroContext): Set<string> {

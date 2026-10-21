@@ -43,13 +43,13 @@ const provider = createServer(async (request, response) => {
     assert.match(system.content, /"all" ONLY/);
     const text: string = transcript.content;
     result = {
-      summary: `The compass promise was recorded. ${text.includes("ONLY_TOBIAS") ? "Tobias discussed the absent Cornelius." : "The travelers remembered the compass."}${text.includes("PRIVATE_TOBIAS") ? ' {{#if char == "Tobias"}}TOBIAS_PRIVATE{{/if}}' : ""}`,
-      ...(text.includes("ONLY_TOBIAS")
-        ? { audience: ["tobias"] }
+      summary: `The compass promise was recorded. ${text.includes("ONLY_MAURUS") ? "Maurus discussed the absent Peregrine." : "The travelers remembered the compass."}${text.includes("PRIVATE_MAURUS") ? ' {{#if char == "Maurus"}}MAURUS_PRIVATE{{/if}}' : ""}`,
+      ...(text.includes("ONLY_MAURUS")
+        ? { audience: ["maurus"] }
         : text.includes("EVERYONE_PRESENT")
           ? { audience: "all" }
           : text.includes("BOTH_PRESENT")
-            ? { audience: ["tobias", "cornelius"] }
+            ? { audience: ["maurus", "peregrine"] }
             : text.includes("UNKNOWN_PARTICIPANT")
               ? { audience: ["not-a-chat-character"] }
               : {}),
@@ -92,7 +92,7 @@ try {
   const chat = await chats.create({
     name: "Scene access",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection.id,
   });
   assert(chat);
@@ -101,26 +101,26 @@ try {
     advancedMemory: {
       enabled: true,
       narratorCharacterId: "narrator",
-      knowledgeStarts: { tobias: null, cornelius: null },
+      knowledgeStarts: { maurus: null, peregrine: null },
       retrieveMinMessages: 1,
       retrieveMaxMessages: 3,
       retrieveMaxScenes: 10,
     },
   });
   await chats.createMessagesBatch(chat.id, [
-    { role: "user", content: "ONLY_TOBIAS YunYun and Tobias discuss the absent Cornelius and their compass promise." },
+    { role: "user", content: "ONLY_MAURUS YunYun and Maurus discuss the absent Peregrine and their compass promise." },
     {
       role: "assistant",
       characterId: "narrator",
-      content: "Tobias explains his compass promise. Cornelius is far away.",
+      content: "Maurus explains his compass promise. Peregrine is far away.",
     },
     { role: "user", content: "SCENE_CHANGE USER_ALONE YunYun considers the compass promise alone." },
     { role: "assistant", characterId: "narrator", content: "The compass promise remains a private memory." },
     {
       role: "user",
-      content: "SCENE_CHANGE EVERYONE_PRESENT YunYun, Tobias and Cornelius meet to discuss the compass promise.",
+      content: "SCENE_CHANGE EVERYONE_PRESENT YunYun, Maurus and Peregrine meet to discuss the compass promise.",
     },
-    { role: "assistant", characterId: "tobias", content: "Tobias and Cornelius agree on the compass promise." },
+    { role: "assistant", characterId: "maurus", content: "Maurus and Peregrine agree on the compass promise." },
     { role: "user", content: "SCENE_CHANGE UNKNOWN_PARTICIPANT A stranger holds a compass." },
     { role: "assistant", characterId: "narrator", content: "The stranger recalls a compass promise." },
     {
@@ -151,7 +151,7 @@ try {
     "initial classification scans all globally hidden turns",
   );
   assert(
-    summaryInputs.some((text) => text.includes("ONLY_TOBIAS")),
+    summaryInputs.some((text) => text.includes("ONLY_MAURUS")),
     "hidden participation reaches the summarizer",
   );
   const indexed = (await memory.status(chat.id)).records.filter((record) => record.kind === "excerpt");
@@ -172,12 +172,12 @@ try {
   assert.equal(summaries, 4, "one helper summary per finished scene, with no separate participant call");
   assert.equal(saved.length, 4, "one scene memory, regardless of the number of characters");
   const at = (index: number) => saved.find((record) => record.messageIds.includes(source[index]!.id))!;
-  assert.deepEqual(at(0).audienceCharacterIds, ["tobias"], "discussing Cornelius does not grant Cornelius access");
+  assert.deepEqual(at(0).audienceCharacterIds, ["maurus"], "discussing Peregrine does not grant Peregrine access");
   // YunYun decided on 2026-10-07 (#7184) that a group scene with no listed participants goes to every
   // character, flagged so the user removes anyone who wasn't there. It was narrator-only before.
   assert.deepEqual(
     at(2).audienceCharacterIds,
-    ["tobias", "cornelius"],
+    ["maurus", "peregrine"],
     "a missing audience in a group chat goes to every character, excluding the implicit narrator",
   );
   const flag = (index: number) =>
@@ -188,7 +188,7 @@ try {
   assert.equal(flag(4), undefined, "explicit all is not flagged");
   assert.deepEqual(
     at(4).audienceCharacterIds,
-    ["tobias", "cornelius"],
+    ["maurus", "peregrine"],
     "explicit all expands current characters, excluding the implicit narrator",
   );
   assert.deepEqual(at(6).audienceCharacterIds, [], "unknown model IDs cannot grant access");
@@ -231,8 +231,8 @@ try {
     .where(eq(advancedMemoryRecords.id, unlistedScene.id));
   for (const mode of ["individual", "shared"]) {
     await chats.patchMetadata(chat.id, { groupChatMode: mode });
-    const absent = await recall(["cornelius"]);
-    // Cornelius has the unlisted scene and the "all" scene, never the one Tobias only discussed him in.
+    const absent = await recall(["peregrine"]);
+    // Peregrine has the unlisted scene and the "all" scene, never the one Maurus only discussed him in.
     const assigned = [at(2), at(4)];
     assert.deepEqual(
       absent.receipt.recalledSceneIds,
@@ -251,23 +251,23 @@ try {
     // YunYun decided on 2026-10-07 (#7237) that a merged group recalls what any present character
     // remembers, marked with who does. It needed every present character before. Individual is unchanged.
     assert.deepEqual(
-      (await recall(["tobias", "cornelius", "narrator"])).receipt.recalledSceneIds,
+      (await recall(["maurus", "peregrine", "narrator"])).receipt.recalledSceneIds,
       (mode === "individual" ? assigned : [...assigned, at(0)]).map((record) => record.sceneId),
       "a mixed group cannot use narrator privilege for absent characters",
     );
-    assert.equal((await recall(["tobias"])).receipt.recalledSceneIds.length, 3);
+    assert.equal((await recall(["maurus"])).receipt.recalledSceneIds.length, 3);
   }
   const shared = at(4);
   const row = (await db.select().from(advancedMemoryRecords).where(eq(advancedMemoryRecords.id, shared.id)))[0]!;
   await db
     .update(advancedMemoryRecords)
-    .set({ audienceCharacterIds: '["tobias"]', dependencies: "[]" })
+    .set({ audienceCharacterIds: '["maurus"]', dependencies: "[]" })
     .where(eq(advancedMemoryRecords.id, shared.id));
   await db.insert(advancedMemoryRecords).values({
     ...row,
-    id: "legacy-cornelius",
+    id: "legacy-peregrine",
     dependencies: "[]",
-    audienceCharacterIds: '["cornelius"]',
+    audienceCharacterIds: '["peregrine"]',
     content: "Another compass promise recap.",
   });
   await db
@@ -280,7 +280,7 @@ try {
     [],
     "legacy roster-based audiences grant no character access until reviewed",
   );
-  assert(!(await recall(["cornelius"])).receipt.recalledSceneIds.includes(shared.sceneId));
+  assert(!(await recall(["peregrine"])).receipt.recalledSceneIds.includes(shared.sceneId));
   assert.equal((await recall(["narrator"])).receipt.recalledSceneIds.length, 4);
   assert.equal(summaries, 4, "opening or recalling an old archive never starts background classification");
   const legacyRows = (await db.select().from(advancedMemoryRecords)).filter(
@@ -311,15 +311,15 @@ try {
   saved = await scenes();
   assert.equal(summaries, 5, "explicit preparation checks only the unreviewed scene's participants");
   assert.equal(at(4).content, keptSummary, "access review reuses the paid summary verbatim");
-  assert.deepEqual(at(4).audienceCharacterIds, ["tobias", "cornelius"]);
-  assert((await recall(["cornelius"])).receipt.recalledSceneIds.includes(shared.sceneId));
+  assert.deepEqual(at(4).audienceCharacterIds, ["maurus", "peregrine"]);
+  assert((await recall(["peregrine"])).receipt.recalledSceneIds.includes(shared.sceneId));
   const editId = at(4).id;
   await memory.updateRecord(chat.id, editId, { audienceCharacterIds: [] });
   saved = await scenes();
   assert.deepEqual(at(4).audienceCharacterIds, [], "clearing selection saves narrator-only access");
-  // Cornelius keeps only the unlisted scene, which every character received.
+  // Peregrine keeps only the unlisted scene, which every character received.
   const unlistedOnly = [unlistedScene.sceneId];
-  assert.deepEqual((await recall(["cornelius"])).receipt.recalledSceneIds, unlistedOnly);
+  assert.deepEqual((await recall(["peregrine"])).receipt.recalledSceneIds, unlistedOnly);
   assert.equal((await recall(["narrator"])).receipt.recalledSceneIds.length, 4);
   assert.equal(summaries, 5, "reading/editing legacy access spends no model tokens");
   await memory.initialize(chat.id, { detectScenes: false });
@@ -329,13 +329,13 @@ try {
     0,
     "narrator-only is a complete scene, not a missing character copy",
   );
-  await memory.updateRecord(chat.id, editId, { audienceCharacterIds: ["tobias", "cornelius"] });
+  await memory.updateRecord(chat.id, editId, { audienceCharacterIds: ["maurus", "peregrine"] });
   assert.equal((await scenes()).length, 4, "assigning multiple characters never creates another narrator copy");
-  await chats.updateMessageExtra(source[4]!.id, { hiddenFromAICharacterIds: ["cornelius"] });
+  await chats.updateMessageExtra(source[4]!.id, { hiddenFromAICharacterIds: ["peregrine"] });
   const hidden = await memory.prepare({
     chatId: chat.id,
     messages: await chats.listMessages(chat.id),
-    audienceCharacterIds: ["cornelius"],
+    audienceCharacterIds: ["peregrine"],
     budgetTokens: 12000,
     readOnly: true,
   });
@@ -349,18 +349,18 @@ try {
     content: (await scenes()).find((record) => record.id === editId)!.content,
   });
   assert.deepEqual(
-    (await recall(["cornelius"], await chats.listMessages(chat.id))).receipt.recalledSceneIds,
+    (await recall(["peregrine"], await chats.listMessages(chat.id))).receipt.recalledSceneIds,
     [...unlistedOnly, shared.sceneId],
     "reviewing the recap restores partial scene access",
   );
   for (const messageId of (await scenes()).find((record) => record.id === editId)!.messageIds)
-    await chats.updateMessageExtra(messageId, { hiddenFromAICharacterIds: ["cornelius"] });
+    await chats.updateMessageExtra(messageId, { hiddenFromAICharacterIds: ["peregrine"] });
   assert.deepEqual(
     (
       await memory.prepare({
         chatId: chat.id,
         messages: await chats.listMessages(chat.id),
-        audienceCharacterIds: ["cornelius"],
+        audienceCharacterIds: ["peregrine"],
         budgetTokens: 12000,
         readOnly: true,
       })
@@ -378,11 +378,11 @@ try {
   const historicalChat = await chats.create({
     name: "Previously skipped hidden history",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection.id,
   });
   assert(historicalChat);
-  const knowledgeStarts = { tobias: null, cornelius: null };
+  const knowledgeStarts = { maurus: null, peregrine: null };
   await chats.patchMetadata(historicalChat.id, {
     groupChatMode: "individual",
     advancedMemory: {
@@ -395,16 +395,16 @@ try {
     },
   });
   await chats.createMessagesBatch(historicalChat.id, [
-    { role: "user", content: "ONLY_TOBIAS Tobias makes a compass promise.", extra: { hiddenFromAI: true } },
+    { role: "user", content: "ONLY_MAURUS Maurus makes a compass promise.", extra: { hiddenFromAI: true } },
     { role: "user", content: "SCENE_CHANGE EVERYONE_PRESENT A compass reunion.", extra: { hiddenFromAI: true } },
-    { role: "assistant", characterId: "tobias", content: "Everyone remembers the compass promise." },
+    { role: "assistant", characterId: "maurus", content: "Everyone remembers the compass promise." },
     { role: "user", content: "SCENE_CHANGE What about the compass promise?" },
   ]);
   let history = await chats.listMessages(historicalChat.id);
   const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
   const oldFingerprint = hash([
     advancedMemorySourceFingerprint(history),
-    hash([true, ["tobias", "cornelius", "narrator"], knowledgeStarts, "narrator"]),
+    hash([true, ["maurus", "peregrine", "narrator"], knowledgeStarts, "narrator"]),
     [],
   ]);
   // An old successful scan omitted a hidden scene transition, but saved a later closed boundary.
@@ -477,13 +477,13 @@ try {
   );
   assert.deepEqual(
     recovered[0]!.audienceCharacterIds,
-    ["tobias"],
+    ["maurus"],
     "recovered hidden scenes get their own participants",
   );
   const prepared = await memory.prepare({
     chatId: historicalChat.id,
     messages: history,
-    audienceCharacterIds: ["tobias"],
+    audienceCharacterIds: ["maurus"],
     budgetTokens: 12000,
     readOnly: true,
   });
@@ -503,10 +503,10 @@ try {
   assert.equal(summaries, paidSummaries, "completed summaries are reused");
 
   await chats.createMessagesBatch(historicalChat.id, [
-    { role: "user", content: "SCENE_CHANGE ONLY_TOBIAS Another compass promise.", extra: { hiddenFromAI: true } },
+    { role: "user", content: "SCENE_CHANGE ONLY_MAURUS Another compass promise.", extra: { hiddenFromAI: true } },
     {
       role: "assistant",
-      characterId: "tobias",
+      characterId: "maurus",
       content: "The hidden compass promise is fulfilled.",
       extra: { hiddenFromAI: true },
     },
@@ -526,7 +526,7 @@ try {
       (record) =>
         record.kind === "scene" &&
         record.messageIds.includes(history[5]!.id) &&
-        record.audienceCharacterIds.includes("tobias"),
+        record.audienceCharacterIds.includes("maurus"),
     ),
     "later hidden scenes are summarized and attributed",
   );
@@ -542,7 +542,7 @@ try {
   await chats.createMessage({
     chatId: historicalChat.id,
     role: "user",
-    content: "NEW_HIDDEN_END Tobias fulfills the compass promise.",
+    content: "NEW_HIDDEN_END Maurus fulfills the compass promise.",
     extra: { hiddenFromAI: true },
   });
   history = await chats.listMessages(historicalChat.id);
@@ -577,11 +577,11 @@ try {
   assert.equal(classifiedIds.size, 0, "hiding already classified history does not repeat paid scene decisions");
   assert.equal(summaries, beforeVisibilityChange, "visibility-only edits keep completed summaries");
 
-  // #7237: Cara joins a merged group chat after Tobias and Cornelius made memories. Her ID sorts first,
+  // #7237: Cara joins a merged group chat after Maurus and Peregrine made memories. Her ID sorts first,
   // which used to make her the `char` that every summary condition was checked against.
   for (const [id, name] of [
-    ["tobias", "Tobias"],
-    ["cornelius", "Cornelius"],
+    ["maurus", "Maurus"],
+    ["peregrine", "Peregrine"],
     ["narrator", "Narrator"],
     ["aaa-newcomer", "Cara"],
   ])
@@ -591,14 +591,14 @@ try {
   const group = await chats.create({
     name: "Merged newcomer",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection.id,
   });
   assert(group);
   const groupSettings = {
     enabled: true,
     narratorCharacterId: "narrator",
-    knowledgeStarts: { tobias: null, cornelius: null },
+    knowledgeStarts: { maurus: null, peregrine: null },
     retrieveMinMessages: 1,
     retrieveMaxMessages: 3,
     retrieveMaxScenes: 10,
@@ -609,13 +609,13 @@ try {
     macroVariables: { ready: "yes" },
   });
   await chats.createMessagesBatch(group.id, [
-    { role: "user", content: "ONLY_TOBIAS Tobias buries the compass promise." },
-    { role: "assistant", characterId: "tobias", content: "Tobias hides the compass promise alone." },
+    { role: "user", content: "ONLY_MAURUS Maurus buries the compass promise." },
+    { role: "assistant", characterId: "maurus", content: "Maurus hides the compass promise alone." },
     {
       role: "user",
-      content: "SCENE_CHANGE BOTH_PRESENT PRIVATE_TOBIAS Tobias and Cornelius renew the compass promise.",
+      content: "SCENE_CHANGE BOTH_PRESENT PRIVATE_MAURUS Maurus and Peregrine renew the compass promise.",
     },
-    { role: "assistant", characterId: "cornelius", content: "Cornelius accepts the compass promise." },
+    { role: "assistant", characterId: "peregrine", content: "Peregrine accepts the compass promise." },
     { role: "user", content: "SCENE_CHANGE UNKNOWN_PARTICIPANT A stranger holds a compass." },
     { role: "assistant", characterId: "narrator", content: "The stranger recalls a compass promise." },
     { role: "user", content: "SCENE_CHANGE What about the compass promise?", extra: { isConversationStart: true } },
@@ -626,13 +626,13 @@ try {
     summaryEntries: [
       // Advanced Memory scopes a promoted scene to its participants and the narrator.
       createChatSummaryEntry({
-        content: scopeCharacterSummary("CONST_SHARED The compass promise holds.", ["Tobias", "Cornelius", "Narrator"]),
+        content: scopeCharacterSummary("CONST_SHARED The compass promise holds.", ["Maurus", "Peregrine", "Narrator"]),
         enabled: true,
         messageIds: groupSource.slice(2, 4).map((message) => message.id),
       }),
       createChatSummaryEntry({
         content:
-          'CONST_PLAIN The compass promise. {{#if char == "Tobias" || "Narrator"}}CONST_TOBIAS{{/if}}{{#if char == "Narrator"}}CONST_NARRATOR{{/if}} {{#if char == "Tobias" && getvar::ready == "yes"}}MIXED_SECRET{{/if}}',
+          'CONST_PLAIN The compass promise. {{#if char == "Maurus" || "Narrator"}}CONST_MAURUS{{/if}}{{#if char == "Narrator"}}CONST_NARRATOR{{/if}} {{#if char == "Maurus" && getvar::ready == "yes"}}MIXED_SECRET{{/if}}',
         enabled: true,
         messageIds: groupSource.slice(0, 2).map((message) => message.id),
       }),
@@ -644,7 +644,7 @@ try {
   );
   const sceneAt = (index: number) =>
     groupScenes.find((record) => record.messageIds.includes(groupSource[index]!.id))!.sceneId;
-  const [tobiasOnly, both, narratorOnly] = [sceneAt(0), sceneAt(2), sceneAt(4)];
+  const [maurusOnly, both, narratorOnly] = [sceneAt(0), sceneAt(2), sceneAt(4)];
   const groupRecall = async (audienceCharacterIds: string[], chatId = group.id) =>
     memory.prepare({
       chatId,
@@ -654,17 +654,17 @@ try {
       readOnly: true,
     });
   const sharedSceneExcerpt =
-    /remembered the compass\. \[Known only to Tobias: TOBIAS_PRIVATE\]\n\nExcerpt:\nMessages #3–#4;[^\n]*\n#3 User: [^\n]*\n#4 Cornelius: Cornelius accepts the compass promise\.$/u;
+    /remembered the compass\. \[Known only to Maurus: MAURUS_PRIVATE\]\n\nExcerpt:\nMessages #3–#4;[^\n]*\n#3 User: [^\n]*\n#4 Peregrine: Peregrine accepts the compass promise\.$/u;
   const marked = (prepared: { chatSummary: string | null; recalledScenes: string | null }) =>
     /known only to/iu.test(`${prepared.chatSummary}\n${prepared.recalledScenes}`);
-  // Before anyone joins, a scene only Tobias saw is recalled and marked as his. Shared memories carry no mark.
-  const beforeJoin = await groupRecall(["tobias", "cornelius", "narrator"]);
+  // Before anyone joins, a scene only Maurus saw is recalled and marked as his. Shared memories carry no mark.
+  const beforeJoin = await groupRecall(["maurus", "peregrine", "narrator"]);
   assert.deepEqual(
     new Set(beforeJoin.receipt.recalledSceneIds),
-    new Set([tobiasOnly, both]),
+    new Set([maurusOnly, both]),
     "a merged group recalls what any present character remembers",
   );
-  assert.match(beforeJoin.recalledScenes!, /Scene summary \(known only to Tobias\):\nMessages #1–#2;/u);
+  assert.match(beforeJoin.recalledScenes!, /Scene summary \(known only to Maurus\):\nMessages #1–#2;/u);
   assert.match(
     beforeJoin.recalledScenes!,
     /\n\nScene summary:\nMessages #3–#4;/u,
@@ -680,20 +680,20 @@ try {
   // A condition mixing a name with a variable is checked for each present character.
   assert.match(
     beforeJoin.chatSummary!,
-    /CONST_PLAIN The compass promise\. \[Known only to Tobias: CONST_TOBIAS\] \[Known only to Tobias: MIXED_SECRET\]$/u,
+    /CONST_PLAIN The compass promise\. \[Known only to Maurus: CONST_MAURUS\] \[Known only to Maurus: MIXED_SECRET\]$/u,
   );
   assert(!beforeJoin.chatSummary!.includes("CONST_NARRATOR"), "a mixed group gets no narrator-only knowledge");
 
-  await chats.update(group.id, { characterIds: ["tobias", "cornelius", "narrator", "aaa-newcomer"] });
+  await chats.update(group.id, { characterIds: ["maurus", "peregrine", "narrator", "aaa-newcomer"] });
   await chats.createMessagesBatch(group.id, [
     { role: "assistant", characterId: "aaa-newcomer", content: "Cara arrives and asks about the compass promise." },
     { role: "user", content: "Tell Cara about the compass promise." },
   ]);
   // The merged audience is every chat character, the newcomer included.
-  const afterJoin = await groupRecall(["tobias", "cornelius", "narrator", "aaa-newcomer"]);
+  const afterJoin = await groupRecall(["maurus", "peregrine", "narrator", "aaa-newcomer"]);
   assert.deepEqual(
     new Set(afterJoin.receipt.recalledSceneIds),
-    new Set([tobiasOnly, both]),
+    new Set([maurusOnly, both]),
     "a character who joins later hides no earlier memory",
   );
   assert(!afterJoin.receipt.recalledSceneIds.includes(narratorOnly), "a memory no present character has stays out");
@@ -702,56 +702,56 @@ try {
     new Set(groupSource.slice(0, 4).map((message) => message.id)),
     "a scene with a private section recalls the messages its readers saw (#7269)",
   );
-  assert.match(afterJoin.recalledScenes!, /Scene summary \(known only to Tobias\):\nMessages #1–#2;/u);
-  assert.match(afterJoin.recalledScenes!, /Scene summary \(known only to Tobias, Cornelius\):\nMessages #3–#4;/u);
+  assert.match(afterJoin.recalledScenes!, /Scene summary \(known only to Maurus\):\nMessages #1–#2;/u);
+  assert.match(afterJoin.recalledScenes!, /Scene summary \(known only to Maurus, Peregrine\):\nMessages #3–#4;/u);
   assert.match(afterJoin.recalledScenes!, sharedSceneExcerpt);
   assert.match(
     afterJoin.chatSummary!,
-    /\n\[Known only to Tobias, Cornelius: CONST_SHARED The compass promise holds\.\]\n/u,
+    /\n\[Known only to Maurus, Peregrine: CONST_SHARED The compass promise holds\.\]\n/u,
     "summary conditions are never checked as the newcomer",
   );
   assert.match(
     afterJoin.chatSummary!,
-    /CONST_PLAIN The compass promise\. \[Known only to Tobias: CONST_TOBIAS\] \[Known only to Tobias: MIXED_SECRET\]$/u,
+    /CONST_PLAIN The compass promise\. \[Known only to Maurus: CONST_MAURUS\] \[Known only to Maurus: MIXED_SECRET\]$/u,
     "a mixed condition is not checked as the newcomer either",
   );
   assert(!afterJoin.chatSummary!.includes("CONST_NARRATOR"), "a mixed group gets no narrator-only knowledge");
   assert(!/known only to[^\n\]]*Cara/iu.test(`${afterJoin.chatSummary}${afterJoin.recalledScenes}`));
   // A reply pinned to one character (an @mention or a regeneration) keeps its single-reader rendering.
-  for (const id of ["tobias", "cornelius", "aaa-newcomer", "narrator"])
+  for (const id of ["maurus", "peregrine", "aaa-newcomer", "narrator"])
     assert(!marked(await groupRecall([id])), `${id}: one reader needs no marks`);
-  // Messages hidden from Cornelius stay out of the shared live history, but Tobias still remembers them.
-  const hiddenFromCornelius = [0, 2].map((index) => groupSource[index]!.id);
-  for (const id of hiddenFromCornelius) await chats.updateMessageExtra(id, { hiddenFromAICharacterIds: ["cornelius"] });
-  const partlyHidden = await groupRecall(["tobias", "cornelius", "narrator", "aaa-newcomer"]);
+  // Messages hidden from Peregrine stay out of the shared live history, but Maurus still remembers them.
+  const hiddenFromPeregrine = [0, 2].map((index) => groupSource[index]!.id);
+  for (const id of hiddenFromPeregrine) await chats.updateMessageExtra(id, { hiddenFromAICharacterIds: ["peregrine"] });
+  const partlyHidden = await groupRecall(["maurus", "peregrine", "narrator", "aaa-newcomer"]);
   assert.deepEqual(
     new Set(partlyHidden.receipt.recalledSceneIds),
-    new Set([tobiasOnly, both]),
+    new Set([maurusOnly, both]),
     "a scene stays recalled while a present character who remembers it may read its sources",
   );
   assert.match(
     partlyHidden.recalledScenes!,
-    /Scene summary \(known only to Tobias\):\nMessages #3–#4;/u,
+    /Scene summary \(known only to Maurus\):\nMessages #3–#4;/u,
     "a reader some of the scene was hidden from is not named as remembering it",
   );
-  assert.match(partlyHidden.recalledScenes!, /known only to Tobias\):\nMessages #1–#2;[^]*\n#1 User: ONLY_TOBIAS/u);
-  for (const id of hiddenFromCornelius) await chats.updateMessageExtra(id, { hiddenFromAICharacterIds: [] });
-  // Messages excluded from Cornelius's excerpts still show in a scene only Tobias remembers,
-  // while messages excluded from Tobias's own excerpts stay out of it.
-  const tobiasOnlyIds = groupSource.slice(0, 2).map((message) => message.id);
+  assert.match(partlyHidden.recalledScenes!, /known only to Maurus\):\nMessages #1–#2;[^]*\n#1 User: ONLY_MAURUS/u);
+  for (const id of hiddenFromPeregrine) await chats.updateMessageExtra(id, { hiddenFromAICharacterIds: [] });
+  // Messages excluded from Peregrine's excerpts still show in a scene only Maurus remembers,
+  // while messages excluded from Maurus's own excerpts stay out of it.
+  const maurusOnlyIds = groupSource.slice(0, 2).map((message) => message.id);
   const excerptRow = (await db.select().from(advancedMemoryRecords)).find(
-    (record) => record.sceneId === tobiasOnly && record.kind === "excerpt",
+    (record) => record.sceneId === maurusOnly && record.kind === "excerpt",
   )!;
-  assert.equal(excerptRow.messageIds, JSON.stringify(tobiasOnlyIds));
-  // The shared scene's excerpt (#3–#4) is untouched by these exclusions of the Tobias-only scene (#7269).
+  assert.equal(excerptRow.messageIds, JSON.stringify(maurusOnlyIds));
+  // The shared scene's excerpt (#3–#4) is untouched by these exclusions of the Maurus-only scene (#7269).
   const bothIds = groupSource.slice(2, 4).map((message) => message.id);
   for (const [reader, expected, message] of [
     [
-      "cornelius",
-      [...tobiasOnlyIds, ...bothIds],
+      "peregrine",
+      [...maurusOnlyIds, ...bothIds],
       "an exclusion for a character who doesn't remember the scene leaves its excerpt alone",
     ],
-    ["tobias", bothIds, "a message excluded for the scene's own reader never shows in its excerpt"],
+    ["maurus", bothIds, "a message excluded for the scene's own reader never shows in its excerpt"],
   ] as const) {
     await db.insert(advancedMemoryRecords).values({
       ...excerptRow,
@@ -759,8 +759,8 @@ try {
       audienceCharacterIds: JSON.stringify([reader]),
       enabled: 0,
     });
-    const excluded = await groupRecall(["tobias", "cornelius", "narrator", "aaa-newcomer"]);
-    assert.deepEqual(new Set(excluded.receipt.recalledSceneIds), new Set([tobiasOnly, both]));
+    const excluded = await groupRecall(["maurus", "peregrine", "narrator", "aaa-newcomer"]);
+    assert.deepEqual(new Set(excluded.receipt.recalledSceneIds), new Set([maurusOnly, both]));
     assert.deepEqual(new Set(excluded.receipt.recalledMessageIds), new Set(expected), message);
     await db.delete(advancedMemoryRecords).where(eq(advancedMemoryRecords.id, `excluded-for-${reader}`));
   }
@@ -776,67 +776,67 @@ try {
   const duo = await chats.create({
     name: "Merged narrator duo",
     mode: "roleplay",
-    characterIds: ["tobias", "aa-narrator"],
+    characterIds: ["maurus", "aa-narrator"],
     connectionId: connection.id,
   });
   assert(duo);
   await chats.patchMetadata(duo.id, {
     groupChatMode: "merged",
-    advancedMemory: { ...groupSettings, narratorCharacterId: "aa-narrator", knowledgeStarts: { tobias: null } },
+    advancedMemory: { ...groupSettings, narratorCharacterId: "aa-narrator", knowledgeStarts: { maurus: null } },
   });
   await chats.createMessagesBatch(duo.id, [
-    { role: "user", content: "ONLY_TOBIAS PRIVATE_TOBIAS Tobias buries the compass promise." },
-    { role: "assistant", characterId: "tobias", content: "Tobias hides the compass promise alone." },
+    { role: "user", content: "ONLY_MAURUS PRIVATE_MAURUS Maurus buries the compass promise." },
+    { role: "assistant", characterId: "maurus", content: "Maurus hides the compass promise alone." },
     { role: "user", content: "SCENE_CHANGE What about the compass promise?", extra: { isConversationStart: true } },
   ]);
   await chats.patchMetadata(duo.id, {
     summaryEntries: [
       createChatSummaryEntry({
-        content: 'DUO_PLAIN {{#if char == "Narrator"}}DUO_NARRATOR{{/if}}{{#if char == "Tobias"}}DUO_TOBIAS{{/if}}',
+        content: 'DUO_PLAIN {{#if char == "Narrator"}}DUO_NARRATOR{{/if}}{{#if char == "Maurus"}}DUO_MAURUS{{/if}}',
         enabled: true,
         messageIds: (await chats.listMessages(duo.id)).slice(0, 2).map((message) => message.id),
       }),
     ],
   });
   await memory.initialize(duo.id);
-  const duoRecall = await groupRecall(["aa-narrator", "tobias"], duo.id);
-  assert.match(duoRecall.chatSummary!, /\nDUO_PLAIN DUO_TOBIAS$/u, "the duo's summary is read as Tobias");
-  // Tobias saw both messages, so the private section no longer withholds the excerpt (#7269).
-  assert.match(duoRecall.recalledScenes!, /Tobias discussed the absent Cornelius\. TOBIAS_PRIVATE\n\nExcerpt:\n/u);
+  const duoRecall = await groupRecall(["aa-narrator", "maurus"], duo.id);
+  assert.match(duoRecall.chatSummary!, /\nDUO_PLAIN DUO_MAURUS$/u, "the duo's summary is read as Maurus");
+  // Maurus saw both messages, so the private section no longer withholds the excerpt (#7269).
+  assert.match(duoRecall.recalledScenes!, /Maurus discussed the absent Peregrine\. MAURUS_PRIVATE\n\nExcerpt:\n/u);
   assert(!/DUO_NARRATOR/u.test(duoRecall.chatSummary!), "a narrator-only section stays out");
 
   // Individual group chats recall per responder exactly as before #7237.
   const joinedAt = (await chats.listMessages(group.id)).at(-2)!.id;
   await chats.patchMetadata(group.id, {
     groupChatMode: "individual",
-    advancedMemory: { ...groupSettings, knowledgeStarts: { tobias: null, cornelius: null, "aaa-newcomer": joinedAt } },
+    advancedMemory: { ...groupSettings, knowledgeStarts: { maurus: null, peregrine: null, "aaa-newcomer": joinedAt } },
   });
   const range = (span: string, source = true) =>
     `Messages #${span}; ${source ? "source timeframe (summary corrections take precedence)" : "story timeframe"}: unknown (use message order).`;
   const intro =
     "Included below are recalled memories of scenes from the past chat history, together with small message excerpts from them. Present message range in the context is: #7–#9, with the last user message being #9.";
   const sharedRecap = `Scene summary:\n${range("3–#4")}\nThe compass promise was recorded. The travelers remembered the compass.`;
-  // Both saw #3–#4, so each quotes it despite Tobias's private recap section (#7269). PRIVATE_TOBIAS is
-  // only the fixture's cue to write that section; the message itself was visible to Cornelius.
-  const sharedExcerpt = `\n\nExcerpt:\n${range("3–#4", false)}\n#3 User: SCENE_CHANGE BOTH_PRESENT PRIVATE_TOBIAS Tobias and Cornelius renew the compass promise.\n#4 Cornelius: Cornelius accepts the compass promise.`;
-  const tobias = await groupRecall(["tobias"]);
+  // Both saw #3–#4, so each quotes it despite Maurus's private recap section (#7269). PRIVATE_MAURUS is
+  // only the fixture's cue to write that section; the message itself was visible to Peregrine.
+  const sharedExcerpt = `\n\nExcerpt:\n${range("3–#4", false)}\n#3 User: SCENE_CHANGE BOTH_PRESENT PRIVATE_MAURUS Maurus and Peregrine renew the compass promise.\n#4 Peregrine: Peregrine accepts the compass promise.`;
+  const maurus = await groupRecall(["maurus"]);
   assert.equal(
-    tobias.chatSummary,
-    `${range("3–#4")}\nCONST_SHARED The compass promise holds.\n\n${range("1–#2")}\nCONST_PLAIN The compass promise. CONST_TOBIAS MIXED_SECRET`,
+    maurus.chatSummary,
+    `${range("3–#4")}\nCONST_SHARED The compass promise holds.\n\n${range("1–#2")}\nCONST_PLAIN The compass promise. CONST_MAURUS MIXED_SECRET`,
   );
   assert.equal(
-    tobias.recalledScenes,
-    `${intro}\n\nScene summary:\n${range("1–#2")}\nThe compass promise was recorded. Tobias discussed the absent Cornelius.\n\nExcerpt:\n${range("1–#2", false)}\n#1 User: ONLY_TOBIAS Tobias buries the compass promise.\n#2 Tobias: Tobias hides the compass promise alone.\n\n${sharedRecap} TOBIAS_PRIVATE${sharedExcerpt}`,
+    maurus.recalledScenes,
+    `${intro}\n\nScene summary:\n${range("1–#2")}\nThe compass promise was recorded. Maurus discussed the absent Peregrine.\n\nExcerpt:\n${range("1–#2", false)}\n#1 User: ONLY_MAURUS Maurus buries the compass promise.\n#2 Maurus: Maurus hides the compass promise alone.\n\n${sharedRecap} MAURUS_PRIVATE${sharedExcerpt}`,
   );
-  const cornelius = await groupRecall(["cornelius"]);
+  const peregrine = await groupRecall(["peregrine"]);
   assert.equal(
-    cornelius.chatSummary,
+    peregrine.chatSummary,
     `${range("3–#4")}\nCONST_SHARED The compass promise holds.\n\n${range("1–#2")}\nCONST_PLAIN The compass promise.`,
   );
-  assert.equal(cornelius.recalledScenes, `${intro}\n\n${sharedRecap}${sharedExcerpt}`);
+  assert.equal(peregrine.recalledScenes, `${intro}\n\n${sharedRecap}${sharedExcerpt}`);
   const cara = await groupRecall(["aaa-newcomer"]);
   assert.equal(cara.recalledScenes, null, "an individual newcomer recalls nothing from before joining");
-  assert(!/CONST_SHARED|CONST_TOBIAS|MIXED_SECRET/u.test(cara.chatSummary ?? ""));
+  assert(!/CONST_SHARED|CONST_MAURUS|MIXED_SECRET/u.test(cara.chatSummary ?? ""));
 
   // A summary whose sections all render empty for its reader adds nothing, not even its range header. The one
   // Cara reads covers only #1–#2, from before she joined, so it shows her no range or date of those (#7454).
@@ -853,8 +853,8 @@ try {
     tokens: receipt.estimatedTokensAfter,
   });
   for (const [mode, audiences] of [
-    ["individual", [["tobias"], ["cornelius"], ["aaa-newcomer"]]],
-    ["merged", [["tobias", "cornelius", "narrator", "aaa-newcomer"], ["tobias", "cornelius", "narrator"], ["tobias"]]],
+    ["individual", [["maurus"], ["peregrine"], ["aaa-newcomer"]]],
+    ["merged", [["maurus", "peregrine", "narrator", "aaa-newcomer"], ["maurus", "peregrine", "narrator"], ["maurus"]]],
   ] as const) {
     await chats.patchMetadata(group.id, { groupChatMode: mode, summaryEntries: groupEntries });
     const without = [];
@@ -876,42 +876,42 @@ try {
   // #7454: the narrator alone reads every character's section once and plain, also one whose condition leaves
   // the narrator out or names a character who left the chat. A condition with a variable still decides as usual.
   const othersNote = createChatSummaryEntry({
-    content: '{{#if char == "Cornelius"}}CORNELIUS_ONLY_NOTE{{/if}} {{#if char == "Cyno"}}LEFT_CHAT_NOTE{{/if}}',
+    content: '{{#if char == "Peregrine"}}PEREGRINE_ONLY_NOTE{{/if}} {{#if char == "Cyno"}}LEFT_CHAT_NOTE{{/if}}',
     enabled: true,
     messageIds: groupSource.slice(4, 6).map((message) => message.id),
   });
   await chats.patchMetadata(group.id, { summaryEntries: [...groupEntries, narratorNote, othersNote] });
   const narratorView = (await groupRecall(["narrator"])).chatSummary!;
-  for (const text of ["CONST_TOBIAS", "CONST_NARRATOR", "NARRATOR_ONLY_NOTE", "CORNELIUS_ONLY_NOTE", "LEFT_CHAT_NOTE"])
+  for (const text of ["CONST_MAURUS", "CONST_NARRATOR", "NARRATOR_ONLY_NOTE", "PEREGRINE_ONLY_NOTE", "LEFT_CHAT_NOTE"])
     assert.equal(narratorView.split(text).length, 2, `the narrator reads ${text} once`);
   assert.doesNotMatch(narratorView, /MIXED_SECRET|\{\{|Known only/u);
   assert.doesNotMatch(
-    (await groupRecall(["tobias"])).chatSummary!,
-    /CORNELIUS_ONLY_NOTE|LEFT_CHAT_NOTE|CONST_NARRATOR/u,
+    (await groupRecall(["maurus"])).chatSummary!,
+    /PEREGRINE_ONLY_NOTE|LEFT_CHAT_NOTE|CONST_NARRATOR/u,
   );
   // {{char}} in a character's section names that character for the narrator, and branches no reader got
   // together are not glued together.
   const charNote = createChatSummaryEntry({
     content:
-      '{{#if char == "Tobias"}}{{char}} buried the brass key.{{/if}} {{#if char == "Cornelius"}}{{char}} sold the ledger.{{/if}} {{#if char == "Tobias"}}EMPTY_SIDE.{{else}}FULL_SIDE.{{/if}}',
+      '{{#if char == "Maurus"}}{{char}} buried the brass key.{{/if}} {{#if char == "Peregrine"}}{{char}} sold the ledger.{{/if}} {{#if char == "Maurus"}}EMPTY_SIDE.{{else}}FULL_SIDE.{{/if}}',
     enabled: true,
     messageIds: groupSource.slice(4, 6).map((message) => message.id),
   });
   await chats.patchMetadata(group.id, { summaryEntries: [...groupEntries, narratorNote, othersNote, charNote] });
   assert.match(
     (await groupRecall(["narrator"])).chatSummary!,
-    /\nTobias buried the brass key\. Cornelius sold the ledger\. EMPTY_SIDE\. FULL_SIDE\.$/u,
+    /\nMaurus buried the brass key\. Peregrine sold the ledger\. EMPTY_SIDE\. FULL_SIDE\.$/u,
   );
-  assert.match((await groupRecall(["tobias"])).chatSummary!, /\nTobias buried the brass key\. {2}EMPTY_SIDE\.$/u);
+  assert.match((await groupRecall(["maurus"])).chatSummary!, /\nMaurus buried the brass key\. {2}EMPTY_SIDE\.$/u);
   // A merged prompt the narrator shares with the characters keeps marking who knows what (#7237).
   await chats.patchMetadata(group.id, { groupChatMode: "merged" });
-  const sharedView = (await groupRecall(["tobias", "cornelius", "narrator"])).chatSummary!;
-  assert.match(sharedView, /\[Known only to Cornelius: CORNELIUS_ONLY_NOTE\]/u);
+  const sharedView = (await groupRecall(["maurus", "peregrine", "narrator"])).chatSummary!;
+  assert.match(sharedView, /\[Known only to Peregrine: PEREGRINE_ONLY_NOTE\]/u);
   assert.doesNotMatch(sharedView, /LEFT_CHAT_NOTE|CONST_NARRATOR/u);
   // A section on lines of its own for someone else leaves no empty line, in every reading (YunYun, 2026-10-14).
   const linesNote = createChatSummaryEntry({
     content:
-      'LINES_OPEN\n\n{{#if char == "Tobias"}}\n{{char}} kept LINES_TOBIAS.\n{{/if}}\n\n{{#if char == "Cornelius"}}\nLINES_CORNELIUS\n{{/if}}\n\nLINES_CLOSE',
+      'LINES_OPEN\n\n{{#if char == "Maurus"}}\n{{char}} kept LINES_MAURUS.\n{{/if}}\n\n{{#if char == "Peregrine"}}\nLINES_PEREGRINE\n{{/if}}\n\nLINES_CLOSE',
     enabled: true,
     messageIds: groupSource.slice(4, 6).map((message) => message.id),
   });
@@ -921,33 +921,33 @@ try {
     return view.slice(view.lastIndexOf("LINES_OPEN"));
   };
   assert.equal(
-    await linesOf(["tobias", "cornelius", "narrator"]),
-    "LINES_OPEN\n\n[Known only to Tobias: Tobias kept LINES_TOBIAS.]\n\n[Known only to Cornelius: LINES_CORNELIUS]\n\nLINES_CLOSE",
+    await linesOf(["maurus", "peregrine", "narrator"]),
+    "LINES_OPEN\n\n[Known only to Maurus: Maurus kept LINES_MAURUS.]\n\n[Known only to Peregrine: LINES_PEREGRINE]\n\nLINES_CLOSE",
     "a merged reply marks each section on its own lines",
   );
   await chats.patchMetadata(group.id, { groupChatMode: "individual" });
-  assert.equal(await linesOf(["tobias"]), "LINES_OPEN\n\nTobias kept LINES_TOBIAS.\n\nLINES_CLOSE");
-  assert.equal(await linesOf(["cornelius"]), "LINES_OPEN\n\nLINES_CORNELIUS\n\nLINES_CLOSE");
+  assert.equal(await linesOf(["maurus"]), "LINES_OPEN\n\nMaurus kept LINES_MAURUS.\n\nLINES_CLOSE");
+  assert.equal(await linesOf(["peregrine"]), "LINES_OPEN\n\nLINES_PEREGRINE\n\nLINES_CLOSE");
   assert.equal(await linesOf(["aaa-newcomer"]), "LINES_OPEN\n\nLINES_CLOSE", "a reader with no section");
   assert.equal(
     await linesOf(["narrator"]),
-    "LINES_OPEN\n\nTobias kept LINES_TOBIAS.\n\nLINES_CORNELIUS\n\nLINES_CLOSE",
+    "LINES_OPEN\n\nMaurus kept LINES_MAURUS.\n\nLINES_PEREGRINE\n\nLINES_CLOSE",
     "the narrator reads every section",
   );
   // A summary that ends with a section no reader gets, or is only sections, still meets the next one with a
   // single blank line in a merged reply.
   const trailNotes = [
     'TRAIL_OPEN {{user}}.\n\n{{#if char == "Cyno"}}\nTRAIL_HIDDEN\n{{/if}}',
-    '{{#if char == "Tobias"}}\nTRAIL_TOBIAS\n{{/if}}\n{{#if char == "Cyno"}}\nTRAIL_HIDDEN\n{{/if}}',
+    '{{#if char == "Maurus"}}\nTRAIL_MAURUS\n{{/if}}\n{{#if char == "Cyno"}}\nTRAIL_HIDDEN\n{{/if}}',
     "TRAIL_NEXT",
   ].map((content, index) =>
     createChatSummaryEntry({ content, enabled: true, messageIds: [groupSource[3 + index]!.id] }),
   );
   await chats.patchMetadata(group.id, { groupChatMode: "merged", summaryEntries: [...groupEntries, ...trailNotes] });
-  const trailView = (await groupRecall(["tobias", "cornelius", "narrator"])).chatSummary!;
+  const trailView = (await groupRecall(["maurus", "peregrine", "narrator"])).chatSummary!;
   assert.match(
     trailView,
-    /\nTRAIL_OPEN [^\n]+\.\n\nMessages #5–#5; [^\n]+\n\[Known only to Tobias: TRAIL_TOBIAS\]\n\nMessages #6–#6; [^\n]+\nTRAIL_NEXT/u,
+    /\nTRAIL_OPEN [^\n]+\.\n\nMessages #5–#5; [^\n]+\n\[Known only to Maurus: TRAIL_MAURUS\]\n\nMessages #6–#6; [^\n]+\nTRAIL_NEXT/u,
   );
   assert.doesNotMatch(trailView, /TRAIL_HIDDEN/u);
   // A paragraph of back-to-back sections that all hide leaves one blank line, as the Chat Summary does.
@@ -962,9 +962,9 @@ try {
     const view = (await groupRecall(audience)).chatSummary!;
     return view.slice(view.lastIndexOf("BACK_OPEN"));
   };
-  assert.equal(await backOf(["tobias", "cornelius", "narrator"]), "BACK_OPEN\n\nBACK_CLOSE", "merged readers");
+  assert.equal(await backOf(["maurus", "peregrine", "narrator"]), "BACK_OPEN\n\nBACK_CLOSE", "merged readers");
   await chats.patchMetadata(group.id, { groupChatMode: "individual" });
-  assert.equal(await backOf(["tobias"]), "BACK_OPEN\n\nBACK_CLOSE", "a single reader");
+  assert.equal(await backOf(["maurus"]), "BACK_OPEN\n\nBACK_CLOSE", "a single reader");
   await chats.patchMetadata(group.id, { groupChatMode: "individual", summaryEntries: [...groupEntries, narratorNote] });
   // A story date keeps the header only for characters who read part of that range, never for a newcomer.
   await chats.updateMessageContent(groupSource[2]!.id, `Date: June 12\n${groupSource[2]!.content}`);
@@ -974,61 +974,61 @@ try {
     "CONST_PLAIN The compass promise.",
     "no dated header for scenes Cara never read",
   );
-  assert.match((await groupRecall(["cornelius"])).chatSummary!, /\n\nMessages #5–#6; [^\n]+: June 13\.\n$/u);
+  assert.match((await groupRecall(["peregrine"])).chatSummary!, /\n\nMessages #5–#6; [^\n]+: June 13\.\n$/u);
   // A one-character chat drops an entry written only for someone else, and keeps its own unchanged.
   const solo = await chats.create({
     name: "Solo empty summary",
     mode: "roleplay",
-    characterIds: ["tobias"],
+    characterIds: ["maurus"],
     connectionId: connection.id,
   });
   assert(solo);
   await chats.patchMetadata(solo.id, {
-    advancedMemory: { ...groupSettings, narratorCharacterId: null, knowledgeStarts: { tobias: null } },
+    advancedMemory: { ...groupSettings, narratorCharacterId: null, knowledgeStarts: { maurus: null } },
   });
   await chats.createMessagesBatch(solo.id, [
-    { role: "user", content: "ONLY_TOBIAS Tobias buries the compass promise." },
-    { role: "assistant", characterId: "tobias", content: "Tobias hides the compass promise alone." },
+    { role: "user", content: "ONLY_MAURUS Maurus buries the compass promise." },
+    { role: "assistant", characterId: "maurus", content: "Maurus hides the compass promise alone." },
     { role: "user", content: "SCENE_CHANGE What about the compass promise?", extra: { isConversationStart: true } },
   ]);
   const soloIds = (await chats.listMessages(solo.id)).slice(0, 2).map((message) => message.id);
   const soloOwn = createChatSummaryEntry({
-    content: 'SOLO_PLAIN {{#if char == "Tobias"}}SOLO_TOBIAS{{/if}}',
+    content: 'SOLO_PLAIN {{#if char == "Maurus"}}SOLO_MAURUS{{/if}}',
     enabled: true,
     messageIds: soloIds,
   });
   await chats.patchMetadata(solo.id, { summaryEntries: [soloOwn] });
   await memory.initialize(solo.id);
-  const soloWithout = promptOf(await groupRecall(["tobias"], solo.id));
-  assert.equal(soloWithout.chatSummary, `${range("1–#2")}\nSOLO_PLAIN SOLO_TOBIAS`);
+  const soloWithout = promptOf(await groupRecall(["maurus"], solo.id));
+  assert.equal(soloWithout.chatSummary, `${range("1–#2")}\nSOLO_PLAIN SOLO_MAURUS`);
   await chats.patchMetadata(solo.id, {
     summaryEntries: [
       createChatSummaryEntry({
-        content: '{{#if char == "Cornelius"}}SOLO_ABSENT{{/if}}',
+        content: '{{#if char == "Peregrine"}}SOLO_ABSENT{{/if}}',
         enabled: true,
         messageIds: soloIds,
       }),
       soloOwn,
     ],
   });
-  assert.deepEqual(promptOf(await groupRecall(["tobias"], solo.id)), soloWithout, "no header for an absent reader");
+  assert.deepEqual(promptOf(await groupRecall(["maurus"], solo.id)), soloWithout, "no header for an absent reader");
 
   // A recap with a private section still gets excerpts, quoting only what each reader saw in the chat (#7269).
   // Whispers live in message extra data and never reach an excerpt.
   const lantern = await chats.create({
     name: "Private-section excerpts",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection.id,
   });
   assert(lantern);
   await chats.patchMetadata(lantern.id, { groupChatMode: "individual", advancedMemory: groupSettings });
-  const whisperToTobias = (text: string) => ({
+  const whisperToMaurus = (text: string) => ({
     roleplayCommandActivity: [
       {
-        command: { type: "whisper", character: "Tobias", text },
-        raw: `[whisper: character="Tobias" text="${text}"]`,
-        whisperRecipient: { id: "tobias", kind: "character" },
+        command: { type: "whisper", character: "Maurus", text },
+        raw: `[whisper: character="Maurus" text="${text}"]`,
+        whisperRecipient: { id: "maurus", kind: "character" },
       },
     ],
   });
@@ -1036,20 +1036,20 @@ try {
     {
       role: "user",
       content:
-        'BOTH_PRESENT PRIVATE_TOBIAS Tobias and Cornelius light the lantern. [whisper: character="Tobias" text="USER_WHISPER_SECRET"]',
-      extra: whisperToTobias("USER_WHISPER_SECRET"),
+        'BOTH_PRESENT PRIVATE_MAURUS Maurus and Peregrine light the lantern. [whisper: character="Maurus" text="USER_WHISPER_SECRET"]',
+      extra: whisperToMaurus("USER_WHISPER_SECRET"),
     },
     {
       role: "assistant",
-      characterId: "tobias",
-      content: "HIDDEN_FROM_CORNELIUS Tobias pockets the lantern key.",
-      extra: { hiddenFromAICharacterIds: ["cornelius"] },
+      characterId: "maurus",
+      content: "HIDDEN_FROM_PEREGRINE Maurus pockets the lantern key.",
+      extra: { hiddenFromAICharacterIds: ["peregrine"] },
     },
     {
       role: "assistant",
-      characterId: "cornelius",
-      content: "Cornelius carries the lantern home.",
-      extra: whisperToTobias("CHARACTER_WHISPER_SECRET"),
+      characterId: "peregrine",
+      content: "Peregrine carries the lantern home.",
+      extra: whisperToMaurus("CHARACTER_WHISPER_SECRET"),
     },
     { role: "user", content: "SCENE_CHANGE What about the lantern?", extra: { isConversationStart: true } },
   ]);
@@ -1057,58 +1057,58 @@ try {
   const [lit, pocketed, carried] = (await chats.listMessages(lantern.id)).map((message) => message.id);
   const whispers = /USER_WHISPER_SECRET|CHARACTER_WHISPER_SECRET|\[whisper/u;
   for (const [reader, expected, label] of [
-    ["tobias", [lit, pocketed, carried], "Tobias quotes every message he saw"],
-    ["cornelius", [lit, carried], "a message hidden from Cornelius never appears in his excerpt"],
+    ["maurus", [lit, pocketed, carried], "Maurus quotes every message he saw"],
+    ["peregrine", [lit, carried], "a message hidden from Peregrine never appears in his excerpt"],
     ["narrator", [lit, pocketed, carried], "the narrator still quotes the whole scene"],
   ] as const) {
     const recalled = await groupRecall([reader], lantern.id);
     assert.deepEqual(recalled.receipt.recalledMessageIds, expected, `individual: ${label}`);
     assert(!recalled.receipt.reasons.some((reason) => reason.startsWith("excerpt-")), `${reader}: nothing is missing`);
-    assert.equal(recalled.recalledScenes!.includes("HIDDEN_FROM_CORNELIUS"), reader !== "cornelius");
-    if (reader !== "narrator") assert.equal(recalled.recalledScenes!.includes("TOBIAS_PRIVATE"), reader === "tobias");
-    if (reader === "cornelius")
+    assert.equal(recalled.recalledScenes!.includes("HIDDEN_FROM_PEREGRINE"), reader !== "peregrine");
+    if (reader !== "narrator") assert.equal(recalled.recalledScenes!.includes("MAURUS_PRIVATE"), reader === "maurus");
+    if (reader === "peregrine")
       assert.doesNotMatch(recalled.recalledScenes!, whispers, "no whisper for a non-recipient");
   }
   // A merged reply speaks for everyone who remembers the scene, so it quotes only what all of them saw.
   await chats.patchMetadata(lantern.id, { groupChatMode: "merged" });
-  const mergedLantern = await groupRecall(["tobias", "cornelius", "narrator"], lantern.id);
+  const mergedLantern = await groupRecall(["maurus", "peregrine", "narrator"], lantern.id);
   assert.deepEqual(
     mergedLantern.receipt.recalledMessageIds,
     [lit, carried],
     "merged: only messages every character who remembers the scene saw",
   );
-  assert.match(mergedLantern.recalledScenes!, /\[Known only to Tobias: TOBIAS_PRIVATE\]\n\nExcerpt:\n/u);
-  assert.doesNotMatch(mergedLantern.recalledScenes!, /HIDDEN_FROM_CORNELIUS/u);
+  assert.match(mergedLantern.recalledScenes!, /\[Known only to Maurus: MAURUS_PRIVATE\]\n\nExcerpt:\n/u);
+  assert.doesNotMatch(mergedLantern.recalledScenes!, /HIDDEN_FROM_PEREGRINE/u);
   assert.doesNotMatch(mergedLantern.recalledScenes!, whispers, "merged: no whisper for the non-recipients");
   // A one-character chat follows the same rule for its only character.
   const soloLantern = await chats.create({
     name: "Solo private-section excerpt",
     mode: "roleplay",
-    characterIds: ["tobias"],
+    characterIds: ["maurus"],
     connectionId: connection.id,
   });
   assert(soloLantern);
   await chats.patchMetadata(soloLantern.id, {
-    advancedMemory: { ...groupSettings, narratorCharacterId: null, knowledgeStarts: { tobias: null } },
+    advancedMemory: { ...groupSettings, narratorCharacterId: null, knowledgeStarts: { maurus: null } },
   });
   await chats.createMessagesBatch(soloLantern.id, [
-    { role: "user", content: "PRIVATE_TOBIAS Tobias lights the solo lantern." },
+    { role: "user", content: "PRIVATE_MAURUS Maurus lights the solo lantern." },
     {
       role: "user",
-      content: "SOLO_HIDDEN A note kept from Tobias.",
-      extra: { hiddenFromAICharacterIds: ["tobias"] },
+      content: "SOLO_HIDDEN A note kept from Maurus.",
+      extra: { hiddenFromAICharacterIds: ["maurus"] },
     },
-    { role: "user", content: "Tobias keeps the solo lantern lit." },
+    { role: "user", content: "Maurus keeps the solo lantern lit." },
     { role: "user", content: "SCENE_CHANGE What about the solo lantern?", extra: { isConversationStart: true } },
   ]);
   await memory.initialize(soloLantern.id);
   const soloLanternIds = (await chats.listMessages(soloLantern.id)).map((message) => message.id);
-  const soloRecall = await groupRecall(["tobias"], soloLantern.id);
-  assert.match(soloRecall.recalledScenes!, /TOBIAS_PRIVATE\n\nExcerpt:\n/u);
+  const soloRecall = await groupRecall(["maurus"], soloLantern.id);
+  assert.match(soloRecall.recalledScenes!, /MAURUS_PRIVATE\n\nExcerpt:\n/u);
   assert.deepEqual(
     soloRecall.receipt.recalledMessageIds,
     [soloLanternIds[0], soloLanternIds[2]],
-    "one-character chat: only the messages Tobias saw",
+    "one-character chat: only the messages Maurus saw",
   );
   assert.doesNotMatch(soloRecall.recalledScenes!, /SOLO_HIDDEN/u);
   console.log(

@@ -65,13 +65,13 @@ try {
     const chat = await chats.create({
       name,
       mode: "roleplay",
-      characterIds: ["tobias"],
+      characterIds: ["maurus"],
       connectionId: connection.id,
     });
     assert(chat);
     await chats.createMessagesBatch(chat.id, [
       { role: "user", content: "The early promise." },
-      { role: "assistant", characterId: "tobias", content: "The middle journey." },
+      { role: "assistant", characterId: "maurus", content: "The middle journey." },
       { role: "user", content: "The late reunion." },
       { role: "user", content: "The current scene.", extra: { isConversationStart: true } },
     ]);

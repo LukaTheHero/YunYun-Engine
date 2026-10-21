@@ -77,7 +77,7 @@ assert.equal(
 const mixedHistory = [
   { id: "checkpoint", role: "assistant" },
   { id: "persona", role: "user", personaId: "mari" },
-  { id: "character", role: "assistant", characterId: "leopold", extra: { hiddenFromAICharacterIds: ["narrator"] } },
+  { id: "character", role: "assistant", characterId: "dominic", extra: { hiddenFromAICharacterIds: ["narrator"] } },
 ];
 const mixedCadence = {
   ...base,

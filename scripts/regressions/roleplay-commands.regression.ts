@@ -755,8 +755,8 @@ assert.equal(
 
 const diceCharacters: { id: string; name: string; rpgStats?: RPGStatsConfig }[] = [
   {
-    id: "leopold",
-    name: "Leopold",
+    id: "dominic",
+    name: "Dominic",
     rpgStats: {
       enabled: true,
       hp: { value: 10, max: 10 },
@@ -770,7 +770,7 @@ const diceCharacters: { id: string; name: string; rpgStats?: RPGStatsConfig }[] 
   { id: "mari", name: "YunYun" },
 ];
 const dice = (args: Record<string, unknown>) =>
-  prepareRoleplayRoll({ notation: "d20", character: "Leopold", ...args }, diceCharacters, "mari");
+  prepareRoleplayRoll({ notation: "d20", character: "Dominic", ...args }, diceCharacters, "mari");
 assert.equal(dice({ attribute: "Strength" }).notation, "d20+1");
 assert.equal(dice({ attribute: "STR", notation: "d20+2" }).notation, "d20+3");
 assert.equal(dice({ attribute: "DEX" }).notation, "d20-1");
@@ -782,7 +782,7 @@ assert.equal(
   prepareRoleplayRoll(
     { notation: "d20", attribute: "STR" },
     [{ ...diceCharacters[0]!, rpgStats: { ...diceCharacters[0]!.rpgStats!, enabled: false } }],
-    "leopold",
+    "dominic",
   ).notation,
   "d20",
 );
@@ -790,9 +790,9 @@ assert.throws(() => dice({ character: "Nobody", attribute: "Strength" }), /one c
 assert.throws(
   () =>
     prepareRoleplayRoll(
-      { character: "Leopold", notation: "d20" },
-      [...diceCharacters, { id: "copy", name: "Leopold" }],
-      "leopold",
+      { character: "Dominic", notation: "d20" },
+      [...diceCharacters, { id: "copy", name: "Dominic" }],
+      "dominic",
     ),
   /one chat participant/u,
 );
@@ -803,7 +803,7 @@ assert.throws(() => dice({ notation: "1d20+9007199254740971", attribute: "STR" }
 const executeRoll = async (args: Record<string, unknown>) => {
   const [result] = await executeToolCalls(
     [{ id: "roll", type: "function", function: { name: "roll_dice", arguments: JSON.stringify(args) } }],
-    { prepareDiceRoll: (input) => prepareRoleplayRoll(input, diceCharacters, "leopold") },
+    { prepareDiceRoll: (input) => prepareRoleplayRoll(input, diceCharacters, "dominic") },
   );
   assert.ok(result);
   return { ...result, payload: JSON.parse(result.result) };
@@ -817,12 +817,12 @@ try {
     [0, 0, 5, true],
   ] as const) {
     const command = parseRoleplayCommands(
-      `[roll: character="Leopold" notation="d20+3" attribute="STR" modifier="${modifier >= 0 ? "+" : ""}${modifier}" dc="${dc}"]`,
+      `[roll: character="Dominic" notation="d20+3" attribute="STR" modifier="${modifier >= 0 ? "+" : ""}${modifier}" dc="${dc}"]`,
     ).roll?.command;
     assert.ok(command);
     assert.equal(command.modifier, modifier);
     assert.equal(command.dc, dc);
-    for (const args of [command, { notation: "d20+3", character: "Leopold", attribute: "STR", modifier, dc }]) {
+    for (const args of [command, { notation: "d20+3", character: "Dominic", attribute: "STR", modifier, dc }]) {
       const result = await executeRoll(args);
       assert.equal(result.success, true);
       assert.equal(result.payload.total, total);
@@ -870,8 +870,8 @@ try {
 }
 // #7481: with Advanced Memory, a new Roleplay reply is saved as one message per scene or POV break.
 assert.deepEqual(
-  splitAtSceneBreaks("CYNO waits alone.\n\n***\n\nMARI and TOBIAS run."),
-  ["CYNO waits alone.", "***\n\nMARI and TOBIAS run."],
+  splitAtSceneBreaks("CYNO waits alone.\n\n***\n\nMARI and MAURUS run."),
+  ["CYNO waits alone.", "***\n\nMARI and MAURUS run."],
   "the break line opens the next part",
 );
 for (const line of ["---", "___", "* * *", "- - -", "_ _ _\t", "*****", "   ***"])
@@ -908,15 +908,15 @@ assert.deepEqual(
   "a closed element, a self-closing tag or a void element doesn't stop a split",
 );
 assert.deepEqual(
-  splitAtSceneBreaks("Cyno, <b>alone\n***\nYunYun asks <name>.\n---\nTobias <i>thinks"),
-  ["Cyno, <b>alone", "***\nYunYun asks <name>.", "---\nTobias <i>thinks"],
+  splitAtSceneBreaks("Cyno, <b>alone\n***\nYunYun asks <name>.\n---\nMaurus <i>thinks"),
+  ["Cyno, <b>alone", "***\nYunYun asks <name>.", "---\nMaurus <i>thinks"],
   "an unclosed inline tag or an angle-bracket placeholder doesn't stop later splits",
 );
 
 // A command is placed after the text before it, even when cleanup stripped a "Name:" from the reply's start.
-assert.equal(placeAfterPrefix("Tobias reads alone.\n\n***\n\nOn.", "Tobias reads alone."), 19);
-assert.equal(placeAfterPrefix("Tobias reads alone.\n\n***\n\nOn.", "Tobias Whiskers: Tobias reads alone."), 19);
-assert.equal(placeAfterPrefix("Tobias reads.\nTobias reads.", "Tobias Whiskers: Tobias reads."), null, "never a guess");
+assert.equal(placeAfterPrefix("Maurus reads alone.\n\n***\n\nOn.", "Maurus reads alone."), 19);
+assert.equal(placeAfterPrefix("Maurus reads alone.\n\n***\n\nOn.", "Maurus Whiskers: Maurus reads alone."), 19);
+assert.equal(placeAfterPrefix("Maurus reads.\nMaurus reads.", "Maurus Whiskers: Maurus reads."), null, "never a guess");
 
 // Each command stays with the part its text was in, so it keeps that part's audience.
 {

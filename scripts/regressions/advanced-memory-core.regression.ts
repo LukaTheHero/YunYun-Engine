@@ -394,9 +394,9 @@ try {
   await memory.validatePrepared(privateChat.id, beforeHistoricalPolicy, alicePast.receipt);
 
   const hiddenSceneChat = await chats.create({
-    name: "Cornelius-only hidden scene",
+    name: "Peregrine-only hidden scene",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection!.id,
   });
   assert(hiddenSceneChat);
@@ -406,20 +406,20 @@ try {
       ...DEFAULT_ADVANCED_MEMORY_SETTINGS,
       enabled: true,
       narratorCharacterId: "narrator",
-      knowledgeStarts: { tobias: null, cornelius: null },
+      knowledgeStarts: { maurus: null, peregrine: null },
     },
   });
   await chats.createMessagesBatch(hiddenSceneChat.id, [
     {
       role: "user",
-      content: "Cornelius enters the private office alone.",
-      extra: { hiddenFromAICharacterIds: ["tobias"] },
+      content: "Peregrine enters the private office alone.",
+      extra: { hiddenFromAICharacterIds: ["maurus"] },
     },
     {
       role: "assistant",
-      characterId: "cornelius",
-      content: "CORNELIUS_PRIVATE_SECRET: The ledger belongs to Cornelius.",
-      extra: { hiddenFromAICharacterIds: ["tobias"] },
+      characterId: "peregrine",
+      content: "PEREGRINE_PRIVATE_SECRET: The ledger belongs to Peregrine.",
+      extra: { hiddenFromAICharacterIds: ["maurus"] },
     },
     { role: "user", content: "SCENE_CHANGE Everyone meets at the compass shop." },
   ]);
@@ -428,27 +428,27 @@ try {
   const privateRecaps = (await memory.status(hiddenSceneChat.id)).records.filter(
     (record) => record.kind === "scene" && record.content && record.status === "closed",
   );
-  assert(privateRecaps.some((record) => record.audienceCharacterIds.includes("cornelius")));
+  assert(privateRecaps.some((record) => record.audienceCharacterIds.includes("peregrine")));
   assert(
-    privateRecaps.every((record) => !record.audienceCharacterIds.includes("tobias")),
-    "initial processing must never assign a fully hidden Cornelius scene to Tobias",
+    privateRecaps.every((record) => !record.audienceCharacterIds.includes("maurus")),
+    "initial processing must never assign a fully hidden Peregrine scene to Maurus",
   );
-  const tobiasRecall = await memory.prepare({
+  const maurusRecall = await memory.prepare({
     chatId: hiddenSceneChat.id,
     messages: hiddenSceneSource,
-    audienceCharacterIds: ["tobias"],
+    audienceCharacterIds: ["maurus"],
     budgetTokens: 3000,
     readOnly: true,
   });
-  assert.equal(tobiasRecall.recalledScenes, null);
-  assert.equal(tobiasRecall.recalledMessages, null);
-  assert.deepEqual(tobiasRecall.messageIds, [hiddenSceneSource[2]!.id]);
+  assert.equal(maurusRecall.recalledScenes, null);
+  assert.equal(maurusRecall.recalledMessages, null);
+  assert.deepEqual(maurusRecall.messageIds, [hiddenSceneSource[2]!.id]);
 
   await assert.rejects(
     memory.updateRecord(
       hiddenSceneChat.id,
-      privateRecaps.find((record) => record.audienceCharacterIds.includes("cornelius"))!.id,
-      { audienceCharacterIds: ["tobias"] },
+      privateRecaps.find((record) => record.audienceCharacterIds.includes("peregrine"))!.id,
+      { audienceCharacterIds: ["maurus"] },
     ),
     /hidden from a selected character/,
     "manual scene access cannot bypass hidden source messages",
@@ -456,7 +456,7 @@ try {
   const audienceChat = await chats.create({
     name: "POV shifts preserve editable memories",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius", "narrator"],
+    characterIds: ["maurus", "peregrine", "narrator"],
     connectionId: connection!.id,
   });
   assert(audienceChat);
@@ -469,7 +469,7 @@ try {
         index === 6
           ? { isConversationStart: true }
           : index === 7
-            ? { conversationStartForCharacterIds: ["cornelius"] }
+            ? { conversationStartForCharacterIds: ["peregrine"] }
             : undefined,
     })),
   );
@@ -480,7 +480,7 @@ try {
       ...DEFAULT_ADVANCED_MEMORY_SETTINGS,
       enabled: true,
       narratorCharacterId: "narrator",
-      knowledgeStarts: { tobias: null, cornelius: audienceSource[2]!.id },
+      knowledgeStarts: { maurus: null, peregrine: audienceSource[2]!.id },
       retrieveMinMessages: 1,
       retrieveMaxMessages: 3,
     },
@@ -491,15 +491,15 @@ try {
       record.kind === "scene" &&
       record.content &&
       record.messageIds.includes(audienceSource[3]!.id) &&
-      record.audienceCharacterIds.includes("cornelius"),
+      record.audienceCharacterIds.includes("peregrine"),
   )!;
   assert(editable, "the initial archive includes scenes between confirmed knowledge and a later personal cutoff");
   const requestCount = requests.length;
-  await memory.updateRecord(audienceChat.id, editable.id, { audienceCharacterIds: ["tobias"] });
-  const repaired = await memory.updateRecord(audienceChat.id, editable.id, { audienceCharacterIds: ["cornelius"] });
+  await memory.updateRecord(audienceChat.id, editable.id, { audienceCharacterIds: ["maurus"] });
+  const repaired = await memory.updateRecord(audienceChat.id, editable.id, { audienceCharacterIds: ["peregrine"] });
   assert.equal(requests.length, requestCount, "audience corrections make no model or embedding calls");
   const repairedScene = repaired.records.find((record) => record.id === editable.id)!;
-  assert.deepEqual(repairedScene.audienceCharacterIds, ["cornelius"]);
+  assert.deepEqual(repairedScene.audienceCharacterIds, ["peregrine"]);
   assert.equal(repairedScene.content, editable.content);
   assert.equal(repairedScene.embeddingStatus, "vectorized", "audience-only edits reuse the existing vector");
   const recallFor = (id: string) =>
@@ -510,19 +510,19 @@ try {
       budgetTokens: 4000,
       readOnly: true,
     });
-  const corneliusRecall = await recallFor("cornelius");
+  const peregrineRecall = await recallFor("peregrine");
   assert.deepEqual(
-    corneliusRecall.messageIds,
+    peregrineRecall.messageIds,
     audienceSource.slice(7).map((message) => message.id),
     "personal flags still trim live messages",
   );
-  assert(corneliusRecall.receipt.recalledSceneIds.includes(editable.sceneId));
+  assert(peregrineRecall.receipt.recalledSceneIds.includes(editable.sceneId));
   assert(
-    corneliusRecall.receipt.recalledMessageIds.some((id) => editable.messageIds.includes(id)),
+    peregrineRecall.receipt.recalledMessageIds.some((id) => editable.messageIds.includes(id)),
     "existing indexed excerpts are reusable for a corrected, eligible audience",
   );
   assert(
-    !(await recallFor("tobias")).receipt.recalledSceneIds.includes(editable.sceneId),
+    !(await recallFor("maurus")).receipt.recalledSceneIds.includes(editable.sceneId),
     "removed audience loses access immediately",
   );
   assert(
@@ -536,14 +536,14 @@ try {
     beforeMaintenance,
     "maintenance preserves the correction without generating replacement summaries",
   );
-  assert(!(await recallFor("tobias")).receipt.recalledSceneIds.includes(editable.sceneId));
-  assert((await recallFor("cornelius")).receipt.recalledSceneIds.includes(editable.sceneId));
+  assert(!(await recallFor("maurus")).receipt.recalledSceneIds.includes(editable.sceneId));
+  assert((await recallFor("peregrine")).receipt.recalledSceneIds.includes(editable.sceneId));
   await memory.updateRecord(audienceChat.id, editable.id, {
-    audienceCharacterIds: ["tobias", "cornelius"],
+    audienceCharacterIds: ["maurus", "peregrine"],
     content: "CORRECTED_GOLD compass promise.",
   });
   assert(
-    (await recallFor("tobias")).receipt.recalledSceneIds.includes(editable.sceneId),
+    (await recallFor("maurus")).receipt.recalledSceneIds.includes(editable.sceneId),
     "granting access again clears the earlier exclusion",
   );
   await assert.rejects(
@@ -561,7 +561,7 @@ try {
   await memory.reindex(audienceChat.id);
   const reindexedScene = (await memory.status(audienceChat.id)).records.find((record) => record.id === editable.id);
   assert.equal(reindexedScene?.content, editedContent, "reindex preserves manual summary text");
-  assert.deepEqual(reindexedScene?.audienceCharacterIds, ["tobias", "cornelius"]);
+  assert.deepEqual(reindexedScene?.audienceCharacterIds, ["maurus", "peregrine"]);
   assert.equal(reindexedScene?.embeddingStatus, "vectorized");
   assert(
     requests.slice(beforeReindexRequests).every((request) => request.kind === "embedding"),
@@ -1059,9 +1059,9 @@ try {
   assert(requests.slice(reindexRequests).every((request) => request.kind === "embedding"));
 
   const accessCorrectionChat = await chats.create({
-    name: "Correcting a scene from Tobias to Cornelius",
+    name: "Correcting a scene from Maurus to Peregrine",
     mode: "roleplay",
-    characterIds: ["tobias", "cornelius"],
+    characterIds: ["maurus", "peregrine"],
     connectionId: connection!.id,
   });
   assert(accessCorrectionChat);
@@ -1074,7 +1074,7 @@ try {
     groupChatMode: "individual",
     advancedMemory: {
       ...dependencySettings,
-      knowledgeStarts: { tobias: null, cornelius: accessSource[3]!.id },
+      knowledgeStarts: { maurus: null, peregrine: accessSource[3]!.id },
     },
     summaryEntries: sourceMetadata.summaryEntries.map((entry: Record<string, unknown>) => ({
       ...entry,
@@ -1083,10 +1083,10 @@ try {
   });
   await memory.initialize(accessCorrectionChat.id);
   const accessScene = (await memory.status(accessCorrectionChat.id)).records.find(
-    (record) => record.kind === "scene" && record.content && record.audienceCharacterIds.includes("tobias"),
+    (record) => record.kind === "scene" && record.content && record.audienceCharacterIds.includes("maurus"),
   )!;
   assert(accessScene.dependencies.length > 0);
-  await memory.updateSettings(accessCorrectionChat.id, { knowledgeStarts: { tobias: null, cornelius: null } });
+  await memory.updateSettings(accessCorrectionChat.id, { knowledgeStarts: { maurus: null, peregrine: null } });
   const accessMetadata = JSON.parse((await chats.getById(accessCorrectionChat.id))!.metadata);
   await chats.patchMetadata(accessCorrectionChat.id, {
     summaryEntries: accessMetadata.summaryEntries.map((entry: Record<string, unknown>) => ({
@@ -1094,14 +1094,14 @@ try {
       enabled: false,
     })),
   });
-  await memory.updateRecord(accessCorrectionChat.id, accessScene.id, { audienceCharacterIds: ["cornelius"] });
+  await memory.updateRecord(accessCorrectionChat.id, accessScene.id, { audienceCharacterIds: ["peregrine"] });
   const beforeAccessReindex = requests.length;
   await memory.reindex(accessCorrectionChat.id);
   const indexedAccessScene = (await memory.status(accessCorrectionChat.id)).records.find(
     (record) => record.id === accessScene.id,
   )!;
   assert.equal(indexedAccessScene.content, accessScene.content, "an audience-only correction preserves summary text");
-  assert.deepEqual(indexedAccessScene.audienceCharacterIds, ["cornelius"]);
+  assert.deepEqual(indexedAccessScene.audienceCharacterIds, ["peregrine"]);
   assert.equal(indexedAccessScene.embeddingStatus, "vectorized");
   assert(requests.slice(beforeAccessReindex).every((request) => request.kind === "embedding"));
   await memory.initialize(accessCorrectionChat.id);
@@ -1110,10 +1110,10 @@ try {
     accessScene.content,
     "later preparation also preserves the corrected scene",
   );
-  await chats.updateMessageExtra(accessSource[0]!.id, { hiddenFromAICharacterIds: ["cornelius"] });
+  await chats.updateMessageExtra(accessSource[0]!.id, { hiddenFromAICharacterIds: ["peregrine"] });
   await memory.updateRecord(accessCorrectionChat.id, accessScene.id, { content: accessScene.content });
   for (const messageId of accessScene.messageIds)
-    await chats.updateMessageExtra(messageId, { hiddenFromAICharacterIds: ["cornelius"] });
+    await chats.updateMessageExtra(messageId, { hiddenFromAICharacterIds: ["peregrine"] });
   await assert.rejects(
     memory.updateRecord(accessCorrectionChat.id, accessScene.id, { content: accessScene.content }),
     /no longer available to its selected characters/,
