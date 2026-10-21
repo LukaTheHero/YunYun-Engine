@@ -324,7 +324,7 @@ try {
     maxTokensOverride: 1024,
     embeddingModel: "fixture-embedding",
   });
-  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Dottore" }));
+  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Leopold" }));
   assert.ok(character);
   const chat = await chats.create({
     name: "Scene cadence",
@@ -912,7 +912,7 @@ try {
     chatId: turnsChat.id,
     role: "assistant",
     characterId: character.id,
-    content: "Dottore remembers the silver compass.",
+    content: "Leopold remembers the silver compass.",
     extra: { advancedMemoryReceipt: { reasons: ["decision-recall"], decisionRecall: ownRecall } },
   });
   await chats.createMessage({
@@ -931,8 +931,8 @@ try {
     assert.equal(response.statusCode, 200, response.body);
     return response.json().prompt.decisionDebug.advancedMemory?.recall;
   };
-  assert.equal(await inspectRecall(newcomer.id), undefined, "Cyno is not shown Dottore's recalled scenes");
-  assert.deepEqual(await inspectRecall(character.id), ownRecall, "Dottore still sees his own recall");
+  assert.equal(await inspectRecall(newcomer.id), undefined, "Cyno is not shown Leopold's recalled scenes");
+  assert.deepEqual(await inspectRecall(character.id), ownRecall, "Leopold still sees his own recall");
   // {{prompt}} opens Peek Prompt with no reply selected: the latest reply's saved prompt names its character.
   const turns = await chats.listMessages(turnsChat.id);
   const cynoPrepared = await memory.prepare({
@@ -953,7 +953,7 @@ try {
   assert.equal(calls.length, callsBeforeInspection, "inspecting either character calls no provider");
   // An inactive character's preview falls back to an active one, but recall stays the inspected character's own.
   await chats.patchMetadata(turnsChat.id, { inactiveCharacterIds: [newcomer.id] });
-  assert.equal(await inspectRecall(newcomer.id), undefined, "an inactive Cyno is not shown Dottore's recall either");
+  assert.equal(await inspectRecall(newcomer.id), undefined, "an inactive Cyno is not shown Leopold's recall either");
   assert.equal(calls.length, callsBeforeInspection, "inspecting an inactive character calls no provider");
   closeLatestScene = false;
 
@@ -1411,7 +1411,7 @@ try {
     calls.map((call) => call.kind),
     ["summary"],
   );
-  assert.match(JSON.stringify(calls[0]!.messages), /Dottore CHAR_CONSTANT/u);
+  assert.match(JSON.stringify(calls[0]!.messages), /Leopold CHAR_CONSTANT/u);
 
   const largeConstants = [{ ...beforeConstants[0], content: "CONSTANTS_ONLY_SOURCE ".repeat(1500) }];
   assert(estimateChatSummaryTokens(largeConstants[0].content) > 7000);
@@ -1585,7 +1585,7 @@ try {
     assert.equal(active.rangeStartIndex, ranged ? 1 : undefined, "legacy summaries acquire no invented coverage");
   }
   const privateCharacters = await Promise.all(
-    ["Maukie", "Pantalone"].map((name) => createCharactersStorage(db).create(characterDataSchema.parse({ name }))),
+    ["Tobias", "Cornelius"].map((name) => createCharactersStorage(db).create(characterDataSchema.parse({ name }))),
   );
   const [privateA, privateB] = privateCharacters;
   assert(privateA && privateB);
@@ -1614,7 +1614,7 @@ try {
   const privateEntries = ["PRIVATE_A_CONSTANT ", "PRIVATE_B_CONSTANT "].map((content, index) =>
     createChatSummaryEntry({
       id: `private-${index}`,
-      content: `{{#if char == "${index === 0 ? "Maukie" : "Pantalone"}"}}${content.repeat(1100)}{{/if}}`,
+      content: `{{#if char == "${index === 0 ? "Tobias" : "Cornelius"}"}}${content.repeat(1100)}{{/if}}`,
       enabled: true,
       rangeStartIndex: index + 1,
       rangeEndIndex: index + 1,
@@ -1635,13 +1635,13 @@ try {
   await memory.checkScenesAfterGeneration(privateChat.id, { blocking: false });
   assert.deepEqual(calls, [], "separate 5k character constants do not jointly exceed a 7k per-view share");
   // Entries with no text for a character add nothing to that character's share, as they add nothing to recall.
-  const maukieFill = "MAUKIE_ONLY ".repeat(2326);
-  const maukieShare = estimateChatSummaryTokens(`${maukieFill}\n\nMAUKIE_TAIL`);
-  assert(maukieShare <= 7000 && maukieShare + 20 > 7000, "Maukie's entries sit just under the 7k share");
+  const tobiasFill = "TOBIAS_ONLY ".repeat(2326);
+  const tobiasShare = estimateChatSummaryTokens(`${tobiasFill}\n\nTOBIAS_TAIL`);
+  assert(tobiasShare <= 7000 && tobiasShare + 20 > 7000, "Tobias's entries sit just under the 7k share");
   await chats.patchMetadata(privateChat.id, {
     summaryEntries: [
       createChatSummaryEntry({
-        content: `{{#if char == "Maukie"}}${maukieFill}{{/if}}`,
+        content: `{{#if char == "Tobias"}}${tobiasFill}{{/if}}`,
         enabled: true,
         rangeStartIndex: 1,
         rangeEndIndex: 1,
@@ -1649,14 +1649,14 @@ try {
       // 40 entries joined by blank lines would add 20 estimated tokens.
       ...Array.from({ length: 40 }, () =>
         createChatSummaryEntry({
-          content: '{{#if char == "Pantalone"}}PANTALONE_NOTE{{/if}}',
+          content: '{{#if char == "Cornelius"}}CORNELIUS_NOTE{{/if}}',
           enabled: true,
           rangeStartIndex: 2,
           rangeEndIndex: 2,
         }),
       ),
       createChatSummaryEntry({
-        content: '{{#if char == "Maukie"}}MAUKIE_TAIL{{/if}}',
+        content: '{{#if char == "Tobias"}}TOBIAS_TAIL{{/if}}',
         enabled: true,
         rangeStartIndex: 1,
         rangeEndIndex: 1,
@@ -1664,10 +1664,10 @@ try {
     ],
   });
   await memory.checkScenesAfterGeneration(privateChat.id, { blocking: false });
-  assert.deepEqual(calls, [], "another character's entries do not push Maukie over his share");
+  assert.deepEqual(calls, [], "another character's entries do not push Tobias over his share");
   await chats.patchMetadata(privateChat.id, {
     summaryEntries: [
-      { ...privateEntries[0], content: `{{#if char == "Maukie"}}${"PRIVATE_A_CONSTANT ".repeat(1700)}{{/if}}` },
+      { ...privateEntries[0], content: `{{#if char == "Tobias"}}${"PRIVATE_A_CONSTANT ".repeat(1700)}{{/if}}` },
       privateEntries[1],
     ],
   });
@@ -1682,7 +1682,7 @@ try {
     privateEntries[1],
   );
   const compactedPrivate = privateAfter.find((entry: { id: string }) => !entry.id.startsWith("private-"));
-  assert.match(compactedPrivate.content, /^\{\{#if char == "Maukie"\}\}/u);
+  assert.match(compactedPrivate.content, /^\{\{#if char == "Tobias"\}\}/u);
   for (const [id, expected, excluded] of [
     [privateA.id, "ARCHIVED_RECAP", "PRIVATE_B_CONSTANT"],
     [privateB.id, "PRIVATE_B_CONSTANT", "ARCHIVED_RECAP"],
@@ -1715,7 +1715,7 @@ try {
   });
   const template = createChatSummaryEntry({
     id: "character-template",
-    content: `{{#if char == "Maukie"}}${"MAUKIE_SECTION ".repeat(150)}{{/if}}\n{{#if char == "Pantalone"}}${"PANTALONE_SECTION ".repeat(150)}{{/if}}`,
+    content: `{{#if char == "Tobias"}}${"TOBIAS_SECTION ".repeat(150)}{{/if}}\n{{#if char == "Cornelius"}}${"CORNELIUS_SECTION ".repeat(150)}{{/if}}`,
     enabled: true,
     rangeStartIndex: 1,
     rangeEndIndex: 1,
@@ -1745,17 +1745,17 @@ try {
   // #7454: a summary written by hand with a section per character goes to the Helper too, with its conditions.
   // This answer drops those sections, so it is not saved; retried in halves, the other summary is shortened alone.
   assert.equal(calls.length, 3);
-  assert.match(calls[0]!.messages[1]!.content, /\{\{#if char == "Maukie"\}\}MAUKIE_SECTION[\s\S]*STABLE_CONSTANT/u);
+  assert.match(calls[0]!.messages[1]!.content, /\{\{#if char == "Tobias"\}\}TOBIAS_SECTION[\s\S]*STABLE_CONSTANT/u);
   assert.match(JSON.stringify(calls[2]!.messages), /STABLE_CONSTANT/u);
-  assert.doesNotMatch(JSON.stringify(calls[2]!.messages), /MAUKIE_SECTION|PANTALONE_SECTION/u);
+  assert.doesNotMatch(JSON.stringify(calls[2]!.messages), /TOBIAS_SECTION|CORNELIUS_SECTION/u);
   const macroAfter = JSON.parse((await chats.getById(macroChat.id))!.metadata).summaryEntries;
   assert.deepEqual(
     macroAfter.find((entry: { id: string }) => entry.id === template.id),
     template,
   );
   for (const [id, expected, excluded] of [
-    [privateA.id, "MAUKIE_SECTION", "PANTALONE_SECTION"],
-    [privateB.id, "PANTALONE_SECTION", "MAUKIE_SECTION"],
+    [privateA.id, "TOBIAS_SECTION", "CORNELIUS_SECTION"],
+    [privateB.id, "CORNELIUS_SECTION", "TOBIAS_SECTION"],
   ]) {
     const prepared = await memory.prepare({
       chatId: macroChat.id,
@@ -1785,10 +1785,10 @@ try {
   assert.equal(calls.length, 3);
   assert.match(
     calls[0]!.messages[1]!.content,
-    /\{\{#if char == "Maukie"\}\}MAUKIE_SECTION[\s\S]*\{\{#if char == "Pantalone"\}\}PANTALONE_SECTION/u,
+    /\{\{#if char == "Tobias"\}\}TOBIAS_SECTION[\s\S]*\{\{#if char == "Cornelius"\}\}CORNELIUS_SECTION/u,
     "shared-mode compaction must not resolve a mixed-POV template as only the first character",
   );
-  assert.doesNotMatch(JSON.stringify(calls[2]!.messages), /MAUKIE_SECTION|PANTALONE_SECTION/u);
+  assert.doesNotMatch(JSON.stringify(calls[2]!.messages), /TOBIAS_SECTION|CORNELIUS_SECTION/u);
   assert.deepEqual(
     JSON.parse((await chats.getById(macroChat.id))!.metadata).summaryEntries.find(
       (entry: { id: string }) => entry.id === template.id,
@@ -1801,7 +1801,7 @@ try {
   // Its {{char}} keeps it out of combining (#7454), so it still fills most of each view.
   const tightTemplate = {
     ...template,
-    content: `{{#if char == "Maukie"}}${"A".repeat(6803 * 4)}{{/if}}\n{{#if char == "Pantalone"}}${"B".repeat(6803 * 4)}{{/if}}\n{{char}} remembers.`,
+    content: `{{#if char == "Tobias"}}${"A".repeat(6803 * 4)}{{/if}}\n{{#if char == "Cornelius"}}${"B".repeat(6803 * 4)}{{/if}}\n{{char}} remembers.`,
   };
   const longConstant = createChatSummaryEntry({
     id: "two-thousand-word-constant",
@@ -1913,20 +1913,20 @@ try {
     id: "kept-range",
     origin: "manual",
     enabled: true,
-    content: '{{#if char == "Dottore"}}EXISTING_RANGE_CORRECTION{{/if}}',
+    content: '{{#if char == "Leopold"}}EXISTING_RANGE_CORRECTION{{/if}}',
     sourceMode: "range",
     rangeStartIndex: 1,
     rangeEndIndex: 2,
   });
   await chats.patchMetadata(partialChat.id, { summaryEntries: [manual] });
   await memory.initialize(partialChat.id);
-  const maukieManual = createChatSummaryEntry({
+  const tobiasManual = createChatSummaryEntry({
     ...manual,
-    id: "maukie-kept-range",
-    content: '{{#if char == "Maukie"}}MAUKIE_RANGE_CORRECTION{{/if}}',
+    id: "tobias-kept-range",
+    content: '{{#if char == "Tobias"}}TOBIAS_RANGE_CORRECTION{{/if}}',
     rangeEndIndex: 1,
   });
-  await chats.patchMetadata(partialChat.id, { summaryEntries: [manual, maukieManual] });
+  await chats.patchMetadata(partialChat.id, { summaryEntries: [manual, tobiasManual] });
   const partialSource = await chats.listMessages(partialChat.id);
   const beforeAddition = await memory.prepare({
     chatId: partialChat.id,
@@ -1938,13 +1938,13 @@ try {
   summaryFinishReason = "error";
   await assert.rejects(memory.checkScenesAfterGeneration(partialChat.id), /summary model.*complete/u);
   const afterFailure = JSON.parse((await chats.getById(partialChat.id))!.metadata).summaryEntries;
-  assert.deepEqual(afterFailure.slice(0, 2), [manual, maukieManual]);
+  assert.deepEqual(afterFailure.slice(0, 2), [manual, tobiasManual]);
   // The scene's constant that needs no Helper call is saved first, so the failed re-summary of a partly
   // covered copy doesn't hold it back.
-  assert.equal(afterFailure.length, 3, "Pantalone's constant is saved before the failed call");
+  assert.equal(afterFailure.length, 3, "Cornelius's constant is saved before the failed call");
   assert.match(
     afterFailure[2].content,
-    /^\{\{#if char == "Pantalone"\}\}/u,
+    /^\{\{#if char == "Cornelius"\}\}/u,
     "a failed new-range summary is not added to Chat Summaries",
   );
   assert.equal(afterFailure[2].rangeStartIndex, 1);
@@ -1965,16 +1965,16 @@ try {
   assert.equal(
     calls.filter((call) => JSON.stringify(call.messages).includes("ALREADY_COVERED_B")).length,
     1,
-    "Maukie still needs the second message; Dottore's existing range already covers it",
+    "Tobias still needs the second message; Leopold's existing range already covers it",
   );
   const addedEntries = JSON.parse((await chats.getById(partialChat.id))!.metadata).summaryEntries;
   assert.equal(addedEntries.length, 5);
   assert.deepEqual(addedEntries[0], manual, "pre-existing ranged constants remain intact");
-  assert.deepEqual(addedEntries[1], maukieManual);
+  assert.deepEqual(addedEntries[1], tobiasManual);
   for (const [name, start] of [
-    ["Dottore", 3],
-    ["Maukie", 2],
-    ["Pantalone", 1],
+    ["Leopold", 3],
+    ["Tobias", 2],
+    ["Cornelius", 1],
   ] as const) {
     const added = addedEntries
       .slice(2)
@@ -1999,8 +1999,8 @@ try {
     "manual activation changes still invalidate a saved swipe",
   );
 
-  // #7454: a scene with a message hidden from Pantalone becomes one constant for everyone who reads its recap,
-  // not a copy per reader, so the narrator, who reads every section, gets the scene once. Pantalone's prompt
+  // #7454: a scene with a message hidden from Cornelius becomes one constant for everyone who reads its recap,
+  // not a copy per reader, so the narrator, who reads every section, gets the scene once. Cornelius's prompt
   // still shows only the range and text he may read.
   const whisperChat = await chats.create({
     name: "Whispered scene, one constant",
@@ -2027,7 +2027,7 @@ try {
   await chats.createMessage({
     chatId: whisperChat.id,
     role: "user",
-    content: "Date: NIGHT_OF_WHISPER\nMaukie whispers the plan.",
+    content: "Date: NIGHT_OF_WHISPER\nTobias whispers the plan.",
     extra: { hiddenFromAICharacterIds: [privateB.id] },
   });
   await chats.createMessage({
@@ -2036,7 +2036,7 @@ try {
     content: "SCENE_CHANGE present day",
     extra: { isConversationStart: true },
   });
-  summaryReply = () => 'They took a SHARED_STROLL. {{#if char == "Maukie"}}Maukie heard the WHISPERED_PLAN.{{/if}}';
+  summaryReply = () => 'They took a SHARED_STROLL. {{#if char == "Tobias"}}Tobias heard the WHISPERED_PLAN.{{/if}}';
   await memory.initialize(whisperChat.id);
   await memory.checkScenesAfterGeneration(whisperChat.id, { blocking: false });
   summaryReply = undefined;
@@ -2062,12 +2062,12 @@ try {
   assert.equal(narratorWhisper.match(/SHARED_STROLL/gu)?.length, 1, "the narrator reads the scene once");
   assert.equal(narratorWhisper.match(/WHISPERED_PLAN/gu)?.length, 1);
   assert.match(await whisperPrompt(privateA.id), /DAY_OF_STROLL → NIGHT_OF_WHISPER[\s\S]*WHISPERED_PLAN/u);
-  const pantaloneWhisper = await whisperPrompt(privateB.id);
-  assert.match(pantaloneWhisper, /^Messages #1–#1; [^\n]*: DAY_OF_STROLL\.\nThey took a SHARED_STROLL\.\s*$/u);
+  const corneliusWhisper = await whisperPrompt(privateB.id);
+  assert.match(corneliusWhisper, /^Messages #1–#1; [^\n]*: DAY_OF_STROLL\.\nThey took a SHARED_STROLL\.\s*$/u);
   assert.doesNotMatch(
-    pantaloneWhisper,
+    corneliusWhisper,
     /NIGHT_OF_WHISPER|WHISPERED_PLAN|Messages #1–#2/u,
-    "Pantalone gets neither the hidden message's range and date nor Maukie's section",
+    "Cornelius gets neither the hidden message's range and date nor Tobias's section",
   );
 
   // #7454: a scene's one constant for every reader is still shortened when a reader leaves the chat, keeping
@@ -2098,13 +2098,13 @@ try {
     await chats.createMessage({
       chatId: chat.id,
       role: "user",
-      content: "Maukie whispers the plan.",
+      content: "Tobias whispers the plan.",
       extra: { hiddenFromAICharacterIds: [privateB.id] },
     });
     await chats.createMessage({
       chatId: chat.id,
       role: "user",
-      content: "Pantalone counts the coins.",
+      content: "Cornelius counts the coins.",
       extra: { hiddenFromAICharacterIds: [privateA.id] },
     });
     await chats.createMessage({
@@ -2114,13 +2114,13 @@ try {
       extra: { isConversationStart: true },
     });
     summaryReply = () =>
-      `${shared} ${"FILL_S ".repeat(60)}{{#if char == "Maukie"}}${"FILL_M ".repeat(150)}MAUKIE_PLAN{{/if}}` +
-      `{{#if char == "Pantalone"}}${"FILL_P ".repeat(150)}PANTALONE_COINS{{/if}}`;
+      `${shared} ${"FILL_S ".repeat(60)}{{#if char == "Tobias"}}${"FILL_M ".repeat(150)}TOBIAS_PLAN{{/if}}` +
+      `{{#if char == "Cornelius"}}${"FILL_P ".repeat(150)}CORNELIUS_COINS{{/if}}`;
     await memory.initialize(chat.id);
     await memory.checkScenesAfterGeneration(chat.id, { blocking: false });
     const entries = JSON.parse((await chats.getById(chat.id))!.metadata).summaryEntries as Array<{ content: string }>;
     assert.equal(entries.length, 1, "the scene has one constant for every reader");
-    assert.match(entries[0]!.content, /PANTALONE_COINS/u);
+    assert.match(entries[0]!.content, /CORNELIUS_COINS/u);
     summaryReply = (prompt) => (JSON.parse(prompt).at(-1).content as string).replace(/(?:FILL_\w+ )+/gu, "SHORT ");
     await chats.patchMetadata(chat.id, {
       advancedMemory: {
@@ -2145,14 +2145,14 @@ try {
     calls.filter((call) => /Condense the ordered summaries/u.test(JSON.stringify(call.messages)));
   const departure = await sharedSceneChat("Reader leaves", "They took a SHARED_STROLL.");
   await chats.update(departure.chat.id, { characterIds: [character.id, privateA.id] });
-  const maukieBefore = estimateChatSummaryTokens(await departure.view(privateA.id));
+  const tobiasBefore = estimateChatSummaryTokens(await departure.view(privateA.id));
   calls.length = 0;
   await memory.checkScenesAfterGeneration(departure.chat.id, { blocking: false });
-  assert.equal(combineCalls().length, 1, "Maukie's share is shortened after Pantalone leaves");
+  assert.equal(combineCalls().length, 1, "Tobias's share is shortened after Cornelius leaves");
   assert.match(
     JSON.stringify(combineCalls()[0]!.messages),
-    /\{\{#if char == \\"Pantalone\\"\}\}(?:FILL_P )+PANTALONE_COINS/u,
-    "Pantalone's part reaches the Helper with its own condition",
+    /\{\{#if char == \\"Cornelius\\"\}\}(?:FILL_P )+CORNELIUS_COINS/u,
+    "Cornelius's part reaches the Helper with its own condition",
   );
   const departureEntry = (
     JSON.parse((await chats.getById(departure.chat.id))!.metadata).summaryEntries as Array<{
@@ -2160,26 +2160,26 @@ try {
       content: string;
     }>
   ).find((entry) => entry.enabled)!;
-  assert.match(departureEntry.content, /\{\{#if char == "Pantalone"\}\}SHORT PANTALONE_COINS\{\{\/if\}\}/u);
-  const maukieAfter = await departure.view(privateA.id);
-  assert(estimateChatSummaryTokens(maukieAfter) < maukieBefore);
-  assert.match(maukieAfter, /SHARED_STROLL[\s\S]*MAUKIE_PLAN/u);
-  assert.doesNotMatch(maukieAfter, /PANTALONE_COINS/u, "Maukie still never reads Pantalone's part");
+  assert.match(departureEntry.content, /\{\{#if char == "Cornelius"\}\}SHORT CORNELIUS_COINS\{\{\/if\}\}/u);
+  const tobiasAfter = await departure.view(privateA.id);
+  assert(estimateChatSummaryTokens(tobiasAfter) < tobiasBefore);
+  assert.match(tobiasAfter, /SHARED_STROLL[\s\S]*TOBIAS_PLAN/u);
+  assert.doesNotMatch(tobiasAfter, /CORNELIUS_COINS/u, "Tobias still never reads Cornelius's part");
   await chats.update(departure.chat.id, { characterIds: [character.id, privateA.id, privateB.id] });
-  const pantaloneBack = await departure.view(privateB.id);
-  assert.match(pantaloneBack, /PANTALONE_COINS/u, "Pantalone's part is still his when he comes back");
-  assert.doesNotMatch(pantaloneBack, /MAUKIE_PLAN/u);
+  const corneliusBack = await departure.view(privateB.id);
+  assert.match(corneliusBack, /CORNELIUS_COINS/u, "Cornelius's part is still his when he comes back");
+  assert.doesNotMatch(corneliusBack, /TOBIAS_PLAN/u);
 
   const userMacro = await sharedSceneChat("User macro", "{{user}} took a SHARED_STROLL.");
   calls.length = 0;
   await memory.checkScenesAfterGeneration(userMacro.chat.id, { blocking: false });
   assert.equal(combineCalls().length, 1, "a shared part with {{user}} is shortened too");
-  const maukieUser = await userMacro.view(privateA.id);
-  const pantaloneUser = await userMacro.view(privateB.id);
-  assert.match(maukieUser, /SHARED_STROLL[\s\S]*SHORT MAUKIE_PLAN/u);
-  assert.doesNotMatch(maukieUser, /PANTALONE_COINS|\{\{user\}\}/u);
-  assert.match(pantaloneUser, /SHARED_STROLL[\s\S]*SHORT PANTALONE_COINS/u);
-  assert.doesNotMatch(pantaloneUser, /MAUKIE_PLAN/u);
+  const tobiasUser = await userMacro.view(privateA.id);
+  const corneliusUser = await userMacro.view(privateB.id);
+  assert.match(tobiasUser, /SHARED_STROLL[\s\S]*SHORT TOBIAS_PLAN/u);
+  assert.doesNotMatch(tobiasUser, /CORNELIUS_COINS|\{\{user\}\}/u);
+  assert.match(corneliusUser, /SHARED_STROLL[\s\S]*SHORT CORNELIUS_COINS/u);
+  assert.doesNotMatch(corneliusUser, /TOBIAS_PLAN/u);
   summaryReply = undefined;
 
   // #7270: compaction combines Advanced Memory's own summaries with private character sections,
@@ -2200,8 +2200,8 @@ try {
       ...(content.startsWith("The next") ? { extra: { isConversationStart: true } } : {}),
     });
   const combineSource = await chats.listMessages(combineChat.id);
-  const forBoth = '{{#if char == "Maukie" || "Pantalone"}}';
-  const maukieSecret = '{{#if char == "Maukie"}}MAUKIE_SECRET hid the key.{{/if}}';
+  const forBoth = '{{#if char == "Tobias" || "Cornelius"}}';
+  const tobiasSecret = '{{#if char == "Tobias"}}TOBIAS_SECRET hid the key.{{/if}}';
   const recap = (id: string, index: number, content: string) =>
     createChatSummaryEntry({
       id,
@@ -2215,7 +2215,7 @@ try {
       rangeStartIndex: index + 1,
       rangeEndIndex: index + 1,
     });
-  const privateRecap = recap("private-recap", 0, `${forBoth}${"SHARED_WALK ".repeat(300)}${maukieSecret}{{/if}}`);
+  const privateRecap = recap("private-recap", 0, `${forBoth}${"SHARED_WALK ".repeat(300)}${tobiasSecret}{{/if}}`);
   const sharedRecap = recap("shared-recap", 1, `${forBoth}${"SHARED_TWO ".repeat(300)}{{/if}}`);
   await chats.patchMetadata(combineChat.id, {
     groupChatMode: "individual",
@@ -2242,7 +2242,7 @@ try {
         readOnly: true,
       })
     ).chatSummary ?? "";
-  summaryResponse = `COMBINED_WALK. ${maukieSecret}`;
+  summaryResponse = `COMBINED_WALK. ${tobiasSecret}`;
   calls.length = 0;
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
   assert.deepEqual(
@@ -2253,7 +2253,7 @@ try {
   const [combineSystem, combineInput] = calls[0]!.messages;
   assert.match(combineSystem!.content, /Condense the ordered summaries below into one summary/u);
   assert.match(combineSystem!.content, /exactly its original condition/u);
-  assert(combineInput!.content.includes(maukieSecret), "the private section reaches the Helper with its condition");
+  assert(combineInput!.content.includes(tobiasSecret), "the private section reaches the Helper with its condition");
   assert.match(combineInput!.content, /SHARED_WALK[\s\S]*SHARED_TWO/u, "summaries stay in chat order");
   const privateCombined = await combineEntries();
   assert.deepEqual(
@@ -2265,19 +2265,19 @@ try {
   assert.equal(privateResult.origin, "automated");
   assert.equal(privateResult.title, "Messages #1–#2");
   assert.deepEqual(privateResult.messageIds, [combineSource[0]!.id, combineSource[1]!.id]);
-  assert.match(await recallFor(privateA.id), /COMBINED_WALK[\s\S]*MAUKIE_SECRET/u);
-  const pantaloneRecall = await recallFor(privateB.id);
-  assert.match(pantaloneRecall, /COMBINED_WALK/u);
-  assert.doesNotMatch(pantaloneRecall, /MAUKIE_SECRET/u, "Pantalone still never reads Maukie's private section");
+  assert.match(await recallFor(privateA.id), /COMBINED_WALK[\s\S]*TOBIAS_SECRET/u);
+  const corneliusRecall = await recallFor(privateB.id);
+  assert.match(corneliusRecall, /COMBINED_WALK/u);
+  assert.doesNotMatch(corneliusRecall, /TOBIAS_SECRET/u, "Cornelius still never reads Tobias's private section");
   calls.length = 0;
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
   assert.deepEqual(calls, [], "combined summaries within the share need no further calls");
 
-  // A result that would show Maukie's secret to Pantalone is not saved; the plain summary is still shortened.
-  // This one keeps a Maukie section but copies the secret into the text both characters read.
+  // A result that would show Tobias's secret to Cornelius is not saved; the plain summary is still shortened.
+  // This one keeps a Tobias section but copies the secret into the text both characters read.
   summaryReply = (prompt) =>
-    prompt.includes("MAUKIE_SECRET")
-      ? `COMBINED_WALK. MAUKIE_SECRET hid the key. {{#if char == "Maukie"}}Maukie kept quiet.{{/if}}`
+    prompt.includes("TOBIAS_SECRET")
+      ? `COMBINED_WALK. TOBIAS_SECRET hid the key. {{#if char == "Tobias"}}Tobias kept quiet.{{/if}}`
       : "PLAIN_COMPACTED";
   await chats.patchMetadata(combineChat.id, { summaryEntries: [privateRecap, sharedRecap] });
   calls.length = 0;
@@ -2285,11 +2285,11 @@ try {
   // #7454: a rejected answer is retried in halves, in chat order: the private summary alone, rejected again
   // and kept, then the plain one.
   assert.equal(calls.length, 3);
-  assert.match(JSON.stringify(calls[0]!.messages), /MAUKIE_SECRET[\s\S]*SHARED_TWO/u);
-  assert.match(JSON.stringify(calls[1]!.messages), /MAUKIE_SECRET/u);
+  assert.match(JSON.stringify(calls[0]!.messages), /TOBIAS_SECRET[\s\S]*SHARED_TWO/u);
+  assert.match(JSON.stringify(calls[1]!.messages), /TOBIAS_SECRET/u);
   assert.doesNotMatch(
     JSON.stringify(calls[2]!.messages),
-    /MAUKIE_SECRET|SHARED_WALK|exactly its original condition/u,
+    /TOBIAS_SECRET|SHARED_WALK|exactly its original condition/u,
     "the plain summary is shortened on its own, as before",
   );
   const leakEntries = await combineEntries();
@@ -2300,11 +2300,11 @@ try {
   );
   assert.equal(leakEntries.find((entry) => entry.id === sharedRecap.id)!.enabled, false);
   assert(leakEntries.some((entry) => entry.enabled && entry.content.includes("PLAIN_COMPACTED")));
-  assert.doesNotMatch(await recallFor(privateB.id), /MAUKIE_SECRET/u);
+  assert.doesNotMatch(await recallFor(privateB.id), /TOBIAS_SECRET/u);
 
   // A result that drops the private section is rejected too, and the rejected attempt is kept,
   // so unchanged summaries do not pay for it again.
-  summaryReply = () => "COMBINED_WALK. MAUKIE_SECRET hid the key.";
+  summaryReply = () => "COMBINED_WALK. TOBIAS_SECRET hid the key.";
   await chats.patchMetadata(combineChat.id, { summaryEntries: [privateRecap] });
   calls.length = 0;
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
@@ -2314,7 +2314,7 @@ try {
 
   // A result that is only shorter because it left out a condition is not saved, so it is not paid for on every reply.
   const walkRecap = recap("walk-recap", 0, privateRecap.content);
-  summaryReply = () => `${"SHARED_WALK ".repeat(300)}${maukieSecret}`;
+  summaryReply = () => `${"SHARED_WALK ".repeat(300)}${tobiasSecret}`;
   await chats.patchMetadata(combineChat.id, { summaryEntries: [walkRecap] });
   calls.length = 0;
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
@@ -2326,9 +2326,9 @@ try {
   const innRecap = recap(
     "inn-recap",
     0,
-    `${forBoth}They returned to the inn. ${"SHARED_WALK ".repeat(300)}{{#if char == "Maukie"}}MAUKIE_SECRET hid the key. They returned to the inn.{{/if}}{{/if}}`,
+    `${forBoth}They returned to the inn. ${"SHARED_WALK ".repeat(300)}{{#if char == "Tobias"}}TOBIAS_SECRET hid the key. They returned to the inn.{{/if}}{{/if}}`,
   );
-  summaryReply = () => `They returned to the inn. COMBINED_WALK. ${maukieSecret}`;
+  summaryReply = () => `They returned to the inn. COMBINED_WALK. ${tobiasSecret}`;
   await chats.patchMetadata(combineChat.id, { summaryEntries: [innRecap] });
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
   assert.match(
@@ -2340,9 +2340,9 @@ try {
   const curlyRecap = recap(
     "curly-recap",
     0,
-    `${forBoth}“They returned to Maukie’s inn.” ${"SHARED_WALK ".repeat(300)}{{#if char == "Maukie"}}MAUKIE_SECRET hid the key. They returned to Maukie's inn.{{/if}}{{/if}}`,
+    `${forBoth}“They returned to Tobias’s inn.” ${"SHARED_WALK ".repeat(300)}{{#if char == "Tobias"}}TOBIAS_SECRET hid the key. They returned to Tobias's inn.{{/if}}{{/if}}`,
   );
-  summaryReply = () => `They returned to Maukie's inn. COMBINED_CURLY. ${maukieSecret}`;
+  summaryReply = () => `They returned to Tobias's inn. COMBINED_CURLY. ${tobiasSecret}`;
   await chats.patchMetadata(combineChat.id, { summaryEntries: [curlyRecap] });
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
   assert.match(
@@ -2360,7 +2360,7 @@ try {
     content: privateRecap.content.replace("hid", "buried"),
     updatedAt: new Date(Date.parse(privateRecap.createdAt) + 1000).toISOString(),
   };
-  const buriedSecret = '{{#if char == "Maukie"}}MAUKIE_SECRET buried the key.{{/if}}';
+  const buriedSecret = '{{#if char == "Tobias"}}TOBIAS_SECRET buried the key.{{/if}}';
   summaryResponse = `COMBINED_EDIT. ${buriedSecret}`;
   await chats.patchMetadata(combineChat.id, { summaryEntries: [editedRecap, sharedRecap] });
   calls.length = 0;
@@ -2379,30 +2379,30 @@ try {
     "an edited summary is never rewritten",
   );
   assert(editedEntries.find((entry) => entry.enabled)!.content.includes(buriedSecret));
-  assert.doesNotMatch(await recallFor(privateB.id), /MAUKIE_SECRET/u);
+  assert.doesNotMatch(await recallFor(privateB.id), /TOBIAS_SECRET/u);
   summaryResponse = undefined;
 
   // Merged group chats combine them too, instead of skipping every summary with a character condition.
-  summaryResponse = `COMBINED_WALK. ${maukieSecret}`;
+  summaryResponse = `COMBINED_WALK. ${tobiasSecret}`;
   await chats.patchMetadata(combineChat.id, { groupChatMode: "shared", summaryEntries: [privateRecap, sharedRecap] });
   calls.length = 0;
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
   assert.equal(calls.length, 1);
-  assert(calls[0]!.messages[1]!.content.includes(maukieSecret));
+  assert(calls[0]!.messages[1]!.content.includes(tobiasSecret));
   const mergedCombined = await combineEntries();
   assert.equal(mergedCombined.filter((entry) => entry.enabled).length, 1);
-  assert(mergedCombined.find((entry) => entry.enabled)!.content.includes(maukieSecret));
+  assert(mergedCombined.find((entry) => entry.enabled)!.content.includes(tobiasSecret));
   summaryResponse = undefined;
 
   // A private sentence in Chinese or Japanese, which have no spaces, is caught when copied into shared text too.
   const cjkRecap = recap(
     "cjk-recap",
     0,
-    `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Maukie"}}毛奇把钥匙藏在了钟楼里。{{/if}}{{/if}}`,
+    `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Tobias"}}毛奇把钥匙藏在了钟楼里。{{/if}}{{/if}}`,
   );
   summaryReply = (prompt) =>
     prompt.includes("钟楼")
-      ? 'COMBINED_WALK. 毛奇把钥匙藏在了钟楼里。 {{#if char == "Maukie"}}毛奇保持沉默。{{/if}}'
+      ? 'COMBINED_WALK. 毛奇把钥匙藏在了钟楼里。 {{#if char == "Tobias"}}毛奇保持沉默。{{/if}}'
       : "PLAIN_COMPACTED";
   await chats.patchMetadata(combineChat.id, { groupChatMode: "individual", summaryEntries: [cjkRecap, sharedRecap] });
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
@@ -2413,11 +2413,11 @@ try {
     const pieceRecap = recap(
       `piece-recap-${index}`,
       0,
-      `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Maukie"}}${secret}{{/if}}{{/if}}`,
+      `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Tobias"}}${secret}{{/if}}{{/if}}`,
     );
     summaryReply = (prompt) =>
       prompt.includes(secret)
-        ? `COMBINED_WALK. ${secret} {{#if char == "Maukie"}}Maukie kept quiet.{{/if}}`
+        ? `COMBINED_WALK. ${secret} {{#if char == "Tobias"}}Tobias kept quiet.{{/if}}`
         : "PLAIN_COMPACTED";
     await chats.patchMetadata(combineChat.id, { summaryEntries: [pieceRecap, sharedRecap] });
     await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
@@ -2425,32 +2425,32 @@ try {
     assert(!(await recallFor(privateB.id)).includes(secret));
   }
   // So is one copied without its quote marks, from a list without full stops, with a plain apostrophe,
-  // with a part for Maukie in the middle, or shortened around a private phrase (#7454). A long run of "!" in a
+  // with a part for Tobias in the middle, or shortened around a private phrase (#7454). A long run of "!" in a
   // private section is still checked quickly.
   for (const [index, [secret, copy, found]] of [
     [
-      "Maukie secretly hid the brass key under the floorboards.",
-      "Maukie hid the brass key under the floor.",
+      "Tobias secretly hid the brass key under the floorboards.",
+      "Tobias hid the brass key under the floor.",
       "brass key",
     ],
-    ['"Maukie hid the key in the attic."', "Maukie hid the key in the attic.", "hid the key"],
-    ["- Maukie hid the key in the attic\n- Maukie fears the butler", "Maukie fears the butler.", "butler"],
-    ["Maukie’s key is in the attic.", "Maukie's key is in the attic.", "key is in"],
+    ['"Tobias hid the key in the attic."', "Tobias hid the key in the attic.", "hid the key"],
+    ["- Tobias hid the key in the attic\n- Tobias fears the butler", "Tobias fears the butler.", "butler"],
+    ["Tobias’s key is in the attic.", "Tobias's key is in the attic.", "key is in"],
     [
-      "Maukie hid the key in the attic.",
-      'Maukie {{#if char == "Maukie"}}quietly {{/if}}hid the key in the attic.',
+      "Tobias hid the key in the attic.",
+      'Tobias {{#if char == "Tobias"}}quietly {{/if}}hid the key in the attic.',
       "hid the key",
     ],
-    [`Maukie hid the key in the attic${"!".repeat(1000)}`, "Maukie hid the key in the attic.", "hid the key"],
+    [`Tobias hid the key in the attic${"!".repeat(1000)}`, "Tobias hid the key in the attic.", "hid the key"],
   ].entries()) {
     const copyRecap = recap(
       `copy-recap-${index}`,
       0,
-      `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Maukie"}}${secret}{{/if}}{{/if}}`,
+      `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Tobias"}}${secret}{{/if}}{{/if}}`,
     );
     summaryReply = (prompt) =>
       prompt.includes("SHARED_WALK")
-        ? `COMBINED_WALK. ${copy} {{#if char == "Maukie"}}Maukie kept quiet.{{/if}}`
+        ? `COMBINED_WALK. ${copy} {{#if char == "Tobias"}}Tobias kept quiet.{{/if}}`
         : "PLAIN_COMPACTED";
     await chats.patchMetadata(combineChat.id, { summaryEntries: [copyRecap, sharedRecap] });
     const started = Date.now();
@@ -2463,11 +2463,11 @@ try {
   const piecesRecap = recap(
     "pieces-recap",
     0,
-    `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Maukie"}}Meet at 3.5 now. Mr. Fox hid it.{{/if}}{{/if}}`,
+    `${forBoth}${"SHARED_WALK ".repeat(300)}{{#if char == "Tobias"}}Meet at 3.5 now. Mr. Fox hid it.{{/if}}{{/if}}`,
   );
   summaryReply = (prompt) =>
     prompt.includes("Mr. Fox hid it.")
-      ? 'COMBINED_WALK. Mr. Fox met them at 3.5 now. {{#if char == "Maukie"}}Meet at 3.5 now. Mr. Fox hid it.{{/if}}'
+      ? 'COMBINED_WALK. Mr. Fox met them at 3.5 now. {{#if char == "Tobias"}}Meet at 3.5 now. Mr. Fox hid it.{{/if}}'
       : "PLAIN_COMPACTED";
   await chats.patchMetadata(combineChat.id, { summaryEntries: [piecesRecap, sharedRecap] });
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
@@ -2481,19 +2481,19 @@ try {
   assert.doesNotMatch(piecesRecall, /Meet at 3\.5 now|hid it/u);
   // Text next to another macro counts as read by everyone.
   summaryReply = (prompt) =>
-    prompt.includes("MAUKIE_SECRET")
-      ? 'COMBINED_WALK. {{#if char == "Maukie"}}Maukie kept quiet.{{/if}} {{foo}} MAUKIE_SECRET hid the key.'
+    prompt.includes("TOBIAS_SECRET")
+      ? 'COMBINED_WALK. {{#if char == "Tobias"}}Tobias kept quiet.{{/if}} {{foo}} TOBIAS_SECRET hid the key.'
       : "PLAIN_COMPACTED";
   await chats.patchMetadata(combineChat.id, {
     summaryEntries: [privateRecap, recap("macro-recap", 1, `${forBoth}${"SHARED_TWO ".repeat(300)}{{foo}}{{/if}}`)],
   });
   await memory.checkScenesAfterGeneration(combineChat.id, { blocking: false });
   assert.deepEqual((await combineEntries())[0], privateRecap, "a private sentence next to another macro is not saved");
-  assert.doesNotMatch(await recallFor(privateB.id), /MAUKIE_SECRET/u);
+  assert.doesNotMatch(await recallFor(privateB.id), /TOBIAS_SECRET/u);
 
-  // A summary only Maukie reads is combined with one Pantalone also reads (#7454). Each reader's prompt shows
+  // A summary only Tobias reads is combined with one Cornelius also reads (#7454). Each reader's prompt shows
   // the range and story dates of only the messages that reader can see, so the combined summary never shows
-  // Pantalone the number or date of a message hidden from him.
+  // Cornelius the number or date of a message hidden from him.
   const rangeChat = await chats.create({
     name: "Merged private range",
     mode: "roleplay",
@@ -2505,7 +2505,7 @@ try {
   await chats.createMessage({
     chatId: rangeChat.id,
     role: "user",
-    content: "Date: NIGHT_OF_THE_HEIST\nMaukie slips away alone.",
+    content: "Date: NIGHT_OF_THE_HEIST\nTobias slips away alone.",
     extra: { hiddenFromAICharacterIds: [privateB.id] },
   });
   await chats.createMessage({ chatId: rangeChat.id, role: "user", content: "Date: MORNING_AFTER\nA shared walk." });
@@ -2539,13 +2539,13 @@ try {
       knowledgeStarts: { [privateA.id]: null, [privateB.id]: null },
     },
     summaryEntries: [
-      rangeRecap("maukie-only", 0, `{{#if char == "Maukie"}}${"MAUKIE_ALONE ".repeat(300)}{{/if}}`),
+      rangeRecap("tobias-only", 0, `{{#if char == "Tobias"}}${"TOBIAS_ALONE ".repeat(300)}{{/if}}`),
       rangeRecap("both-read", 1, `${forBoth}${"SHARED_TWO ".repeat(300)}{{/if}}`),
     ],
   });
   summaryReply = (prompt) =>
     `${prompt.includes("SHARED_TWO") ? "SHARED_SHORT. " : ""}${
-      prompt.includes("MAUKIE_ALONE") ? '{{#if char == "Maukie"}}MAUKIE_SHORT.{{/if}}' : ""
+      prompt.includes("TOBIAS_ALONE") ? '{{#if char == "Tobias"}}TOBIAS_SHORT.{{/if}}' : ""
     }`;
   calls.length = 0;
   await memory.checkScenesAfterGeneration(rangeChat.id, { blocking: false });
@@ -2567,20 +2567,20 @@ try {
         readOnly: true,
       })
     ).chatSummary ?? "";
-  const maukieRange = await rangeFor(privateA.id);
-  for (const text of ["NIGHT_OF_THE_HEIST", "MAUKIE_SHORT", "SHARED_SHORT"]) assert(maukieRange.includes(text), text);
+  const tobiasRange = await rangeFor(privateA.id);
+  for (const text of ["NIGHT_OF_THE_HEIST", "TOBIAS_SHORT", "SHARED_SHORT"]) assert(tobiasRange.includes(text), text);
   for (const mode of ["shared", "individual"]) {
     await chats.patchMetadata(rangeChat.id, { groupChatMode: mode });
-    const pantaloneRange = await rangeFor(privateB.id);
+    const corneliusRange = await rangeFor(privateB.id);
     assert.match(
-      pantaloneRange,
+      corneliusRange,
       /^Messages #2–#2; source timeframe \(summary corrections take precedence\): MORNING_AFTER\.\nSHARED_SHORT\.$/u,
       mode,
     );
     assert.doesNotMatch(
-      pantaloneRange,
+      corneliusRange,
       /NIGHT_OF_THE_HEIST|Messages #1/u,
-      "Pantalone never gets the range or story date of a message hidden from him",
+      "Cornelius never gets the range or story date of a message hidden from him",
     );
     assert.match(
       await rangeFor(privateA.id),
@@ -2588,7 +2588,7 @@ try {
     );
   }
   // A merged prompt for both shows the range and dates of the messages both of them can see above the text
-  // both read, so the shared events don't seem to start on the night only Maukie knows of.
+  // both read, so the shared events don't seem to start on the night only Tobias knows of.
   await chats.patchMetadata(rangeChat.id, { groupChatMode: "shared" });
   const bothRange =
     (
@@ -2602,12 +2602,12 @@ try {
     ).chatSummary ?? "";
   assert.match(
     bothRange,
-    /^Messages #2–#2; [^\n]*: MORNING_AFTER\.\nSHARED_SHORT\. \[Known only to Maukie: MAUKIE_SHORT\.\]$/u,
+    /^Messages #2–#2; [^\n]*: MORNING_AFTER\.\nSHARED_SHORT\. \[Known only to Tobias: TOBIAS_SHORT\.\]$/u,
   );
   assert.doesNotMatch(bothRange, /NIGHT_OF_THE_HEIST|Messages #1/u);
-  // A summary only Maukie reads keeps its range and date there, next to the mark that it is his.
+  // A summary only Tobias reads keeps its range and date there, next to the mark that it is his.
   await chats.patchMetadata(rangeChat.id, {
-    summaryEntries: [rangeRecap("maukie-alone", 0, '{{#if char == "Maukie"}}MAUKIE_ALONE.{{/if}}')],
+    summaryEntries: [rangeRecap("tobias-alone", 0, '{{#if char == "Tobias"}}TOBIAS_ALONE.{{/if}}')],
   });
   assert.match(
     (
@@ -2619,7 +2619,7 @@ try {
         readOnly: true,
       })
     ).chatSummary ?? "",
-    /^Messages #1–#1; [^\n]*: NIGHT_OF_THE_HEIST\.\n\[Known only to Maukie: MAUKIE_ALONE\.\]$/u,
+    /^Messages #1–#1; [^\n]*: NIGHT_OF_THE_HEIST\.\n\[Known only to Tobias: TOBIAS_ALONE\.\]$/u,
   );
   summaryReply = undefined;
 
@@ -2663,16 +2663,16 @@ try {
       rangeEndIndex: index + 1,
       ...extra,
     });
-  const arcSecret = '{{#if char == "Maukie"}}ARC_SECRET Maukie keeps the brass key hidden.{{/if}}';
+  const arcSecret = '{{#if char == "Tobias"}}ARC_SECRET Tobias keeps the brass key hidden.{{/if}}';
   const canonEntries = [
-    canonEntry(0, `{{#if char == "Maukie" || "Pantalone"}}${fill("A")}{{/if}}`),
-    canonEntry(1, `{{#if char == "Maukie"}}${fill("B")}{{/if}}`),
-    canonEntry(2, `{{#if char == "Dottore" || "Pantalone" || "Powers That Be"}}${fill("C")}{{/if}}`),
-    canonEntry(3, `{{#if char == "Maukie" || "Pantalone" || "Dottore"}}${fill("D")}${arcSecret}{{/if}}`, {
+    canonEntry(0, `{{#if char == "Tobias" || "Cornelius"}}${fill("A")}{{/if}}`),
+    canonEntry(1, `{{#if char == "Tobias"}}${fill("B")}{{/if}}`),
+    canonEntry(2, `{{#if char == "Leopold" || "Cornelius" || "Powers That Be"}}${fill("C")}{{/if}}`),
+    canonEntry(3, `{{#if char == "Tobias" || "Cornelius" || "Leopold"}}${fill("D")}${arcSecret}{{/if}}`, {
       origin: "manual",
       title: "Arc One",
     }),
-    canonEntry(4, `{{#if char == "Pantalone"}}${fill("E")}{{/if}}`, {
+    canonEntry(4, `{{#if char == "Cornelius"}}${fill("E")}{{/if}}`, {
       title: "Combined summary",
       updatedAt: new Date(Date.now() + 1000).toISOString(),
     }),
@@ -2732,7 +2732,7 @@ try {
   // Summaries that can't be combined and already fill a view are not shortened again on every reply.
   const unmergeable = [
     canonEntry(0, `${fill("F", 700)}{{char}} remembers.`),
-    canonEntry(1, `{{#if char == "Maukie"}}${fill("G")}{{/if}}`),
+    canonEntry(1, `{{#if char == "Tobias"}}${fill("G")}{{/if}}`),
   ];
   await chats.patchMetadata(canonChat.id, { summaryEntries: unmergeable });
   for (let pass = 0; pass < 2; pass++) await memory.checkScenesAfterGeneration(canonChat.id, { blocking: false });
@@ -2740,14 +2740,14 @@ try {
   assert.deepEqual(JSON.parse((await chats.getById(canonChat.id))!.metadata).summaryEntries, unmergeable);
 
   // An answer that adds or drops the narrator in a condition changes no reader, so it is saved.
-  const mapSecret = "HIDE_A Maukie hid the map in the cellar.";
-  const ledgerSecret = "HIDE_B Pantalone sold the old ledger.";
+  const mapSecret = "HIDE_A Tobias hid the map in the cellar.";
+  const ledgerSecret = "HIDE_B Cornelius sold the old ledger.";
   const twoReaders = [
-    canonEntry(0, `{{#if char == "Maukie" || "Powers That Be"}}${fill("H", 400)}${mapSecret}{{/if}}`),
-    canonEntry(1, `{{#if char == "Pantalone"}}${fill("I", 400)}${ledgerSecret}{{/if}}`),
+    canonEntry(0, `{{#if char == "Tobias" || "Powers That Be"}}${fill("H", 400)}${mapSecret}{{/if}}`),
+    canonEntry(1, `{{#if char == "Cornelius"}}${fill("I", 400)}${ledgerSecret}{{/if}}`),
   ];
   summaryReply = () =>
-    `{{#if char == "Maukie"}}SHORT ${mapSecret}{{/if}} {{#if char == "Pantalone" || "Powers That Be"}}SHORT ${ledgerSecret}{{/if}}`;
+    `{{#if char == "Tobias"}}SHORT ${mapSecret}{{/if}} {{#if char == "Cornelius" || "Powers That Be"}}SHORT ${ledgerSecret}{{/if}}`;
   await chats.patchMetadata(canonChat.id, { summaryEntries: twoReaders });
   await memory.checkScenesAfterGeneration(canonChat.id, { blocking: false });
   assert.equal(calls.length, 1);
@@ -2767,7 +2767,7 @@ try {
   // One that drops a reader's section is not saved; the halves are tried on their own.
   summaryReply = (prompt) =>
     prompt.includes("HIDE_A") && prompt.includes("HIDE_B")
-      ? `{{#if char == "Maukie"}}SHORT ${mapSecret}{{/if}}`
+      ? `{{#if char == "Tobias"}}SHORT ${mapSecret}{{/if}}`
       : `SHORT ${prompt.includes("HIDE_A") ? mapSecret : ledgerSecret}`;
   await chats.patchMetadata(canonChat.id, { summaryEntries: twoReaders });
   calls.length = 0;
@@ -2789,7 +2789,7 @@ try {
   const departed = canonEntry(0, `{{#if char == "Cyno"}}${fill("J", 300)}CYNO_SECRET Cyno hid the relic.{{/if}}`);
   summaryReply = keepSections;
   await chats.patchMetadata(canonChat.id, {
-    summaryEntries: [departed, canonEntry(1, `{{#if char == "Maukie" || "Pantalone"}}${fill("K", 400)}{{/if}}`)],
+    summaryEntries: [departed, canonEntry(1, `{{#if char == "Tobias" || "Cornelius"}}${fill("K", 400)}{{/if}}`)],
   });
   calls.length = 0;
   await memory.checkScenesAfterGeneration(canonChat.id, { blocking: false });
@@ -2808,7 +2808,7 @@ try {
   // which combine on their own, rather than halving down to single summaries.
   await chats.patchMetadata(canonChat.id, {
     summaryEntries: [0, 1, 2, 3].map((index) =>
-      canonEntry(index, `{{#if char == "${index % 2 ? "Pantalone" : "Maukie"}"}}${fill(`L${index}`)}{{/if}}`),
+      canonEntry(index, `{{#if char == "${index % 2 ? "Cornelius" : "Tobias"}"}}${fill(`L${index}`)}{{/if}}`),
     ),
   });
   summaryReply = () => "PLAIN_SHORT.";
@@ -2837,13 +2837,13 @@ try {
   // narrator under the share in one pass, even when the inputs carry many more conditions than the answer.
   await chats.patchMetadata(canonChat.id, {
     summaryEntries: Array.from({ length: 5 }, (_, index) =>
-      canonEntry(index, `{{#if char == "${index % 2 ? "Pantalone" : "Maukie"}"}}${fill(`N${index}`, 125)}{{/if}}`),
+      canonEntry(index, `{{#if char == "${index % 2 ? "Cornelius" : "Tobias"}"}}${fill(`N${index}`, 125)}{{/if}}`),
     ),
   });
   summaryReply = (prompt) => {
     const target = Math.min(5000, Number(/Aim for approximately (\d+) tokens/u.exec(prompt)?.[1]) || 0);
     let pad = "PAD ";
-    const answer = () => `{{#if char == "Maukie"}}${pad}{{/if}}{{#if char == "Pantalone"}}${pad}{{/if}}`;
+    const answer = () => `{{#if char == "Tobias"}}${pad}{{/if}}{{#if char == "Cornelius"}}${pad}{{/if}}`;
     while (estimateChatSummaryTokens(answer()) < target) pad += "PAD ";
     return answer();
   };
@@ -2892,8 +2892,8 @@ try {
       knowledgeStarts: { [privateA.id]: null, [privateB.id]: null },
     },
     summaryEntries: [
-      startsEntry("pantalone-old", 0, `{{#if char == "Pantalone"}}${fill("P", 700)}PANTALONE_OLD.{{/if}}`),
-      startsEntry("maukie-four", 3, `{{#if char == "Maukie"}}${fill("M", 700)}{{/if}}`),
+      startsEntry("cornelius-old", 0, `{{#if char == "Cornelius"}}${fill("P", 700)}CORNELIUS_OLD.{{/if}}`),
+      startsEntry("tobias-four", 3, `{{#if char == "Tobias"}}${fill("M", 700)}{{/if}}`),
     ],
   });
   const startsView = async (id: string) =>
@@ -2906,19 +2906,19 @@ try {
         readOnly: true,
       })
     ).chatSummary ?? "";
-  assert.match(await startsView(privateB.id), /PANTALONE_OLD/u);
+  assert.match(await startsView(privateB.id), /CORNELIUS_OLD/u);
   summaryReply = keepSections;
   calls.length = 0;
   await memory.checkScenesAfterGeneration(startsChat.id, { blocking: false });
-  assert.equal(calls.length, 1, "only Pantalone's summary is shortened");
+  assert.equal(calls.length, 1, "only Cornelius's summary is shortened");
   const startsEntries = JSON.parse((await chats.getById(startsChat.id))!.metadata).summaryEntries as Array<
     ReturnType<typeof createChatSummaryEntry>
   >;
   assert(
     startsEntries.every((entry) => !entry.enabled || (entry.messageIds ?? []).length === 1),
-    "message #4 is still live for Pantalone, so Maukie's summary of it is not combined",
+    "message #4 is still live for Cornelius, so Tobias's summary of it is not combined",
   );
-  assert.match(await startsView(privateB.id), /PANTALONE_OLD/u, "Pantalone keeps his older summary");
+  assert.match(await startsView(privateB.id), /CORNELIUS_OLD/u, "Cornelius keeps his older summary");
 
   // A merged chat measures what its shared prompt carries, not the first character's view, and a combined
   // summary is for the characters who read its sources, not for everyone in the chat.
@@ -2953,7 +2953,7 @@ try {
         id: `merged-canon-${index}`,
         origin: "automated",
         sourceMode: "range",
-        content: `{{#if char == "Maukie" || "Pantalone"}}${fill(`M${index}`, 300)}{{/if}}`,
+        content: `{{#if char == "Tobias" || "Cornelius"}}${fill(`M${index}`, 300)}{{/if}}`,
         enabled: true,
         messageIds: [message.id],
         rangeStartIndex: index + 1,
@@ -2972,15 +2972,15 @@ try {
       })
     ).chatSummary ?? "";
   const everyone = [character.id, privateA.id, privateB.id];
-  assert.equal(await mergedView([character.id]), "", "Dottore, the first character, reads none of it");
+  assert.equal(await mergedView([character.id]), "", "Leopold, the first character, reads none of it");
   assert(estimateChatSummaryTokens(await mergedView(everyone)) > canonTrigger);
   summaryReply = () => "MERGED_PLAIN";
   calls.length = 0;
   await memory.checkScenesAfterGeneration(mergedCanon.id, { blocking: false });
   assert.equal(calls.length, 1, "the shared prompt's constants are over the share");
   assert(estimateChatSummaryTokens(await mergedView(everyone)) <= canonTrigger);
-  assert.match(await mergedView(everyone), /\[Known only to (?:Maukie, Pantalone|Pantalone, Maukie): MERGED_PLAIN\]/u);
-  assert.equal(await mergedView([character.id]), "", "Dottore still reads nothing");
+  assert.match(await mergedView(everyone), /\[Known only to (?:Tobias, Cornelius|Cornelius, Tobias): MERGED_PLAIN\]/u);
+  assert.equal(await mergedView([character.id]), "", "Leopold still reads nothing");
   summaryReply = undefined;
 
   // #7481: with Advanced Memory, a new Roleplay reply is saved as one message per scene or POV break, from the
@@ -3020,14 +3020,14 @@ try {
   };
   const extraOf = (message: { extra?: unknown }) =>
     (typeof message.extra === "string" ? JSON.parse(message.extra) : (message.extra ?? {})) as Record<string, any>;
-  const splitReply = "CYNO_ALONE waits by the gate.\n\n***\n\nMARI_AND_MAUKIE run through the rain.";
+  const splitReply = "CYNO_ALONE waits by the gate.\n\n***\n\nMARI_AND_TOBIAS run through the rain.";
   mainReply = `<think>PLANNING_BOTH_SCENES</think>${splitReply}`;
   const splitEvents = await splitGenerate(splitChat.id);
   const [, splitFirst, splitLast, ...splitRest] = await chats.listMessages(splitChat.id);
   assert(splitFirst && splitLast);
   assert.equal(splitRest.length, 0, "one break makes two messages");
   assert.equal(splitFirst.content, "CYNO_ALONE waits by the gate.");
-  assert.equal(splitLast.content, "***\n\nMARI_AND_MAUKIE run through the rain.", "the break line opens the second");
+  assert.equal(splitLast.content, "***\n\nMARI_AND_TOBIAS run through the rain.", "the break line opens the second");
   for (const part of [splitFirst, splitLast]) {
     assert.equal(part.role, "assistant");
     assert.equal(part.characterId, character.id, "both parts are from the same character");
@@ -3143,7 +3143,7 @@ try {
   });
   await memory.initialize(rewriteChat.id);
   const firstScene = "CYNO_ALONE waits by the gate.";
-  const laterScene = "MARI_AND_MAUKIE run through the rain.";
+  const laterScene = "MARI_AND_TOBIAS run through the rain.";
   mainReply = splitReply;
   for (const [hold, failFirst] of [
     [true, false],
@@ -3242,7 +3242,7 @@ try {
   // A last reply that is not split is rewritten alone too: the earlier responder's reply never ends up in it.
   mainReplyFor = (prompt) => `REPLY_FROM_${[...prompt.matchAll(/Respond ONLY as (\w+)\./gu)].at(-1)?.[1]}.`;
   const groupReplyOf = (message: { characterId?: string | null }) =>
-    `REPLY_FROM_${message.characterId === character.id ? "Dottore" : "Cyno"}.`;
+    `REPLY_FROM_${message.characterId === character.id ? "Leopold" : "Cyno"}.`;
   for (const [hold, fail] of [
     [true, false],
     [false, false],

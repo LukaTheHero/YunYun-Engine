@@ -65,7 +65,7 @@ export interface MariAppearancePack {
  * Sprites keep their file names when art is replaced, and the service worker serves them CacheFirst
  * (`mari-sprites` in vite.config.ts). Bump this whenever any YunYun art changes.
  */
-export const MARI_SPRITE_VERSION = "39c2";
+export const MARI_SPRITE_VERSION = "yy1";
 
 /** Every YunYun URL is loaded by URL from its own pack folder, never imported into the bundle. */
 const sprite = (path: string) => `/sprites/yunyun/${path}?v=${MARI_SPRITE_VERSION}`;
@@ -83,8 +83,8 @@ const packPoses = (packId: string) =>
 export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
   {
     id: "basic",
-    label: "Basic",
-    description: "The classic pixel Professor YunYun.",
+    label: "YunYun",
+    description: "The classic chibi YunYun.",
     portraits: {
       idle: sprite("basic/portrait-idle.webp"),
       blink: sprite("basic/portrait-blink.webp"),
@@ -95,68 +95,6 @@ export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
     },
     stories: packStories("basic"),
     poses: packPoses("basic"),
-  },
-  {
-    id: "dottore",
-    label: "Prof. YunYun loves Dottore",
-    description: "A cyan heart pin and a Dottore plush.",
-    portraits: {
-      idle: sprite("dottore/portrait-idle.webp"),
-      blink: sprite("dottore/portrait-blink.webp"),
-      shrug: sprite("dottore/portrait-shrug.webp"),
-      drag: sprite("dottore/portrait-drag.webp"),
-      hover: sprite("dottore/portrait-hover.webp"),
-      pullHeads: sprite("dottore/pull-heads.webp"),
-    },
-    stories: packStories("dottore"),
-    poses: packPoses("dottore"),
-  },
-  {
-    id: "golden",
-    label: "Golden Prof. YunYun",
-    description: "A gold outfit and a confident grin.",
-    portraits: {
-      idle: sprite("golden/portrait-idle.webp"),
-      blink: sprite("golden/portrait-blink.webp"),
-      shrug: sprite("golden/portrait-shrug.webp"),
-      drag: sprite("golden/portrait-drag.webp"),
-      hover: sprite("golden/portrait-hover.webp"),
-      pullHeads: sprite("golden/pull-heads.webp"),
-    },
-    stories: packStories("golden"),
-    poses: packPoses("golden"),
-    unlock: { playHours: 100 },
-  },
-  {
-    id: "safari",
-    label: "Safari Prof. YunYun",
-    description: "Safari gear for jungle trips.",
-    portraits: {
-      idle: sprite("safari/portrait-idle.webp"),
-      blink: sprite("safari/portrait-blink.webp"),
-      shrug: sprite("safari/portrait-shrug.webp"),
-      drag: sprite("safari/portrait-drag.webp"),
-      hover: sprite("safari/portrait-hover.webp"),
-      pullHeads: sprite("safari/pull-heads.webp"),
-    },
-    stories: packStories("safari"),
-    poses: packPoses("safari"),
-  },
-  {
-    id: "raccoon",
-    label: "Feral Raccoon Prof. YunYun",
-    description: "A raccoon onesie, slightly chewed.",
-    portraits: {
-      idle: sprite("raccoon/portrait-idle.webp"),
-      blink: sprite("raccoon/portrait-blink.webp"),
-      shrug: sprite("raccoon/portrait-shrug.webp"),
-      drag: sprite("raccoon/portrait-drag.webp"),
-      hover: sprite("raccoon/portrait-hover.webp"),
-      pullHeads: sprite("raccoon/pull-heads.webp"),
-    },
-    stories: packStories("raccoon"),
-    poses: packPoses("raccoon"),
-    season: "halloween",
   },
 ];
 

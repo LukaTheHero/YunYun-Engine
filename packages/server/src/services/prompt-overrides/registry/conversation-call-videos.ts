@@ -110,7 +110,7 @@ function makeConversationCallVideoPrompt(seed: ClipPromptSeed): PromptOverrideKe
     key: `conversation.callVideo.${seed.kind}`,
     description: `Conversation Call character video prompt for the ${seed.label} clip.`,
     variables: [
-      { name: "characterName", description: "Character display name.", example: "Dottore" },
+      { name: "characterName", description: "Character display name.", example: "Leopold" },
       { name: "clipLabel", description: "Human-readable clip type.", example: seed.label },
       {
         name: "clipInstruction",
@@ -122,7 +122,7 @@ function makeConversationCallVideoPrompt(seed: ClipPromptSeed): PromptOverrideKe
     ],
     defaultBuilder: buildDefaultPrompt,
     exampleContext: {
-      characterName: "Dottore",
+      characterName: "Leopold",
       clipLabel: seed.label,
       clipInstruction: seed.instruction,
       durationSeconds: 5,
@@ -137,7 +137,7 @@ export const CONVERSATION_CALL_CUSTOM_VIDEO_PROMPT: PromptOverrideKeyDef<Convers
   key: "conversation.callVideo.custom",
   description: "Conversation Call custom character video prompt for sparse user-requested clips.",
   variables: [
-    { name: "characterName", description: "Character display name.", example: "Dottore" },
+    { name: "characterName", description: "Character display name.", example: "Leopold" },
     { name: "clipLabel", description: "Short saved clip label.", example: "Mask off" },
     {
       name: "customPrompt",
@@ -154,7 +154,7 @@ export const CONVERSATION_CALL_CUSTOM_VIDEO_PROMPT: PromptOverrideKeyDef<Convers
   ],
   defaultBuilder: buildDefaultCustomClipPrompt,
   exampleContext: {
-    characterName: "Dottore",
+    characterName: "Leopold",
     clipLabel: "Blow kiss",
     customPrompt: "blow a kiss",
     durationSeconds: 5,

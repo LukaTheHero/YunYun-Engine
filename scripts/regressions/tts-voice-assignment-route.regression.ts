@@ -63,7 +63,7 @@ try {
     narratorVoice: "sage",
     voiceAssignments: [
       { characterId: "alice", characterName: "Alice", voice: "nova" },
-      { characterId: "dottore", characterName: "Dottore", voice: "onyx" },
+      { characterId: "leopold", characterName: "Leopold", voice: "onyx" },
     ],
     sourceProfiles: { elevenlabs: { apiKey: "eleven-secret", voice: "rachel" } },
   });
@@ -84,7 +84,7 @@ try {
   const expected = structuredClone(beforeVoiceSave);
   expected.voiceAssignments = [
     { characterId: "alice", characterName: "Alice", voice: "shimmer" },
-    { characterId: "dottore", characterName: "Dottore", voice: "onyx" },
+    { characterId: "leopold", characterName: "Leopold", voice: "onyx" },
   ];
   // The active source profile mirrors the list, exactly as PUT /config stores it.
   expected.sourceProfiles.openai!.voiceAssignments = expected.voiceAssignments;
@@ -102,12 +102,12 @@ try {
   // A new card gets its own row after the others; a renamed card keeps its row's place with the new name.
   assert.equal((await putVoice({ characterId: "alice-au", characterName: "Alice", voice: "coral" })).statusCode, 204);
   assert.equal(
-    (await putVoice({ characterId: "dottore", characterName: "Il Dottore", voice: "onyx" })).statusCode,
+    (await putVoice({ characterId: "leopold", characterName: "Leopold", voice: "onyx" })).statusCode,
     204,
   );
   assert.deepEqual((await stored()).voiceAssignments, [
     { characterId: "alice", characterName: "Alice", voice: "shimmer" },
-    { characterId: "dottore", characterName: "Il Dottore", voice: "onyx" },
+    { characterId: "leopold", characterName: "Leopold", voice: "onyx" },
     { characterId: "alice-au", characterName: "Alice", voice: "coral" },
   ]);
 
@@ -115,7 +115,7 @@ try {
   assert.equal((await putVoice({ characterId: "alice", characterName: "Alice", voice: "  " })).statusCode, 204);
   const afterClear = await stored();
   assert.deepEqual(afterClear.voiceAssignments, [
-    { characterId: "dottore", characterName: "Il Dottore", voice: "onyx" },
+    { characterId: "leopold", characterName: "Leopold", voice: "onyx" },
     { characterId: "alice-au", characterName: "Alice", voice: "coral" },
   ]);
   assert.deepEqual(afterClear.sourceProfiles.openai!.voiceAssignments, afterClear.voiceAssignments);
@@ -160,7 +160,7 @@ try {
   assert.deepEqual(
     raced.voiceAssignments,
     [
-      { characterId: "dottore", characterName: "Il Dottore", voice: "onyx" },
+      { characterId: "leopold", characterName: "Leopold", voice: "onyx" },
       { characterId: "alice-au", characterName: "Alice", voice: "echo" },
     ],
     "the settings save must not overwrite the voice saved after it",
@@ -168,15 +168,15 @@ try {
 
   // A failed write answers 500 and stores nothing, and the saves after it still go through.
   failNextWrite = true;
-  assert.equal((await putVoice({ characterId: "dottore", characterName: "Il Dottore", voice: "ash" })).statusCode, 500);
+  assert.equal((await putVoice({ characterId: "leopold", characterName: "Leopold", voice: "ash" })).statusCode, 500);
   assert.deepEqual(await stored(), raced);
   assert.equal((await putConfig({ ...(await readConfig()), speed: 3 })).statusCode, 204);
-  assert.equal((await putVoice({ characterId: "dottore", characterName: "Il Dottore", voice: "ash" })).statusCode, 204);
+  assert.equal((await putVoice({ characterId: "leopold", characterName: "Leopold", voice: "ash" })).statusCode, 204);
   const recovered = await stored();
   assert.equal(recovered.speed, 3);
   assert.deepEqual(recovered.voiceAssignments[0], {
-    characterId: "dottore",
-    characterName: "Il Dottore",
+    characterId: "leopold",
+    characterName: "Leopold",
     voice: "ash",
   });
 

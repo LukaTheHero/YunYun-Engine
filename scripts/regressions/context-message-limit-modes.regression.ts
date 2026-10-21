@@ -42,7 +42,7 @@ try {
     maxTokensOverride: 256,
   });
   assert.ok(connection);
-  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Pantalone" }));
+  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Cornelius" }));
   assert.ok(character);
   const chats = createChatsStorage(db);
 

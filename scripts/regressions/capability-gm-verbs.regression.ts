@@ -248,7 +248,7 @@ function bracketTagNames(source: string): Set<string> {
 
 // Source A — every `[name:` the GM format reminder and the party/VN reminder can render, across
 // all of their branches. Prompt files are swept in colon form only: they carry example lines whose
-// brackets hold arbitrary speaker names and expressions (`[Dottore] [main] [smirk]:`), so a
+// brackets hold arbitrary speaker names and expressions (`[Leopold] [main] [smirk]:`), so a
 // bare-bracket sweep of one would pin half a cast list.
 const reminderTags = new Set<string>();
 for (const file of [

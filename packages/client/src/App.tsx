@@ -1110,11 +1110,9 @@ export function App() {
     const shape =
       chatWidgetShape !== "preset"
         ? chatWidgetShape
-        : chatWidgetPreset === "dottore"
-          ? "cut-corner"
-          : chatWidgetPreset === "mari"
-            ? "arched"
-            : null;
+        : chatWidgetPreset === "mari"
+          ? "arched"
+          : null;
     if (shape) root.dataset.chatWidgetShape = shape;
     else delete root.dataset.chatWidgetShape;
     const font = getChatWidgetFontFamily(chatWidgetFont);

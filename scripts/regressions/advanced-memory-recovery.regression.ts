@@ -12,7 +12,7 @@ process.env.NODE_ENV = "test";
 process.env.LOG_LEVEL = "silent";
 process.env.MARINARA_LITE = "true";
 const summaryRequests: string[] = [];
-let helperAudience: string[] | "all" = [" Maukie "];
+let helperAudience: string[] | "all" = [" Tobias "];
 let helperFinishReason = "stop";
 const provider = createServer(async (request, response) => {
   const chunks: Buffer[] = [];
@@ -26,8 +26,8 @@ const provider = createServer(async (request, response) => {
     return;
   }
   assert.match(body.messages[0].content, /Characters \(IDs and names\):/);
-  assert.match(body.messages[0].content, /maukie/);
-  assert.match(body.messages[0].content, /pantalone/);
+  assert.match(body.messages[0].content, /tobias/);
+  assert.match(body.messages[0].content, /cornelius/);
   summaryRequests.push(body.messages[1].content);
   response.end(
     JSON.stringify({
@@ -57,8 +57,8 @@ const chats = createChatsStorage(db);
 const memory = createAdvancedMemoryService(db);
 try {
   for (const [id, name] of [
-    ["maukie", "Maukie"],
-    ["pantalone", "Pantalone"],
+    ["tobias", "Tobias"],
+    ["cornelius", "Cornelius"],
     ["narrator", "Powers That Be"],
   ])
     await db
@@ -81,7 +81,7 @@ try {
       name: "Recovery",
       mode: "roleplay",
       connectionId: connection.id,
-      characterIds: ["maukie", "pantalone", "narrator"],
+      characterIds: ["tobias", "cornelius", "narrator"],
     });
     assert(chat);
     await chats.patchMetadata(chat.id, {
@@ -89,12 +89,12 @@ try {
       advancedMemory: {
         enabled: true,
         narratorCharacterId: "narrator",
-        knowledgeStarts: { maukie: null, pantalone: null },
+        knowledgeStarts: { tobias: null, cornelius: null },
       },
     });
     await chats.createMessagesBatch(chat.id, [
-      { role: "user", content: "COMPASS_SCENE_BEGIN Maukie makes a compass promise. Pantalone is elsewhere." },
-      { role: "assistant", characterId: "maukie", content: "The compass promise is fulfilled." },
+      { role: "user", content: "COMPASS_SCENE_BEGIN Tobias makes a compass promise. Cornelius is elsewhere." },
+      { role: "assistant", characterId: "tobias", content: "The compass promise is fulfilled." },
       { role: "user", content: "COMPASS_NEXT_SCENE Recall the compass promise.", extra: { isConversationStart: true } },
     ]);
     const messages = await chats.listMessages(chat.id);
@@ -128,7 +128,7 @@ try {
     await db.insert(advancedMemoryRecords).values({
       ...row,
       id: `${sceneId}-deleted-copy`,
-      audienceCharacterIds: '["maukie"]',
+      audienceCharacterIds: '["tobias"]',
       enabled: 0,
       manualOverride: 1,
     });
@@ -137,7 +137,7 @@ try {
       id: `${sceneId}-partial`,
       messageIds: JSON.stringify([messages[1]!.id]),
       content: "Only the end of the compass scene.",
-      audienceCharacterIds: '["maukie"]',
+      audienceCharacterIds: '["tobias"]',
       dependencies: '[{"id":"scene-audience","revision":"participants-v1"}]',
     });
     assert.deepEqual(
@@ -154,7 +154,7 @@ try {
       saved[0]!.messageIds,
       messages.slice(0, 2).map((message) => message.id),
     );
-    assert.deepEqual(saved[0]!.audienceCharacterIds, ["maukie"], "full-scene processing saves its actual participants");
+    assert.deepEqual(saved[0]!.audienceCharacterIds, ["tobias"], "full-scene processing saves its actual participants");
     assert.equal(summaryRequests.length, before + 1, "only the incomplete scene is summarized");
     assert.match(summaryRequests.at(-1)!, /COMPASS_SCENE_BEGIN/);
     assert.doesNotMatch(summaryRequests.at(-1)!, /COMPASS_NEXT_SCENE/);
@@ -169,7 +169,7 @@ try {
       ...row,
       id: deletedId,
       content: "The original recap.",
-      audienceCharacterIds: '["maukie"]',
+      audienceCharacterIds: '["tobias"]',
       manualOverride: 1,
     });
     const laterId = `scene-${messages[2]!.id}`;
@@ -246,15 +246,15 @@ try {
   });
   await test("partial visibility review is saveable and clears its error without rewriting the recap", async () => {
     const { chat, messages, row, sceneId } = await fixture();
-    await chats.updateMessageExtra(messages[1]!.id, { hiddenFromAICharacterIds: ["maukie"] });
+    await chats.updateMessageExtra(messages[1]!.id, { hiddenFromAICharacterIds: ["tobias"] });
     const id = `${sceneId}-partial-reader`;
-    const content = '{{#if char == "Maukie"}}The public promise.{{/if}}';
+    const content = '{{#if char == "Tobias"}}The public promise.{{/if}}';
     await db.insert(advancedMemoryRecords).values({
       ...row,
       id,
       content,
       manualOverride: 1,
-      audienceCharacterIds: '["maukie","pantalone"]',
+      audienceCharacterIds: '["tobias","cornelius"]',
       dependencies: '[{"id":"scene-audience","revision":"participants-v1"}]',
     });
     await assert.rejects(memory.initialize(chat.id, { sceneId }), /manually corrected memory/);
@@ -278,7 +278,7 @@ try {
       ...row,
       id: `${sceneId}-corrected`,
       content: "A manually corrected compass promise.",
-      audienceCharacterIds: '["maukie"]',
+      audienceCharacterIds: '["tobias"]',
       manualOverride: 1,
     };
     await db.insert(advancedMemoryRecords).values(corrected);
@@ -286,13 +286,13 @@ try {
       ...row,
       id: `${sceneId}-automatic`,
       content: "An older automatic copy.",
-      audienceCharacterIds: '["pantalone"]',
+      audienceCharacterIds: '["cornelius"]',
       dependencies: '[{"id":"scene-audience","revision":"participants-v1"}]',
     });
     // Deleting an obsolete copy must not revoke the remaining explicit correction.
     await db
       .insert(advancedMemoryRecords)
-      .values({ ...row, id: `${sceneId}-deleted`, audienceCharacterIds: '["maukie"]', enabled: 0, manualOverride: 1 });
+      .values({ ...row, id: `${sceneId}-deleted`, audienceCharacterIds: '["tobias"]', enabled: 0, manualOverride: 1 });
     const before = summaryRequests.length;
     for (const action of [
       () => memory.status(chat.id),
@@ -307,7 +307,7 @@ try {
       assert.equal(saved[0]!.content, corrected.content, "manual text wins over generated copies");
       assert.deepEqual(
         saved[0]!.audienceCharacterIds,
-        ["maukie"],
+        ["tobias"],
         "manual access wins over generated and deleted copies",
       );
     }
@@ -318,15 +318,15 @@ try {
     );
     const recall = (audienceCharacterIds: string[]) =>
       memory.prepare({ chatId: chat.id, messages, audienceCharacterIds, budgetTokens: 12000, readOnly: true });
-    assert((await recall(["maukie"])).receipt.recalledSceneIds.includes(sceneId));
-    assert(!(await recall(["pantalone"])).receipt.recalledSceneIds.includes(sceneId));
+    assert((await recall(["tobias"])).receipt.recalledSceneIds.includes(sceneId));
+    assert(!(await recall(["cornelius"])).receipt.recalledSceneIds.includes(sceneId));
     const exported = (await memory.exportTransferRecords(chat.id)).find((item) => item.record.id === corrected.id)!;
-    assert.deepEqual(exported.record.audienceCharacterIds, ["maukie"]);
-    await memory.updateRecord(chat.id, corrected.id, { audienceCharacterIds: ["pantalone"] });
+    assert.deepEqual(exported.record.audienceCharacterIds, ["tobias"]);
+    await memory.updateRecord(chat.id, corrected.id, { audienceCharacterIds: ["cornelius"] });
     await memory.reindex(chat.id);
     assert.deepEqual(
       (await memory.status(chat.id)).records.find((record) => record.id === corrected.id)!.audienceCharacterIds,
-      ["pantalone"],
+      ["cornelius"],
     );
     assert.equal(summaryRequests.length, before);
   });
@@ -335,7 +335,7 @@ try {
     const id = `${row.sceneId}-unreviewed`;
     await db
       .insert(advancedMemoryRecords)
-      .values({ ...row, id, content: "An unreviewed compass recap.", audienceCharacterIds: '["maukie"]' });
+      .values({ ...row, id, content: "An unreviewed compass recap.", audienceCharacterIds: '["tobias"]' });
     assert.deepEqual(
       (await memory.status(chat.id)).records.find((record) => record.id === id)!.audienceCharacterIds,
       [],
@@ -343,7 +343,7 @@ try {
     const exported = (await memory.exportTransferRecords(chat.id)).find((item) => item.record.id === id)!;
     assert.deepEqual(
       exported.record.audienceCharacterIds,
-      ["maukie"],
+      ["tobias"],
       "export must not erase stored assignments with a display projection",
     );
   });
@@ -357,14 +357,14 @@ try {
       manualOverride: 1,
       messageIds: JSON.stringify([messages[1]!.id]),
       content,
-      audienceCharacterIds: '["pantalone"]',
+      audienceCharacterIds: '["cornelius"]',
     });
     helperFinishReason = "length";
     await assert.rejects(memory.initialize(chat.id, { sceneId }), /output limit/);
     const failed = await memory.status(chat.id);
     assert.equal(failed.job.status, "error");
     assert.equal(failed.records.find((record) => record.id === id)!.content, content);
-    assert.deepEqual(failed.records.find((record) => record.id === id)!.audienceCharacterIds, ["pantalone"]);
+    assert.deepEqual(failed.records.find((record) => record.id === id)!.audienceCharacterIds, ["cornelius"]);
     assert.equal(failed.unpreparedScenes!.length, 1);
     helperFinishReason = "stop";
     await memory.initialize(chat.id, { sceneId });
@@ -372,14 +372,14 @@ try {
     assert.deepEqual(repaired.unpreparedScenes, []);
     assert.deepEqual(
       repaired.records.find((record) => record.id === id)!.audienceCharacterIds,
-      ["pantalone"],
+      ["cornelius"],
       "manual access overrides a differing helper decision",
     );
     assert.match(summaryRequests.at(-1)!, /CORRECTED_COMPASS/);
   });
   await test("backup round trips keep confirmed shared access without overwriting local corrections", async () => {
     const { chat, row, sceneId } = await fixture();
-    for (const participant of ["maukie", "pantalone"])
+    for (const participant of ["tobias", "cornelius"])
       await db.insert(advancedMemoryRecords).values({
         ...row,
         id: `${sceneId}-${participant}`,
@@ -392,17 +392,17 @@ try {
     const imported = await memory.importMemory(target.chat.id, backup);
     const saved = imported.records.filter((record) => record.kind === "scene" && record.content);
     assert.equal(saved.length, 1);
-    assert.deepEqual(saved[0]!.audienceCharacterIds, ["maukie", "pantalone"]);
-    await memory.updateRecord(target.chat.id, saved[0]!.id, { audienceCharacterIds: ["maukie"] });
+    assert.deepEqual(saved[0]!.audienceCharacterIds, ["tobias", "cornelius"]);
+    await memory.updateRecord(target.chat.id, saved[0]!.id, { audienceCharacterIds: ["tobias"] });
     await memory.importMemory(target.chat.id, backup);
     assert.deepEqual(
       (await memory.status(target.chat.id)).records.find((record) => record.id === saved[0]!.id)!.audienceCharacterIds,
-      ["maukie"],
+      ["tobias"],
     );
     await db
       .update(advancedMemoryRecords)
       .set({ enabled: 0 })
-      .where(eq(advancedMemoryRecords.id, `${sceneId}-pantalone`));
+      .where(eq(advancedMemoryRecords.id, `${sceneId}-cornelius`));
     const disabledTarget = await fixture();
     const disabled = await memory.importMemory(disabledTarget.chat.id, await memory.exportMemory(chat.id));
     assert.equal(disabled.records.find((record) => record.kind === "scene" && record.content)!.enabled, false);
@@ -425,7 +425,7 @@ try {
         id: correctionId,
         endMessageId: messages[2]!.id,
         messageIds: JSON.stringify([messages[0]!.id, messages[2]!.id]),
-        audienceCharacterIds: '["maukie"]',
+        audienceCharacterIds: '["tobias"]',
         manualOverride: 1,
         content: "The corrected compass promise stays intact.",
       });
@@ -435,7 +435,7 @@ try {
       await memory.updateRecord(
         chat.id,
         correctionId,
-        edit === "text" ? { content: before.content } : { audienceCharacterIds: ["maukie"] },
+        edit === "text" ? { content: before.content } : { audienceCharacterIds: ["tobias"] },
       );
       const reviewed = (await memory.status(chat.id)).records.find((record) => record.id === correctionId)!;
       assert.equal(reviewed.content, before.content);
@@ -444,14 +444,14 @@ try {
         sourceIds,
         "saving acknowledges the hidden gap in the original source range",
       );
-      assert.deepEqual(reviewed.audienceCharacterIds, ["maukie"]);
+      assert.deepEqual(reviewed.audienceCharacterIds, ["tobias"]);
       const paid = summaryRequests.length;
       await memory.initialize(chat.id, { sceneId });
       assert.equal(summaryRequests.length, paid, "an acknowledged correction needs no new summary");
-      await chats.updateMessageExtra(messages[1]!.id, { hiddenFromAICharacterIds: ["maukie"] });
+      await chats.updateMessageExtra(messages[1]!.id, { hiddenFromAICharacterIds: ["tobias"] });
       await memory.updateRecord(chat.id, correctionId, { content: before.content });
       for (const message of messages)
-        await chats.updateMessageExtra(message.id, { hiddenFromAICharacterIds: ["maukie"] });
+        await chats.updateMessageExtra(message.id, { hiddenFromAICharacterIds: ["tobias"] });
       await assert.rejects(
         memory.updateRecord(chat.id, correctionId, { content: before.content }),
         /no longer available/,
@@ -464,7 +464,7 @@ try {
       ...row,
       id: `${sceneId}-saved-recap`,
       content: "The original compass scene is already saved.",
-      audienceCharacterIds: '["maukie"]',
+      audienceCharacterIds: '["tobias"]',
     });
     await db
       .update(advancedMemoryRecords)
@@ -491,7 +491,7 @@ try {
       await chats.createMessagesBatch(chat.id, [
         {
           role: "assistant",
-          characterId: "maukie",
+          characterId: "tobias",
           content: "The later compass scene also ends.",
           createdAt: new Date(Date.parse(messages.at(-1)!.createdAt) + 1000).toISOString(),
         },
@@ -539,7 +539,7 @@ try {
             .filter((message) => message.id !== source[1]!.id)
             .map((message) => message.id),
         ),
-        audienceCharacterIds: '["maukie"]',
+        audienceCharacterIds: '["tobias"]',
         manualOverride: 1,
         content: correction,
       });
@@ -573,17 +573,17 @@ try {
   });
   await test("named participants resolve to separate chat characters and unknown names never grant access", async () => {
     for (const [result, expected] of [
-      [["Pantalone"], ["pantalone"]],
+      [["Cornelius"], ["cornelius"]],
       [
-        ["Maukie", "Pantalone"],
-        ["maukie", "pantalone"],
+        ["Tobias", "Cornelius"],
+        ["tobias", "cornelius"],
       ],
-      [["maukie"], ["maukie"]],
+      [["tobias"], ["tobias"]],
       [["Absent stranger", "Powers That Be"], []],
-      [["Pantalone Bisognosi"], ["pantalone"]],
+      [["Cornelius Bisognosi"], ["cornelius"]],
       [["Powers"], []],
       [[], []],
-      ["all", ["maukie", "pantalone"]],
+      ["all", ["tobias", "cornelius"]],
     ] as Array<[string[] | "all", string[]]>) {
       const { chat, sceneId } = await fixture();
       helperAudience = result;

@@ -46,7 +46,7 @@ try {
   });
   assert.ok(connection);
 
-  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Pantalone" }));
+  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Cornelius" }));
   assert.ok(character);
 
   // The preset owns char1; the chat also defines it, plus a name of its own.

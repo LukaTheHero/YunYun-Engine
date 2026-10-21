@@ -11,7 +11,7 @@ const store = {
   async listEntries() {
     return [
       { id: "existing", name: "YunYun's beach", content: "", locked: false },
-      { id: "locked", name: "Dottore & YunYun", content: "Private", locked: true },
+      { id: "locked", name: "Leopold & YunYun", content: "Private", locked: true },
     ];
   },
   async createEntry(input: Record<string, unknown>) {
@@ -26,7 +26,7 @@ const store = {
 const updates = [
   { name: "YunYun&apos;s beach", content },
   { entry: { name: "The &#34;Doctor&#34; &amp; Co.", content } },
-  { entryName: "Dottore &amp; YunYun", content: "Must not overwrite a locked entry" },
+  { entryName: "Leopold &amp; YunYun", content: "Must not overwrite a locked entry" },
 ];
 await persistLorebookKeeperUpdates({
   lorebooksStore: store as unknown as Parameters<typeof persistLorebookKeeperUpdates>[0]["lorebooksStore"],

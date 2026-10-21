@@ -13,6 +13,15 @@
 //   Pasta-Devs/Marinara-Engine    upstream URLs + AGPL attribution (hyphen; must keep)
 //   custom_components/marinara_engine  Home Assistant domain (renaming breaks installs)
 //
+// Upstream characters: the fork ships none of upstream's characters. After a
+// merge, besides running this script, check by hand that the merge did not
+// bring back any of them: Professor Mari's appearance packs (only "basic"
+// ships, see src/lib/mari-work-animations.ts), the Dottore chat-widget style,
+// Professor Mari's persona lore in seed-mari.ts / workspace-agent.service.ts,
+// or new What's New announcements and their /releases/ media (the fork keeps
+// RELEASE_ANNOUNCEMENTS empty because upstream writes them as Mari and
+// illustrates them with its characters).
+//
 // Usage:  node scripts/yunyun-rebrand.mjs [--dry] [--list]
 // ──────────────────────────────────────────────
 import { execSync } from "node:child_process";
@@ -59,6 +68,13 @@ const RULES = [
 
   // The profile slot wants a portrait, so it keeps its own image, not the chibi.
   [/sprites\/mari\/Mari_profile\.png/g, "sprites/yunyun/yunyun-profile.png"],
+  // v2.5.1 split her art into appearance-pack folders (sprites/mari/<pack>/...).
+  // The fork ships one pack, generated from its own art with the same file
+  // names and frame layout, at sprites/yunyun/basic/ — so every pack folder,
+  // Basic or one of upstream's costumes (Dottore, Golden, Safari, Raccoon),
+  // maps onto it. This must run before the catch-all below, which would turn
+  // "sprites/mari/basic/idle.webp" into "chibi-yunyun.png/idle.webp".
+  [/sprites\/mari\/(?!generated\/)[a-z][a-z0-9-]*\//g, "sprites/yunyun/basic/"],
   // Everything else under sprites/mari/ — the six assistant states, the chibi,
   // the pointing/waving tutorial sprites, the memory wheel and its prompt note.
   [/sprites\/mari\/(?:generated\/)?[A-Za-z0-9_][A-Za-z0-9_.-]*/g, "sprites/yunyun/chibi-yunyun.png"],
@@ -84,6 +100,10 @@ const RULES = [
   // the dot arrives backslash-escaped, so accept both spellings.
   [/\bprofessor-mari-memory-wheel-v2\\?\.png/g, "chibi-yunyun.png"],
   [/\bmari-primogem\.svg/g, "chibi-yunyun.png"],
+  // Upstream's Dottore art (the chat-widget crest and the support GIF) is not
+  // shipped either.
+  [/images\/chat-widgets\/dottore-crest\.svg/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/sprites\/dottore\/[A-Za-z0-9_.-]+/g, "sprites/yunyun/chibi-yunyun.png"],
   [/\bchat-ui-mari\.jpg/g, "chibi-yunyun.png"],
   [/\bprofessor-mari-memories\.png/g, "chibi-yunyun.png"],
 
@@ -123,6 +143,26 @@ const RULES = [
   // page, so every merge that adds a new reference must be repointed at ours.
   [/https:\/\/discord\.com\/invite\/KdAkTg94ME/g, "https://discord.gg/canalpa"],
   [/https:\/\/ko-fi\.com\/marinara_spaghetti/g, "https://ko-fi.com/lukathehero"],
+
+  // Upstream's recurring example cast. Their prompts, docs, help text and test
+  // fixtures name these characters; the fork ships none of them, so every
+  // mention is renamed to a neutral stand-in of the same length and gender
+  // (so fixed-width and token-count fixtures keep lining up). The rules have
+  // no word boundary on purpose: ids and camelCase identifiers ("dottoreId")
+  // must be renamed together with the display names they pair with.
+  // NB: this also renames upstream's "dottore" chat-widget preset id if a merge
+  // brings it back. The fork removed that style; drop it again by hand.
+  [/\bIl Dottore\b/g, "Leopold"],
+  [/\bil dottore\b/g, "leopold"],
+  [/Dottore/g, "Leopold"],
+  [/dottore/g, "leopold"],
+  [/DOTTORE/g, "LEOPOLD"],
+  [/Maukie/g, "Tobias"],
+  [/maukie/g, "tobias"],
+  [/MAUKIE/g, "TOBIAS"],
+  [/Pantalone/g, "Cornelius"],
+  [/pantalone/g, "cornelius"],
+  [/PANTALONE/g, "CORNELIUS"],
 ];
 
 // Phrases that must survive verbatim even though they contain the old name.

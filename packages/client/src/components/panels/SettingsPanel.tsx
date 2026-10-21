@@ -3968,18 +3968,13 @@ function AppearanceSettings({ group = "app" }: { group?: AppearanceGroup }) {
                 <p className="mb-3 text-xs leading-relaxed text-[var(--muted-foreground)]">
                   {localizeUi("settings.controls.chatWidgetStyle.help")}
                 </p>
-                <div className="grid grid-cols-1 gap-2 @min-[34rem]:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 @min-[34rem]:grid-cols-2">
                   {(
                     [
                       {
                         id: "default",
                         labelKey: "settings.controls.chatWidgetStyle.default",
                         descriptionKey: "settings.controls.chatWidgetStyle.defaultDescription",
-                      },
-                      {
-                        id: "dottore",
-                        labelKey: "settings.controls.chatWidgetStyle.dottore",
-                        descriptionKey: "settings.controls.chatWidgetStyle.dottoreDescription",
                       },
                       {
                         id: "mari",

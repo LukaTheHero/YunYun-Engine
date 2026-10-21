@@ -22,9 +22,9 @@ const schedule: WeekSchedule = {
 };
 schedule.days.Monday = [{ time: "09:00-17:00", activity: "Research", status: "dnd" }];
 
-const envelope = createCharacterScheduleExport(schedule, "Il Dottore");
+const envelope = createCharacterScheduleExport(schedule, "Leopold");
 assert.equal(envelope.kind, CHARACTER_SCHEDULE_EXPORT_KIND);
-assert.equal(envelope.characterName, "Il Dottore");
+assert.equal(envelope.characterName, "Leopold");
 
 const current = parseCharacterScheduleImport(envelope, "2026-07-27T00:00:00.000Z");
 assert.equal(current.ok, true);

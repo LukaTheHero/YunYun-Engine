@@ -20,7 +20,7 @@ export const NOODLE_IMAGE_POST: PromptOverrideKeyDef<NoodleImagePostCtx> = {
   description:
     "Template that assembles the base image-generation prompt. When the selected image connection has image instructions, YunYun first tries to have an agent text model apply them; if rewriting is unavailable, the prompt is sent without them. The default sends the visual idea and appearance notes, without the post text, your Noodle image instructions (those are also given to the timeline model), or the character's personality and image habits (those are given to the agent text model).",
   variables: [
-    { name: "authorName", description: "Display name of the Noodle account posting.", example: "Dottore" },
+    { name: "authorName", description: "Display name of the Noodle account posting.", example: "Leopold" },
     {
       name: "postContent",
       description: "The Noodle post text, available for custom templates but omitted by the default image prompt.",
@@ -29,7 +29,7 @@ export const NOODLE_IMAGE_POST: PromptOverrideKeyDef<NoodleImagePostCtx> = {
     {
       name: "draftPrompt",
       description: "The timeline writer's initial image idea for this post.",
-      example: 'Meme image: Dottore staring at a ruined lab bench, caption text "six minutes unsupervised" at the top',
+      example: 'Meme image: Leopold staring at a ruined lab bench, caption text "six minutes unsupervised" at the top',
     },
     {
       name: "userInstructions",
@@ -42,7 +42,7 @@ export const NOODLE_IMAGE_POST: PromptOverrideKeyDef<NoodleImagePostCtx> = {
       name: "characterDescription",
       description:
         "Character appearance notes from Include descriptions in Noodle Settings. Empty in the prompt an agent text model rewrites, because that model gets them as character context instead.",
-      example: "Character appearance notes:\nDottore's Appearance: tall, slim build, blue hair, red eyes, mask.",
+      example: "Character appearance notes:\nLeopold's Appearance: tall, slim build, blue hair, red eyes, mask.",
     },
     {
       name: "characterPersonality",
@@ -65,14 +65,14 @@ export const NOODLE_IMAGE_POST: PromptOverrideKeyDef<NoodleImagePostCtx> = {
       .filter(Boolean)
       .join("\n\n"),
   exampleContext: {
-    authorName: "Dottore",
+    authorName: "Leopold",
     postContent: "I left one meeting unattended for six minutes and returned to theatrical accusations.",
     draftPrompt:
-      'Meme image: Dottore staring at a ruined lab bench, caption text "six minutes unsupervised" at the top',
+      'Meme image: Leopold staring at a ruined lab bench, caption text "six minutes unsupervised" at the top',
     userInstructions:
       "Create either a social-media-ready character image or a meme. Mention build, clothing, appearance, pose, expression, setting, lighting, mood, composition, meme format, and short visible meme text when relevant.",
     characterDescription:
-      "Character appearance notes:\nDottore's Appearance: tall, slim build, blue hair, red eyes, mask.",
+      "Character appearance notes:\nLeopold's Appearance: tall, slim build, blue hair, red eyes, mask.",
     characterPersonality: "precise, arrogant, intensely curious, impatient with staged sentimentality",
     characterImageInstructions: "Shares stark lab photography with cold lighting and clinical framing.",
   },

@@ -497,11 +497,11 @@ assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorEnabled, f
 assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorConnectionId, "");
 assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorEmotionsEnabled, false);
 
-const extractorMessage = 'Dottore sighs. "Enough of this," he says. A pause follows. "Skill issue," YunYun chuckles.';
+const extractorMessage = 'Leopold sighs. "Enough of this," he says. A pause follows. "Skill issue," YunYun chuckles.';
 const extractedSegments = parseRoleplaySpeakerExtractorOutput(
   JSON.stringify({
     dialogue: [
-      { speaker: "Dottore", text: '"Enough of this,"', speech: '[irritated] "Enough of this,"' },
+      { speaker: "Leopold", text: '"Enough of this,"', speech: '[irritated] "Enough of this,"' },
       { speaker: "YunYun", text: '"Skill issue,"', speech: '[chuckle] "Skill issue,"' },
     ],
   }),
@@ -509,8 +509,8 @@ const extractedSegments = parseRoleplaySpeakerExtractorOutput(
   true,
 ).segments;
 assert.deepEqual(extractedSegments, [
-  { kind: "narration", text: "Dottore sighs." },
-  { kind: "dialogue", speaker: "Dottore", text: '[irritated] "Enough of this,"' },
+  { kind: "narration", text: "Leopold sighs." },
+  { kind: "dialogue", speaker: "Leopold", text: '[irritated] "Enough of this,"' },
   { kind: "narration", text: "he says. A pause follows." },
   { kind: "dialogue", speaker: "YunYun", text: '[chuckle] "Skill issue,"' },
   { kind: "narration", text: "YunYun chuckles." },
@@ -518,7 +518,7 @@ assert.deepEqual(extractedSegments, [
 assert.throws(
   () =>
     parseRoleplaySpeakerExtractorOutput(
-      JSON.stringify({ dialogue: [{ speaker: "Dottore", text: '"Changed dialogue"' }] }),
+      JSON.stringify({ dialogue: [{ speaker: "Leopold", text: '"Changed dialogue"' }] }),
       extractorMessage,
       false,
     ),
@@ -530,7 +530,7 @@ assert.throws(
       JSON.stringify({
         dialogue: [
           {
-            speaker: "Dottore",
+            speaker: "Leopold",
             text: '"Enough of this,"',
             speech: '[irritated] "I have had enough,"',
           },
@@ -545,9 +545,9 @@ assert.throws(
   () =>
     parseRoleplaySpeakerExtractorOutput(
       JSON.stringify({
-        dialogue: [{ speaker: "Dottore", text: '"Wait  here."', speech: '[tense] "Wait here."' }],
+        dialogue: [{ speaker: "Leopold", text: '"Wait  here."', speech: '[tense] "Wait here."' }],
       }),
-      'Dottore says, "Wait  here."',
+      'Leopold says, "Wait  here."',
       true,
     ),
   /changed dialogue while adding emotion indicators/,
@@ -556,14 +556,14 @@ assert.throws(
 assert.deepEqual(
   parseRoleplaySpeakerExtractorOutput(
     JSON.stringify({
-      dialogue: [{ speaker: "Dottore", text: '"Use [A] now."', speech: '[firm] "Use [A] now."' }],
+      dialogue: [{ speaker: "Leopold", text: '"Use [A] now."', speech: '[firm] "Use [A] now."' }],
     }),
-    'Dottore orders, "Use [A] now."',
+    'Leopold orders, "Use [A] now."',
     true,
   ).segments,
   [
-    { kind: "narration", text: "Dottore orders," },
-    { kind: "dialogue", speaker: "Dottore", text: '[firm] "Use [A] now."' },
+    { kind: "narration", text: "Leopold orders," },
+    { kind: "dialogue", speaker: "Leopold", text: '[firm] "Use [A] now."' },
   ],
   "source-authored brackets must survive alongside inserted emotion indicators",
 );
@@ -571,8 +571,8 @@ assert.match(
   buildRoleplaySpeakerExtractorPrompt({
     group: "Lab group",
     user: "YunYun",
-    characters: ["Dottore", "YunYun"],
-    messageAuthor: "Dottore",
+    characters: ["Leopold", "YunYun"],
+    messageAuthor: "Leopold",
     includeEmotions: true,
   }),
   /"speech":"Exact dialogue with only inserted \[indicators\]"/,
@@ -581,8 +581,8 @@ assert.match(
   buildRoleplaySpeakerExtractorPrompt({
     group: "Lab group",
     user: "YunYun",
-    characters: ["Dottore", "YunYun"],
-    messageAuthor: "Dottore",
+    characters: ["Leopold", "YunYun"],
+    messageAuthor: "Leopold",
     includeEmotions: true,
   }),
   /\[Low, steady voice, restrained irritation\].*\[Firm, controlled impatience\].*\[sigh\]/s,
@@ -591,11 +591,11 @@ assert.match(
   buildRoleplaySpeakerExtractorPrompt({
     group: "Lab group",
     user: "YunYun",
-    characters: ["Dottore", "Maukie"],
-    messageAuthor: "Maukie",
+    characters: ["Leopold", "Tobias"],
+    messageAuthor: "Tobias",
     includeEmotions: true,
   }),
-  /response was generated for Maukie.*exact name.*not explicitly attributed to a different speaker/su,
+  /response was generated for Tobias.*exact name.*not explicitly attributed to a different speaker/su,
 );
 const responsesCompatibleExtractorInput = buildRoleplaySpeakerExtractorUserPrompt('Columbina says, "Sing."');
 assert.match(responsesCompatibleExtractorInput, /\bjson\b/u);
@@ -615,7 +615,7 @@ A shoulder-wide passage climbs into Belleau. Fresh scrapes mark its lower wall. 
 
 Red light floods the shaft.
 
-An alarm shudders through the station—the same one now screaming around Maukie’s tea table. Fagio’s cable lashes upward. Columbina catches its hook between two fingers, and the line draws taut enough to sing.
+An alarm shudders through the station—the same one now screaming around Tobias’s tea table. Fagio’s cable lashes upward. Columbina catches its hook between two fingers, and the line draws taut enough to sing.
 
 A warning races across Fagio’s distant slate:
 
@@ -660,25 +660,25 @@ const extractedVoiceConfig = ttsConfigSchema.parse({
   voice: "global",
   voiceMode: "per-character",
   voiceAssignments: [
-    { characterId: "dottore-id", characterName: "Dottore", voice: "dottore-voice" },
+    { characterId: "leopold-id", characterName: "Leopold", voice: "leopold-voice" },
     { characterId: "mari-id", characterName: "YunYun", voice: "mari-voice" },
   ],
   narratorVoiceEnabled: true,
   narratorVoice: "narrator-voice",
 });
-const extractedCharacterIds: Record<string, string> = { Dottore: "dottore-id", YunYun: "mari-id" };
+const extractedCharacterIds: Record<string, string> = { Leopold: "leopold-id", YunYun: "mari-id" };
 const extractedVoiceRequests = buildExtractedRoleplayTTSVoiceRequests(
   extractedSegments,
   extractedVoiceConfig,
-  "Dottore",
-  "dottore-id",
+  "Leopold",
+  "leopold-id",
   (speaker) => extractedCharacterIds[speaker ?? ""],
 );
 assert.deepEqual(
   extractedVoiceRequests.map(({ speaker, voice, text }) => ({ speaker, voice, text })),
   [
-    { speaker: "Narrator", voice: "narrator-voice", text: "Dottore sighs." },
-    { speaker: "Dottore", voice: "dottore-voice", text: '[irritated] "Enough of this,"' },
+    { speaker: "Narrator", voice: "narrator-voice", text: "Leopold sighs." },
+    { speaker: "Leopold", voice: "leopold-voice", text: '[irritated] "Enough of this,"' },
     { speaker: "Narrator", voice: "narrator-voice", text: "he says. A pause follows." },
     { speaker: "YunYun", voice: "mari-voice", text: '[chuckle] "Skill issue,"' },
     { speaker: "Narrator", voice: "narrator-voice", text: "YunYun chuckles." },
@@ -687,8 +687,8 @@ assert.deepEqual(
 const extractedGlobalNarrationRequests = buildExtractedRoleplayTTSVoiceRequests(
   extractedSegments,
   { ...extractedVoiceConfig, narratorVoiceEnabled: false, narratorVoice: "" },
-  "Dottore",
-  "dottore-id",
+  "Leopold",
+  "leopold-id",
   (speaker) => extractedCharacterIds[speaker ?? ""],
 );
 assert.deepEqual(
@@ -704,13 +704,13 @@ assert.deepEqual(
 const extractedDialogueOnlyRequests = buildExtractedRoleplayTTSVoiceRequests(
   extractedSegments,
   { ...extractedVoiceConfig, dialogueOnly: true, dialoguePauseMs: 2000 },
-  "Dottore",
-  "dottore-id",
+  "Leopold",
+  "leopold-id",
 );
 assert.deepEqual(
   extractedDialogueOnlyRequests.map(({ speaker, pauseAfterMs }) => ({ speaker, pauseAfterMs })),
   [
-    { speaker: "Dottore", pauseAfterMs: 2000 },
+    { speaker: "Leopold", pauseAfterMs: 2000 },
     { speaker: "YunYun", pauseAfterMs: undefined },
   ],
 );
@@ -727,42 +727,42 @@ const extractedVoiceFallbackConfig = ttsConfigSchema.parse({
 const extractedVoiceFallbackRequests = buildExtractedRoleplayTTSVoiceRequests(
   [
     { kind: "dialogue", speaker: "Columbina", text: '"Come closer."' },
-    { kind: "dialogue", speaker: "Dottore", text: '"How unfortunate."' },
+    { kind: "dialogue", speaker: "Leopold", text: '"How unfortunate."' },
     { kind: "dialogue", speaker: "Fatui Guard", text: '"At once."' },
   ],
   extractedVoiceFallbackConfig,
   null,
   null,
   (speaker) =>
-    speaker === "Columbina" ? "columbina-id" : speaker === "Dottore" ? "dottore-without-assignment-id" : null,
+    speaker === "Columbina" ? "columbina-id" : speaker === "Leopold" ? "leopold-without-assignment-id" : null,
 );
 assert.deepEqual(
   extractedVoiceFallbackRequests.map(({ speaker, voice }) => ({ speaker, voice })),
   [
     { speaker: "Columbina", voice: "columbina-voice" },
-    { speaker: "Dottore", voice: "random-npc-voice" },
+    { speaker: "Leopold", voice: "random-npc-voice" },
     { speaker: "Fatui Guard", voice: "random-npc-voice" },
   ],
 );
 const extractedDecoratedSpeakerRequests = buildExtractedRoleplayTTSVoiceRequests(
-  [{ kind: "dialogue", speaker: "**Maukie:** [chuckle]", text: '[chuckle] "I said it."' }],
+  [{ kind: "dialogue", speaker: "**Tobias:** [chuckle]", text: '[chuckle] "I said it."' }],
   {
     ...extractedVoiceFallbackConfig,
-    voiceAssignments: [{ characterId: "maukie-id", characterName: "Maukie", voice: "maukie-voice" }],
+    voiceAssignments: [{ characterId: "tobias-id", characterName: "Tobias", voice: "tobias-voice" }],
   },
   null,
   null,
-  (speaker) => findTTSCharacterIdBySpeakerName(speaker, [["maukie-id", { name: "Maukie" }]] as const),
+  (speaker) => findTTSCharacterIdBySpeakerName(speaker, [["tobias-id", { name: "Tobias" }]] as const),
 );
 assert.deepEqual(
   extractedDecoratedSpeakerRequests.map(({ speaker, voice }) => ({ speaker, voice })),
-  [{ speaker: "**Maukie:** [chuckle]", voice: "maukie-voice" }],
+  [{ speaker: "**Tobias:** [chuckle]", voice: "tobias-voice" }],
   "Extractor label formatting must not send a known character through the Random NPC Voice pool",
 );
 assert.equal(
-  findTTSCharacterIdBySpeakerName("Maukie", [
-    ["maukie-one", { name: "Maukie" }],
-    ["maukie-two", { name: "Maukie" }],
+  findTTSCharacterIdBySpeakerName("Tobias", [
+    ["tobias-one", { name: "Tobias" }],
+    ["tobias-two", { name: "Tobias" }],
   ]),
   null,
   "duplicate exact character names must not select an arbitrary voice assignment",
@@ -771,7 +771,7 @@ assert.equal(
 // The Character Editor's Voice section edits one character's row of the shared list (Agents#1176).
 const sharedVoiceRows = [
   { characterId: "alice-original", characterName: "Alice", voice: "original-voice" },
-  { characterId: "dottore-id", characterName: "Dottore", voice: "dottore-voice" },
+  { characterId: "leopold-id", characterName: "Leopold", voice: "leopold-voice" },
 ];
 const withAuVoice = setCharacterVoiceAssignment(
   sharedVoiceRows,
@@ -801,28 +801,28 @@ assert.equal(
   "original-voice",
   "speakers known only by name keep the first matching row",
 );
-const renamedDottore = setCharacterVoiceAssignment(
+const renamedLeopold = setCharacterVoiceAssignment(
   withAuVoice,
-  { characterId: "dottore-id", characterName: "Il Dottore" },
-  "new-dottore-voice",
+  { characterId: "leopold-id", characterName: "Leopold" },
+  "new-leopold-voice",
 );
 assert.deepEqual(
-  renamedDottore.map(({ characterName, voice }) => `${characterName}:${voice}`),
-  ["Alice:original-voice", "Il Dottore:new-dottore-voice", "Alice:au-voice"],
+  renamedLeopold.map(({ characterName, voice }) => `${characterName}:${voice}`),
+  ["Alice:original-voice", "Leopold:new-leopold-voice", "Alice:au-voice"],
   "changing a voice updates the existing row in place with the current name",
 );
-const clearedDottore = setCharacterVoiceAssignment(
-  [...renamedDottore, { characterId: "dottore-id", characterName: "Dottore", voice: "" }],
-  { characterId: "dottore-id", characterName: "Il Dottore" },
+const clearedLeopold = setCharacterVoiceAssignment(
+  [...renamedLeopold, { characterId: "leopold-id", characterName: "Leopold", voice: "" }],
+  { characterId: "leopold-id", characterName: "Leopold" },
   " ",
 );
 assert.deepEqual(
-  clearedDottore.map(({ characterId }) => characterId),
+  clearedLeopold.map(({ characterId }) => characterId),
   ["alice-original", "alice-au"],
   "a blank voice removes every row for that character",
 );
 assert.equal(
-  resolveTTSVoiceForSpeaker({ ...characterVoiceConfig, voiceAssignments: clearedDottore }, "Il Dottore", "dottore-id"),
+  resolveTTSVoiceForSpeaker({ ...characterVoiceConfig, voiceAssignments: clearedLeopold }, "Leopold", "leopold-id"),
   "default-voice",
   "a character without its own row falls back to the default voice",
 );
@@ -834,7 +834,7 @@ assert.equal(
 );
 assert.equal(getCharacterNameVoice(sharedVoiceRows, auCard), "original-voice", "an AU card shows the voice it uses");
 assert.equal(getCharacterNameVoice(withAuVoice, auCard), "original-voice", "its own row is not the name's voice");
-assert.equal(getCharacterNameVoice(withAuVoice, { characterId: "dottore-id", characterName: "Dottore" }), "");
+assert.equal(getCharacterNameVoice(withAuVoice, { characterId: "leopold-id", characterName: "Leopold" }), "");
 assert.equal(
   getCharacterNameVoice([{ characterId: "alice-au", characterName: "Alice (Modern AU)", voice: "au-voice" }], {
     characterId: "alice-original",

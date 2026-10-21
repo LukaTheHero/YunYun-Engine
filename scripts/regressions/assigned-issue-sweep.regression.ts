@@ -628,8 +628,8 @@ assert.equal(
 
 const liveMacroContext = {
   user: "YunYun",
-  char: "Dottore",
-  characters: ["Dottore"],
+  char: "Leopold",
+  characters: ["Leopold"],
   variables: {},
   localVariables: { existing: "kept" },
 };

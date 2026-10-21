@@ -73,7 +73,7 @@ const owner = { ownerType: "character", ownerId: "char_tripo" } as const;
   const built = buildVrmImport(await vrmImporter.validate(input), input, null);
   assert.equal(built.data.specVersion, "1.0");
   assert.deepEqual(built.data.expressionNames, [], "body only: no face expressions");
-  assert.equal(built.data.meta?.title, "Maukie");
+  assert.equal(built.data.meta?.title, "Tobias");
   assert.deepEqual(built.data.meta?.authors, ["Tripo AI"]);
   assert.equal(built.data.meta?.termsUrl, "https://developers.tripo3d.ai/en/terms", "its terms still link Tripo's");
   assert.ok(

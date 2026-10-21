@@ -27,11 +27,11 @@ const { characterDataSchema, resolveDeferredCharacterMacros } = await import("..
 
 const SUMMARY = [
   "{{user}} and {{char}} reached the harbor.",
-  '{{#if char == "Maukie"}}{{char}} hid the compass.{{/if}}',
-  '{{#if char == "Maukie" || char == "Pantalone"}}The travelers kept the compass promise.{{/if}}',
+  '{{#if char == "Tobias"}}{{char}} hid the compass.{{/if}}',
+  '{{#if char == "Tobias" || char == "Cornelius"}}The travelers kept the compass promise.{{/if}}',
   '{{#if char == "Narrator"}}NARRATOR_ONLY The storm was planned.{{/if}}',
-  '{{#if char == "Pantalone"}}Pantalone owes Cara a debt.{{else}}Nobody mentions the debt.{{/if}}',
-  '{{#if char == "Pantalone" && getvar::ready == "yes"}}MIXED_SECRET{{/if}}',
+  '{{#if char == "Cornelius"}}Cornelius owes Cara a debt.{{else}}Nobody mentions the debt.{{/if}}',
+  '{{#if char == "Cornelius" && getvar::ready == "yes"}}MIXED_SECRET{{/if}}',
 ].join("\n");
 const MAIN = "<main>\n    Write the next reply.\n</main>\n\n";
 
@@ -40,9 +40,9 @@ try {
   const characters = createCharactersStorage(db);
   // The narrator comes first in chat order, so staging read the whole summary as the narrator.
   const narrator = await characters.create(characterDataSchema.parse({ name: "Narrator" }));
-  const maukie = await characters.create(characterDataSchema.parse({ name: "Maukie" }));
-  const pantalone = await characters.create(characterDataSchema.parse({ name: "Pantalone" }));
-  const all = [narrator.id, maukie.id, pantalone.id];
+  const tobias = await characters.create(characterDataSchema.parse({ name: "Tobias" }));
+  const cornelius = await characters.create(characterDataSchema.parse({ name: "Cornelius" }));
+  const all = [narrator.id, tobias.id, cornelius.id];
   const profiles = (await resolveCharacterMacroData(db, all)).profilesById;
   const section = (overrides: Record<string, unknown>) => ({
     presetId: "merged-summary",
@@ -109,16 +109,16 @@ try {
       })
     ).messages[0]!.content;
 
-  const readers = [profiles.get(maukie.id)!, profiles.get(pantalone.id)!];
+  const readers = [profiles.get(tobias.id)!, profiles.get(cornelius.id)!];
   const merged =
     MAIN +
     "<chat_summary>\n" +
     "    YunYun and Narrator reached the harbor.\n" +
-    "    [Known only to Maukie: Maukie hid the compass.]\n" +
+    "    [Known only to Tobias: Tobias hid the compass.]\n" +
     "    The travelers kept the compass promise.\n" +
-    "    [Known only to Pantalone: Pantalone owes Cara a debt.]\n" +
-    "    [Known only to Maukie: Nobody mentions the debt.]\n" +
-    "    [Known only to Pantalone: MIXED_SECRET]\n" +
+    "    [Known only to Cornelius: Cornelius owes Cara a debt.]\n" +
+    "    [Known only to Tobias: Nobody mentions the debt.]\n" +
+    "    [Known only to Cornelius: MIXED_SECRET]\n" +
     "</chat_summary>";
   for (const marker of [true, false]) {
     assert.equal(
@@ -130,11 +130,11 @@ try {
 
   // A merged chat of the narrator and one character reads every section as that character, unmarked.
   assert.equal(
-    await summaryBlock([narrator.id, maukie.id], true, { chatSummaryReaders: [profiles.get(maukie.id)!] }),
+    await summaryBlock([narrator.id, tobias.id], true, { chatSummaryReaders: [profiles.get(tobias.id)!] }),
     MAIN +
-      "<chat_summary>\n    YunYun and Narrator reached the harbor.\n    Maukie hid the compass.\n" +
+      "<chat_summary>\n    YunYun and Narrator reached the harbor.\n    Tobias hid the compass.\n" +
       "    The travelers kept the compass promise.\n    Nobody mentions the debt.\n</chat_summary>",
-    "the narrator-and-Maukie summary is read as Maukie",
+    "the narrator-and-Tobias summary is read as Tobias",
   );
 
   // Preset-less generation appends the summary through the same reading.
@@ -151,7 +151,7 @@ try {
   );
 
   // ponytail ceiling: a summary with a group block keeps the single reading rather than splitting the block.
-  const groupBlock = '[\n{{#if char == "Maukie"}}{{char}} waves.{{/if}}\n]';
+  const groupBlock = '[\n{{#if char == "Tobias"}}{{char}} waves.{{/if}}\n]';
   assert.equal(
     appendFallbackChatSummaryToSystemPrompt([], groupBlock, "xml", mergedCtx, undefined, readers)[0]!.content,
     appendFallbackChatSummaryToSystemPrompt([], groupBlock, "xml", mergedCtx)[0]!.content,
@@ -163,23 +163,23 @@ try {
   const individual =
     MAIN +
     "<chat_summary>\n    YunYun and \u001eMARINARA_DEFERRED_CHARACTER_CHAR\u001f reached the harbor." +
-    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Maukie%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5Cn%7B%7Bchar%7D%7D%20hid%20the%20compass.%22%7D%5D%7D\u001f" +
-    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Maukie%5C%22%20%7C%7C%20char%20%3D%3D%20%5C%22Pantalone%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnThe%20travelers%20kept%20the%20compass%20promise.%22%7D%5D%7D\u001f" +
+    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Tobias%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5Cn%7B%7Bchar%7D%7D%20hid%20the%20compass.%22%7D%5D%7D\u001f" +
+    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Tobias%5C%22%20%7C%7C%20char%20%3D%3D%20%5C%22Cornelius%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnThe%20travelers%20kept%20the%20compass%20promise.%22%7D%5D%7D\u001f" +
     "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Narrator%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnNARRATOR_ONLY%20The%20storm%20was%20planned.%22%7D%5D%7D\u001f" +
-    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Pantalone%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnPantalone%20owes%20Cara%20a%20debt.%22%7D%2C%7B%22condition%22%3Anull%2C%22content%22%3A%22%5CnNobody%20mentions%20the%20debt.%22%7D%5D%7D\u001f" +
-    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Pantalone%5C%22%20%26%26%20getvar%3A%3Aready%20%3D%3D%20%5C%22yes%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnMIXED_SECRET%22%7D%5D%7D\u001f\n" +
+    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Cornelius%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnCornelius%20owes%20Cara%20a%20debt.%22%7D%2C%7B%22condition%22%3Anull%2C%22content%22%3A%22%5CnNobody%20mentions%20the%20debt.%22%7D%5D%7D\u001f" +
+    "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Cornelius%5C%22%20%26%26%20getvar%3A%3Aready%20%3D%3D%20%5C%22yes%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnMIXED_SECRET%22%7D%5D%7D\u001f\n" +
     "</chat_summary>";
   const pinned =
     MAIN +
-    "<chat_summary>\n    YunYun and Pantalone reached the harbor.\n    The travelers kept the compass promise.\n" +
-    "    Pantalone owes Cara a debt.\n    MIXED_SECRET\n</chat_summary>";
+    "<chat_summary>\n    YunYun and Cornelius reached the harbor.\n    The travelers kept the compass promise.\n" +
+    "    Cornelius owes Cara a debt.\n    MIXED_SECRET\n</chat_summary>";
   const single =
-    "<chat_summary>\n    YunYun and Maukie reached the harbor.\n    Maukie hid the compass.\n" +
+    "<chat_summary>\n    YunYun and Tobias reached the harbor.\n    Tobias hid the compass.\n" +
     "    The travelers kept the compass promise.\n    Nobody mentions the debt.\n</chat_summary>";
   for (const marker of [true, false]) {
     assert.equal(await summaryBlock(all, marker, { deferCharacterMacros: true }), individual, "Individual mode");
-    assert.equal(await summaryBlock([pantalone.id], marker), pinned, "an Individual-mode reply for one chosen speaker");
-    assert.equal(await summaryBlock([maukie.id], marker, { groupCharacterIds: undefined }), MAIN + single, "solo");
+    assert.equal(await summaryBlock([cornelius.id], marker), pinned, "an Individual-mode reply for one chosen speaker");
+    assert.equal(await summaryBlock([tobias.id], marker, { groupCharacterIds: undefined }), MAIN + single, "solo");
   }
   // Filled in for each responder, Individual mode reads that responder's lines, a hidden last section included,
   // with no empty line. (Lines filled into the XML wrapper start at its margin.)
@@ -196,7 +196,7 @@ try {
     );
   const soloCtx = await buildPromptMacroContext({
     db,
-    characterIds: [maukie.id],
+    characterIds: [tobias.id],
     personaName: "YunYun",
     localVariables: { ready: "yes" },
   });
@@ -214,29 +214,29 @@ try {
   };
   assert.deepEqual(
     mergedChatSummaryReaders(base)?.map((profile) => profile.name),
-    ["Maukie", "Pantalone"],
+    ["Tobias", "Cornelius"],
     "a merged group reads the summary for everyone present but the narrator",
   );
   assert.deepEqual(
     mergedChatSummaryReaders({ ...base, narratorCharacterId: null })?.map((profile) => profile.name),
-    ["Narrator", "Maukie", "Pantalone"],
+    ["Narrator", "Tobias", "Cornelius"],
     "without a narrator setting every present character is a reader",
   );
   for (const [label, input] of [
     ["Individual mode", { ...base, individual: true }],
     ["impersonation", { ...base, impersonate: true }],
-    ["a single-character chat", { ...base, characterIds: [maukie.id] }],
+    ["a single-character chat", { ...base, characterIds: [tobias.id] }],
   ] as const) {
     assert.equal(mergedChatSummaryReaders(input), undefined, `${label} keeps the usual single reading`);
   }
 
   // A card whose data is not JSON still gets a reply profile, but no macro profile, so reading for the
-  // rest would leave Maukie's sections unmarked and the unreadable character's out. Keep the single reading.
+  // rest would leave Tobias's sections unmarked and the unreadable character's out. Keep the single reading.
   const broken = await characters.create(characterDataSchema.parse({ name: "Broken" }));
   const { characters: characterTable } = await import("../../packages/server/src/db/schema/characters.js");
   const { eq } = await import("../../packages/server/src/db/file-query.js");
   await db.update(characterTable).set({ data: "{not json" }).where(eq(characterTable.id, broken.id));
-  const brokenCast = [narrator.id, maukie.id, broken.id];
+  const brokenCast = [narrator.id, tobias.id, broken.id];
   const { loadCharacterPromptInfo } =
     await import("../../packages/server/src/services/generation/character-prompt-context.js");
   assert.ok(
@@ -263,11 +263,11 @@ try {
   assert.deepEqual(
     mergedChatSummaryReaders({
       ...base,
-      characterIds: [broken.id, maukie.id, pantalone.id],
+      characterIds: [broken.id, tobias.id, cornelius.id],
       narratorCharacterId: broken.id,
-      ...(await resolveCharacterMacroData(db, [broken.id, maukie.id, pantalone.id])),
+      ...(await resolveCharacterMacroData(db, [broken.id, tobias.id, cornelius.id])),
     })?.map((profile) => profile.name),
-    ["Maukie", "Pantalone"],
+    ["Tobias", "Cornelius"],
     "an unreadable narrator still leaves the readers",
   );
 
@@ -277,7 +277,7 @@ try {
     (await loadCharacterPromptInfo({ chars: characters, characterIds: staleCast, chatMode: "roleplay" })).map(
       (info) => info.name,
     ),
-    ["Narrator", "Maukie", "Pantalone"],
+    ["Narrator", "Tobias", "Cornelius"],
     "a deleted card's leftover id takes no part in the reply",
   );
   const staleReaders = mergedChatSummaryReaders({

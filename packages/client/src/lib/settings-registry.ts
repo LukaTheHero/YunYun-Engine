@@ -385,7 +385,7 @@ export const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMet
     label: "Professor YunYun appearance",
     description: "How Professor YunYun looks in her chat, Search, Home and the top bar.",
     descriptionKey: "omnibar.settings.appearance.description",
-    aliases: ["appearance pack", "mari look", "pack", "basic", "dottore", "golden", "safari"],
+    aliases: ["appearance pack", "mari look", "pack", "basic"],
     kind: "Picker",
   },
   {
@@ -937,7 +937,7 @@ export const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMet
     description:
       "Choose a look for movable chat buttons, windows and sections. Picking a preset resets Font, Shape and Colors. Professor YunYun can create custom themes for you.",
     descriptionKey: "settings.controls.chatWidgetStyle.help",
-    aliases: ["dottore", "mari", "preset", "window", "drawer", "button", "sci-fi", "fantasy"],
+    aliases: ["mari", "yunyun", "preset", "window", "drawer", "button", "fantasy"],
     kind: "Button group",
   },
   {
@@ -1019,7 +1019,7 @@ export const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMet
     label: "Apply preset font",
     description: "Use the selected widget font for chat messages, input boxes and controls.",
     descriptionKey: "settings.search.chatWidgetApplyFont.description",
-    aliases: ["widget", "message", "composer", "typography", "dottore", "mari"],
+    aliases: ["widget", "message", "composer", "typography", "mari", "yunyun"],
     kind: "Toggle",
   },
   {
@@ -1039,7 +1039,7 @@ export const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMet
     label: "Apply preset colors",
     description: "Use widget colors and custom gradients for chat messages, input boxes and controls.",
     descriptionKey: "settings.search.chatWidgetApplyColors.description",
-    aliases: ["widget", "message", "composer", "gradient", "dottore", "mari"],
+    aliases: ["widget", "message", "composer", "gradient", "mari", "yunyun"],
     kind: "Toggle",
   },
   {

@@ -865,8 +865,7 @@ function ShortcutIcon({ tone, children }: { tone: string; children: ReactNode })
 }
 
 export function HomeBrowserHub({ pageActive, onOpenCredits }: HomeBrowserHubProps) {
-  const { id: mariPackId, poses: mariPoses, portraits: mariPortraits } = useMariAppearancePack();
-  const mariRaccoon = mariPackId === "raccoon";
+  const { poses: mariPoses, portraits: mariPortraits } = useMariAppearancePack();
   const { t, i18n } = useTranslation();
   const installedChannel = useQuery<{ channel: "stable" | "staging" }>({
     queryKey: ["update-channel"],
@@ -2164,9 +2163,7 @@ export function HomeBrowserHub({ pageActive, onOpenCredits }: HomeBrowserHubProp
                             className="mt-1 line-clamp-6 min-w-0 text-[clamp(0.56rem,2.4cqw,0.75rem)] leading-[1.3] text-[var(--muted-foreground)] sm:mt-1.5 sm:line-clamp-7"
                             data-home-professor-description
                           >
-                            {mariRaccoon
-                              ? t("home.professorMari.raccoon.widgetDescription")
-                              : t("home.professorMari.widgetDescription", { mod: formatShortcutKey("Mod") })}
+                            {t("home.professorMari.widgetDescription", { mod: formatShortcutKey("Mod") })}
                           </p>
                           <button
                             type="button"
@@ -2177,9 +2174,6 @@ export function HomeBrowserHub({ pageActive, onOpenCredits }: HomeBrowserHubProp
                             <MessageCircle size="0.8rem" className="mari-rgb-static-icon text-current" />{" "}
                             {t("home.professorMari.ask")}
                           </button>
-                          {mariRaccoon ? (
-                            <p className="mari-home-professor-greeting">{t("home.professorMari.raccoon.greeting")}</p>
-                          ) : null}
                         </div>
                         {/* Slice 85: the navigator's idle portrait with its blink on top, scaled to 192 px tall
                             and standing on the card's bottom border. */}

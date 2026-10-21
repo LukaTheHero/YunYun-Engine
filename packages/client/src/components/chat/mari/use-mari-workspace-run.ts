@@ -16,7 +16,7 @@ import { awaitMariPermissionsModeWrites } from "../../../lib/mari-permissions-wr
 import { describeProfessorMariError } from "../../../lib/professor-mari-errors";
 import { RafThrottle, rafThrottle } from "../../../lib/raf-throttle";
 import { useChatStore } from "../../../stores/chat.store";
-import { shownMariAppearancePack, useUIStore } from "../../../stores/ui.store";
+import { useUIStore } from "../../../stores/ui.store";
 import {
   ProfessorMariRecovery,
   isProfessorMariAbortError,
@@ -181,7 +181,6 @@ export function useMariWorkspaceRun({
         document.addEventListener("visibilitychange", recordBackgroundedStream);
         window.addEventListener("pagehide", markPageHidden);
       }
-      const shownPack = shownMariAppearancePack(useUIStore.getState());
       try {
         for await (const event of api.streamEvents(
           "/professor-mari/workspace/prompt",
@@ -193,8 +192,6 @@ export function useMariWorkspaceRun({
             attachments,
             context: context ?? undefined,
             existingUserMessageId,
-            // Flavors her voice only while the dated pack is the one on screen.
-            seasonalPackId: shownPack.season ? shownPack.id : undefined,
           },
           controller.signal,
           // Backgrounding leaves the socket half-open; detach on resume. The

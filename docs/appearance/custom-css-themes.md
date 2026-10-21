@@ -4,7 +4,7 @@ This guide explains how to change the whole look of YunYun Engine with a custom 
 
 ## Ready-made chat window styles
 
-For a quick change without writing CSS, open **Settings > Appearance > App** and find **Chat widget style** at the bottom of **App Style**. **Dottore** gives your chat controls icy blue instrument frames, pale metal edges and cut corners. **Prof. YunYun** adds gold-trimmed storybook frames, gemstone blues and Primogems on window titles. Its buttons use the same background as its windows. Each preset has its own font, works in light and dark mode, and styles buttons, windows and expandable sections together.
+For a quick change without writing CSS, open **Settings > Appearance > App** and find **Chat widget style** at the bottom of **App Style**. **Prof. YunYun** adds gold-trimmed storybook frames, gemstone blues and a small chibi YunYun on window titles. Its buttons use the same background as its windows. The preset has its own font, works in light and dark mode, and styles buttons, windows and expandable sections together.
 
 The **Font** and **Shape** controls let you change those details separately. **Preset font** and **Preset shape** follow the selected style.
 

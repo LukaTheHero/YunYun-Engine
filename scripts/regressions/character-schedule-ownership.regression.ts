@@ -48,7 +48,7 @@ try {
   const chats = createChatsStorage(db);
   const chars = createCharactersStorage(db);
 
-  const character = await chars.create({ name: "Il Dottore", description: "", personality: "" } as never);
+  const character = await chars.create({ name: "Leopold", description: "", personality: "" } as never);
   assert.ok(character, "character was created");
   const characterId = character!.id;
 

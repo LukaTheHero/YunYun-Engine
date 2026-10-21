@@ -19,7 +19,7 @@ const characterReaction: MessageReaction = {
   emoji: "✨",
   by: ["character-a"],
   segment: 2,
-  segmentSpeaker: "Maukie",
+  segmentSpeaker: "Tobias",
 };
 assert.deepEqual(removeCharacterReaction([characterReaction], characterReaction), []);
 

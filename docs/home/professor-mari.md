@@ -107,7 +107,7 @@ Pi works with every connection, including the local model. If Professor YunYun b
 
 ## Changing how she looks
 
-Open **Search and Professor YunYun settings** and scroll to **Appearance**. Pick a look for her, such as **Basic**, **Prof. YunYun loves Dottore** or **Safari Prof. YunYun**. Her new look shows in her chat, Search, Home and the top bar. Some looks unlock after enough play time. A locked look shows how many hours you have played so far.
+Open **Search and Professor YunYun settings** and scroll to **Appearance**. YunYun Engine ships one look for her, **YunYun**, which shows in her chat, Search, Home and the top bar.
 
 ## Attaching files
 

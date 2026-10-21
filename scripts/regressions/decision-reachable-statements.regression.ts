@@ -30,12 +30,12 @@ const mira = { user: "User", char: "Mira", characters: ["Mira"], variables: {}, 
 const group = {
   user: "User",
   char: "Mira",
-  characters: ["Mira", "Dottore"],
-  characterProfiles: [{ name: "Mira" }, { name: "Dottore" }],
+  characters: ["Mira", "Leopold"],
+  characterProfiles: [{ name: "Mira" }, { name: "Leopold" }],
   variables: {},
 } as never;
 const reached = (template: string, ctx = mira) => [...planDecisionStatements(template, ctx).statements];
-assert.deepEqual(reached('{{#if char == "Dottore" && decision:"X"}}x{{/if}}'), [], "a fixed value rules a block out");
+assert.deepEqual(reached('{{#if char == "Leopold" && decision:"X"}}x{{/if}}'), [], "a fixed value rules a block out");
 assert.deepEqual(reached('{{#if decision:"A" && decision:"B"}}x{{/if}}'), ["A", "B"], "every part of an && counts");
 assert.deepEqual(reached('{{#if decision:"A"}}{{#if decision:"B"}}x{{/if}}{{/if}}'), ["A", "B"], "and nested blocks");
 assert.deepEqual(reached('{{#if char == "Mira"}}a{{else if decision:"C"}}c{{/if}}'), [], "a settled chain stops");
@@ -45,7 +45,7 @@ assert.deepEqual(
   "a variable can change while the prompt is built, so it rules nothing out",
 );
 assert.deepEqual(
-  reached('{{#if char == "Dottore" && decision:"G"}}x{{/if}}', group),
+  reached('{{#if char == "Leopold" && decision:"G"}}x{{/if}}', group),
   ["G"],
   "in a group the character differs per section",
 );
@@ -122,7 +122,7 @@ const presetParts = {
 const texts = collectTurnDecisionTexts({
   preset: presetParts,
   ctx: mira,
-  extra: ['{{#if char == "Dottore" && decision:"Ruled out by the character"}}x{{/if}}'],
+  extra: ['{{#if char == "Leopold" && decision:"Ruled out by the character"}}x{{/if}}'],
 });
 const plan = (limit: number) =>
   planPromptDecisions([{ texts, ctx: mira, reachable: reachableDecisionStatements(texts, mira) }], limit);
@@ -430,7 +430,7 @@ try {
     const character = await createCharactersStorage(db).create(
       characterDataSchema.parse({
         name: "Mira",
-        description: `{{#if char == "Dottore" && decision:"Ruled out in the card"}}x{{/if}}`,
+        description: `{{#if char == "Leopold" && decision:"Ruled out in the card"}}x{{/if}}`,
       }),
     );
     assert(character);

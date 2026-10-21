@@ -600,7 +600,7 @@ export const SUPPORTED_MACROS: readonly SupportedMacroDefinition[] = [
   },
   {
     category: "Formatting",
-    syntax: '{{#if character != "Maukie"}}...{{/if}}',
+    syntax: '{{#if character != "Tobias"}}...{{/if}}',
     description: 'Negated comparison; "is not", "not contains", and "not includes" are also supported',
   },
   {
@@ -2322,7 +2322,7 @@ function planConditionAtom(
 /**
  * A condition's value with decisions unknown, and the statements whose answers could
  * change it. A statement behind a part that already settles the result is dropped:
- * `char == "Dottore" && decision:"..."` asks nothing while the character is Mira.
+ * `char == "Leopold" && decision:"..."` asks nothing while the character is Mira.
  */
 function planCondition(node: ConditionSyntaxNode, ctx: MacroContext, options: ResolveMacroOptions): PlanResult {
   if (node.kind === "atom" || node.kind === "adjacent")
@@ -2645,7 +2645,7 @@ function characterOnlyCondition(condition: string | null): boolean {
   );
 }
 
-/** The one character a condition such as `char == "Maukie"` names, or `null`. */
+/** The one character a condition such as `char == "Tobias"` names, or `null`. */
 function namedCharacter(condition: string | null): string | null {
   const comparisons = condition === null ? [] : parseConditionComparisons(condition);
   if (comparisons.length !== 1) return null;
@@ -2789,7 +2789,7 @@ export function characterConditionNames(input: string, depth = 0): string[] {
 
 /**
  * Render text once per reader of a shared prompt and mark each version not everyone gets,
- * e.g. `[Known only to Maukie: …]` (#7237). `everyone` is how many readers the prompt has.
+ * e.g. `[Known only to Tobias: …]` (#7237). `everyone` is how many readers the prompt has.
  */
 export function markReaderVersions(
   readers: readonly string[],

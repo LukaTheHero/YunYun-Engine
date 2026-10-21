@@ -29,30 +29,30 @@ const { DEFAULT_ADVANCED_MEMORY_SETTINGS, characterDataSchema, estimateChatSumma
 type Call = { kind: "main" | "visibility" | "scene" | "scene+visibility" | "other"; prompt: string };
 const calls: Call[] = [];
 const decisionRequests: Array<{ state: Record<string, any>; questions: Record<string, { instructions: string }> }> = [];
-const ids = { maukie: "", pantalone: "", narrator: "" };
+const ids = { tobias: "", cornelius: "", narrator: "" };
 let failVisibility = false;
 let dropPresence = false;
 let dropEnds = false;
 /** When set, the fake Jev gives this unsure score to every presence question. */
 let unsurePresence: number | null = null;
 let mainReplies: string[] = [];
-/** When set, the fake helper places Pantalone in the messages that contain it. */
-let pantaloneSceneMarker: string | null = null;
+/** When set, the fake helper places Cornelius in the messages that contain it. */
+let corneliusSceneMarker: string | null = null;
 
-/** The fake helper keeps Maukie (by first name only) and leaves Pantalone out of every scene. */
+/** The fake helper keeps Tobias (by first name only) and leaves Cornelius out of every scene. */
 function presence(task: {
   decide: Array<{ messageNumber: number; candidates: string[] }>;
   transcript?: Array<{ messageNumber: number; content: string }>;
 }) {
   return task.decide.map(({ messageNumber, candidates }) => {
     const content = task.transcript?.find((entry) => entry.messageNumber === messageNumber)?.content ?? "";
-    const pantalonePresent = pantaloneSceneMarker !== null && content.includes(pantaloneSceneMarker);
+    const corneliusPresent = corneliusSceneMarker !== null && content.includes(corneliusSceneMarker);
     return {
       messageNumber,
       present: Object.fromEntries(
         candidates.map((name) => [
           name.split(" ")[0]!.toUpperCase(),
-          !name.startsWith("Pantalone") || pantalonePresent,
+          !name.startsWith("Cornelius") || corneliusPresent,
         ]),
       ),
     };
@@ -76,9 +76,9 @@ const provider = createServer(async (req, res) => {
               {
                 type: "noul",
                 // The question asks whether the character can't see or hear the message:
-                // the fake Jev is sure only about the absent Pantalone.
+                // the fake Jev is sure only about the absent Cornelius.
                 noul: id.startsWith("presence:")
-                  ? (unsurePresence ?? (id.endsWith(ids.pantalone) ? 0.99 : 0.01))
+                  ? (unsurePresence ?? (id.endsWith(ids.cornelius) ? 0.99 : 0.01))
                   : 0.01,
               },
             ]),
@@ -156,8 +156,8 @@ try {
   });
   const characters = createCharactersStorage(db);
   for (const [key, name] of [
-    ["maukie", "Maukie Whiskers"],
-    ["pantalone", "Pantalone"],
+    ["tobias", "Tobias Whiskers"],
+    ["cornelius", "Cornelius"],
     ["narrator", "Narrator"],
   ] as const) {
     const created = await characters.create(characterDataSchema.parse({ name }));
@@ -169,7 +169,7 @@ try {
     const chat = await chats.create({
       name: "Visibility",
       mode: "roleplay",
-      characterIds: [ids.maukie, ids.pantalone, ids.narrator],
+      characterIds: [ids.tobias, ids.cornelius, ids.narrator],
       connectionId: connection.id,
     });
     assert(chat);
@@ -184,7 +184,7 @@ try {
         narratorCharacterId: ids.narrator,
         autoMessageVisibility: true,
         sceneCheckInterval: 50,
-        knowledgeStarts: { [ids.maukie]: null, [ids.pantalone]: null, [ids.narrator]: null },
+        knowledgeStarts: { [ids.tobias]: null, [ids.cornelius]: null, [ids.narrator]: null },
         knowledgeConfirmed: true,
         ...settings,
       },
@@ -211,11 +211,11 @@ try {
     return (typeof message!.extra === "string" ? JSON.parse(message!.extra) : message!.extra) as Record<string, any>;
   };
 
-  // Helper path: each new message is hidden from the absent Pantalone only.
+  // Helper path: each new message is hidden from the absent Cornelius only.
   const helperChat = await createChat();
-  const greeting = await say(helperChat, "user", "P waves at Maukie across the tavern.");
-  const maukieReply = await say(helperChat, "assistant", "Maukie purrs back.", ids.maukie);
-  const pantaloneLine = await say(helperChat, "assistant", "Pantalone counts coins far away.", ids.pantalone);
+  const greeting = await say(helperChat, "user", "P waves at Tobias across the tavern.");
+  const tobiasReply = await say(helperChat, "assistant", "Tobias purrs back.", ids.tobias);
+  const corneliusLine = await say(helperChat, "assistant", "Cornelius counts coins far away.", ids.cornelius);
   calls.length = 0;
   await memory.settleMessageVisibility(helperChat);
   assert.deepEqual(
@@ -232,24 +232,24 @@ try {
     JSON.parse(calls[0]!.prompt)[0].content.includes("being left out of a whisper does not count"),
     "a whisper stays private on its own, so a bystander keeps the rest of the message",
   );
-  assert.deepEqual(task.recentlyActive, ["Maukie Whiskers", "Pantalone"], "speakers since the scene began are a hint");
+  assert.deepEqual(task.recentlyActive, ["Tobias Whiskers", "Cornelius"], "speakers since the scene began are a hint");
   assert(
     task.decide.every((entry: { candidates: string[] }) => !entry.candidates.includes("Narrator")),
     "the narrator is never a candidate",
   );
-  assert.deepEqual((await extraOf(greeting.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(greeting.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   assert.deepEqual(
-    (await extraOf(maukieReply.id)).hiddenFromAICharacterIds,
-    [ids.pantalone],
+    (await extraOf(tobiasReply.id)).hiddenFromAICharacterIds,
+    [ids.cornelius],
     "first-name, upper-case answers still map to the right characters",
   );
-  const ownLine = await extraOf(pantaloneLine.id);
+  const ownLine = await extraOf(corneliusLine.id);
   assert.equal(ownLine.hiddenFromAICharacterIds, undefined, "the author always sees their own message");
   assert.deepEqual(ownLine.autoVisibility.hiddenCharacterIds, [], "a message everyone sees is still decided once");
-  for (const swipe of await chats.getSwipes(maukieReply.id))
+  for (const swipe of await chats.getSwipes(tobiasReply.id))
     assert.deepEqual(
       (typeof swipe.extra === "string" ? JSON.parse(swipe.extra) : swipe.extra).hiddenFromAICharacterIds,
-      [ids.pantalone],
+      [ids.cornelius],
       "swipes stay in sync",
     );
   calls.length = 0;
@@ -259,11 +259,11 @@ try {
   // A manual change wins, before or after automation.
   const unhidden = await app.inject({
     method: "PATCH",
-    url: `/api/chats/${helperChat}/messages/${maukieReply.id}/extra`,
+    url: `/api/chats/${helperChat}/messages/${tobiasReply.id}/extra`,
     payload: { hiddenFromAI: false, hiddenFromAICharacterIds: [] },
   });
   assert.equal(unhidden.statusCode, 200, unhidden.body);
-  const manualBefore = await say(helperChat, "assistant", "Maukie stretches.", ids.maukie);
+  const manualBefore = await say(helperChat, "assistant", "Tobias stretches.", ids.tobias);
   assert.equal(
     (
       await app.inject({
@@ -300,7 +300,7 @@ try {
       ).statusCode,
       200,
     );
-  const presetHide = await say(helperChat, "assistant", "Maukie whispers.", ids.maukie, {
+  const presetHide = await say(helperChat, "assistant", "Tobias whispers.", ids.tobias, {
     hiddenFromAICharacterIds: [ids.narrator],
   });
   const later = await say(helperChat, "user", "P orders a drink.");
@@ -313,15 +313,15 @@ try {
     [numbers.get(later.id)],
     "manual and pre-existing visibility choices are not asked about",
   );
-  assert.deepEqual((await extraOf(maukieReply.id)).hiddenFromAICharacterIds, [], "a later run keeps the user's unhide");
-  assert.equal((await extraOf(maukieReply.id)).visibilityManual, true);
+  assert.deepEqual((await extraOf(tobiasReply.id)).hiddenFromAICharacterIds, [], "a later run keeps the user's unhide");
+  assert.equal((await extraOf(tobiasReply.id)).visibilityManual, true);
   assert.deepEqual((await extraOf(manualBefore.id)).hiddenFromAICharacterIds, []);
   assert.equal((await extraOf(manualBefore.id)).autoVisibility, undefined);
   assert.deepEqual((await extraOf(presetHide.id)).hiddenFromAICharacterIds, [ids.narrator]);
   assert.equal((await extraOf(slashUnhidden.id)).hiddenFromAICharacterIds, undefined, "/unhide keeps it visible");
   assert.equal((await extraOf(globalUnhidden.id)).visibilityManual, true, "Hide from AI for everyone counts as manual");
   assert.equal((await extraOf(globalUnhidden.id)).hiddenFromAICharacterIds, undefined, "unhiding keeps it visible");
-  assert.deepEqual((await extraOf(later.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(later.id)).hiddenFromAICharacterIds, [ids.cornelius]);
 
   // A failed decision hides nothing.
   failVisibility = true;
@@ -332,22 +332,22 @@ try {
   assert.deepEqual((await extraOf(failed.id)).autoVisibility.hiddenCharacterIds, []);
 
   // An absent whisper recipient loses the narration, and the whisper still reaches them (#7191).
-  const whisper = { type: "whisper", character: "Pantalone", text: "Meet me at dawn." };
+  const whisper = { type: "whisper", character: "Cornelius", text: "Meet me at dawn." };
   const whispered = await say(helperChat, "user", "P glances at the window.", null, {
     roleplayCommandActivity: [
-      { raw: JSON.stringify(whisper), command: whisper, whisperRecipient: { id: ids.pantalone, kind: "character" } },
+      { raw: JSON.stringify(whisper), command: whisper, whisperRecipient: { id: ids.cornelius, kind: "character" } },
     ],
   });
   calls.length = 0;
   await memory.settleMessageVisibility(helperChat);
   assert.deepEqual(JSON.parse(JSON.parse(calls[0]!.prompt)[1].content).decide[0].candidates, [
-    "Maukie Whiskers",
-    "Pantalone",
+    "Tobias Whiskers",
+    "Cornelius",
   ]);
-  assert.deepEqual((await extraOf(whispered.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(whispered.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   assert(
-    roleplayHiddenWhisperMessageIds(await chats.listMessages(helperChat), ids.pantalone).has(whispered.id),
-    "the hidden message still delivers its whisper to Pantalone",
+    roleplayHiddenWhisperMessageIds(await chats.listMessages(helperChat), ids.cornelius).has(whispered.id),
+    "the hidden message still delivers its whisper to Cornelius",
   );
 
   // Off, merged mode and one-character chats make no extra call.
@@ -356,7 +356,7 @@ try {
   const soloChat = await chats.create({
     name: "Solo",
     mode: "roleplay",
-    characterIds: [ids.maukie],
+    characterIds: [ids.tobias],
     connectionId: connection.id,
   });
   assert(soloChat);
@@ -377,14 +377,14 @@ try {
 
   // Without a Decision model, a due helper scene check also answers presence in the same call.
   const sharedHelperChat = await createChat({ sceneCheckInterval: 1 });
-  const sharedHelperMessage = await say(sharedHelperChat, "user", "P sits beside Maukie.");
+  const sharedHelperMessage = await say(sharedHelperChat, "user", "P sits beside Tobias.");
   calls.length = 0;
   await memory.checkScenesAfterGeneration(sharedHelperChat);
   assert.deepEqual(
     calls.map((call) => call.kind),
     ["scene+visibility"],
   );
-  assert.deepEqual((await extraOf(sharedHelperMessage.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(sharedHelperMessage.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   const sharedState = JSON.parse((await chats.getById(sharedHelperChat))!.metadata).advancedMemoryState;
   assert.equal(sharedState.sceneCheckMessageId, sharedHelperMessage.id, "the shared scene check still commits");
   dropEnds = true;
@@ -397,7 +397,7 @@ try {
     ["scene+visibility", "scene"],
     "a shared answer without scene endings asks for the scene check alone",
   );
-  assert.deepEqual((await extraOf(noEnds.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(noEnds.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   const retriedState = JSON.parse((await chats.getById(sharedHelperChat))!.metadata).advancedMemoryState;
   assert.equal(retriedState.sceneCheckMessageId, noEnds.id);
   assert.equal(retriedState.error, null);
@@ -408,7 +408,7 @@ try {
     decisionConnectionId: decisionConnection.id,
     sceneCheckInterval: 1,
   });
-  const jevMessage = await say(jevChat, "user", "P pours tea for Maukie.");
+  const jevMessage = await say(jevChat, "user", "P pours tea for Tobias.");
   decisionRequests.length = 0;
   calls.length = 0;
   await memory.checkScenesAfterGeneration(jevChat);
@@ -417,11 +417,11 @@ try {
   assert(questionIds.includes(jevMessage.id), "the scene-end question is asked");
   assert.deepEqual(
     questionIds.filter((id) => id.startsWith("presence:")).sort(),
-    [`presence:${jevMessage.id}:${ids.maukie}`, `presence:${jevMessage.id}:${ids.pantalone}`].sort(),
+    [`presence:${jevMessage.id}:${ids.tobias}`, `presence:${jevMessage.id}:${ids.cornelius}`].sort(),
   );
   assert(decisionRequests[0]!.state.transcript && decisionRequests[0]!.state.presence.transcript);
   assert.equal(calls.length, 0, "the Decision model, not the helper, decides presence");
-  assert.deepEqual((await extraOf(jevMessage.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(jevMessage.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   dropPresence = true;
   const unanswered = await say(jevChat, "user", "P hums.");
   decisionRequests.length = 0;
@@ -436,19 +436,19 @@ try {
   );
   assert.equal((await extraOf(unanswered.id)).hiddenFromAICharacterIds, undefined, "no presence answer hides nothing");
   await memory.updateSettings(jevChat, { sceneCheckInterval: 50 });
-  const jevAlone = await say(jevChat, "assistant", "Maukie sips.", ids.maukie);
+  const jevAlone = await say(jevChat, "assistant", "Tobias sips.", ids.tobias);
   decisionRequests.length = 0;
   await memory.checkScenesAfterGeneration(jevChat);
   assert.equal(decisionRequests.length, 1);
   assert(Object.keys(decisionRequests[0]!.questions).every((id) => id.startsWith("presence:")));
-  assert.deepEqual((await extraOf(jevAlone.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(jevAlone.id)).hiddenFromAICharacterIds, [ids.cornelius]);
 
-  // Maukie replies, then Pantalone answers beside her: an unsure Decision model hides nothing (#7263).
+  // Tobias replies, then Cornelius answers beside her: an unsure Decision model hides nothing (#7263).
   const besideChat = await createChat({ decisionEnabled: true, decisionConnectionId: decisionConnection.id });
-  await say(besideChat, "user", "P sits by the campfire with Maukie and Pantalone.");
-  await say(besideChat, "assistant", "MAUKIE_BESIDE_THE_FIRE", ids.maukie);
+  await say(besideChat, "user", "P sits by the campfire with Tobias and Cornelius.");
+  await say(besideChat, "assistant", "TOBIAS_BESIDE_THE_FIRE", ids.tobias);
   await memory.settleMessageVisibility(besideChat);
-  const besideLine = await say(besideChat, "assistant", "Pantalone passes Maukie the bread.", ids.pantalone);
+  const besideLine = await say(besideChat, "assistant", "Cornelius passes Tobias the bread.", ids.cornelius);
   unsurePresence = 0.3;
   decisionRequests.length = 0;
   await memory.settleMessageVisibility(besideChat);
@@ -459,13 +459,13 @@ try {
       .slice(-2)
       .map((entry: { speaker: string; content: string }) => [entry.speaker, entry.content]),
     [
-      ["Maukie Whiskers", "MAUKIE_BESIDE_THE_FIRE"],
-      ["Pantalone", "Pantalone passes Maukie the bread."],
+      ["Tobias Whiskers", "TOBIAS_BESIDE_THE_FIRE"],
+      ["Cornelius", "Cornelius passes Tobias the bread."],
     ],
     "the reply just before is in the context, with its speaker",
   );
-  const besideQuestion = decisionRequests[0]!.questions[`presence:${besideLine.id}:${ids.maukie}`];
-  assert(besideQuestion?.instructions.includes('by "Pantalone"'), "the question names who wrote the message");
+  const besideQuestion = decisionRequests[0]!.questions[`presence:${besideLine.id}:${ids.tobias}`];
+  assert(besideQuestion?.instructions.includes('by "Cornelius"'), "the question names who wrote the message");
   assert(besideQuestion.instructions.includes("present even when silent or left out of a whisper"));
   assert(
     besideQuestion.instructions.includes("never places there"),
@@ -480,21 +480,21 @@ try {
 
   // A new scene's opening message still shows the messages just before it (#7263).
   const sceneChat = await createChat({ decisionEnabled: true, decisionConnectionId: decisionConnection.id });
-  await say(sceneChat, "user", "P and Maukie walk to the market together.");
-  await say(sceneChat, "assistant", "MAUKIE_FOLLOWS_TO_MARKET", ids.maukie);
+  await say(sceneChat, "user", "P and Tobias walk to the market together.");
+  await say(sceneChat, "assistant", "TOBIAS_FOLLOWS_TO_MARKET", ids.tobias);
   await memory.settleMessageVisibility(sceneChat);
   const closing = await memory.getSceneCheck(sceneChat, { force: true });
   assert(closing && (await memory.commitSceneCheck(sceneChat, closing, { ends: [{ messageNumber: 2 }] })));
-  const opening = await say(sceneChat, "assistant", "Pantalone haggles at the market stall.", ids.pantalone);
+  const opening = await say(sceneChat, "assistant", "Cornelius haggles at the market stall.", ids.cornelius);
   decisionRequests.length = 0;
   await memory.settleMessageVisibility(sceneChat);
   assert.equal(decisionRequests.length, 1);
   assert.deepEqual(
     decisionRequests[0]!.state.presence.transcript.map((entry: { content: string }) => entry.content),
-    ["P and Maukie walk to the market together.", "MAUKIE_FOLLOWS_TO_MARKET", "Pantalone haggles at the market stall."],
+    ["P and Tobias walk to the market together.", "TOBIAS_FOLLOWS_TO_MARKET", "Cornelius haggles at the market stall."],
     "the messages before a new scene are still context",
   );
-  assert.deepEqual(decisionRequests[0]!.state.presence.recentlyActive, ["Pantalone"], "speakers stay scene-only");
+  assert.deepEqual(decisionRequests[0]!.state.presence.recentlyActive, ["Cornelius"], "speakers stay scene-only");
   assert.equal((await extraOf(opening.id)).hiddenFromAICharacterIds, undefined);
 
   // Once the window has moved past a candidate who was away, their latest message still says where they are,
@@ -505,72 +505,72 @@ try {
     const check = await memory.getSceneCheck(chatId, { force: true });
     assert(check && (await memory.commitSceneCheck(chatId, check, { ends: [{ messageNumber }] })));
   };
-  const stairTranscript = async (opening: string[], maukieAway: (step: number) => boolean, savedStart = true) => {
+  const stairTranscript = async (opening: string[], tobiasAway: (step: number) => boolean, savedStart = true) => {
     const chat = await createChat({ decisionEnabled: true, decisionConnectionId: decisionConnection.id });
     for (const [index, line] of opening.entries())
-      await say(chat, index % 2 ? "assistant" : "user", line, index % 2 ? ids.maukie : null, {
+      await say(chat, index % 2 ? "assistant" : "user", line, index % 2 ? ids.tobias : null, {
         ...(line.startsWith("HIDDEN") ? { hiddenFromAI: true } : {}),
       });
     if (savedStart) await endScene(chat, opening.length);
     for (let step = 1; step <= 13; step++) {
-      // Maukie could not perceive this step, by an earlier decision or the user's own choice.
-      const away = maukieAway(step) ? { hiddenFromAICharacterIds: [ids.maukie], visibilityManual: true } : {};
-      await say(chat, "assistant", `Pantalone climbs step ${step}.${stairStep}`, ids.pantalone, away);
+      // Tobias could not perceive this step, by an earlier decision or the user's own choice.
+      const away = tobiasAway(step) ? { hiddenFromAICharacterIds: [ids.tobias], visibilityManual: true } : {};
+      await say(chat, "assistant", `Cornelius climbs step ${step}.${stairStep}`, ids.cornelius, away);
       await memory.settleMessageVisibility(chat);
     }
-    await say(chat, "assistant", "Pantalone reaches the top.", ids.pantalone);
+    await say(chat, "assistant", "Cornelius reaches the top.", ids.cornelius);
     decisionRequests.length = 0;
     await memory.settleMessageVisibility(chat);
-    assert.deepEqual(decisionRequests[0]!.state.presence.recentlyActive, ["Pantalone"], "speakers stay scene-only");
+    assert.deepEqual(decisionRequests[0]!.state.presence.recentlyActive, ["Cornelius"], "speakers stay scene-only");
     return decisionRequests[0]!.state.presence.transcript.map((entry: { content: string }) => entry.content);
   };
-  const swampOpening = ["P and Maukie wade through the swamp.", "MAUKIE_IN_THE_SWAMP"];
+  const swampOpening = ["P and Tobias wade through the swamp.", "TOBIAS_IN_THE_SWAMP"];
   const swamp = await stairTranscript(swampOpening, () => true);
-  assert.equal(swamp[0], "MAUKIE_IN_THE_SWAMP", "an away candidate's latest message comes first");
-  assert(!swamp.includes("P and Maukie wade through the swamp."), "only that message, not their old scene");
+  assert.equal(swamp[0], "TOBIAS_IN_THE_SWAMP", "an away candidate's latest message comes first");
+  assert(!swamp.includes("P and Tobias wade through the swamp."), "only that message, not their old scene");
   assert(swamp.length < 15, "the long scene was trimmed");
-  assert.equal(swamp.at(-1), "Pantalone reaches the top.");
+  assert.equal(swamp.at(-1), "Cornelius reaches the top.");
   // Without a saved scene start, the last few messages may not be the whole scene.
   const unsaved = await stairTranscript(swampOpening, () => true, false);
-  assert(!unsaved.includes("MAUKIE_IN_THE_SWAMP"), "no saved scene start, no away");
+  assert(!unsaved.includes("TOBIAS_IN_THE_SWAMP"), "no saved scene start, no away");
   // A message hidden from the AI is never brought back as where she was.
-  const hiddenLast = await stairTranscript([...swampOpening, "P naps.", "HIDDEN: Maukie dreams of fish."], () => true);
-  assert.equal(hiddenLast[0], "MAUKIE_IN_THE_SWAMP");
+  const hiddenLast = await stairTranscript([...swampOpening, "P naps.", "HIDDEN: Tobias dreams of fish."], () => true);
+  assert.equal(hiddenLast[0], "TOBIAS_IN_THE_SWAMP");
   assert(!hiddenLast.some((content) => content.startsWith("HIDDEN")), "a hidden message stays out");
   // Someone who could perceive the scene, such as a character carried in, is never shown somewhere else.
   const carried = await stairTranscript(
-    [...swampOpening, "P carries Maukie up the stair; she curls up, silent."],
+    [...swampOpening, "P carries Tobias up the stair; she curls up, silent."],
     () => false,
   );
-  assert(!carried.includes("MAUKIE_IN_THE_SWAMP"), "a present character gets no earlier location");
-  // One message she could not perceive, such as Pantalone stepping out, does not make her away.
+  assert(!carried.includes("TOBIAS_IN_THE_SWAMP"), "a present character gets no earlier location");
+  // One message she could not perceive, such as Cornelius stepping out, does not make her away.
   const steppedOut = await stairTranscript(swampOpening, (step) => step === 13);
-  assert(!steppedOut.includes("MAUKIE_IN_THE_SWAMP"), "one hidden message is not a scene away");
+  assert(!steppedOut.includes("TOBIAS_IN_THE_SWAMP"), "one hidden message is not a scene away");
   // A scene that opens with a short cutaway hidden from her does not make her away either.
   const cutawayChat = await createChat({ decisionEnabled: true, decisionConnectionId: decisionConnection.id });
   await say(cutawayChat, "user", swampOpening[0]!);
-  await say(cutawayChat, "assistant", swampOpening[1]!, ids.maukie);
-  await say(cutawayChat, "user", "P carries Maukie into the tower study; she curls up, silent.");
+  await say(cutawayChat, "assistant", swampOpening[1]!, ids.tobias);
+  await say(cutawayChat, "user", "P carries Tobias into the tower study; she curls up, silent.");
   for (let line = 1; line <= 6; line++)
-    await say(cutawayChat, "assistant", `Pantalone reads ledger ${line}.`, ids.pantalone);
+    await say(cutawayChat, "assistant", `Cornelius reads ledger ${line}.`, ids.cornelius);
   await endScene(cutawayChat, 9);
-  const hiddenFromMaukie = { hiddenFromAICharacterIds: [ids.maukie], visibilityManual: true };
-  await say(cutawayChat, "user", "Meanwhile, far away in the forest, P waits.", null, hiddenFromMaukie);
-  await say(cutawayChat, "user", "The forest stays quiet.", null, hiddenFromMaukie);
-  await say(cutawayChat, "assistant", "Back in the tower study, Pantalone turns a page.", ids.pantalone);
+  const hiddenFromTobias = { hiddenFromAICharacterIds: [ids.tobias], visibilityManual: true };
+  await say(cutawayChat, "user", "Meanwhile, far away in the forest, P waits.", null, hiddenFromTobias);
+  await say(cutawayChat, "user", "The forest stays quiet.", null, hiddenFromTobias);
+  await say(cutawayChat, "assistant", "Back in the tower study, Cornelius turns a page.", ids.cornelius);
   decisionRequests.length = 0;
   await memory.settleMessageVisibility(cutawayChat);
   const cutaway = decisionRequests[0]!.state.presence.transcript.map((entry: { content: string }) => entry.content);
-  assert(!cutaway.includes("MAUKIE_IN_THE_SWAMP"), "a short cutaway opening the scene is not a scene away");
+  assert(!cutaway.includes("TOBIAS_IN_THE_SWAMP"), "a short cutaway opening the scene is not a scene away");
   // A scene message nobody decided was visible to her, so she was not away for the whole scene.
   const undecidedChat = await createChat({ decisionEnabled: true, decisionConnectionId: decisionConnection.id });
   await say(undecidedChat, "user", swampOpening[0]!);
-  await say(undecidedChat, "assistant", swampOpening[1]!, ids.maukie);
+  await say(undecidedChat, "assistant", swampOpening[1]!, ids.tobias);
   await endScene(undecidedChat, 2);
-  await say(undecidedChat, "assistant", "UNDECIDED: Pantalone sets down his bag.", ids.pantalone);
+  await say(undecidedChat, "assistant", "UNDECIDED: Cornelius sets down his bag.", ids.cornelius);
   for (let step = 1; step <= 11; step++)
-    await say(undecidedChat, "assistant", `Pantalone climbs step ${step}.`, ids.pantalone, hiddenFromMaukie);
-  await say(undecidedChat, "assistant", "Pantalone reaches the top.", ids.pantalone);
+    await say(undecidedChat, "assistant", `Cornelius climbs step ${step}.`, ids.cornelius, hiddenFromTobias);
+  await say(undecidedChat, "assistant", "Cornelius reaches the top.", ids.cornelius);
   decisionRequests.length = 0;
   await memory.settleMessageVisibility(undecidedChat);
   assert.equal(
@@ -581,7 +581,7 @@ try {
   const undecidedTranscript = decisionRequests[0]!.state.presence.transcript.map(
     (entry: { content: string }) => entry.content,
   );
-  assert(!undecidedTranscript.includes("MAUKIE_IN_THE_SWAMP"), "an undecided scene message counts as visible to her");
+  assert(!undecidedTranscript.includes("TOBIAS_IN_THE_SWAMP"), "an undecided scene message counts as visible to her");
 
   // A small Decision state limit shortens long messages instead of dropping the earlier ones (#7263).
   const smallJev = await connections.create({
@@ -596,16 +596,16 @@ try {
   const longChat = await createChat({ decisionEnabled: true, decisionConnectionId: smallJev.id });
   const rain = " The rain drums on the tavern roof.".repeat(300);
   const decided = { autoVisibility: { decidedAt: "2026-01-01T00:00:00.000Z", hiddenCharacterIds: [] } };
-  await say(longChat, "user", `EARLIER_1 Pantalone walks out toward the harbour.${rain}`, null, decided);
-  await say(longChat, "assistant", `EARLIER_2 Maukie watches him go.${rain}`, ids.maukie, decided);
+  await say(longChat, "user", `EARLIER_1 Cornelius walks out toward the harbour.${rain}`, null, decided);
+  await say(longChat, "assistant", `EARLIER_2 Tobias watches him go.${rain}`, ids.tobias, decided);
   await say(longChat, "user", `EARLIER_3 P shuts the door.${rain}`, null, decided);
   // Under the 1000-token cap, so its last line reaches the shortening.
-  const lastLine = "Pantalone's footsteps fade down the stairs.";
+  const lastLine = "Cornelius's footsteps fade down the stairs.";
   await say(
     longChat,
     "assistant",
-    `EARLIER_4 Maukie curls up by the fire.${rain.slice(0, 3200)} ${lastLine}`,
-    ids.maukie,
+    `EARLIER_4 Tobias curls up by the fire.${rain.slice(0, 3200)} ${lastLine}`,
+    ids.tobias,
     decided,
   );
   const longLine = await say(longChat, "user", `CURRENT_LINE P raises a toast.${rain}`);
@@ -619,9 +619,9 @@ try {
     longTranscript.map((entry) => [entry.speaker, entry.content.split(" ")[0]]),
     [
       ["P", "EARLIER_1"],
-      ["Maukie Whiskers", "EARLIER_2"],
+      ["Tobias Whiskers", "EARLIER_2"],
       ["P", "EARLIER_3"],
-      ["Maukie Whiskers", "EARLIER_4"],
+      ["Tobias Whiskers", "EARLIER_4"],
       ["P", "CURRENT_LINE"],
     ],
     "four earlier messages stay in order with their speakers beside a long new message",
@@ -632,16 +632,16 @@ try {
     longTranscript.every((entry) => estimateChatSummaryTokens(entry.content) >= 64),
     "each message keeps a few sentences",
   );
-  assert.deepEqual((await extraOf(longLine.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(longLine.id)).hiddenFromAICharacterIds, [ids.cornelius]);
 
   // A message over the 1000-token cap keeps its real end, even when the transcript is shortened again.
   const overCapChat = await createChat({ decisionEnabled: true, decisionConnectionId: smallJev.id });
-  const exitLine = "At last Pantalone walks out toward the harbour.";
+  const exitLine = "At last Cornelius walks out toward the harbour.";
   await say(
     overCapChat,
     "assistant",
-    `OVER_CAP Maukie and Pantalone share a drink.${rain} ${exitLine}`,
-    ids.maukie,
+    `OVER_CAP Tobias and Cornelius share a drink.${rain} ${exitLine}`,
+    ids.tobias,
     decided,
   );
   await say(overCapChat, "user", `AFTER_EXIT P raises a toast.${rain}`);
@@ -652,7 +652,7 @@ try {
   assert(estimateChatSummaryTokens(JSON.stringify(overCapState)) <= 2000, "the Decision state limit holds");
   const overCapTranscript = overCapState.presence.transcript as Array<{ content: string }>;
   assert(overCapTranscript[0]!.content.startsWith("OVER_CAP"), "the long message keeps its start");
-  assert(overCapTranscript[0]!.content.endsWith(exitLine), "and its real last line, where Pantalone leaves");
+  assert(overCapTranscript[0]!.content.endsWith(exitLine), "and its real last line, where Cornelius leaves");
   assert.equal(overCapTranscript[0]!.content.split("omitted]").length, 2, "shortening twice leaves one gap");
 
   // The generation guard decides earlier messages before each character's context is built.
@@ -660,7 +660,7 @@ try {
   await memory.initialize(routeChat);
   const undecided = await say(routeChat, "user", "UNDECIDED_PERSONA_LINE");
   calls.length = 0;
-  mainReplies = ["MAUKIE_REPLY", "PANTALONE_REPLY", "NARRATOR_REPLY"];
+  mainReplies = ["TOBIAS_REPLY", "CORNELIUS_REPLY", "NARRATOR_REPLY"];
   const generated = await app.inject({ method: "POST", url: "/api/generate/", payload: { chatId: routeChat } });
   assert.equal(generated.statusCode, 200, generated.body);
   assert(!generated.body.includes('"type":"error"'), generated.body);
@@ -672,11 +672,11 @@ try {
   );
   const mains = calls.filter((call) => call.kind === "main");
   assert.equal(mains.length, 3);
-  assert.deepEqual((await extraOf(undecided.id)).hiddenFromAICharacterIds, [ids.pantalone]);
-  assert(mains[0]!.prompt.includes("UNDECIDED_PERSONA_LINE"), "Maukie is present");
-  assert(!mains[1]!.prompt.includes("UNDECIDED_PERSONA_LINE"), "Pantalone never receives the earlier line");
-  assert(!mains[1]!.prompt.includes("MAUKIE_REPLY"), "nor Maukie's reply from the same turn");
-  assert(mains[2]!.prompt.includes("UNDECIDED_PERSONA_LINE") && mains[2]!.prompt.includes("MAUKIE_REPLY"));
+  assert.deepEqual((await extraOf(undecided.id)).hiddenFromAICharacterIds, [ids.cornelius]);
+  assert(mains[0]!.prompt.includes("UNDECIDED_PERSONA_LINE"), "Tobias is present");
+  assert(!mains[1]!.prompt.includes("UNDECIDED_PERSONA_LINE"), "Cornelius never receives the earlier line");
+  assert(!mains[1]!.prompt.includes("TOBIAS_REPLY"), "nor Tobias's reply from the same turn");
+  assert(mains[2]!.prompt.includes("UNDECIDED_PERSONA_LINE") && mains[2]!.prompt.includes("TOBIAS_REPLY"));
   const routeMessages = await chats.listMessages(routeChat);
   for (const message of routeMessages)
     assert(
@@ -686,7 +686,7 @@ try {
   const narratorReply = routeMessages.find((message) => message.content.includes("NARRATOR_REPLY"))!;
   assert.deepEqual(
     (await extraOf(narratorReply.id)).hiddenFromAICharacterIds,
-    [ids.pantalone],
+    [ids.cornelius],
     "the post-reply check decides the turn's last reply",
   );
 
@@ -706,7 +706,7 @@ try {
   const sendChat = await createChat();
   await memory.initialize(sendChat);
   calls.length = 0;
-  mainReplies = ["MAUKIE_ANSWERS", "PANTALONE_ANSWERS", "NARRATOR_ANSWERS"];
+  mainReplies = ["TOBIAS_ANSWERS", "CORNELIUS_ANSWERS", "NARRATOR_ANSWERS"];
   const sent = await app.inject({
     method: "POST",
     url: "/api/generate/",
@@ -715,13 +715,13 @@ try {
   assert.equal(sent.statusCode, 200, sent.body);
   const sentEvents = events(sent.body);
   const sentLine = (await chats.listMessages(sendChat)).find((message) => message.content === "SENT_PERSONA_LINE")!;
-  assert.deepEqual((await extraOf(sentLine.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(sentLine.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   const firstReply = sentEvents.findIndex((event) => event.type === "message_saved" && event.data.role === "assistant");
   const shownDecided = sentEvents.findIndex(
     (event) =>
       event.type === "message_saved" &&
       event.data.id === sentLine.id &&
-      JSON.parse(event.data.extra).hiddenFromAICharacterIds?.includes(ids.pantalone),
+      JSON.parse(event.data.extra).hiddenFromAICharacterIds?.includes(ids.cornelius),
   );
   assert(
     shownDecided >= 0 && shownDecided < firstReply,
@@ -739,7 +739,7 @@ try {
   assert.equal(posted.statusCode, 200, posted.body);
   assert.deepEqual(
     JSON.parse(posted.json().extra).hiddenFromAICharacterIds,
-    [ids.pantalone],
+    [ids.cornelius],
     "a message posted without a reply is decided when you post it",
   );
   assert.deepEqual(
@@ -755,7 +755,7 @@ try {
   const asCharacter = await app.inject({
     method: "POST",
     url: `/api/chats/${sendChat}/messages`,
-    payload: { role: "assistant", content: "Maukie, by hand.", characterId: ids.maukie },
+    payload: { role: "assistant", content: "Tobias, by hand.", characterId: ids.tobias },
   });
   assert.equal(asCharacter.statusCode, 200, asCharacter.body);
   assert.equal(calls.length, 1, "a character message written by hand is left for the next reply, as before");
@@ -778,13 +778,13 @@ try {
   assert.equal(impersonated.statusCode, 200, impersonated.body);
   const impersonatedLine = (await chats.listMessages(sendChat)).at(-1)!;
   assert.equal(impersonatedLine.role, "user", impersonated.body);
-  assert.deepEqual((await extraOf(impersonatedLine.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  assert.deepEqual((await extraOf(impersonatedLine.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   assert(
     events(impersonated.body).some(
       (event) =>
         event.type === "message_saved" &&
         event.data.id === impersonatedLine.id &&
-        JSON.parse(event.data.extra).hiddenFromAICharacterIds?.includes(ids.pantalone),
+        JSON.parse(event.data.extra).hiddenFromAICharacterIds?.includes(ids.cornelius),
     ),
     "the crossed-eye marker reaches the written message without waiting for a refresh",
   );
@@ -793,40 +793,40 @@ try {
   const splitChat = await createChat();
   await memory.initialize(splitChat);
   await say(splitChat, "user", "P waits for news.");
-  pantaloneSceneMarker = "WITH_PANTALONE";
+  corneliusSceneMarker = "WITH_CORNELIUS";
   calls.length = 0;
   mainReplies = [
-    "MAUKIE_ALONE hides the letter.\n\n***\n\nMaukie joins Pantalone, MAUKIE_WITH_PANTALONE.",
-    "PANTALONE_COUNTS coins.\n\n---\n\nPANTALONE_LEAVES the tavern.",
+    "TOBIAS_ALONE hides the letter.\n\n***\n\nTobias joins Cornelius, TOBIAS_WITH_CORNELIUS.",
+    "CORNELIUS_COUNTS coins.\n\n---\n\nCORNELIUS_LEAVES the tavern.",
     "NARRATOR_SPLIT_REPLY",
   ];
   const splitTurn = await app.inject({ method: "POST", url: "/api/generate/", payload: { chatId: splitChat } });
-  pantaloneSceneMarker = null;
+  corneliusSceneMarker = null;
   assert.equal(splitTurn.statusCode, 200, splitTurn.body);
   assert(!splitTurn.body.includes('"type":"error"'), splitTurn.body);
   const splitMessages = (await chats.listMessages(splitChat)).slice(1);
   assert.deepEqual(
     splitMessages.map((message) => [message.characterId, message.content.split("\n")[0]]),
     [
-      [ids.maukie, "MAUKIE_ALONE hides the letter."],
-      [ids.maukie, "***"],
-      [ids.pantalone, "PANTALONE_COUNTS coins."],
-      [ids.pantalone, "---"],
+      [ids.tobias, "TOBIAS_ALONE hides the letter."],
+      [ids.tobias, "***"],
+      [ids.cornelius, "CORNELIUS_COUNTS coins."],
+      [ids.cornelius, "---"],
       [ids.narrator, "NARRATOR_SPLIT_REPLY"],
     ],
     "each responder's reply is split at its own break, in order",
   );
-  const [maukieAlone, maukieWithPantalone] = splitMessages;
-  assert.deepEqual((await extraOf(maukieAlone!.id)).hiddenFromAICharacterIds, [ids.pantalone]);
+  const [tobiasAlone, tobiasWithCornelius] = splitMessages;
+  assert.deepEqual((await extraOf(tobiasAlone!.id)).hiddenFromAICharacterIds, [ids.cornelius]);
   assert.deepEqual(
-    (await extraOf(maukieWithPantalone!.id)).hiddenFromAICharacterIds ?? [],
+    (await extraOf(tobiasWithCornelius!.id)).hiddenFromAICharacterIds ?? [],
     [],
-    "the part with Pantalone in it is decided on its own",
+    "the part with Cornelius in it is decided on its own",
   );
   const splitMains = calls.filter((call) => call.kind === "main");
-  assert(!splitMains[1]!.prompt.includes("MAUKIE_ALONE"), "Pantalone never reads the part he was away for");
-  assert(splitMains[1]!.prompt.includes("MAUKIE_WITH_PANTALONE"), "but reads the part he was there for");
-  assert(splitMains[2]!.prompt.includes("MAUKIE_ALONE") && splitMains[2]!.prompt.includes("PANTALONE_LEAVES"));
+  assert(!splitMains[1]!.prompt.includes("TOBIAS_ALONE"), "Cornelius never reads the part he was away for");
+  assert(splitMains[1]!.prompt.includes("TOBIAS_WITH_CORNELIUS"), "but reads the part he was there for");
+  assert(splitMains[2]!.prompt.includes("TOBIAS_ALONE") && splitMains[2]!.prompt.includes("CORNELIUS_LEAVES"));
 
   // A reply with more parts than one visibility pass looks at is still decided whole.
   const manyPartsChat = await createChat();
@@ -834,8 +834,8 @@ try {
   await say(manyPartsChat, "user", "P waits for news.");
   calls.length = 0;
   mainReplies = [
-    Array.from({ length: 10 }, (_, index) => `MAUKIE_PART_${index + 1}_ALONE in the cellar.`).join("\n\n***\n\n"),
-    "PANTALONE_WAITS.",
+    Array.from({ length: 10 }, (_, index) => `TOBIAS_PART_${index + 1}_ALONE in the cellar.`).join("\n\n***\n\n"),
+    "CORNELIUS_WAITS.",
     "NARRATOR_MANY_PARTS",
   ];
   const manyPartsTurn = await app.inject({
@@ -844,12 +844,12 @@ try {
     payload: { chatId: manyPartsChat },
   });
   assert.equal(manyPartsTurn.statusCode, 200, manyPartsTurn.body);
-  const manyParts = (await chats.listMessages(manyPartsChat)).filter((message) => message.characterId === ids.maukie);
+  const manyParts = (await chats.listMessages(manyPartsChat)).filter((message) => message.characterId === ids.tobias);
   assert.equal(manyParts.length, 10);
   for (const part of manyParts)
-    assert.deepEqual((await extraOf(part.id)).hiddenFromAICharacterIds, [ids.pantalone], part.content);
+    assert.deepEqual((await extraOf(part.id)).hiddenFromAICharacterIds, [ids.cornelius], part.content);
   const manyPartsMains = calls.filter((call) => call.kind === "main");
-  assert(!manyPartsMains[1]!.prompt.includes("MAUKIE_PART_1_ALONE"), "Pantalone never reads the earliest parts");
+  assert(!manyPartsMains[1]!.prompt.includes("TOBIAS_PART_1_ALONE"), "Cornelius never reads the earliest parts");
 } finally {
   await app.close();
   provider.close();

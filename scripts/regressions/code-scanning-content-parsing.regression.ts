@@ -147,33 +147,33 @@ assert.equal(stripMacroComments("Before{{// comment with } a lone brace }}After"
 const groupMacroContext = {
   user: "YunYun",
   char: "Miko",
-  characters: ["Miko", "Dottore"],
-  characterProfiles: [{ name: "Miko" }, { name: "Dottore" }],
+  characters: ["Miko", "Leopold"],
+  characterProfiles: [{ name: "Miko" }, { name: "Leopold" }],
   variables: {},
 };
 assert.equal(
   resolveMacros("[\n{{char}} greets YunYun.\n]", groupMacroContext),
-  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
+  "[\nMiko greets YunYun.\n]\n[\nLeopold greets YunYun.\n]",
 );
 assert.equal(
-  resolveMacros('[\n{{#if char == "Miko"}}Miko{{else}}Dottore{{/if}} greets YunYun.\n]', groupMacroContext),
-  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
+  resolveMacros('[\n{{#if char == "Miko"}}Miko{{else}}Leopold{{/if}} greets YunYun.\n]', groupMacroContext),
+  "[\nMiko greets YunYun.\n]\n[\nLeopold greets YunYun.\n]",
 );
 assert.equal(
-  resolveMacros('[\n{{#if {{char}} == "Miko"}}Miko{{else}}Dottore{{/if}} greets YunYun.\n]', groupMacroContext),
-  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
+  resolveMacros('[\n{{#if {{char}} == "Miko"}}Miko{{else}}Leopold{{/if}} greets YunYun.\n]', groupMacroContext),
+  "[\nMiko greets YunYun.\n]\n[\nLeopold greets YunYun.\n]",
 );
 assert.equal(
   resolveMacros("[\n{{group}}\n]", groupMacroContext),
-  "[\nDottore\n]\n[\nMiko\n]",
+  "[\nLeopold\n]\n[\nMiko\n]",
 );
-assert.equal(resolveMacros("[\n{{ char }}\n]", groupMacroContext), "[\nMiko\n]\n[\nDottore\n]");
+assert.equal(resolveMacros("[\n{{ char }}\n]", groupMacroContext), "[\nMiko\n]\n[\nLeopold\n]");
 assert.equal(
   resolveMacros(
-    '[\n{{#if user == "Other"}}Other{{else if char == "Miko"}}Miko{{else}}Dottore{{/if}} greets YunYun.\n]',
+    '[\n{{#if user == "Other"}}Other{{else if char == "Miko"}}Miko{{else}}Leopold{{/if}} greets YunYun.\n]',
     groupMacroContext,
   ),
-  "[\nMiko greets YunYun.\n]\n[\nDottore greets YunYun.\n]",
+  "[\nMiko greets YunYun.\n]\n[\nLeopold greets YunYun.\n]",
 );
 const nestedParenthesesConditional = `[\n{{#if ${"(".repeat(10_000)}unknown${")".repeat(10_000)}}}text\n]`;
 const nestedParenthesesStartedAt = performance.now();
@@ -182,11 +182,11 @@ assert.ok(
   performance.now() - nestedParenthesesStartedAt < 1_000,
   "malformed nested conditional detection should complete within one second",
 );
-const nestedCharacterCondition = `[\n{{#if ${"(".repeat(8_000)}char == "Miko"${")".repeat(8_000)}}}Miko{{else}}Dottore{{/if}}\n]`;
+const nestedCharacterCondition = `[\n{{#if ${"(".repeat(8_000)}char == "Miko"${")".repeat(8_000)}}}Miko{{else}}Leopold{{/if}}\n]`;
 const nestedCharacterStartedAt = performance.now();
 assert.equal(
   resolveMacros(nestedCharacterCondition, groupMacroContext),
-  "[\nMiko\n]\n[\nDottore\n]",
+  "[\nMiko\n]\n[\nLeopold\n]",
 );
 assert.ok(
   performance.now() - nestedCharacterStartedAt < 1_000,
@@ -195,7 +195,7 @@ assert.ok(
 const nestedAndCondition = `${"char && (".repeat(50_000)}char${")".repeat(50_000)}`;
 const nestedAndConditional = `[\n{{#if ${nestedAndCondition}}}{{char}}{{else}}missing{{/if}}\n]`;
 const nestedAndStartedAt = performance.now();
-assert.equal(resolveMacros(nestedAndConditional, groupMacroContext), "[\nMiko\n]\n[\nDottore\n]");
+assert.equal(resolveMacros(nestedAndConditional, groupMacroContext), "[\nMiko\n]\n[\nLeopold\n]");
 assert.ok(
   performance.now() - nestedAndStartedAt < 1_000,
   "deeply nested boolean conditions should complete within one second",

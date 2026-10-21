@@ -89,11 +89,11 @@ function normalizeConnectionPanelSort(value: unknown): ConnectionPanelSort {
 }
 type FontSize = 12 | 14 | 16 | 17 | 19 | 22 | 26 | 30 | 34;
 export type VisualTheme = "default" | "sillytavern";
-export type ChatWidgetPreset = "default" | "dottore" | "mari";
+export type ChatWidgetPreset = "default" | "mari";
 export type ChatWidgetShape = "preset" | "rounded" | "square" | "cut-corner" | "arched";
 
 export function normalizeChatWidgetPreset(value: unknown): ChatWidgetPreset {
-  return value === "dottore" || value === "mari" ? value : "default";
+  return value === "mari" ? value : "default";
 }
 
 export function normalizeChatWidgetShape(value: unknown): ChatWidgetShape {

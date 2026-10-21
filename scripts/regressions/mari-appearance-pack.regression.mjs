@@ -129,9 +129,8 @@ for (const [name, state] of [
 ]) {
   assert.equal(selectMariWorkAnimation({ activity: "", toolNames: [name], packId: "stale" }).id, state);
 }
-// Dated packs follow their seasonal theme by the theme's own decision (`seasonalThemeFor`): its window, Settings →
-// Disable seasonal ME themes, this year's greeting "Turn it off" and the `?seasonalPreview=` page. A pick of another
-// pack while it is worn wins for that year only. The user's own pick is never overwritten.
+// The fork ships one pack and no dated costumes: no seasonal theme, preview or opt-out may swap her look, and a
+// stored id from an upstream pack the fork does not ship falls back to YunYun.
 const settings = {
   seasonalThemesDisabled: false,
   seasonalGreetingYears: {},
@@ -139,56 +138,28 @@ const settings = {
   seasonalPreview: null,
 };
 const worn = (now, changed = {}) => seasonalThemeFor({ ...settings, ...changed }, now).themeId;
-const shown = (storedId, now, { optOut = "", changed } = {}) =>
-  resolveMariAppearancePack(storedId, [], null, optOut, worn(now, changed), now).id;
-const listed = (now, changed) => visibleMariAppearancePacks(worn(now, changed)).map(({ id }) => id);
-const at = (iso) => new Date(iso);
-const day = (iso) => at(`${iso}T12:00:00`);
-assert.equal(getMariAppearancePack("raccoon").season, "halloween", "the raccoon pack belongs to Halloween");
-// Minute by minute at both ends, and hour by hour around them, the costume is on exactly when the theme is.
-const halloween = SEASONAL_THEMES.find(({ id }) => id === "halloween");
-const moments = ["2026-10-29T23:59:00", "2026-10-30T00:00:00", "2026-11-01T11:59:00", "2026-11-01T12:00:00"].map(at);
-for (let hour = 0; hour < 24 * 7; hour += 1) moments.push(new Date(2026, 9, 27, hour, 30));
-for (const now of moments) {
-  const on = halloween.isActive(now);
-  assert.equal(shown("safari", now) === "raccoon", on, `${now.toString()}: raccoon follows Halloween`);
-  assert.equal(listed(now).includes("raccoon"), on, `${now.toString()}: the chooser follows Halloween`);
-}
-assert.ok(
-  !listed(at("2026-10-29T23:59:00")).includes("raccoon") && !listed(at("2026-11-01T12:00:00")).includes("raccoon"),
+const day = (iso) => new Date(`${iso}T12:00:00`);
+assert.deepEqual(
+  MARI_APPEARANCE_PACKS.map(({ id }) => id),
+  ["basic"],
+  "only the YunYun pack ships",
 );
-assert.ok(
-  listed(at("2026-10-30T00:00:00")).includes("raccoon") && listed(at("2026-11-01T11:59:00")).includes("raccoon"),
-);
-assert.equal(shown("safari", day("2026-10-31")), "raccoon");
-assert.equal(shown("safari", day("2026-10-31"), { optOut: "raccoon-2026" }), "safari");
-assert.equal(shown("safari", day("2027-10-31"), { optOut: "raccoon-2026" }), "raccoon");
-assert.equal(shown("safari", day("2026-11-02")), "safari");
-assert.equal(shown("raccoon", day("2026-06-15")), "basic");
-assert.equal(shown("golden", day("2026-10-30")), "raccoon");
-// Settings → Disable seasonal ME themes: dated packs neither show by themselves nor appear in the chooser.
-const toggledOff = { seasonalThemesDisabled: true };
-assert.equal(shown("safari", day("2026-10-31"), { changed: toggledOff }), "safari");
-assert.equal(shown("raccoon", day("2026-10-31"), { changed: toggledOff }), "basic");
-assert.ok(!listed(day("2026-10-31"), toggledOff).includes("raccoon"));
-// The greeting's "Turn it off" takes the costume off with the theme, for that year's Halloween only.
-const turnedOff = { seasonalThemeOffYears: { halloween: 2026 } };
-assert.equal(shown("safari", day("2026-10-31"), { changed: turnedOff }), "safari");
-assert.equal(shown("raccoon", day("2026-10-31"), { changed: turnedOff }), "basic");
-assert.ok(!listed(day("2026-10-31"), turnedOff).includes("raccoon"));
-assert.equal(shown("safari", day("2027-10-31"), { changed: turnedOff }), "raccoon", "back on next Halloween");
-// `?seasonalPreview=halloween` dresses her on any date, even with the toggle on or this year turned off; the
-// preview's own "Turn it off" undresses her, and the real records stay out of it.
-const preview = (records = {}) => ({
-  seasonalPreview: { themeId: "halloween", greeted: {}, turnedOff: {}, ...records },
-});
-for (const changed of [preview(), { ...toggledOff, ...preview() }, { ...turnedOff, ...preview() }]) {
-  assert.equal(shown("safari", day("2026-03-05"), { changed }), "raccoon", "the preview shows the costume");
-  assert.ok(listed(day("2026-03-05"), changed).includes("raccoon"), "the preview lists the costume");
+assert.ok(MARI_APPEARANCE_PACKS.every((appearance) => !appearance.season && !appearance.unlock));
+assert.ok(SEASONAL_THEMES.some(({ id }) => id === "halloween"), "the seasonal theme itself stays");
+const halloweenPreview = { seasonalPreview: { themeId: "halloween", greeted: {}, turnedOff: {} } };
+for (const [now, changed] of [
+  [day("2026-10-31"), {}],
+  [day("2026-03-05"), halloweenPreview],
+]) {
+  assert.equal(worn(now, changed), "halloween");
+  assert.deepEqual(
+    visibleMariAppearancePacks(worn(now, changed)).map(({ id }) => id),
+    ["basic"],
+  );
+  for (const stored of ["basic", "golden", "safari", "raccoon"]) {
+    assert.equal(resolveMariAppearancePack(stored, [], null, "", worn(now, changed), now).id, "basic");
+  }
 }
-const previewOff = preview({ turnedOff: { halloween: 2026 } });
-assert.equal(shown("safari", day("2026-03-05"), { changed: previewOff }), "safari");
-assert.ok(!listed(day("2026-03-05"), previewOff).includes("raccoon"));
 
 console.info(
   "YunYun appearance pack: fallback, lifecycle outcomes, activity selection, per-pack isolation, loading tiers and all sprite assets passed.",

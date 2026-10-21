@@ -9535,7 +9535,7 @@ export function ChatSettingsDrawer({
                               title={localizeUi("ui.chat.chatsettingsdrawer.sceneImageInstructions")}
                               ariaLabel={localizeUi("ui.chat.chatsettingsdrawer.sceneImageInstructions")}
                               placeholder={localizeUi(
-                                "ui.chat.chatsettingsdrawer.eGDottoreSMaskCompletelyCoversHisEyes",
+                                "ui.chat.chatsettingsdrawer.eGLeopoldSMaskCompletelyCoversHisEyes",
                               )}
                               rows={3}
                               maxLength={1200}

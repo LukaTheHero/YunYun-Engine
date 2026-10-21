@@ -8,11 +8,11 @@ const CHIBI_PROFESSOR_MARI_IMAGE = "/sprites/yunyun/chibi-yunyun.png";
 const SHINY_CHIBI_PROFESSOR_MARI_IMAGE = "/sprites/yunyun/chibi-yunyun.png";
 const CHIBI_PROFESSOR_MARI_SEEN_KEY = "marinara:chibi-professor-mari-toast-seen";
 const CHIBI_PROFESSOR_MARI_ROLL_CHANCE = 0.001;
-/** Which look a rare visit gets; weights add up to 100. Pixel poses are 94x128, so they stay crisp. */
+/** Which look a rare visit gets; weights add up to 100. */
 const CHIBI_PROFESSOR_MARI_VARIANTS = [
   {
     id: "normal",
-    weight: 60,
+    weight: 72,
     title: "ui.chibiProfessorMari.found.normal",
     src: CHIBI_PROFESSOR_MARI_IMAGE,
     className: "h-24 w-20",
@@ -30,20 +30,6 @@ const CHIBI_PROFESSOR_MARI_VARIANTS = [
     title: "ui.chibiProfessorMari.found.upsideDown",
     src: CHIBI_PROFESSOR_MARI_IMAGE,
     className: "h-24 w-20 rotate-180",
-  },
-  {
-    id: "dottore",
-    weight: 7,
-    title: "ui.chibiProfessorMari.found.dottore",
-    src: "/sprites/yunyun/chibi-yunyun.png/pose-chibi.webp",
-    className: "h-32 w-24 [image-rendering:pixelated]",
-  },
-  {
-    id: "gold",
-    weight: 5,
-    title: "ui.chibiProfessorMari.found.gold",
-    src: "/sprites/yunyun/chibi-yunyun.png/pose-chibi.webp",
-    className: "h-32 w-24 [image-rendering:pixelated]",
   },
   {
     id: "shiny",

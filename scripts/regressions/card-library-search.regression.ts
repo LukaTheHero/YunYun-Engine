@@ -7,7 +7,7 @@ import {
 } from "../../packages/client/src/lib/card-library-search.js";
 
 const characterLibrarySearchDocument = {
-  name: "Il Dottore",
+  name: "Leopold",
   title: "Modern AU version",
   meta: formatCardLibraryMeta("Pasta Devs", "3.0"),
   summary: getCardLibrarySummary(["A meticulous creator note.", "A Fatui researcher."]),
@@ -29,7 +29,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  matchesCardLibrarySearch(characterLibrarySearchDocument, parseCardLibrarySearchQuery("-tag:villain dottore")),
+  matchesCardLibrarySearch(characterLibrarySearchDocument, parseCardLibrarySearchQuery("-tag:villain leopold")),
   false,
 );
 
@@ -42,7 +42,7 @@ const personaLibrarySearchDocument = {
   sections: [
     { content: "An AI engineer." },
     { content: "Curious and formidable." },
-    { content: "Working beside Dottore." },
+    { content: "Working beside Leopold." },
     { content: "A shared laboratory history." },
     { content: "White coat and crimson accents." },
   ],

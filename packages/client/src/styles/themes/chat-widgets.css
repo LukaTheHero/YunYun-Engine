@@ -60,46 +60,7 @@
   --mari-widget-crest-height: initial;
 }
 
-[data-chat-widget-preset="dottore"] {
-  --mari-widget-bg: oklch(0.965 0.014 238);
-  --mari-widget-text: oklch(0.3 0.045 252);
-  --mari-widget-accent: oklch(0.415 0.075 230);
-  --mari-widget-muted: oklch(0.48 0.035 248);
-  --mari-widget-field: oklch(0.935 0.023 243);
-  --mari-widget-border: oklch(0.7 0.035 238);
-  --mari-widget-gold: oklch(0.59 0.035 83);
-  --mari-widget-soft: oklch(0.87 0.043 235);
-  --mari-widget-font-preset: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
-  --mari-widget-header-bg: linear-gradient(110deg, transparent 35%, oklch(0.7 0.08 235 / 0.14));
-  --mari-widget-header-padding: 0.75rem 1.75rem;
-  --mari-widget-crest-height: 2.5rem;
-  --mari-widget-crest: url("/images/chat-widgets/dottore-crest.svg");
-  --mari-widget-crest-content: "";
-  --mari-widget-ornament-content: "";
-  --mari-widget-isolation: isolate;
-  --mari-widget-drawer-margin: 0 0.625rem;
-  --mari-widget-body-inset: 0 0.375rem 0.375rem;
-  --mari-widget-drawer-border-width: 1px;
-  --mari-widget-drawer-radius: 0px;
-  --mari-widget-frame-shadow:
-    inset 0 0 0 3px var(--mari-widget-custom-background-solid, var(--mari-widget-bg)),
-    inset 0 0 0 4px var(--mari-widget-custom-border-solid, var(--mari-widget-accent));
-}
-
-[data-theme="dark"][data-chat-widget-preset="dottore"],
-[data-theme="dark"] [data-chat-widget-preset="dottore"] {
-  --mari-widget-bg: oklch(0.235 0.03 252);
-  --mari-widget-text: oklch(0.915 0.025 245);
-  --mari-widget-accent: oklch(0.83 0.095 218);
-  --mari-widget-muted: oklch(0.73 0.035 244);
-  --mari-widget-field: oklch(0.275 0.035 250);
-  --mari-widget-border: oklch(0.46 0.045 244);
-  --mari-widget-gold: oklch(0.74 0.035 92);
-  --mari-widget-soft: oklch(0.34 0.05 245);
-}
-
-/* The framed presets' thin inner button ring. Custom border paint redraws it too. */
-[data-chat-widget-preset="dottore"],
+/* The framed preset's thin inner button ring. Custom border paint redraws it too. */
 [data-chat-widget-preset="mari"] {
   --mari-widget-button-ring:
     inset 0 0 0 2px var(--mari-widget-custom-background-solid, var(--mari-widget-bg)),
@@ -173,8 +134,7 @@
   --mari-widget-drawer-radius: 0.625rem 0.625rem 0.25rem 0.25rem;
 }
 
-[data-chat-widget-shape="cut-corner"],
-[data-chat-widget-preset="dottore"][data-chat-widget-shape="preset"] {
+[data-chat-widget-shape="cut-corner"] {
   --mari-widget-radius: 0px;
   --mari-widget-bubble-radius: 0.25rem;
   --mari-widget-shell-bg: transparent;
@@ -293,13 +253,8 @@
 
   /* Resolve the public blur hook at the painted element so per-window themes
      work too. Rounded frames keep their original single blur on the root. */
-  :root:is([data-chat-widget-shape="cut-corner"], [data-chat-widget-preset="dottore"][data-chat-widget-shape="preset"])
-    .mari-window:not([data-chat-widget-preview] *)::after,
-  [data-chat-widget-preview]:is(
-      [data-chat-widget-shape="cut-corner"],
-      [data-chat-widget-preset="dottore"][data-chat-widget-shape="preset"]
-    )
-    .mari-window::after {
+  :root[data-chat-widget-shape="cut-corner"] .mari-window:not([data-chat-widget-preview] *)::after,
+  [data-chat-widget-preview][data-chat-widget-shape="cut-corner"] .mari-window::after {
     -webkit-backdrop-filter: var(--mari-window-backdrop-filter, blur(12px));
     backdrop-filter: var(--mari-window-backdrop-filter, blur(12px));
   }
@@ -581,7 +536,6 @@
     --mari-widget-drawer-margin: 0;
   }
 
-  [data-chat-widget-preview][data-chat-widget-preset="dottore"] .mari-widget-style-preview__window,
   [data-chat-widget-preview][data-chat-widget-preset="mari"] .mari-widget-style-preview__window {
     --mari-window-header-padding: 0.625rem 1rem;
   }

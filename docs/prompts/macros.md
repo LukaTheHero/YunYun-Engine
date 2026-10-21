@@ -65,7 +65,7 @@ The character field macros read the current character's card:
 
 In a chat with one character, these resolve against that character. In a group chat, they resolve against the first character by default. To repeat text for each character, put it inside a bracketed group block. See [Conditional Prompts](conditional-prompts.md) for group blocks.
 
-`{{group}}` follows the character currently responding, including during individual group generations. For example, if Pantalone is responding in a Roleplay group containing Powers That Be, Maukie, and Pantalone, `{{group}}` resolves to `Powers That Be, Maukie`. A character card remains in this roster even if its name happens to match `{{user}}`.
+`{{group}}` follows the character currently responding, including during individual group generations. For example, if Cornelius is responding in a Roleplay group containing Powers That Be, Tobias, and Cornelius, `{{group}}` resolves to `Powers That Be, Tobias`. A character card remains in this roster even if its name happens to match `{{user}}`.
 
 The Phonetic name field has two jobs. It sets how the name is pronounced by text-to-speech. It also feeds `{{charNamePhonetic}}` and `{{userNamePhonetic}}`. You will find it in both the **Character Editor** and the **Persona Editor**.
 
@@ -273,7 +273,7 @@ These fields also finish macro names for you. Type `{{ch` at the end of a line a
 
 You can also type `/macros` in the chat box (the short form `/macro` works too). It prints the full macro list right in the chat as a quick reminder.
 
-Conditional blocks can combine comparisons with `||` (OR), `&&` (AND), and parentheses. Equality lists may use the compact form `{{#if character == "Maukie" || "Pantalone"}}`. See [Conditional Prompts](conditional-prompts.md) for precedence, group-chat examples, and the full operator list.
+Conditional blocks can combine comparisons with `||` (OR), `&&` (AND), and parentheses. Equality lists may use the compact form `{{#if character == "Tobias" || "Cornelius"}}`. See [Conditional Prompts](conditional-prompts.md) for precedence, group-chat examples, and the full operator list.
 
 A condition can also ask your Decision model about the scene: `{{#if decision:"The latest message moves the scene to a new place"}}` for yes or no, and `{{#if decision_choice:"The kind of scene in the latest message" == "combat"}}` to pick one option. With no Decision model, or no answer, these read as no. See [Asking the Decision model](conditional-prompts.md#asking-the-decision-model). Add `sticky:3 cooldown:5` after a statement to keep a yes for three turns and then rest it for five; see [Sticky and cooldown](conditional-prompts.md#sticky-and-cooldown). Add `until:"..."` or `while:"..."` to keep a yes for as long as a second statement allows; see [Until and while](conditional-prompts.md#until-and-while). `every:3` asks a statement only every three turns, and `priority:high` or `priority:low` chooses which statements fit within a prompt plan; see [Checking every few turns](conditional-prompts.md#checking-every-few-turns), [Priority](conditional-prompts.md#priority), and [Limits and cost](conditional-prompts.md#limits-and-cost).
 

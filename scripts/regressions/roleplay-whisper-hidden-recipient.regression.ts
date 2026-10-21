@@ -77,10 +77,10 @@ try {
     maxTokensOverride: 512,
   });
   assert(connection);
-  const [maukie, pantalone, narrator] = await Promise.all(
-    ["Maukie", "Pantalone", "Narrator"].map((name) => characters.create(characterDataSchema.parse({ name }))),
+  const [tobias, cornelius, narrator] = await Promise.all(
+    ["Tobias", "Cornelius", "Narrator"].map((name) => characters.create(characterDataSchema.parse({ name }))),
   );
-  assert(maukie && pantalone && narrator);
+  assert(tobias && cornelius && narrator);
   const persona = await characters.createPersona("YunYun", "The player.");
   assert(persona);
   const presets = createPromptsStorage(db);
@@ -101,7 +101,7 @@ try {
   const chat = await chats.create({
     name: "Hidden whisper proof",
     mode: "roleplay",
-    characterIds: [maukie.id, pantalone.id, narrator.id],
+    characterIds: [tobias.id, cornelius.id, narrator.id],
     personaId: persona.id,
     connectionId: connection.id,
     promptPresetId: preset.id,
@@ -148,78 +148,78 @@ try {
     assert.equal(response.statusCode, 200, response.body);
   };
 
-  // The narrator talks to YunYun alone, whispering to absent Maukie and to YunYun.
+  // The narrator talks to YunYun alone, whispering to absent Tobias and to YunYun.
   await generate(
-    'NARRATION_HEAD on the pier. [whisper: character="Maukie" text="MAUKIE_SECRET"] NARRATION_TAIL as the tide turns. [whisper: character="YunYun" text="PERSONA_SECRET"]',
+    'NARRATION_HEAD on the pier. [whisper: character="Tobias" text="TOBIAS_SECRET"] NARRATION_TAIL as the tide turns. [whisper: character="YunYun" text="PERSONA_SECRET"]',
     narrator.id,
   );
   const narration = (await chats.listMessages(chat.id)).at(-1)!;
   assert.equal(getRoleplayWhispers(JSON.parse(narration.extra)).length, 2);
-  await patchExtra(narration.id, { hiddenFromAICharacterIds: [maukie.id, pantalone.id] });
+  await patchExtra(narration.id, { hiddenFromAICharacterIds: [tobias.id, cornelius.id] });
 
-  const pantaloneLive = await generate("PANTALONE_LATER_LINE.", pantalone.id);
-  for (const content of [pantaloneLive, await preview(pantalone.id)]) {
-    assert(!content.includes("NARRATION_"), "Pantalone never sees the hidden narration");
-    assert(!content.includes("SECRET") && !content.includes("[Private whisper"), "Pantalone gets no whisper or trace");
+  const corneliusLive = await generate("CORNELIUS_LATER_LINE.", cornelius.id);
+  for (const content of [corneliusLive, await preview(cornelius.id)]) {
+    assert(!content.includes("NARRATION_"), "Cornelius never sees the hidden narration");
+    assert(!content.includes("SECRET") && !content.includes("[Private whisper"), "Cornelius gets no whisper or trace");
   }
 
-  const maukieLive = await generate("Maukie replies.", maukie.id);
-  for (const content of [maukieLive, await preview(maukie.id)]) {
-    assert(content.includes("[Private whisper to Maukie"), "Maukie still receives the whisper fragment");
-    assert(content.includes("MAUKIE_SECRET"));
+  const tobiasLive = await generate("Tobias replies.", tobias.id);
+  for (const content of [tobiasLive, await preview(tobias.id)]) {
+    assert(content.includes("[Private whisper to Tobias"), "Tobias still receives the whisper fragment");
+    assert(content.includes("TOBIAS_SECRET"));
     assert(!content.includes("NARRATION_"), "only the whisper survives the hide, never the narration");
     assert(!content.includes("PERSONA_SECRET"), "a stand-in carries only the viewer's own whispers");
     assert(
-      content.indexOf("OPENING_LINE") < content.indexOf("MAUKIE_SECRET") &&
-        content.indexOf("MAUKIE_SECRET") < content.indexOf("PANTALONE_LATER_LINE"),
+      content.indexOf("OPENING_LINE") < content.indexOf("TOBIAS_SECRET") &&
+        content.indexOf("TOBIAS_SECRET") < content.indexOf("CORNELIUS_LATER_LINE"),
       "the whisper keeps the hidden message's place in the story",
     );
   }
   // Previews without a preset, or built from extension prompt parts, keep the stand-in's whisper too.
   for (const options of [{ skipPreset: true }, { promptParts: { presetText: "Parts preview." } }]) {
-    const content = await preview(maukie.id, options);
-    assert(content.includes("MAUKIE_SECRET") && !content.includes("NARRATION_"), JSON.stringify(options));
+    const content = await preview(tobias.id, options);
+    assert(content.includes("TOBIAS_SECRET") && !content.includes("NARRATION_"), JSON.stringify(options));
   }
 
   // The narrator and the persona keep today's views.
   const narratorLive = await generate("The narrator continues.", narrator.id);
   for (const content of [narratorLive, await preview(narrator.id)]) {
     assert(content.includes("NARRATION_HEAD") && content.includes("NARRATION_TAIL"));
-    assert(content.includes("MAUKIE_SECRET") && content.includes("PERSONA_SECRET"));
+    assert(content.includes("TOBIAS_SECRET") && content.includes("PERSONA_SECRET"));
   }
-  const personaView = await preview(maukie.id, { impersonate: true });
+  const personaView = await preview(tobias.id, { impersonate: true });
   assert(personaView.includes("NARRATION_HEAD") && personaView.includes("PERSONA_SECRET"));
-  assert(!personaView.includes("MAUKIE_SECRET"), "the persona does not gain Maukie's whisper");
+  assert(!personaView.includes("TOBIAS_SECRET"), "the persona does not gain Tobias's whisper");
 
   // Hiding the message from the narrator too gives the narrator nothing back.
-  await patchExtra(narration.id, { hiddenFromAICharacterIds: [maukie.id, pantalone.id, narrator.id] });
+  await patchExtra(narration.id, { hiddenFromAICharacterIds: [tobias.id, cornelius.id, narrator.id] });
   const narratorHidden = await preview(narrator.id);
   assert(!narratorHidden.includes("SECRET") && !narratorHidden.includes("NARRATION_"), "no narrator resurrection");
-  assert((await preview(maukie.id)).includes("MAUKIE_SECRET"));
-  await patchExtra(narration.id, { hiddenFromAICharacterIds: [maukie.id, pantalone.id] });
+  assert((await preview(tobias.id)).includes("TOBIAS_SECRET"));
+  await patchExtra(narration.id, { hiddenFromAICharacterIds: [tobias.id, cornelius.id] });
 
   // A message trimmed out of the history window takes its whisper with it.
   await chats.patchMetadata(chat.id, { contextMessageLimit: 2 });
-  assert(!(await preview(maukie.id)).includes("MAUKIE_SECRET"), "the stand-in follows history trimming");
+  assert(!(await preview(tobias.id)).includes("TOBIAS_SECRET"), "the stand-in follows history trimming");
   await chats.patchMetadata(chat.id, { contextMessageLimit: null });
 
   // Hiding from everyone keeps today's rule: nothing comes back.
   await patchExtra(narration.id, { hiddenFromAI: true });
-  for (const content of [await generate("Maukie shrugs.", maukie.id), await preview(maukie.id)]) {
-    assert(!content.includes("MAUKIE_SECRET") && !content.includes("[Private whisper"));
+  for (const content of [await generate("Tobias shrugs.", tobias.id), await preview(tobias.id)]) {
+    assert(!content.includes("TOBIAS_SECRET") && !content.includes("[Private whisper"));
   }
   await patchExtra(narration.id, { hiddenFromAI: false });
-  assert((await preview(maukie.id)).includes("MAUKIE_SECRET"));
+  assert((await preview(tobias.id)).includes("TOBIAS_SECRET"));
 
   // Emptying a whisper removes it from the message; other commands stay as they were.
   const before = getRoleplayCommandActivity(JSON.parse((await chats.getMessage(narration.id))!.extra));
-  const maukieIndex = before.findIndex(
-    (item) => item.command.type === "whisper" && item.whisperRecipient?.id === maukie.id,
+  const tobiasIndex = before.findIndex(
+    (item) => item.command.type === "whisper" && item.whisperRecipient?.id === tobias.id,
   );
-  assert(maukieIndex >= 0);
+  assert(tobiasIndex >= 0);
   await patchExtra(narration.id, {
     roleplayCommandActivity: before.map((item, index) =>
-      index === maukieIndex && item.command.type === "whisper"
+      index === tobiasIndex && item.command.type === "whisper"
         ? { ...item, command: { ...item.command, text: "  \n " } }
         : item,
     ),
@@ -227,18 +227,18 @@ try {
   const after = getRoleplayCommandActivity(JSON.parse((await chats.getMessage(narration.id))!.extra));
   assert.deepEqual(
     after,
-    before.filter((_, index) => index !== maukieIndex),
+    before.filter((_, index) => index !== tobiasIndex),
     "the emptied whisper is gone",
   );
-  const emptied = await preview(maukie.id);
-  assert(!emptied.includes("MAUKIE_SECRET") && !emptied.includes("[Private whisper"), "no blank whisper remains");
-  assert((await preview(maukie.id, { impersonate: true })).includes("PERSONA_SECRET"));
+  const emptied = await preview(tobias.id);
+  assert(!emptied.includes("TOBIAS_SECRET") && !emptied.includes("[Private whisper"), "no blank whisper remains");
+  assert((await preview(tobias.id, { impersonate: true })).includes("PERSONA_SECRET"));
 
-  // With Advanced Memory on, a hidden message that opens Maukie's history keeps his whisper too.
+  // With Advanced Memory on, a hidden message that opens Tobias's history keeps his whisper too.
   const memoryChat = await chats.create({
     name: "Hidden whisper memory",
     mode: "roleplay",
-    characterIds: [maukie.id, narrator.id],
+    characterIds: [tobias.id, narrator.id],
     personaId: persona.id,
     connectionId: connection.id,
     promptPresetId: preset.id,
@@ -257,7 +257,7 @@ try {
       ...DEFAULT_ADVANCED_MEMORY_SETTINGS,
       enabled: true,
       narratorCharacterId: narrator.id,
-      knowledgeStarts: { [maukie.id]: null, [narrator.id]: null },
+      knowledgeStarts: { [tobias.id]: null, [narrator.id]: null },
       knowledgeConfirmed: true,
     },
   };
@@ -267,14 +267,14 @@ try {
     role: "assistant",
     characterId: narrator.id,
     content: "MEMORY_OPENER_NARRATION on the pier.",
-    extra: { hiddenFromAICharacterIds: [maukie.id], roleplayCommandActivity: before },
+    extra: { hiddenFromAICharacterIds: [tobias.id], roleplayCommandActivity: before },
   });
   await chats.createMessage({ chatId: memoryChat.id, role: "user", content: "MEMORY_VISIBLE_LINE YunYun calls out." });
   for (const content of [
-    await generate("Maukie answers.", maukie.id, { chatId: memoryChat.id }),
-    await preview(maukie.id, { chatId: memoryChat.id }),
+    await generate("Tobias answers.", tobias.id, { chatId: memoryChat.id }),
+    await preview(tobias.id, { chatId: memoryChat.id }),
   ]) {
-    assert(content.includes("MAUKIE_SECRET"), "Advanced Memory keeps the whisper of the message that opens the window");
+    assert(content.includes("TOBIAS_SECRET"), "Advanced Memory keeps the whisper of the message that opens the window");
     assert(!content.includes("MEMORY_OPENER_NARRATION") && !content.includes("PERSONA_SECRET"));
     assert(content.includes("MEMORY_VISIBLE_LINE"));
   }
@@ -288,17 +288,17 @@ try {
   assert.equal(whisperOnly.statusCode, 200, whisperOnly.body);
   assert.equal(whisperOnly.json().content, "");
   for (const content of [
-    await generate('[whisper: character="Maukie" text="NARRATOR_WHISPER_ONLY_SECRET"]', narrator.id, {
+    await generate('[whisper: character="Tobias" text="NARRATOR_WHISPER_ONLY_SECRET"]', narrator.id, {
       chatId: memoryChat.id,
     }),
     await preview(narrator.id, { chatId: memoryChat.id }),
   ])
     assert(content.includes("USER_WHISPER_ONLY_SECRET"), "the narrator receives a whisper-only user message");
-  const maukieView = await preview(maukie.id, { chatId: memoryChat.id });
-  assert(maukieView.includes("NARRATOR_WHISPER_ONLY_SECRET"), "Maukie receives a whisper-only narrator reply");
-  assert(!maukieView.includes("USER_WHISPER_ONLY_SECRET"), "Maukie never receives the narrator's whisper");
+  const tobiasView = await preview(tobias.id, { chatId: memoryChat.id });
+  assert(tobiasView.includes("NARRATOR_WHISPER_ONLY_SECRET"), "Tobias receives a whisper-only narrator reply");
+  assert(!tobiasView.includes("USER_WHISPER_ONLY_SECRET"), "Tobias never receives the narrator's whisper");
   // Its whisper stays inside the last message's wrapper, even when memory leaves out an earlier message.
-  for (const content of [maukieView, await generate("Maukie reacts.", maukie.id, { chatId: memoryChat.id })]) {
+  for (const content of [tobiasView, await generate("Tobias reacts.", tobias.id, { chatId: memoryChat.id })]) {
     assert.equal(content.split("</last_message>").length, 2, "one closing tag");
     const secretAt = content.indexOf("NARRATOR_WHISPER_ONLY_SECRET");
     assert(content.lastIndexOf("<last_message>", secretAt) >= 0 && secretAt < content.indexOf("</last_message>"));
@@ -317,7 +317,7 @@ try {
   });
   for (const content of [
     await preview(narrator.id, { chatId: memoryChat.id }),
-    await preview(maukie.id, { chatId: memoryChat.id }),
+    await preview(tobias.id, { chatId: memoryChat.id }),
     await generate("A new day.", narrator.id, { chatId: memoryChat.id }),
   ]) {
     assert(content.includes("NEW_CONVERSATION_LINE"));
@@ -328,7 +328,7 @@ try {
   const whisperFirstChat = await chats.create({
     name: "Whisper first",
     mode: "roleplay",
-    characterIds: [maukie.id, narrator.id],
+    characterIds: [tobias.id, narrator.id],
     personaId: persona.id,
     connectionId: connection.id,
     promptPresetId: preset.id,
@@ -350,11 +350,11 @@ try {
     chatId: whisperFirstChat.id,
     role: "user",
     content:
-      '[whisper: character="Narrator" text="SPACED_NARRATOR_SECRET"] [whisper: character="Maukie" text="SPACED_MAUKIE_SECRET"]',
+      '[whisper: character="Narrator" text="SPACED_NARRATOR_SECRET"] [whisper: character="Tobias" text="SPACED_TOBIAS_SECRET"]',
   });
   for (const [id, name] of [
     [narrator.id, "Narrator"],
-    [maukie.id, "Maukie"],
+    [tobias.id, "Tobias"],
   ] as const) {
     const content = await preview(id, { chatId: whisperFirstChat.id });
     assert(
@@ -367,21 +367,21 @@ try {
   await chats.createMessage({
     chatId: whisperFirstChat.id,
     role: "user",
-    content: '[whisper: character="Maukie" text="PERSONAL_START_SECRET"]',
-    extra: { conversationStartForCharacterIds: [maukie.id] },
+    content: '[whisper: character="Tobias" text="PERSONAL_START_SECRET"]',
+    extra: { conversationStartForCharacterIds: [tobias.id] },
   });
   for (const content of [
-    await preview(maukie.id, { chatId: whisperFirstChat.id }),
-    await generate("Maukie starts over.", maukie.id, { chatId: whisperFirstChat.id }),
+    await preview(tobias.id, { chatId: whisperFirstChat.id }),
+    await generate("Tobias starts over.", tobias.id, { chatId: whisperFirstChat.id }),
   ]) {
-    assert(content.includes("PERSONAL_START_SECRET"), "a whisper that opens Maukie's conversation reaches him");
+    assert(content.includes("PERSONAL_START_SECRET"), "a whisper that opens Tobias's conversation reaches him");
     assert(!content.includes("PERSONAL_EARLY_LINE"));
   }
   // A notice memory never keeps, between a whisper-only message and later text, does not cut the whisper off.
   const noticeChat = await chats.create({
     name: "Whisper notice",
     mode: "roleplay",
-    characterIds: [maukie.id, narrator.id],
+    characterIds: [tobias.id, narrator.id],
     personaId: persona.id,
     connectionId: connection.id,
     promptPresetId: preset.id,
@@ -437,7 +437,7 @@ try {
   const knowledgeChat = await chats.create({
     name: "Whisper knowledge",
     mode: "roleplay",
-    characterIds: [maukie.id, narrator.id],
+    characterIds: [tobias.id, narrator.id],
     personaId: persona.id,
     connectionId: connection.id,
     promptPresetId: preset.id,
@@ -448,12 +448,12 @@ try {
   const knowledgeWhisper = await chats.createMessage({
     chatId: knowledgeChat.id,
     role: "user",
-    content: '[whisper: character="Maukie" text="KNOWLEDGE_SECRET"]',
+    content: '[whisper: character="Tobias" text="KNOWLEDGE_SECRET"]',
   });
   const oldReply = await chats.createMessage({
     chatId: knowledgeChat.id,
     role: "assistant",
-    characterId: maukie.id,
+    characterId: tobias.id,
     content: "KNOWLEDGE_OLD_REPLY",
   });
   const anchor = await chats.createMessage({ chatId: knowledgeChat.id, role: "user", content: "KNOWLEDGE_ANCHOR" });
@@ -462,28 +462,28 @@ try {
     chats.patchMetadata(knowledgeChat.id, {
       advancedMemory: {
         ...memoryMetadata.advancedMemory,
-        knowledgeStarts: { [maukie.id]: id, [narrator.id]: null },
+        knowledgeStarts: { [tobias.id]: id, [narrator.id]: null },
       },
     });
   await knowledgeFrom(knowledgeWhisper.id);
   for (const content of [
-    await preview(maukie.id, { chatId: knowledgeChat.id }),
-    await generate("Maukie knows.", maukie.id, { chatId: knowledgeChat.id }),
+    await preview(tobias.id, { chatId: knowledgeChat.id }),
+    await generate("Tobias knows.", tobias.id, { chatId: knowledgeChat.id }),
   ]) {
-    assert(content.includes("KNOWLEDGE_SECRET"), "Maukie's knowledge opens on the whisper");
+    assert(content.includes("KNOWLEDGE_SECRET"), "Tobias's knowledge opens on the whisper");
     assert(!content.includes("KNOWLEDGE_EARLY_LINE"));
   }
-  // Regenerating a reply from before Maukie's knowledge start gives him nothing from then.
+  // Regenerating a reply from before Tobias's knowledge start gives him nothing from then.
   await knowledgeFrom(anchor.id);
   assert(
     !(
-      await generate("Maukie again.", maukie.id, { chatId: knowledgeChat.id, regenerateMessageId: oldReply.id })
+      await generate("Tobias again.", tobias.id, { chatId: knowledgeChat.id, regenerateMessageId: oldReply.id })
     ).includes("KNOWLEDGE_SECRET"),
     "regenerating before the knowledge start",
   );
-  // Impersonating reads memory as its owner, without Maukie's knowledge range, in Peek Prompt as in the live route.
+  // Impersonating reads memory as its owner, without Tobias's knowledge range, in Peek Prompt as in the live route.
   assert(
-    (await preview(maukie.id, { chatId: knowledgeChat.id, impersonate: true })).includes("KNOWLEDGE_EARLY_LINE"),
+    (await preview(tobias.id, { chatId: knowledgeChat.id, impersonate: true })).includes("KNOWLEDGE_EARLY_LINE"),
     "owner view",
   );
 
@@ -515,9 +515,9 @@ try {
     ...extra,
     roleplayCommandActivity: [
       {
-        command: { type: "whisper", character: "Maukie", text: "UNIT_SECRET" },
+        command: { type: "whisper", character: "Tobias", text: "UNIT_SECRET" },
         raw: "",
-        whisperRecipient: { id: maukie.id, kind: "character" },
+        whisperRecipient: { id: tobias.id, kind: "character" },
       },
     ],
   });
@@ -530,29 +530,29 @@ try {
   });
   const whisperOnlyFor = (
     messages: Array<{ id: string; role: string; content: string; extra: Record<string, unknown> }>,
-    knowledgeStarts: Record<string, string | null> = { [maukie.id]: null },
+    knowledgeStarts: Record<string, string | null> = { [tobias.id]: null },
   ) => [
     ...selectAdvancedMemoryWhisperOnlyIds(
       messages,
       { ...DEFAULT_ADVANCED_MEMORY_SETTINGS, enabled: true, knowledgeStarts },
-      [maukie.id],
+      [tobias.id],
       true,
     ),
   ];
   assert.deepEqual(whisperOnlyFor([line("a"), whisper("w")]), ["w"]);
-  assert.deepEqual(whisperOnlyFor([line("a"), whisper("w")], { [maukie.id]: "w" }), ["w"], "knowledge opens on it");
-  assert.deepEqual(whisperOnlyFor([whisper("w"), line("a")], { [maukie.id]: "later" }), [], "regenerating before it");
+  assert.deepEqual(whisperOnlyFor([line("a"), whisper("w")], { [tobias.id]: "w" }), ["w"], "knowledge opens on it");
+  assert.deepEqual(whisperOnlyFor([whisper("w"), line("a")], { [tobias.id]: "later" }), [], "regenerating before it");
   assert.deepEqual(
     whisperOnlyFor([whisper("w"), line("a", { isConversationStart: true })]),
     [],
     "earlier conversation",
   );
   assert.deepEqual(
-    whisperOnlyFor([line("a"), whisper("w", { conversationStartForCharacterIds: [maukie.id] })]),
+    whisperOnlyFor([line("a"), whisper("w", { conversationStartForCharacterIds: [tobias.id] })]),
     ["w"],
     "personal conversation start",
   );
-  assert.deepEqual(whisperOnlyFor([whisper("w", { hiddenFromAICharacterIds: [maukie.id] })]), [], "hidden");
+  assert.deepEqual(whisperOnlyFor([whisper("w", { hiddenFromAICharacterIds: [tobias.id] })]), [], "hidden");
   console.log(
     "Hidden whisper recipient passed: recipient-only stand-in, position, other characters, narrator, persona, trimming, global hide, emptied whispers and memory window.",
   );

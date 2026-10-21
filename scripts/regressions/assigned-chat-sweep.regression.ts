@@ -193,7 +193,7 @@ try {
 
   const { createCharactersStorage } = await import("../../packages/server/src/services/storage/characters.storage.js");
   const { characterDataSchema } = await import("../../packages/shared/src/schemas/character.schema.js");
-  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Dottore" }));
+  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Leopold" }));
   assert.ok(character);
   const { createPromptsStorage } = await import("../../packages/server/src/services/storage/prompts.storage.js");
   const presets = createPromptsStorage(db);
@@ -252,7 +252,7 @@ try {
       content: "The original passage remains.",
     });
     assert.ok(original);
-    const replyTo = { messageId: original.id, name: "Dottore", content: "Selected snapshot only." };
+    const replyTo = { messageId: original.id, name: "Leopold", content: "Selected snapshot only." };
     const generate = async (payload: Record<string, unknown>) => {
       const response = await app.inject({
         method: "POST",
@@ -490,7 +490,7 @@ try {
   await chats.patchMetadata(artChat.id, { enableAgents: false });
   assert.equal((await illustrateTurn()).length, 0, "the automatic agent master switch is respected");
   await chats.patchMetadata(artChat.id, { enableAgents: true });
-  mainResponse = '[illustrate: subject="The laboratory" characters="Dottore"] The scene changes.';
+  mainResponse = '[illustrate: subject="The laboratory" characters="Leopold"] The scene changes.';
   const commandRequests = await illustrateTurn();
   assert.equal(commandRequests.length, 2, "an explicit illustration command adds to the automatic decision");
   assert.equal(commandRequests.filter((prompt) => prompt.includes("manual_gallery_illustration_request")).length, 1);
@@ -583,7 +583,7 @@ try {
   const source = await chats.create({
     name: "DM source",
     mode: "roleplay",
-    characterIds: ["dottore"],
+    characterIds: ["leopold"],
     connectionId: connection.id,
     promptPresetId: null,
   });
@@ -601,10 +601,10 @@ try {
     handleRoleplayDmCommand({
       command: {
         type: "dm",
-        character: "Dottore",
+        character: "Leopold",
         message: "A private message.",
-        resolvedCharacterId: "dottore",
-        resolvedCharacterName: "Dottore",
+        resolvedCharacterId: "leopold",
+        resolvedCharacterName: "Leopold",
       },
       chatId: source.id,
       sourceChat: source,
@@ -620,7 +620,7 @@ try {
   await sendDm();
   assert.equal(actions.at(-1)?.chatId, dmId);
   assert.equal((await unread(dmId)).autonomousUnreadCount, 2, "reused DM increments durable badge");
-  assert.deepEqual((await unread(dmId)).autonomousUnreadCharacterIds, ["dottore"]);
+  assert.deepEqual((await unread(dmId)).autonomousUnreadCharacterIds, ["leopold"]);
   await chats.clearAutonomousUnread(dmId);
   assert.equal((await unread(dmId)).autonomousUnreadCount, undefined);
   await chats.update(source.id, { connectedChatId: dmId });

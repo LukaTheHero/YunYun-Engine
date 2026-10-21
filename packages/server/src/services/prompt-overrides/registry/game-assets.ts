@@ -285,7 +285,7 @@ export const GAME_SCENE_ILLUSTRATION: PromptOverrideKeyDef<GameSceneIllustration
     {
       name: "imagePromptInstructionsLine",
       description: "Pre-formatted user image instructions line from chat settings, or empty string.",
-      example: "User image instructions: Dottore's mask fully covers his eyes; do not render visible eyes behind it.",
+      example: "User image instructions: Leopold's mask fully covers his eyes; do not render visible eyes behind it.",
     },
   ],
   defaultBuilder: (ctx) =>
@@ -317,7 +317,7 @@ export const GAME_SCENE_ILLUSTRATION: PromptOverrideKeyDef<GameSceneIllustration
     artDirectionLine:
       "Art direction: Watercolor fantasy illustration, soft edges, warm palette, Ghibli-inspired, fantasy, medieval kingdom.",
     imagePromptInstructionsLine:
-      "User image instructions: Dottore's mask fully covers his eyes; do not render visible eyes behind it.",
+      "User image instructions: Leopold's mask fully covers his eyes; do not render visible eyes behind it.",
   },
 };
 

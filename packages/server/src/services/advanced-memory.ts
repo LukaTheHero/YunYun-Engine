@@ -661,7 +661,7 @@ function audienceView(ctx: Context, audience: string[]): string[] {
 /**
  * Who a participant the helper named is: a character ID, "" for the user's persona, or null when unknown
  * or ambiguous. After IDs and full names, a plain partial name fits when it is unique: "Kaito" for
- * "Kaito Nakamura", or "Pantalone Bisognosi" for a card named "Pantalone".
+ * "Kaito Nakamura", or "Cornelius Bisognosi" for a card named "Cornelius".
  */
 function matchAudienceName(ctx: Context, personas: readonly string[], value: string): string | null {
   const name = value.trim();
@@ -5112,7 +5112,7 @@ export function createAdvancedMemoryService(db: DB, { includeExcerptsInStatus = 
     );
     // The caller's generic group query may contain a hidden speaker; construct the actual query from this audience's source view.
     // The responders answer what the user said since one of them last spoke, in a group also to another character,
-    // as when Maukie replies after the user talked with Pantalone (#7699). A first reply, or one with no user
+    // as when Tobias replies after the user talked with Cornelius (#7699). A first reply, or one with no user
     // message since, reads the latest user message. A continuation reads past the reply it extends.
     const responderIds = new Set(audience.length ? audience : ctx.characterIds);
     let spanStart =

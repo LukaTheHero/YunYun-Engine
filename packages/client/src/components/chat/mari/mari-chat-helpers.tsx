@@ -93,7 +93,7 @@ export const MARI_PERMISSIONS_MODE_FACT_KEYS: Record<MariPermissionsMode, string
 };
 
 export const MARI_WELCOME =
-  "Howdy, welcome to YunYun Engine!\n\nFeeling a little lost? It is not a skill issue yet, I am here to help! Ask me about the app, your setup, or what to do next.\n\nNeed something made or changed? I can create character cards, personas, lorebooks, chats, and presets, and I can make reversible local workspace changes with a Keep/Restore review. Select a connection via the link icon beside the paperclip first and then ask away!";
+  "Howdy, welcome to YunYun Engine!\n\nFeeling a little lost? Don't worry, I am here to help! Ask me about the app, your setup, or what to do next.\n\nNeed something made or changed? I can create character cards, personas, lorebooks, chats, and presets, and I can make reversible local workspace changes with a Keep/Restore review. Select a connection via the link icon beside the paperclip first and then ask away!";
 export const NEW_SKILL_CONTENT = `# Custom Professor YunYun Skill
 
 Use this skill when the request matches a workflow you want Professor YunYun to follow.

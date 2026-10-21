@@ -135,22 +135,20 @@ try {
   const thisYear = new Date().getFullYear();
   const previewDay = local(3, 5, 10, 0, thisYear);
   assert.deepEqual(seasonalThemeFor(useUIStore.getState(), previewDay), ON, "the preview wears Halloween in March");
-  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "raccoon", "and so does YunYun");
+  // The fork ships no dated costume, so the theme never changes YunYun's look.
+  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "basic", "YunYun has no costume");
   useUIStore.getState().markSeasonalGreetingShown("halloween", thisYear);
   assert.deepEqual(seasonalThemeFor(useUIStore.getState(), previewDay), { themeId: "halloween", showGreeting: false });
-  useUIStore.getState().setMariAppearancePack("safari");
-  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "safari", "a pick wins in it");
-  useUIStore.getState().setMariAppearancePack("raccoon");
-  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "raccoon");
-  useUIStore.getState().setMariAppearancePack("safari");
+  useUIStore.getState().setMariAppearancePack("basic");
+  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "basic", "a pick wins in it");
   useUIStore.getState().turnOffSeasonalTheme("halloween", thisYear);
   assert.deepEqual(seasonalThemeFor(useUIStore.getState(), previewDay), OFF, "the preview's Turn it off");
-  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "safari", "takes YunYun's off too");
+  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "basic");
   const previewed = useUIStore.getState();
   assert.deepEqual(previewed.seasonalGreetingYears, {}, "the real greeting record is untouched");
   assert.deepEqual(previewed.seasonalThemeOffYears, {}, "the real Turn it off record is untouched");
   assert.equal(previewed.mariSeasonOptOut, "", "the real outfit opt-out is untouched");
-  assert.equal(previewed.mariAppearancePackId, "safari", "the user's own pick is still theirs");
+  assert.equal(previewed.mariAppearancePackId, "basic", "the user's own pick is still theirs");
   for (const pick of [pickPersistedUIState, pickSyncedSettings]) {
     const picked = pick(previewed);
     assert.ok(!("seasonalPreview" in picked), "the preview is never saved or synced");

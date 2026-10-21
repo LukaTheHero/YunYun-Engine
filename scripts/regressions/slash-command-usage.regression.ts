@@ -18,13 +18,13 @@ i18n.addResourceBundle("en", "translation", english);
 
 const characters = [
   { id: "maria", name: "Lady Maria" },
-  { id: "maukie", name: "Maukie" },
+  { id: "tobias", name: "Tobias" },
   { id: "maurice", name: "Maurice" },
   { id: "numeric", name: "123" },
 ];
 const messages: Array<{ id: string; extra: unknown }> = [
   { id: "first", extra: { hiddenFromAICharacterIds: ["other"] } },
-  { id: "second", extra: JSON.stringify({ hiddenFromAICharacterIds: ["maukie"] }) },
+  { id: "second", extra: JSON.stringify({ hiddenFromAICharacterIds: ["tobias"] }) },
   { id: "third", extra: { hiddenFromAI: true, hiddenFromAICharacterIds: ["other"] } },
 ];
 const writes: Array<{ path: string; body: unknown }> = [];
@@ -114,7 +114,7 @@ try {
     writes,
     [
       { path: "/chats/slash-chat/messages/first/extra", body: { hiddenFromAICharacterIds: ["other", "maria"] } },
-      { path: "/chats/slash-chat/messages/second/extra", body: { hiddenFromAICharacterIds: ["maukie", "maria"] } },
+      { path: "/chats/slash-chat/messages/second/extra", body: { hiddenFromAICharacterIds: ["tobias", "maria"] } },
     ],
     "Range-first hide must append the target to each selected message without replacing other character IDs",
   );
@@ -122,13 +122,13 @@ try {
   await command.command.execute('1-3 "Lady Maria"', context);
   assert.deepEqual(writes, [], "Repeated targeting is idempotent and globally hidden messages remain untouched");
 
-  await command.command.execute("Maukie 1", context);
+  await command.command.execute("Tobias 1", context);
   assert.deepEqual(
     writes,
     [
       {
         path: "/chats/slash-chat/messages/first/extra",
-        body: { hiddenFromAICharacterIds: ["other", "maria", "maukie"] },
+        body: { hiddenFromAICharacterIds: ["other", "maria", "tobias"] },
       },
     ],
     "Existing name-first execution still preserves unrelated targets",
@@ -177,7 +177,7 @@ try {
   assert.deepEqual((messages[0]!.extra as { hiddenFromAICharacterIds: string[] }).hiddenFromAICharacterIds, [
     "other",
     "maria",
-    "maukie",
+    "tobias",
   ]);
 } finally {
   api.get = originalGet;

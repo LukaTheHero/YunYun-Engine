@@ -128,7 +128,7 @@ const config = ttsConfigSchema.parse({
 const main: NarrationSegment = {
   id: "main",
   type: "dialogue",
-  speaker: "Dottore",
+  speaker: "Leopold",
   sprite: "angry",
   partyType: "main",
   content: "[whispering] Stay close. [sigh]",
@@ -213,7 +213,7 @@ for (const job of jobs) await game.generate(job, new AbortController());
 assert.deepEqual(
   generated.map(({ text, options: { speaker, tone } }) => ({ text, speaker, tone })),
   [
-    { text: main.content, speaker: "Dottore", tone: "angry" },
+    { text: main.content, speaker: "Leopold", tone: "angry" },
     { text: side.content, speaker: "Guard", tone: "laughing" },
   ],
   "the actual Game synthesis helper forwards inline cues with the existing tone",

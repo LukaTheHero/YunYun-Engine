@@ -1058,7 +1058,7 @@ const MAX_START_CHAT_ROWS = 3;
 /**
  * Rows for two everyday sentences the name search cannot answer: "new character
  * Bob" opens the create window with Bob filled in (casing kept), and "chat with
- * Shrek" / "new chat Dottore" starts a chat with a matching character. Both use
+ * Shrek" / "new chat Leopold" starts a chat with a matching character. Both use
  * the app's existing windows; nothing is created from here.
  */
 export function buildOmnibarIntentShortcuts({

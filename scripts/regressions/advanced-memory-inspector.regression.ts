@@ -41,7 +41,7 @@ const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(valu
 const parse = JSON.parse;
 let metadataParses = 0;
 try {
-  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Dottore" }));
+  const character = await createCharactersStorage(db).create(characterDataSchema.parse({ name: "Leopold" }));
   assert(character);
   const connection = await createConnectionsStorage(db).create({
     name: "Read-only preview fixture",

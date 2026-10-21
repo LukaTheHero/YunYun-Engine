@@ -58,10 +58,10 @@ try {
     maxTokensOverride: 256,
   });
   assert(connection);
-  const [pantalone, maukie, narrator] = await Promise.all(
-    ["Pantalone", "Maukie", "Narrator"].map((name) => characters.create(characterDataSchema.parse({ name }))),
+  const [cornelius, tobias, narrator] = await Promise.all(
+    ["Cornelius", "Tobias", "Narrator"].map((name) => characters.create(characterDataSchema.parse({ name }))),
   );
-  assert(pantalone && maukie && narrator);
+  assert(cornelius && tobias && narrator);
   const presets = createPromptsStorage(db);
   const preset = await presets.create({
     name: "Regex fixture",
@@ -85,7 +85,7 @@ try {
   const chat = await chats.create({
     name: "Group regex proof",
     mode: "roleplay",
-    characterIds: [pantalone.id, maukie.id, narrator.id],
+    characterIds: [cornelius.id, tobias.id, narrator.id],
     connectionId: connection.id,
     promptPresetId: preset.id,
   });
@@ -102,14 +102,14 @@ try {
     await chats.createMessage({
       chatId: chat.id,
       role: "assistant",
-      characterId: pantalone.id,
-      content: "PANTALONE_PUBLIC *PANTALONE_THOUGHT*",
+      characterId: cornelius.id,
+      content: "CORNELIUS_PUBLIC *CORNELIUS_THOUGHT*",
     }),
     await chats.createMessage({
       chatId: chat.id,
       role: "assistant",
-      characterId: maukie.id,
-      content: "MAUKIE_PUBLIC *MAUKIE_THOUGHT*",
+      characterId: tobias.id,
+      content: "TOBIAS_PUBLIC *TOBIAS_THOUGHT*",
     }),
   ];
   const hideThoughts = await scripts.create({
@@ -120,7 +120,7 @@ try {
     enabled: true,
     placement: ["user_input"],
     applyMode: "prompt",
-    targetCharacterIds: [pantalone.id, maukie.id],
+    targetCharacterIds: [cornelius.id, tobias.id],
   });
   assert(hideThoughts);
   const generate = async (forCharacterId: string | undefined, replies = ["A public reply."], extra = {}) => {
@@ -149,40 +149,40 @@ try {
     const text = JSON.stringify(messages);
     const excluded = scoped && target === narrator.id;
     assert.equal(text.includes("PERSONA_THOUGHT"), excluded, "persona thoughts follow User Input");
-    const ownMarker = target === pantalone.id ? "PANTALONE_PUBLIC" : target === maukie.id ? "MAUKIE_PUBLIC" : null;
+    const ownMarker = target === cornelius.id ? "CORNELIUS_PUBLIC" : target === tobias.id ? "TOBIAS_PUBLIC" : null;
     if (ownMarker) assert.equal(messages.find((message) => message.content.includes(ownMarker))?.role, "assistant");
     assert.equal(
-      text.includes("PANTALONE_THOUGHT"),
-      excluded || target === pantalone.id,
+      text.includes("CORNELIUS_THOUGHT"),
+      excluded || target === cornelius.id,
       "other character thoughts follow User Input; own thoughts stay AI Output",
     );
     assert.equal(
-      text.includes("MAUKIE_THOUGHT"),
-      excluded || target === maukie.id,
+      text.includes("TOBIAS_THOUGHT"),
+      excluded || target === tobias.id,
       "recipient gets their own perspective",
     );
-    for (const marker of ["PERSONA_PUBLIC", "PANTALONE_PUBLIC", "MAUKIE_PUBLIC", "PROMPT_RULE"])
+    for (const marker of ["PERSONA_PUBLIC", "CORNELIUS_PUBLIC", "TOBIAS_PUBLIC", "PROMPT_RULE"])
       assert(text.includes(marker));
   };
-  for (const target of [maukie.id, pantalone.id, narrator.id]) {
+  for (const target of [tobias.id, cornelius.id, narrator.id]) {
     assertThoughts((await generate(target))[0]!, target);
     assertThoughts(await preview(target), target);
   }
-  const handoff = await generate(maukie.id, ["@Narrator, continue.", "The narrator continues."]);
+  const handoff = await generate(tobias.id, ["@Narrator, continue.", "The narrator continues."]);
   assert.equal(handoff.length, 2);
-  assertThoughts(handoff[0]!, maukie.id);
+  assertThoughts(handoff[0]!, tobias.id);
   assertThoughts(handoff[1]!, narrator.id);
-  const rawPreview = JSON.stringify(await preview(maukie.id, { skipPreset: true }));
-  assert(!rawPreview.includes("PANTALONE_THOUGHT") && rawPreview.includes("MAUKIE_THOUGHT"));
+  const rawPreview = JSON.stringify(await preview(tobias.id, { skipPreset: true }));
+  assert(!rawPreview.includes("CORNELIUS_THOUGHT") && rawPreview.includes("TOBIAS_THOUGHT"));
 
   await chats.patchMetadata(chat.id, { groupResponseOrder: "sequential" });
   const group = await generate(undefined, [
-    "Pantalone speaks. *SAME_TURN_THOUGHT*",
-    "Maukie replies.",
+    "Cornelius speaks. *SAME_TURN_THOUGHT*",
+    "Tobias replies.",
     "Narrator replies.",
   ]);
   assert.equal(group.length, 3);
-  for (const [index, target] of [pantalone.id, maukie.id, narrator.id].entries()) assertThoughts(group[index]!, target);
+  for (const [index, target] of [cornelius.id, tobias.id, narrator.id].entries()) assertThoughts(group[index]!, target);
   assert(!JSON.stringify(group[1]).includes("SAME_TURN_THOUGHT"));
   assert(
     JSON.stringify(group[2]).includes("SAME_TURN_THOUGHT"),
@@ -198,7 +198,7 @@ try {
     placement: ["user_input", "ai_output"],
     applyMode: "prompt",
   });
-  for (const target of [maukie.id, narrator.id]) {
+  for (const target of [tobias.id, narrator.id]) {
     for (const messages of [(await generate(target))[0]!, await preview(target)]) {
       assertThoughts(messages, target, false);
       assert(JSON.stringify(messages).includes("PUBLIC_ONCE"));
@@ -216,14 +216,14 @@ try {
   assert(anchored);
   for (const groupSpeakerNamesInHistory of [false, true]) {
     await chats.patchMetadata(chat.id, { groupSpeakerNamesInHistory });
-    for (const messages of [(await generate(maukie.id))[0]!, await preview(maukie.id)]) {
+    for (const messages of [(await generate(tobias.id))[0]!, await preview(tobias.id)]) {
       const text = JSON.stringify(messages);
       assert(text.includes("PERSONA_ANCHORED"));
       assert(!text.includes("PERSONA_PUBLIC_ONCE"));
       assert(text.includes("<chat_history>"), "prompt wrappers survive history regexes");
       if (groupSpeakerNamesInHistory) {
-        assert(text.includes("Pantalone: PANTALONE_PUBLIC_ONCE"));
-        assert(text.includes("Maukie: MAUKIE_PUBLIC_ONCE"));
+        assert(text.includes("Cornelius: CORNELIUS_PUBLIC_ONCE"));
+        assert(text.includes("Tobias: TOBIAS_PUBLIC_ONCE"));
       }
     }
   }
@@ -233,46 +233,46 @@ try {
   const inactiveReply = await chats.createMessage({
     chatId: chat.id,
     role: "assistant",
-    characterId: maukie.id,
+    characterId: tobias.id,
     content: "Regenerate this reply.",
   });
   assert(inactiveReply);
-  await chats.patchMetadata(chat.id, { inactiveCharacterIds: [maukie.id], groupResponseOrder: "manual" });
+  await chats.patchMetadata(chat.id, { inactiveCharacterIds: [tobias.id], groupResponseOrder: "manual" });
   assertThoughts(
-    (await generate(maukie.id, ["Regenerated."], { regenerateMessageId: inactiveReply.id }))[0]!,
-    maukie.id,
+    (await generate(tobias.id, ["Regenerated."], { regenerateMessageId: inactiveReply.id }))[0]!,
+    tobias.id,
     false,
   );
   await chats.patchMetadata(chat.id, { inactiveCharacterIds: [] });
 
   // AI Output uses the inverse perspective; display-only and wrong-preset rules stay out.
-  await scripts.update(hideThoughts.id, { placement: ["ai_output"], targetCharacterIds: [maukie.id] });
-  for (const messages of [(await generate(maukie.id))[0]!, await preview(maukie.id)]) {
+  await scripts.update(hideThoughts.id, { placement: ["ai_output"], targetCharacterIds: [tobias.id] });
+  for (const messages of [(await generate(tobias.id))[0]!, await preview(tobias.id)]) {
     const text = JSON.stringify(messages);
-    assert(text.includes("PERSONA_THOUGHT") && text.includes("PANTALONE_THOUGHT"));
-    assert(!text.includes("MAUKIE_THOUGHT"));
+    assert(text.includes("PERSONA_THOUGHT") && text.includes("CORNELIUS_THOUGHT"));
+    assert(!text.includes("TOBIAS_THOUGHT"));
   }
   for (const change of [
     { applyMode: "display" as const },
     { applyMode: "prompt" as const, targetPromptPresetIds: ["other-preset"] },
   ]) {
     await scripts.update(hideThoughts.id, { placement: ["user_input"], ...change });
-    for (const messages of [(await generate(maukie.id))[0]!, await preview(maukie.id)]) {
-      assert(JSON.stringify(messages).includes("PANTALONE_THOUGHT"));
+    for (const messages of [(await generate(tobias.id))[0]!, await preview(tobias.id)]) {
+      assert(JSON.stringify(messages).includes("CORNELIUS_THOUGHT"));
     }
   }
   await scripts.update(hideThoughts.id, { targetPromptPresetIds: [preset.id], minDepth: 0, maxDepth: 0 });
   await chats.createMessage({
     chatId: chat.id,
     role: "assistant",
-    characterId: pantalone.id,
+    characterId: cornelius.id,
     content: "Latest. *DEPTH_ZERO_THOUGHT*",
   });
-  const depthPreview = JSON.stringify(await preview(maukie.id));
-  const depthLive = JSON.stringify((await generate(maukie.id))[0]);
+  const depthPreview = JSON.stringify(await preview(tobias.id));
+  const depthLive = JSON.stringify((await generate(tobias.id))[0]);
   for (const text of [depthPreview, depthLive]) {
     assert(!text.includes("DEPTH_ZERO_THOUGHT"), "depth zero is the latest history turn, not an injected instruction");
-    assert(text.includes("PANTALONE_THOUGHT"), "older turns keep their thoughts outside the depth range");
+    assert(text.includes("CORNELIUS_THOUGHT"), "older turns keep their thoughts outside the depth range");
   }
   await scripts.update(hideThoughts.id, {
     targetCharacterIds: [],
@@ -295,17 +295,17 @@ try {
     [{ groupChatMode: "individual" }, { impersonate: true }],
   ] as const) {
     await chats.patchMetadata(chat.id, metadata);
-    for (const messages of [(await generate(maukie.id, ["Public."], extra))[0]!, await preview(maukie.id, extra)]) {
+    for (const messages of [(await generate(tobias.id, ["Public."], extra))[0]!, await preview(tobias.id, extra)]) {
       const text = JSON.stringify(messages);
       assert(!text.includes("PERSONA_THOUGHT"));
-      assert(text.includes("PANTALONE_THOUGHT") && text.includes("MAUKIE_THOUGHT"));
+      assert(text.includes("CORNELIUS_THOUGHT") && text.includes("TOBIAS_THOUGHT"));
     }
   }
-  await chats.update(chat.id, { characterIds: [maukie.id] });
-  for (const messages of [(await generate(maukie.id))[0]!, await preview(maukie.id)]) {
+  await chats.update(chat.id, { characterIds: [tobias.id] });
+  for (const messages of [(await generate(tobias.id))[0]!, await preview(tobias.id)]) {
     const text = JSON.stringify(messages);
     assert(!text.includes("PERSONA_THOUGHT"));
-    assert(text.includes("PANTALONE_THOUGHT") && text.includes("MAUKIE_THOUGHT"));
+    assert(text.includes("CORNELIUS_THOUGHT") && text.includes("TOBIAS_THOUGHT"));
   }
   console.log(
     "Group prompt regex passed: recipient placement, narrator exclusion, same-turn replies, preview parity, one pass and transcript preservation.",

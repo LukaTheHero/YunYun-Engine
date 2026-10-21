@@ -82,7 +82,7 @@ class FakeAudio extends EventTarget {
   load() {}
 }
 const CLIPS: Record<string, string> = {
-  dottore: JSON.stringify([
+  leopold: JSON.stringify([
     { seconds: 0.1, hz: 0, amp: 0 },
     { seconds: 0.4, hz: 300, amp: 0.5 },
   ]),
@@ -174,42 +174,42 @@ try {
   // ── Request builders carry the character their voice lookup resolved ──
   {
     const config = ttsConfigSchema.parse({ source: "openai", voice: "alloy" });
-    const [line] = buildTTSVoiceRequests("Hello there.", config, "Dottore", "dottore-id");
-    assert.equal(line?.characterId, "dottore-id", "a character's message is read in that character's voice");
+    const [line] = buildTTSVoiceRequests("Hello there.", config, "Leopold", "leopold-id");
+    assert.equal(line?.characterId, "leopold-id", "a character's message is read in that character's voice");
     const [narration] = buildTTSVoiceRequests("The wind howls.", config, "Narrator", null);
     assert.equal(narration?.characterId, undefined, "narration belongs to no character");
 
-    const characterIds: Record<string, string> = { Dottore: "dottore-id", YunYun: "mari-id" };
+    const characterIds: Record<string, string> = { Leopold: "leopold-id", YunYun: "mari-id" };
     const extracted = buildExtractedRoleplayTTSVoiceRequests(
       [
-        { kind: "narration", text: "Dottore sighs." },
-        { kind: "dialogue", speaker: "Dottore", text: '"Enough of this."' },
+        { kind: "narration", text: "Leopold sighs." },
+        { kind: "dialogue", speaker: "Leopold", text: '"Enough of this."' },
         { kind: "dialogue", speaker: "YunYun", text: '"Skill issue."' },
         { kind: "dialogue", speaker: "Fatui Guard", text: '"At once."' },
       ],
       config,
-      "Dottore",
-      "dottore-id",
+      "Leopold",
+      "leopold-id",
       (speaker) => characterIds[speaker ?? ""],
     );
     assert.deepEqual(
       extracted.map(({ speaker, characterId }) => [speaker, characterId]),
       [
         ["Narrator", undefined],
-        ["Dottore", "dottore-id"],
+        ["Leopold", "leopold-id"],
         ["YunYun", "mari-id"],
         ["Fatui Guard", undefined],
       ],
       "each extracted speaker keeps the character the voice lookup found",
     );
-    const content = "Dottore sighs.\n\nYunYun laughs.";
+    const content = "Leopold sighs.\n\nYunYun laughs.";
     const paragraphs = withRoleplayTTSParagraphs(
-      buildTTSVoiceRequests(content, config, "Dottore", "dottore-id"),
+      buildTTSVoiceRequests(content, config, "Leopold", "leopold-id"),
       content,
       config,
     );
     assert.ok(
-      paragraphs.length > 0 && paragraphs.every((request) => request.characterId === "dottore-id"),
+      paragraphs.length > 0 && paragraphs.every((request) => request.characterId === "leopold-id"),
       "Roleplay VN paragraphs keep the speaking character",
     );
     const { characterId: _characterId, ...withoutCharacter } = line!;
@@ -229,40 +229,40 @@ try {
 
     const reading = ttsService.speakSequence(
       [
-        { text: "dottore", speaker: "Dottore", characterId: "dottore-id" },
+        { text: "leopold", speaker: "Leopold", characterId: "leopold-id" },
         { text: "narration", speaker: "Narrator" },
         { text: "mari", speaker: "YunYun", characterId: "mari-id" },
       ],
       "message-1",
       { chatId: "chat-a" },
     );
-    await until(() => events.length === 1, "Dottore's line starts");
+    await until(() => events.length === 1, "Leopold's line starts");
     const element = ttsService.getPlayback()?.element as unknown as FakeAudio;
-    const [dottoreOwner, dottore] = events[0]!;
-    assert.equal(dottoreOwner, "dottore-id");
-    assert.ok(dottore, "the speaking character gets a level source");
+    const [leopoldOwner, leopold] = events[0]!;
+    assert.equal(leopoldOwner, "leopold-id");
+    assert.ok(leopold, "the speaking character gets a level source");
     element.currentTime = 0.3;
-    await until(() => dottore.viseme?.() === "ou", "Dottore's clip decodes");
+    await until(() => leopold.viseme?.() === "ou", "Leopold's clip decodes");
     element.currentTime = 0.05;
-    assert.equal(dottore.level(), 0, "the silent lead-in keeps the mouth shut");
+    assert.equal(leopold.level(), 0, "the silent lead-in keeps the mouth shut");
     element.currentTime = 0.3;
-    assert.ok(dottore.level() > 0.9, "the level follows the playback position");
-    assert.equal(dottore.viseme?.(), "ou");
+    assert.ok(leopold.level() > 0.9, "the level follows the playback position");
+    assert.equal(leopold.viseme?.(), "ou");
     // The 0.5 s clip at 0.3 s: its text, and how far through it the voice is, for the avatar's moods.
-    const line = dottore.line?.();
-    assert.equal(line?.text, "dottore", "the line is the text the clip reads");
+    const line = leopold.line?.();
+    assert.equal(line?.text, "leopold", "the line is the text the clip reads");
     assert.ok(Math.abs(line!.progress - 0.6) < 0.01, `progress follows the playback position (${line?.progress})`);
     element.currentTime = 9;
-    assert.equal(dottore.line?.()?.progress, 1, "progress stops at the end of the clip");
+    assert.equal(leopold.line?.()?.progress, 1, "progress stops at the end of the clip");
     element.currentTime = 0.3;
 
     element.ended = true;
     element.onended?.();
-    assert.equal(dottore.isPlaying(), false, "a finished line reports no voice before the next one starts");
+    assert.equal(leopold.isPlaying(), false, "a finished line reports no voice before the next one starts");
     await until(() => events.length === 2, "the narrator's line starts");
-    assert.deepEqual(events[1], ["dottore-id", null], "narration moves no mouth");
-    assert.equal(dottore.level(), 0);
-    assert.equal(dottore.line?.(), null, "nor gives a line to a withdrawn source");
+    assert.deepEqual(events[1], ["leopold-id", null], "narration moves no mouth");
+    assert.equal(leopold.level(), 0);
+    assert.equal(leopold.line?.(), null, "nor gives a line to a withdrawn source");
 
     element.ended = true;
     element.onended?.();
@@ -302,11 +302,11 @@ try {
     // A reading started in another chat belongs to that chat.
     useChatStore.setState({ activeChatId: "chat-b" });
     const countBefore = events.length;
-    void ttsService.speak("dottore", "message-2", { chatId: "chat-b", characterId: "dottore-id" });
+    void ttsService.speak("leopold", "message-2", { chatId: "chat-b", characterId: "leopold-id" });
     await until(() => events.length === countBefore + 1, "a reading in chat B starts");
-    assert.equal(events.at(-1)?.[0], "dottore-id");
+    assert.equal(events.at(-1)?.[0], "leopold-id");
     ttsService.stop();
-    assert.deepEqual(events.at(-1), ["dottore-id", null], "stopping withdraws the voice");
+    assert.deepEqual(events.at(-1), ["leopold-id", null], "stopping withdraws the voice");
 
     // Switching chats while the voice still loads: the reading stays with the chat it was requested in.
     useChatStore.setState({ activeChatId: "chat-a" });
@@ -314,7 +314,7 @@ try {
     fetchGate = new Promise<void>((resolve) => (releaseFetch = resolve));
     const countBeforeLoading = events.length;
     const loading = ttsService.speakSequence(
-      [{ text: "dottore", speaker: "Dottore", characterId: "dottore-id" }],
+      [{ text: "leopold", speaker: "Leopold", characterId: "leopold-id" }],
       "message-5",
       { chatId: "chat-a" },
     );
@@ -325,13 +325,13 @@ try {
     await until(() => ttsService.getState() === "playing", "chat A's voice starts while chat B is open");
     assert.equal(events.length, countBeforeLoading, "chat B's avatars stay still for chat A's voice");
     useChatStore.setState({ activeChatId: "chat-a" });
-    assert.equal(events.at(-1)?.[0], "dottore-id", "chat A's avatar follows its own voice when the user comes back");
+    assert.equal(events.at(-1)?.[0], "leopold-id", "chat A's avatar follows its own voice when the user comes back");
     assert.ok(events.at(-1)?.[1]);
     ttsService.stop();
     await loading;
 
     // An undecodable clip still plays; the avatar just gets no level.
-    void ttsService.speak("broken", "message-3", { chatId: "chat-a", characterId: "dottore-id" });
+    void ttsService.speak("broken", "message-3", { chatId: "chat-a", characterId: "leopold-id" });
     await until(() => ttsService.getState() === "playing" && events.at(-1)?.[1] != null, "the broken clip plays");
     const broken = events.at(-1)![1]!;
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -342,14 +342,14 @@ try {
 
     // A reading with no chat, like the voice preview in settings, moves no mouth.
     const countBeforePreview = events.length;
-    void ttsService.speak("dottore", "tts-preview", { characterId: "dottore-id" });
+    void ttsService.speak("leopold", "tts-preview", { characterId: "leopold-id" });
     await until(() => ttsService.getState() === "playing", "a reading with no chat plays");
     assert.equal(events.length, countBeforePreview, "a reading with no chat moves no avatar");
     ttsService.stop();
 
     unsubscribe();
     const countAfterUnsubscribe = events.length;
-    void ttsService.speak("dottore", "message-4", { chatId: "chat-a", characterId: "dottore-id" });
+    void ttsService.speak("leopold", "message-4", { chatId: "chat-a", characterId: "leopold-id" });
     await until(() => ttsService.getState() === "playing", "playback without listeners");
     assert.equal(events.length, countAfterUnsubscribe, "nothing is published once the director unsubscribes");
 
@@ -359,7 +359,7 @@ try {
     const unsubscribeLate = subscribeAvatarAudio((ownerId, source) => lateEvents.push([ownerId, source]));
     assert.deepEqual(lateEvents, [], "a stage mounted in another chat does not take chat A's voice");
     useChatStore.setState({ activeChatId: "chat-a" });
-    assert.equal(lateEvents.at(-1)?.[0], "dottore-id", "the chat being read follows the voice");
+    assert.equal(lateEvents.at(-1)?.[0], "leopold-id", "the chat being read follows the voice");
     unsubscribeLate();
     ttsService.stop();
 

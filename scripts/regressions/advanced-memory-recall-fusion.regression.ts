@@ -401,8 +401,8 @@ try {
   assert(estimateChatSummaryTokens(oathLine) <= 25);
   assert.doesNotMatch(decisionBodies.join("\n"), /Autumn 1|Winter 9|PRIVATE_SECRET/u, "nothing the reader missed");
 
-  // A group reply's recall reads what the user said since the responder last spoke, as when Maukie answers after
-  // the user talked with Pantalone: each user message is its own embedding query, a record scores its best match,
+  // A group reply's recall reads what the user said since the responder last spoke, as when Tobias answers after
+  // the user talked with Cornelius: each user message is its own embedding query, a record scores its best match,
   // and the cue words and the Decision model's conversation cover the same span (#7699).
   const conceptVector = vector;
   vector = (text: string) => [
@@ -414,29 +414,29 @@ try {
   const span = await chats.create({
     name: "Span",
     mode: "roleplay",
-    characterIds: ["maukie", "pantalone", "colombina"],
+    characterIds: ["tobias", "cornelius", "colombina"],
     connectionId: helper.id,
   });
   assert(span);
   await chats.patchMetadata(span.id, { groupChatMode: "individual" });
   await memory.updateSettings(span.id, {
     ...decisionSettings,
-    knowledgeStarts: { maukie: null, pantalone: null, colombina: null },
+    knowledgeStarts: { tobias: null, cornelius: null, colombina: null },
   });
-  const cue = "Pantalone, do you remember the pendant on its chain?";
-  const smallTalk = ["We still need rope, Pantalone.", "Anyway, we still need rope."];
+  const cue = "Cornelius, do you remember the pendant on its chain?";
+  const smallTalk = ["We still need rope, Cornelius.", "Anyway, we still need rope."];
   await chats.createMessagesBatch(span.id, [
     ...summaries.flatMap((_, index) =>
       sceneMessages(index).map((message) =>
-        message.role === "assistant" ? { ...message, characterId: "pantalone" } : message,
+        message.role === "assistant" ? { ...message, characterId: "cornelius" } : message,
       ),
     ),
     { role: "user", content: "SCENE_CHANGE YunYun comes home late.", extra: { isConversationStart: true } },
-    { role: "assistant", characterId: "maukie", content: "Maukie waves from the kitchen." },
+    { role: "assistant", characterId: "tobias", content: "Tobias waves from the kitchen." },
     { role: "user", content: cue },
-    { role: "assistant", characterId: "pantalone", content: "Pantalone shrugs." },
+    { role: "assistant", characterId: "cornelius", content: "Cornelius shrugs." },
     { role: "user", content: smallTalk[0]! },
-    { role: "assistant", characterId: "pantalone", content: "Pantalone counts his coins." },
+    { role: "assistant", characterId: "cornelius", content: "Cornelius counts his coins." },
     { role: "user", content: smallTalk[1]! },
   ]);
   await memory.initialize(span.id);
@@ -455,19 +455,19 @@ try {
       continueMessageId,
     });
   };
-  // YunYun's case: the question was the first of three user messages to Pantalone, and Maukie replies.
-  const maukie = await replyAs("maukie");
-  assert.deepEqual(embeddingInputs, [[cue, ...smallTalk]], "each user message since Maukie spoke, one request");
+  // YunYun's case: the question was the first of three user messages to Cornelius, and Tobias replies.
+  const tobias = await replyAs("tobias");
+  assert.deepEqual(embeddingInputs, [[cue, ...smallTalk]], "each user message since Tobias spoke, one request");
   assert(
     recallRequests[0]!.some(({ id }) => id === spanScene(LOCKET_SCENE).id),
     "the locket scene reaches the Decision shortlist through the first message",
   );
   assert.match(recallConversations[0]!, /pendant on its chain/u, "the Decision model reads the question too");
-  assert.deepEqual(maukie.receipt.recalledSceneIds, [spanScene(LOCKET_SCENE).sceneId]);
+  assert.deepEqual(tobias.receipt.recalledSceneIds, [spanScene(LOCKET_SCENE).sceneId]);
   // Decision off: the locket scene scores by the first message and the rope scenes by the later ones, each by its
   // best match, so the locket comes first, then the scenes most about rope.
   await memory.updateSettings(span.id, { decisionEnabled: false });
-  const plain = await replyAs("maukie");
+  const plain = await replyAs("tobias");
   await memory.updateSettings(span.id, { decisionEnabled: true });
   const mostRope = summaries.flatMap((summary, index) => (summary.split("rope").length === 4 ? [index] : []));
   assert.equal(plain.receipt.recalledSceneIds[0], spanScene(LOCKET_SCENE).sceneId, "the locket scene first");
@@ -482,60 +482,60 @@ try {
   await replyAs("colombina");
   assert.deepEqual(embeddingInputs, [[smallTalk[1]]], "a first reply reads the latest user message");
   assert.doesNotMatch(recallConversations[0] ?? "", /pendant/u, "and the last four messages");
-  // Continuing Maukie's reply reads what it answered, as when it began, not from after the reply itself.
+  // Continuing Tobias's reply reads what it answered, as when it began, not from after the reply itself.
   const [partialReplyId] = await chats.createMessagesBatch(span.id, [
-    { role: "assistant", characterId: "maukie", content: "Maukie starts to answer." },
+    { role: "assistant", characterId: "tobias", content: "Tobias starts to answer." },
   ]);
-  const continued = await replyAs("maukie", partialReplyId);
+  const continued = await replyAs("tobias", partialReplyId);
   assert.deepEqual(embeddingInputs, [[cue, ...smallTalk]], "a continuation reads the same user messages");
   assert.match(recallConversations[0]!, /pendant on its chain/u, "and the Decision model reads the question");
   assert.deepEqual(continued.receipt.recalledSceneIds, [spanScene(LOCKET_SCENE).sceneId]);
   await chats.removeMessage(partialReplyId!);
-  // What Maukie may not read never joins his query: a whisper to Pantalone, a message hidden from Maukie.
+  // What Tobias may not read never joins his query: a whisper to Cornelius, a message hidden from Tobias.
   await chats.createMessagesBatch(span.id, [
     {
       role: "user",
-      content: '[whisper: character="Pantalone" text="WHISPERED_PENDANT"]',
+      content: '[whisper: character="Cornelius" text="WHISPERED_PENDANT"]',
       extra: {
         roleplayCommandActivity: [
           {
-            command: { type: "whisper", character: "Pantalone", text: "WHISPERED_PENDANT" },
-            raw: '[whisper: character="Pantalone" text="WHISPERED_PENDANT"]',
-            whisperRecipient: { id: "pantalone", kind: "character" },
+            command: { type: "whisper", character: "Cornelius", text: "WHISPERED_PENDANT" },
+            raw: '[whisper: character="Cornelius" text="WHISPERED_PENDANT"]',
+            whisperRecipient: { id: "cornelius", kind: "character" },
           },
         ],
       },
     },
-    { role: "user", content: "HIDDEN_PENDANT chain", extra: { hiddenFromAICharacterIds: ["maukie"] } },
+    { role: "user", content: "HIDDEN_PENDANT chain", extra: { hiddenFromAICharacterIds: ["tobias"] } },
   ]);
-  await replyAs("maukie");
-  assert.deepEqual(embeddingInputs, [[cue, ...smallTalk]], "nothing Maukie may not read");
+  await replyAs("tobias");
+  assert.deepEqual(embeddingInputs, [[cue, ...smallTalk]], "nothing Tobias may not read");
   assert.doesNotMatch(recallConversations.join("\n"), /WHISPERED|HIDDEN_PENDANT/u);
-  await replyAs("pantalone");
-  assert.deepEqual(embeddingInputs, [[smallTalk[1], "HIDDEN_PENDANT chain"]], "Pantalone's span is his own");
+  await replyAs("cornelius");
+  assert.deepEqual(embeddingInputs, [[smallTalk[1], "HIDDEN_PENDANT chain"]], "Cornelius's span is his own");
   // At most the six latest user messages with text; an image alone has none to search with.
   const notes = Array.from({ length: 8 }, (_, index) => `Rope note ${index + 1}.`);
   await chats.createMessagesBatch(span.id, [
-    { role: "assistant", characterId: "maukie", content: "Maukie nods." },
+    { role: "assistant", characterId: "tobias", content: "Tobias nods." },
     ...notes.map((content) => ({ role: "user" as const, content })),
     { role: "user", content: "", extra: { attachments: [{ type: "image", url: "/rope.png" }] } },
   ]);
-  await replyAs("maukie");
+  await replyAs("tobias");
   assert.deepEqual(embeddingInputs, [notes.slice(-6)], "the six latest user messages with text");
   // An embedder that rejects one long earlier message fails the whole request: the latest message is then
   // embedded alone, so the question still finds the locket by meaning.
   const question = "Do you remember the pendant on its chain?";
   await new Promise((resolve) => setTimeout(resolve, 20)); // after the notes' timestamps
   await chats.createMessagesBatch(span.id, [
-    { role: "assistant", characterId: "maukie", content: "Maukie listens." },
+    { role: "assistant", characterId: "tobias", content: "Tobias listens." },
     { role: "user", content: `LONG_TURN ${"The storm rolls over the hills. ".repeat(60)}` },
-    { role: "assistant", characterId: "pantalone", content: "Pantalone shrugs." },
+    { role: "assistant", characterId: "cornelius", content: "Cornelius shrugs." },
     { role: "user", content: question },
   ]);
   await memory.updateSettings(span.id, { decisionEnabled: false });
   rejectedEmbedding = /LONG_TURN/u;
   requests = embeddingRequests;
-  const rejectedTurn = await replyAs("maukie");
+  const rejectedTurn = await replyAs("tobias");
   rejectedEmbedding = null;
   await memory.updateSettings(span.id, { decisionEnabled: true });
   assert.equal(embeddingRequests - requests, 2, "the span's messages, then the latest alone");

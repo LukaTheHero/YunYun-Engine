@@ -70,11 +70,11 @@ A few rules control how the comparison works:
 Use `||` when either condition may match. Use `&&` when every condition must match.
 
 ```
-{{#if character == "Maukie" || character == "Pantalone"}}
-Use the shared Maukie and Pantalone instructions.
+{{#if character == "Tobias" || character == "Cornelius"}}
+Use the shared Tobias and Cornelius instructions.
 {{/if}}
 
-{{#if characters contains "Maukie" && characters contains "Pantalone"}}
+{{#if characters contains "Tobias" && characters contains "Cornelius"}}
 Both characters are present in this chat.
 {{/if}}
 ```
@@ -82,7 +82,7 @@ Both characters are present in this chat.
 `&&` is evaluated before `||`. Add parentheses when you want to control the order explicitly:
 
 ```
-{{#if (character == "Maukie" || character == "Pantalone") && scenario contains "lake"}}
+{{#if (character == "Tobias" || character == "Cornelius") && scenario contains "lake"}}
 Use the lakeside instructions for either character.
 {{/if}}
 ```
@@ -90,12 +90,12 @@ Use the lakeside instructions for either character.
 For several equality choices on the same value, you may omit the repeated left side after `||`:
 
 ```
-{{#if character == "Maukie" || "Pantalone"}}
+{{#if character == "Tobias" || "Cornelius"}}
 Use the shared instructions.
 {{/if}}
 ```
 
-This shorthand means `character == "Maukie" || character == "Pantalone"`. It applies to the equality operators `==`, `=`, and `is`. Write complete conditions on both sides of `&&`, since one value usually cannot equal two different choices at once.
+This shorthand means `character == "Tobias" || character == "Cornelius"`. It applies to the equality operators `==`, `=`, and `is`. Write complete conditions on both sides of `&&`, since one value usually cannot equal two different choices at once.
 
 ### Truthy checks (no operator)
 
@@ -129,7 +129,7 @@ If you write a bare word that is not a keyword, YunYun treats it as a variable n
 When you compare against a fixed piece of text, put it in quotes. This tells YunYun to treat it as an exact literal and not as a keyword or a variable.
 
 ```
-{{#if char == "Dottore"}}
+{{#if char == "Leopold"}}
 Speak in a cold, clinical tone.
 {{/if}}
 ```
@@ -162,14 +162,14 @@ Here are five full examples with the result the model receives.
 Character-specific tone inside a shared preset:
 
 ```
-{{#if char == "Dottore"}}
+{{#if char == "Leopold"}}
 Speak in a cold, clinical tone.
 {{else}}
 Speak warmly and casually.
 {{/if}}
 ```
 
-For a character named `Dottore`, the model receives `Speak in a cold, clinical tone.` For every other character, it receives `Speak warmly and casually.`
+For a character named `Leopold`, the model receives `Speak in a cold, clinical tone.` For every other character, it receives `Speak warmly and casually.`
 
 Include a field only when it is filled in:
 
@@ -237,8 +237,8 @@ Open your reply by describing the new location in one or two sentences.
 The condition is true when the Decision model says the statement is true. It works with everything else in this guide: `{{else}}`, `{{else if}}`, `&&`, `||`, parentheses, nesting and group blocks.
 
 ```
-{{#if char == "Dottore" && decision:"In the latest message, {{user}} says something that contradicts what they said earlier"}}
-Dottore notices the inconsistency and files it away.
+{{#if char == "Leopold" && decision:"In the latest message, {{user}} says something that contradicts what they said earlier"}}
+Leopold notices the inconsistency and files it away.
 {{/if}}
 ```
 
@@ -415,7 +415,7 @@ The recommended wordings scored 31 of 32 on Open-Jev 2B, 31 of 32 on Open-Jev 9B
 
 Agent **activation questions** and **Smart response order** are separate from this setting.
 
-Only statements the current stage can use enter its plan: enabled preset sections and groups, selected variable options, and content from activated lorebook entries. A fixed condition can rule a statement out: `{{#if char == "Dottore" && decision:"..."}}` is not asked while the character is Mira. Variables can change during prompt building, so a variable condition does not rule a statement out in advance.
+Only statements the current stage can use enter its plan: enabled preset sections and groups, selected variable options, and content from activated lorebook entries. A fixed condition can rule a statement out: `{{#if char == "Leopold" && decision:"..."}}` is not asked while the character is Mira. Variables can change during prompt building, so a variable condition does not rule a statement out in advance.
 
 A statement held by [sticky, cooldown](#sticky-and-cooldown) or [`every:`](#checking-every-few-turns) takes no slot. [Priority](#priority) chooses which statements fit within a prompt plan. Lorebook activation draws on its remaining allowance as entries are considered. Statements left out read as no, and Peek Prompt lists them.
 
