@@ -1,6 +1,6 @@
 # Guided Generation and Impersonate
 
-This guide covers two ways to steer a chat in YunYun Engine. Guided generation points the AI in a direction without posting a visible message. Impersonate has the AI write your own reply for you. It also covers the Quick replies menu that puts both actions next to the Send button.
+This guide covers two ways to steer a chat in Marinara Engine. Guided generation points the AI in a direction without posting a visible message. Impersonate has the AI write your own reply for you. It also covers the Quick replies menu that puts both actions next to the Send button.
 
 ## Guided generation
 
@@ -43,7 +43,7 @@ Your direction stays in the message box afterwards, so you can adjust it and reg
 
 ### Reading Stored guidance
 
-When a reply was made with a direction, YunYun saves that direction so you can see it later. A **Stored guidance** action (a scroll icon) appears on the message.
+When a reply was made with a direction, Marinara saves that direction so you can see it later. A **Stored guidance** action (a scroll icon) appears on the message.
 
 1. Click the **Stored guidance** icon on the AI message.
 2. A window titled **Stored guidance** opens and shows the direction that produced the reply.
@@ -87,11 +87,11 @@ Impersonate has a settings section that applies to every `/impersonate` you run,
 
 The section has these controls:
 
-- **Prompt Template**: an optional instruction sent to the model every time you impersonate. Leave it empty to use the chat's own prompt, or the built-in default when the chat has none. It supports the macros `{{user}}`, `{{persona_description}}`, and `{{impersonate_direction}}`. A macro is a placeholder that YunYun replaces with real text before sending. Click **Built-in default** to read the default text. A **Reset** button clears a custom template back to empty.
+- **Prompt Template**: an optional instruction sent to the model every time you impersonate. Leave it empty to use the chat's own prompt, or the built-in default when the chat has none. It supports the macros `{{user}}`, `{{persona_description}}`, and `{{impersonate_direction}}`. A macro is a placeholder that Marinara replaces with real text before sending. Click **Built-in default** to read the default text. A **Reset** button clears a custom template back to empty.
 - **Preset**: use a specific prompt preset for impersonate replies only. A preset is a saved bundle of prompt settings. See [Presets](../prompts/presets.md). The default is **Use chat default**. Presets apply in Roleplay only.
 - **Connection**: route impersonate replies to a specific connection, such as a cheaper or faster model. A connection is a saved link to an AI provider. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md). The default is **Use chat default**. You can also choose **Random**.
-- **Skip agents**: when on, YunYun skips the agent pipeline (trackers, lorebook routers, and similar helpers) during impersonate. This keeps impersonate fast and stops it from changing world state. It is off by default. See [Agents](../agents/agents-overview.md).
-- **Use CYOA as direction**: when on, clicking a CYOA option uses it as the impersonate direction instead of posting it as a normal message. CYOA means choose your own adventure, a set of clickable choices some chats show after a reply. This setting is off by default.
+- **Skip agents**: when on, Marinara skips the agent pipeline (trackers, lorebook routers, and similar helpers) during impersonate. This keeps impersonate fast and stops it from changing world state. It is off by default. See [Agents](../agents/agents-overview.md).
+- **Use CYOA as direction**: when on, clicking a CYOA option uses it as the impersonate direction instead of posting it as a normal message. CYOA means choose your own adventure, a set of clickable choices some chats show after a reply. This setting is off by default. If **Add CYOA choices to the message box instead of sending them** is on in **Settings** > **General** > **Input & Editing**, clicking a choice only adds its text to your message box, and this setting has no effect.
 
 ### Setting a custom impersonate prompt
 

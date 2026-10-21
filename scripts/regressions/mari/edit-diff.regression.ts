@@ -1,10 +1,14 @@
-// #4919 Professor YunYun "Easy Viewer" diff-logic regression. Guards the two pure client utilities
+// #4919 Professor Mari "Easy Viewer" diff-logic regression. Guards the two pure client utilities
 // that power the readable before/after view: the word-level diff must reconstruct both sides
 // exactly (so nothing is dropped or duplicated when highlighting), and field-change extraction must
 // find real edits (recursing into the nested `data` column) while skipping noise/unchanged keys.
 import assert from "node:assert/strict";
 import { diffWords, type DiffSegment } from "../../../packages/client/src/lib/word-diff.js";
-import { computeFieldChanges, resolveLorebookVectorStatus } from "../../../packages/client/src/lib/mari-edit-diff.js";
+import {
+  computeFieldChanges,
+  fieldLabel,
+  resolveLorebookVectorStatus,
+} from "../../../packages/client/src/lib/mari-edit-diff.js";
 
 const reconstruct = (segments: DiffSegment[], side: "added" | "removed") =>
   segments
@@ -138,4 +142,9 @@ assert.deepEqual(
   "opting back in without an embedding transitions from excluded to not vectorized",
 );
 
-console.log("YunYun Easy Viewer diff regressions passed.");
+// The held card and the applied card name a field with the same label map, never its raw key.
+assert.equal(fieldLabel("first_mes"), "First message");
+assert.equal(fieldLabel("first mes"), "First message", "a key typed with a space still gets its label, not 'First mes'");
+assert.equal(fieldLabel("mes_example"), "Example messages");
+
+console.log("Mari Easy Viewer diff regressions passed.");

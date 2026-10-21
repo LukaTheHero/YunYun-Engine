@@ -23,17 +23,20 @@ async function fixture(request: APIRequestContext, art = false) {
     }
   };
   try {
-    const character = await create("/api/characters", { data: { name: "YunYun", first_mes: "" } });
+    const character = await create("/api/characters", { data: { name: "Mari", first_mes: "" } });
     if (art) {
       const image = readFileSync(
-        new URL("../packages/client/public/sprites/yunyun/chibi-yunyun.png", import.meta.url),
+        new URL(
+          "../packages/client/assets/imagegen/mari-generated-originals/professor-mari-assistant-map-source.png",
+          import.meta.url,
+        ),
       ).toString("base64");
       expect(
         (
           await request.post(`/api/characters/${character.id}/avatar`, {
             data: {
               avatar: readFileSync(
-                new URL("../packages/client/public/sprites/yunyun/yunyun-profile.png", import.meta.url),
+                new URL("../packages/client/public/sprites/mari/Mari_profile.png", import.meta.url),
               ).toString("base64"),
               filename: "mari.png",
             },
@@ -70,7 +73,7 @@ async function fixture(request: APIRequestContext, art = false) {
       role: "assistant",
       characterId: character.id,
       content:
-        'The archive falls quiet.\n\n"We have a new experiment," YunYun says.\n\nA small light flickers across the desk.',
+        'The archive falls quiet.\n\n"We have a new experiment," Mari says.\n\nA small light flickers across the desk.',
     });
     return {
       chat,
@@ -121,7 +124,7 @@ for (const theme of ["dark", "light"] as const) {
       await open(page, data.chat.id, theme, { appAccentColor: "#3b82f6" });
       const vn = page.locator("[data-roleplay-vn]");
       await expect(vn).toContainText("A small light flickers across the desk.");
-      await expect(vn.getByRole("img", { name: "YunYun", exact: true })).toBeVisible();
+      await expect(vn.getByRole("img", { name: "Mari", exact: true })).toBeVisible();
       // Test paragraph progression in VN mode
       const prevBtn = vn.getByRole("button", { name: "Previous paragraph" });
       const nextBtn = vn.getByRole("button", { name: "Next paragraph" });
@@ -132,12 +135,12 @@ for (const theme of ["dark", "light"] as const) {
       await expect(nextBtn).toBeDisabled();
       await expect(prevBtn).toBeEnabled();
       await prevBtn.click();
-      await expect(vn).toContainText('"We have a new experiment," YunYun says.');
+      await expect(vn).toContainText('"We have a new experiment," Mari says.');
       await prevBtn.click();
       await expect(vn).toContainText("The archive falls quiet.");
       await expect(prevBtn).toBeDisabled();
       await nextBtn.click();
-      await expect(vn).toContainText('"We have a new experiment," YunYun says.');
+      await expect(vn).toContainText('"We have a new experiment," Mari says.');
       await nextBtn.click();
       await expect(vn).toContainText("A small light flickers across the desk.");
       await expect(page.locator("[data-chat-scroll] [data-message-id]")).toHaveCount(0);
@@ -147,7 +150,7 @@ for (const theme of ["dark", "light"] as const) {
       await input.blur();
       await expect(page.getByRole("img", { name: /full.*sprite/i })).toBeVisible();
       await page.screenshot({ path: info.outputPath(`vn-${theme}.png`), animations: "disabled" });
-      const portrait = vn.getByRole("button", { name: "Open YunYun avatar", exact: true });
+      const portrait = vn.getByRole("button", { name: "Open Mari avatar", exact: true });
       await expect(portrait).toBeVisible();
       await portrait.focus();
       if (info.project.name.includes("mobile")) await portrait.tap();
@@ -156,7 +159,7 @@ for (const theme of ["dark", "light"] as const) {
       await expect(preview).toBeVisible();
       await expect(preview.locator("img")).toHaveAttribute(
         "src",
-        (await vn.getByRole("img", { name: "YunYun", exact: true }).getAttribute("src")) ?? "",
+        (await vn.getByRole("img", { name: "Mari", exact: true }).getAttribute("src")) ?? "",
       );
       await page.screenshot({ path: info.outputPath(`vn-portrait-${theme}.png`), animations: "disabled" });
       await preview.getByRole("button", { name: "Close image", exact: true }).click();
@@ -622,7 +625,7 @@ test("Roleplay VN shows dice and image-only messages without findLast support", 
       data: {
         role: "user",
         content: "",
-        extra: { attachments: [{ type: "image", url: "/sprites/yunyun/yunyun-profile.png", filename: "portrait.png" }] },
+        extra: { attachments: [{ type: "image", url: "/sprites/mari/Mari_profile.png", filename: "portrait.png" }] },
       },
     });
     expect(attachment.ok(), await attachment.text()).toBeTruthy();
@@ -651,7 +654,10 @@ test("VN history opens at the newest message and scene art respects size, activi
   const extras: string[] = [];
   try {
     const image = readFileSync(
-      new URL("../packages/client/public/sprites/yunyun/chibi-yunyun.png", import.meta.url),
+      new URL(
+        "../packages/client/assets/imagegen/mari-generated-originals/professor-mari-assistant-map-source.png",
+        import.meta.url,
+      ),
     ).toString("base64");
     for (const name of ["Second active", "Inactive"]) {
       const created = await request.post("/api/characters", { data: { data: { name, first_mes: "" } } });
@@ -696,7 +702,7 @@ test("VN history opens at the newest message and scene art respects size, activi
         extra: {
           spriteExpressions: { [ids[0]!]: "neutral", [ids[1]!]: "neutral" },
           attachments: [
-            { type: "image", url: "/sprites/yunyun/chibi-yunyun.png", filename: "Scene illustration" },
+            { type: "image", url: "/illustrations/marinara-universal-preset.webp", filename: "Scene illustration" },
           ],
         },
       },
@@ -770,7 +776,7 @@ test("Roleplay VN portrait honors avatar crop and allows history expansion", asy
 
     await open(page, data.chat.id);
     const vn = page.locator("[data-roleplay-vn]");
-    const avatarImg = vn.getByRole("img", { name: "YunYun", exact: true });
+    const avatarImg = vn.getByRole("img", { name: "Mari", exact: true });
     await expect(avatarImg).toBeVisible();
     await expect(avatarImg).toHaveCSS("position", "absolute");
     expect(
@@ -880,7 +886,7 @@ for (const automatic of [false, true]) {
       await page.evaluate(() => (window as any).__vnSpeechAudio.dispatchEvent(new Event("ended")));
       expect(spoken).toEqual([
         "The archive falls quiet.",
-        '"We have a new experiment," YunYun says.',
+        '"We have a new experiment," Mari says.',
         "A small light flickers across the desk.",
       ]);
       await page.evaluate(async () => {

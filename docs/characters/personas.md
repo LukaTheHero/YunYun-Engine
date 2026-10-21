@@ -1,10 +1,10 @@
 # User Personas: Creating and Editing
 
-This guide explains what a persona is, how to create and edit one, and how to import, export, duplicate, and delete personas. A persona is your own character card: the identity YunYun Engine uses to represent you in a chat.
+This guide explains what a persona is, how to create and edit one, and how to import, export, duplicate, and delete personas. A persona is your own character card: the identity Marinara Engine uses to represent you in a chat.
 
 ## What a persona is
 
-A persona is who you are in a chat. It has a name, a description, and other optional details. YunYun sends these details into every prompt so the AI knows who it is talking to.
+A persona is who you are in a chat. It has a name, a description, and other optional details. Marinara sends these details into every prompt so the AI knows who it is talking to.
 
 You can make many personas and keep them in the **Personas** panel. Choose which persona to use in each chat, or choose **None** to use no persona. This guide covers making and editing personas. To learn how to choose which persona a chat uses, see [Choosing Your Persona in a Chat](choosing-your-persona.md).
 
@@ -20,12 +20,13 @@ The **Personas** panel is your persona library. Open it from the person icon in 
 
 The panel gives you these controls:
 
-- **Open Full Library** opens the responsive full-page Persona Library. It uses the same grid-and-preview layout as the Character Library, with persona descriptions, card sections, tags, and token estimates.
+- **Download** opens the [Card Browser](bot-browser.md), where you can also find personas on PlotLight.
+- **Open Library** opens the responsive full-page Persona Library. It uses the same grid-and-preview layout as the Character Library, with persona descriptions, card sections, tags, and token estimates.
 - **New** creates a persona.
 - **Import** opens the **Import Persona** window.
 - **Select** turns on bulk-selection mode so you can act on many personas at once.
 - The search box, with placeholder **Search personas**, matches name, description, comment, and tags.
-- The sort dropdown offers **A-Z**, **Z-A**, **Newest**, **Oldest**, and **Tokens** (estimated prompt size).
+- The sort dropdown offers **Manual order**, **A-Z**, **Z-A**, **Newest**, **Oldest**, and **Tokens** (estimated prompt size). **Manual order** keeps the order you set: drag a row up or down, or press Alt+Up or Alt+Down on a focused row. On a touch screen, press and hold a row to pick it up.
 - **New Folder** creates a folder to organize personas.
 - A **Tags** chip expands the tag list for filtering.
 
@@ -82,7 +83,7 @@ The **Card** tab is where you write the core persona fields. Each field is a lar
 - **Personality**: your temperament, behavior, speech habits, and emotional patterns.
 - **Backstory**: your history, origin, relationships, and formative events.
 - **Appearance**: physical description, clothing, and visual details the model should remember.
-- **Image Appearance Override**: an optional switch under **Appearance**, off by default. Turn it on to reveal a second box for an image-prompt-ready description of your persona. While it is on and the box is filled, image prompts use that text instead of **Appearance**. The narrator always sees the full **Appearance** text.
+- **Image Appearance Override**: an optional switch under **Appearance**, off by default. Turn it on to reveal a second box for short image tags that describe your persona, such as a LoRA trigger word. While it is on and the box is filled, image prompts use those tags exactly as written, with **Appearance** kept as background. The narrator always sees the full **Appearance** text.
 - **Scenario**: your default situation or context for roleplays. Use it to establish where your persona starts.
 
 These text boxes support macros. Quote characters you type are auto-formatted to match your app quote style.
@@ -127,7 +128,7 @@ The values you set here are the starting defaults for new chats. Persona Status 
 
 ## Version history
 
-Every time you save a change to a persona's card fields, YunYun saves a snapshot automatically. The **Version history** panel on the **Metadata** tab lists these saved versions with a timestamp.
+Every time you save a change to a persona's card fields, Marinara saves a snapshot automatically. The **Version history** panel on the **Metadata** tab lists these saved versions with a timestamp.
 
 For each saved version you can:
 
@@ -138,7 +139,7 @@ For each saved version you can:
 
 Before your first edit, the panel says "Previous persona states will appear here after the next edit.".
 
-Use **Reset** in the panel header to delete every saved persona snapshot and set the current card version to `0.0`. YunYun asks for confirmation because the deleted history cannot be recovered.
+Use **Reset** in the panel header to delete every saved persona snapshot and set the current card version to `0.0`. Marinara asks for confirmation because the deleted history cannot be recovered.
 
 ## Duplicating a persona
 
@@ -157,7 +158,7 @@ To delete many at once, click **Select** in the **Personas** panel and check the
 Click **Import** in the **Personas** panel to open the **Import Persona** window. You can drag files in or click to browse. You can import many files at once. It accepts two file types:
 
 - **.marinara** native package files. These restore full persona details, sprites, and gallery structure.
-- **.json** files. A YunYun JSON export imports fully. A generic JSON file from another tool is mapped field by field into a new persona. The name is required. Other recognized fields are pulled in when present.
+- **.json** files. A Marinara JSON export imports fully. A generic JSON file from another tool is mapped field by field into a new persona. The name is required. Other recognized fields are pulled in when present.
 
 Each file shows a success or failure icon and a message. A summary line shows how many succeeded and how many failed.
 
@@ -165,8 +166,8 @@ Each file shows a success or failure icon and a message. A summary line shows ho
 
 You can export from the **Export persona** icon in the **Persona Editor**, or with the bulk **Export** action in the panel's selection mode. The **Export Persona** window offers two formats:
 
-- **Native**: keeps all YunYun persona details, sprites, and attached lorebooks. Use this to move a persona between YunYun installs.
-- **Compatible**: exports plain persona fields only. Use this for other tools that do not understand YunYun's format.
+- **Marinara Native**: keeps all Marinara persona details, sprites, and attached lorebooks. Use this to move a persona between Marinara installs.
+- **Compatible JSON**: exports plain persona fields only. Use this for other tools that do not understand Marinara's format.
 
 A bulk export downloads a single zip file with one file per selected persona.
 

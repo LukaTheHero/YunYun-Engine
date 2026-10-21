@@ -9,14 +9,14 @@ The first time you enter a chat after this update, a short video shows how to ar
 ## Opening Chat Settings
 
 1. Open a chat.
-2. Click or tap the **Chat Settings** button (the sliders icon). It starts at the top right of the chat, below the app's top bar.
+2. Click or tap the **Chat Settings** button (the sliders icon). It starts at the top right of the chat, below the app's top bar. On a computer with the Tracker Panel shown on the right, it starts just left of the panel instead.
 3. Click a section's title to open it. These sections are also called **drawers**: click the title again to fold one away.
 
 Chat Settings opens automatically when you create a new chat. To close it, click its **X** or click the sliders button again.
 
 Chats from before this update keep their familiar tools outside Chat Settings: as movable buttons on a computer, or in the **Chat tools** three-dot menu on a phone. When you upgrade an existing installation, that familiar arrangement also becomes the favorite layout for new chats in each mode, unless you already chose a favorite. Open a tool, then choose **Put back in Chat Settings** if you would rather keep it inside Chat Settings. Desktop Roleplay trackers are grouped in the **Trackers** window. Existing saved window and button positions are preserved.
 
-You can drag the sliders button to a convenient spot. It lines up with nearby chat buttons as you drag; on a computer, hold Alt to place it freely. Each chat remembers its position. A small dot on the button means agents are working.
+You can drag the sliders button to a convenient spot. It lines up with nearby chat buttons as you drag; on a computer, hold Alt to place it freely. Each chat remembers its position. A small dot on the button means agents are working. In a Roleplay chat with Advanced Memory Recall, a steady dot in the button's other corner means some scene memories need attention; see [Fixing memory problems](../agents/memory.md#fixing-memory-problems).
 
 The small reminder beside the sliders button in Roleplay only needs to be dismissed once. Its **X** keeps it hidden across chats and page refreshes.
 
@@ -24,13 +24,13 @@ On a computer, click the **X** beside the layout tips (**Hide these tips for thi
 
 ## Changing how chat windows look
 
-Open **Settings > Appearance > App** and scroll to **Chat widget style** at the bottom of **App Style**. **Default** keeps the familiar YunYun look. **Dottore** combines icy blues and pale metal with technical lettering and cut corners; **YunYun** pairs gemstone blues and warm gold with storybook lettering and arched frames. Both adapt to light and dark mode and style the movable buttons, windows and expandable sections in all three chat modes.
+Open **Settings > Appearance > App** and scroll to **Chat widget style** at the bottom of **App Style**. **Default** keeps the familiar Marinara look. **Dottore** combines icy blues and pale metal with technical lettering and cut corners; **Prof. Mari** pairs gemstone blues and warm gold with storybook lettering and arched frames. Both adapt to light and dark mode and style the movable buttons, windows and expandable sections in all three chat modes.
 
-Use **Font**, **Shape** and the three color pickers below the presets to mix things up. Fonts you have installed in YunYun appear in the font list too. Choosing a preset again resets the font, shape and custom colors. These choices do not move your windows or change your saved chat layouts. They are saved with your app preferences and sync to browsers connected to the same server.
+Use **Font**, **Shape** and the three color pickers below the presets to mix things up. Fonts you have installed in Marinara appear in the font list too. Choosing a preset again resets the font, shape and custom colors. These choices do not move your windows or change your saved chat layouts. They are saved with your app preferences and sync to browsers connected to the same server.
 
 **Button size (px)** changes movable chat buttons and their icons without changing Display Size. Enter a size from 32 to 96 pixels. Leave the field empty, or use its reset button, to keep the current default. The size is saved with your appearance preferences and stays the same when you choose another preset.
 
-To make the rest of the chat match, turn on **Apply preset font**, **Apply preset shape** or **Apply preset colors**. Each switch works on its own and includes your custom choices above it. They apply to messages, input boxes and chat controls; Conversation messages use the optional font and colors but keep their own shape. All three start off. Turn one off to return that part of the chat to its usual styling. See [Custom CSS Themes](../appearance/custom-css-themes.md#ready-made-chat-window-styles) for more detail.
+To make the rest of the chat match, turn on **Apply preset font**, **Apply preset shape** or **Apply preset colors**. Each switch works on its own and includes your custom choices above it. They apply to messages, input boxes and chat controls; Conversation messages use the optional font and colors but keep their own shape. With **Apply preset colors** on, quoted dialogue keeps each Character's or Persona's own Dialogue Highlight Color. All three start off. Turn one off to return that part of the chat to its usual styling. See [Custom CSS Themes](../appearance/custom-css-themes.md#ready-made-chat-window-styles) for more detail.
 
 ## Moving, pinning and locking the window
 
@@ -42,7 +42,7 @@ On a computer, Chat Settings floats over the chat. Its contents rearrange to fit
 - **Lock** stops the window from moving or resizing and fixes its button in place. You can still click the button to open the window. Unlock the window to move either one again.
 - **Close** (the **X**) hides the window.
 
-Windows stay inside the chat area when you resize the browser or open a sidebar.
+Windows stay inside the chat area when you resize the browser or open a sidebar. On a computer, a window or button can sit in the space beside the message box, all the way down to the bottom of the chat. It never covers the message box itself.
 
 On a phone, Chat Settings opens as a full-width panel. The panel fits above the keyboard while you type.
 
@@ -53,7 +53,7 @@ The title bar has a few other useful buttons:
 - **Help** (the **?** beside the title) shows labels explaining the chat's controls. On a phone, it closes Chat Settings first so you can see the chat. Tap the highlighted **Chat Settings** button for a guide to its icons: Reset View, favorite layout, the Roleplay Tracker Panel, lock/unlock, close and moving a section out. Scroll inside the guide to read every item. You can hide the Help button in **Settings → General → App Behavior → Hide chat Help button**.
 - **Reset View** (the circular arrow) asks for confirmation, then restores this chat's starting layout. It puts popped-out sections back and restores the default window sizes, positions, pins and locks.
 - **Favorite layout** (the star beside Reset View) saves this arrangement for new chats in the current mode. See [Choosing a layout for new chats](#choosing-a-layout-for-new-chats).
-- **Tracker Panel** (the die) turns the panel on or off in a Roleplay chat that uses agents or Advanced Memory. On a computer, the panel opens beside the chat. On a phone, a movable button opens it. This setting also changes the Tracker Panel preference in **Settings → Appearance**.
+- **Tracker Panel** (the die) turns the panel on or off in a Roleplay chat that uses agents or Advanced Memory. On a computer, the panel opens beside the chat. On a phone or tablet, a movable button opens and closes it. This setting also changes the Tracker Panel preference in **Settings → Appearance**.
 
 When the Tracker Panel is not shown, desktop trackers use the [Trackers window](../roleplay/hud-and-trackers.md#the-trackers-window). When there is not enough room beside your messages, it starts as a small **Trackers** button. Closing the window returns it to that button. Use the die in the Chat Settings title bar to show the Tracker Panel again.
 
@@ -122,7 +122,7 @@ The **Chat Name** section holds the name shown in your chat list. This name is o
 
 ## Connection
 
-The **Connection** section picks which AI provider and model answers in this chat. A connection is a saved link to an AI provider, including its API key and chosen model. An API key is a secret code that lets YunYun Engine use your account with that provider.
+The **Connection** section picks which AI provider and model answers in this chat. A connection is a saved link to an AI provider, including its API key and chosen model. An API key is a secret code that lets Marinara Engine use your account with that provider.
 
 Pick a saved connection from the dropdown. You can also pick **Random**. It chooses a different connection each time from the connections you marked for your random pool.
 
@@ -138,20 +138,20 @@ A profile bundles this chat's connection, prompt preset, agents, tools, translat
 
 The bar has a row of small icon buttons with no text labels. Each button shows its name in a tooltip when you hover over it:
 
-- The disk icon (**Save current chat settings into this profile**) writes the current chat's settings into the selected profile.
+- The disk icon (**Save current chat settings into this profile**) writes the current chat's settings into the selected profile. If other chats use the profile, it asks whether to update them too.
 - The pencil icon (**Rename profile**) renames the selected profile.
 - The file-plus icon (**Save current chat settings as a new profile**) saves the current chat's settings as a new profile.
 - The down-arrow icon (**Import settings profile (.json)**) loads a profile from a `.json` file.
 - The up-arrow icon (**Export settings profile (.json)**) saves the selected profile to a `.json` file.
 - The trash icon (**Delete profile**) removes the selected profile.
 
-Next to the dropdown is a star button. Click it to make a profile the default for new chats in this mode. When you create a new chat in that mode, YunYun applies the starred profile for you. Only one profile per mode can be the default.
+Next to the dropdown is a star button. Click it to make a profile the default for new chats in this mode. When you create a new chat in that mode, Marinara applies the starred profile for you. Only one profile per mode can be the default.
 
 Each mode that supports this feature has a built-in **Default** profile. You cannot rename, save into, or delete the **Default** profile. Applying it resets the profile-controlled settings to the app defaults.
 
 The profile controls do not appear in Game mode.
 
-YunYun reserves **preset** for prompt presets. A prompt preset shapes the system prompt structure and generation parameters; a settings profile bundles the reusable chat configuration listed above. For the full rules, see [Settings Profiles](settings-profiles.md).
+Marinara reserves **preset** for prompt presets. A prompt preset shapes the system prompt structure and generation parameters; a settings profile bundles the reusable chat configuration listed above. For the full rules, see [Settings Profiles](settings-profiles.md).
 
 ## Chat Variables
 
@@ -165,6 +165,8 @@ Three things are worth knowing.
 - Variables belong to this chat alone. Another chat has its own list, and yours survives a restart.
 - This is the same storage `{{setvar}}` uses. A value set by a prompt section or a lorebook entry shows up here as a row you can edit, and such an entry overwrites the value you typed if it uses the same name.
 
+With many variables, click **Search and edit all in the State Editor** at the top of the section. It opens every variable in one list where you can search, edit values as fields, or paste in many at once as JSON, and review the changes before saving. Saving only changes the names you edited, so a value `{{setvar}}` saves meanwhile under another name is kept. See [The State Editor](../roleplay/hud-and-trackers.md#the-state-editor).
+
 For everything else you can write in double braces, see [Prompt Macros](../prompts/macros.md).
 
 ## Chat tools in Chat Settings
@@ -176,7 +178,7 @@ The chat's tools are sections of Chat Settings too. Which ones you see depends o
 - **Chat Summary**, under **Lorebooks**, reviews and creates summaries of a Roleplay chat. See [Memory Recall and Chat Summaries](../agents/memory.md#chat-summary-roleplay).
 - **Active Context**, under **Chat Summary**, shows the lorebooks and context active in this chat. See [Token Budgets and Recursion](../lorebooks/token-budgets.md#seeing-skipped-entries-in-active-context).
 - **Agent activity**, just below **Agents** in a Roleplay chat that uses agents or Advanced Memory, shows what the chat's agents did. It also lets you re-run trackers, retry or stop agents, and clear trackers. See [Agent activity](../roleplay/getting-started.md#agent-activity).
-- **Author's Notes**, under **Agents**, holds a note the AI reads on every turn of a Roleplay chat. See [Author's Notes](../roleplay/getting-started.md#authors-notes).
+- **Author's Notes**, under **Agents**, holds a note the AI reads on every turn of a Roleplay chat. When you pop it out, its text box grows with the window; on a phone it fills the screen. See [Author's Notes](../roleplay/getting-started.md#authors-notes).
 - **Gallery** holds the chat's images and videos. See [Scene Backgrounds and the Gallery](../media/scene-backgrounds.md).
 
 ## Other sections in the panel

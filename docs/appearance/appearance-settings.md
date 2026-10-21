@@ -1,6 +1,6 @@
 # Appearance Settings
 
-This guide walks through the **Settings -> Appearance** tab in YunYun Engine section by section. It covers colors, text size, chat layout, message styling for each mode, and how to reset everything to the defaults.
+This guide walks through the **Settings -> Appearance** tab in Marinara Engine section by section. It covers colors, text size, chat layout, message styling for each mode, and how to reset everything to the defaults.
 
 Fonts, backgrounds, and custom CSS themes each have their own guide. This page links to them where they belong.
 
@@ -24,7 +24,7 @@ Several colors below have separate dark and light defaults. They follow the acti
 
 **Visual Style** picks the overall look of the whole app. You choose between two cards:
 
-- **Default (YunYun)** (the default). A retro Y2K look with glow effects.
+- **Default (Marinara)** (the default). A retro Y2K look with glow effects.
 - **SillyTavern**. A clean, minimal look inspired by the original SillyTavern.
 
 This is only a skin. It has nothing to do with importing data from SillyTavern, which is a separate tool.
@@ -47,15 +47,15 @@ You can only use one of these at a time. Turning on **RGB Mode** turns off **Acc
 
 ## Chat widget style
 
-At the bottom of **App Style**, choose **Default**, **Dottore** or **YunYun** for movable chat buttons, windows and sections. You can change the font, frame shape and three main colors separately. Color pickers also support gradients.
+At the bottom of **App Style**, choose **Default**, **Dottore** or **Prof. Mari** for movable chat buttons, windows and sections. You can change the font, frame shape and three main colors separately. Color pickers also support gradients.
 
 **Button size (px)** changes movable chat buttons and their icons without changing Display Size. Enter a size from 32 to 96 pixels. Leave the field empty, or use its reset button, to keep the current default. The size is saved with your appearance preferences and stays the same when you choose another preset.
 
-Below the color pickers, **Apply preset font**, **Apply preset shape** and **Apply preset colors** let the rest of the chat match. They start off and work independently. They cover messages, input boxes and chat controls, plus Game Mode's HUD widgets, map panel, side remarks and character sheets; Conversation messages get the optional font and colors while keeping their own shape. Your custom font, shape and color choices are included. For examples and custom themes, see [Custom CSS Themes](custom-css-themes.md#ready-made-chat-window-styles).
+Below the color pickers, **Apply preset font**, **Apply preset shape** and **Apply preset colors** let the rest of the chat match. They start off and work independently. They cover messages, input boxes and chat controls. In Game Mode they also cover HUD widgets, the map panel, side remarks, character sheets, logs, the Inventory, combat panels and dialogs. Conversation messages get the optional font and colors while keeping their own shape. Your custom font, shape and color choices are included. With **Apply preset colors** on, quoted dialogue still uses each Character's or Persona's own Dialogue Highlight Color. For examples and custom themes, see [Custom CSS Themes](custom-css-themes.md#ready-made-chat-window-styles).
 
 ## Custom Mouse Pointer
 
-**Custom Mouse Pointer** (default on) uses YunYun's accent-colored cursor across the app. Turn it off to use your normal system cursor, or to let a custom CSS theme control the cursor.
+**Custom Mouse Pointer** (default on) uses Marinara's accent-colored cursor across the app. Turn it off to use your normal system cursor, or to let a custom CSS theme control the cursor.
 
 ## Display Size and Chat Font Size
 
@@ -71,7 +71,7 @@ The **Font** dropdown lives in this same section. To add your own fonts or downl
 Also in the **Text & Scale** section, four controls change how chat text reads over your background.
 
 - **Chat Text Color** sets the main chat message text color. The default is `#d4d4d4` in Dark mode and `#1a1025` in Light mode.
-- **Default Dialogue Color** colors quoted dialogue when a Character or Persona card does not define its own Dialogue Highlight Color. It is always active; card-specific colors take priority.
+- **Default Dialogue Color** colors quoted dialogue when a Character or Persona card does not define its own Dialogue Highlight Color. Card-specific colors take priority. While **Apply preset colors** is on, this dialogue uses the chat style's text color instead.
 - **Chat Chrome Text Color** sets ordinary text in tracker widgets, folder labels, and settings descriptions. It uses the same defaults as **Chat Text Color**.
 - **Text Outline / Stroke** adds an outline around chat text so it stays readable over busy backgrounds. Set the outline color and a **Width** from 0px to 5px. The default width is 0.5px. Set the width to 0 to turn the outline off.
 
@@ -127,7 +127,7 @@ The **Backgrounds** section lets you import and choose chat background images an
 
 ## Reset Appearance
 
-The **Reset Appearance** button sits at the top of the **App Style** section. It resets the entire **Appearance** tab back to YunYun defaults. This includes colors, text sizes, layout, avatar and sprite scales, and gradients.
+The **Reset Appearance** button sits at the top of the **App Style** section. It resets the entire **Appearance** tab back to Marinara defaults. This includes colors, text sizes, layout, avatar and sprite scales, and gradients.
 
 Reset also clears the current chat's background and turns off any active custom theme from the Theme Library. Use it when your styling gets messy and you want a clean start.
 

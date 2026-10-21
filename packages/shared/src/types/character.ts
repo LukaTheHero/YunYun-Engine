@@ -1,6 +1,8 @@
 // ──────────────────────────────────────────────
 // Character Card V2 Types (compatible with ST / Chub)
 // ──────────────────────────────────────────────
+import type { ChoiceDisplayMode, ChoiceOption, ChoiceOptionSort } from "./prompt.js";
+
 /** Full Character Card V2 envelope. */
 export interface CharacterCardV2 {
   spec: "chara_card_v2";
@@ -36,71 +38,116 @@ export interface CharacterExtensions {
   fav: boolean;
   world: string;
   depth_prompt: DepthPrompt;
-  /** YunYun Engine extension: character backstory / lore */
+  /** Marinara Engine extension: character backstory / lore */
   backstory: string;
-  /** YunYun Engine extension: physical appearance description */
+  /** Marinara Engine extension: physical appearance description */
   appearance: string;
-  /** YunYun Engine: use `imageAppearance` instead of `appearance` in image prompts. */
+  /** Marinara Engine: use `imageAppearance` instead of `appearance` in image prompts. */
   imageAppearanceEnabled?: boolean;
-  /** YunYun Engine: appearance text used for image prompts when the override is enabled. */
+  /** Marinara Engine: appearance text used for image prompts when the override is enabled. */
   imageAppearance?: string;
-  /** YunYun Engine: Name display color/gradient (CSS value, e.g. "linear-gradient(90deg, #ff6b6b, #ffd93d)" or "#ff6b6b") */
+  /** Marinara Engine: Name display color/gradient (CSS value, e.g. "linear-gradient(90deg, #ff6b6b, #ffd93d)" or "#ff6b6b") */
   nameColor?: string;
-  /** YunYun Engine: Dialogue highlight color — text in quotation marks is bold + colored with this */
+  /** Marinara Engine: Dialogue highlight color — text in quotation marks is bold + colored with this */
   dialogueColor?: string;
-  /** YunYun Engine: Chat bubble / dialogue box background color */
+  /** Marinara Engine: Chat bubble / dialogue box background color */
   boxColor?: string;
-  /** YunYun Engine: Alternative names/nicknames that should be colored with this
+  /** Marinara Engine: Alternative names/nicknames that should be colored with this
    *  character's nameColor when they appear in chat prose. The character's primary
    *  `name` is always a trigger; these are additional aliases (e.g. "Kate", "Kitty"). */
   nameAliases?: string[];
-  /** YunYun Engine: RPG stats toggle + custom attributes */
+  /** Marinara Engine: RPG stats toggle + custom attributes */
   rpgStats?: RPGStatsConfig;
-  /** YunYun Engine: starting builds for Game Mode rulesets, keyed by ruleset id. A game copies
+  /** Marinara Engine: starting builds for Game Mode rulesets, keyed by ruleset id. A game copies
    *  the one it needs; a sheet for a ruleset that is not installed is kept dormant. */
   rulesetSheets?: Record<string, unknown>;
-  /** YunYun Engine: per-character Tracker fields copied into each new Roleplay chat. */
+  /** Marinara Engine: per-character Tracker fields copied into each new Roleplay chat. */
   trackerCustomFieldDefaults?: CharacterTrackerCustomFieldDefault[];
-  /** YunYun Engine: Conversation-mode availability status */
+  /** Marinara Engine: Conversation-mode availability status */
   conversationStatus?: import("./chat.js").ConversationPresenceStatus;
-  /** YunYun Engine (Conversation mode ONLY): manual presence override. Like the
+  /** Marinara Engine (Conversation mode ONLY): manual presence override. Like the
    *  schedule, it belongs to the character and applies in every Conversation chat;
    *  `null` means no override. Chats cache a resolved copy in
    *  `chats.metadata.conversationStatusOverrides`. */
   conversationStatusOverride?: import("./chat.js").ConversationStatusOverride | null;
-  /** YunYun Engine (Conversation mode ONLY): the character's weekly schedule. The
+  /** Marinara Engine (Conversation mode ONLY): the character's weekly schedule. The
    *  character owns it; every conversation chat caches a resolved copy in
    *  `chats.metadata.characterSchedules`. Per-chat opt-out lives on the chat as
    *  `conversationSchedulesEnabled`. */
   conversationSchedule?: import("../utils/conversation-presence.js").WeekSchedule;
   /** Renew the weekly Conversation schedule when its week ends. Defaults on when a schedule exists. */
   conversationScheduleAutoRenew?: boolean;
-  /** YunYun Engine: pronunciation override used when sending this character's name to TTS. */
+  /** Marinara Engine: pronunciation override used when sending this character's name to TTS. */
   phoneticName?: string;
-  /** YunYun Engine (Conversation mode ONLY): display name shown as the sender label
+  /** Marinara Engine (Conversation mode ONLY): display name shown as the sender label
    *  in Convo and used for attribution in the convo prompt. Never read in RP/VN/Game. */
   convoDisplayName?: string;
-  /** YunYun Engine (Conversation mode ONLY): when true, prepend a line declaring the
+  /** Marinara Engine (Conversation mode ONLY): when true, prepend a line declaring the
    *  convo display name to this character's card so the model can map the display name
    *  to this specific card. No effect without a convoDisplayName. Never read in RP/VN/Game. */
   convoDisplayNameInCard?: boolean;
-  /** YunYun Engine (Conversation mode ONLY): public "about me" profile. The
+  /** Marinara Engine (Conversation mode ONLY): public "about me" profile. The
    *  cross-chat default; a per-chat override can supersede it. Never read in RP/VN/Game. */
   aboutMe?: string;
-  /** YunYun Engine (Conversation mode ONLY): behavior directive + insertion strategy.
+  /** Marinara Engine (Conversation mode ONLY): behavior directive + insertion strategy.
    *  Never read in RP/VN/Game. */
   convoBehavior?: ConvoBehaviorConfig;
-  /** YunYun Engine: character-specific direction for Conversation selfie image prompts. */
+  /** Marinara Engine: character-specific direction for Conversation selfie image prompts. */
   conversationImageInstructions?: string;
   /** Retain prior card revisions and automatically advance character_version on edits. */
   versioningEnabled?: boolean;
-  /** YunYun Engine: also apply conversationImageInstructions to this character's Noodle images. */
+  /**
+   * Also apply conversationImageInstructions to this character's Noodle images. Noodle owns the
+   * control; Slurp reads it as the default until the character has its own Slurp choice.
+   */
   applyConversationImageInstructionsToNoodle?: boolean;
-  /** YunYun Engine: gallery image selected as this character's optional visual reference sheet. */
+  /** Marinara Engine: gallery image selected as this character's optional visual reference sheet. */
   characterSheetImageId?: string | null;
-  /** YunYun Engine: prefer the selected character sheet over the avatar for image references. */
+  /** Marinara Engine: prefer the selected character sheet over the avatar for image references. */
   useCharacterSheetAsReference?: boolean;
+  /** Marinara Engine: interactive onboarding ("skeleton persona") carried by the card. */
+  onboarding?: CharacterOnboarding;
   [key: string]: unknown;
+}
+
+/**
+ * Interactive onboarding: a skeleton persona the card ships. The five persona
+ * Card fields are prose that may use `{{variable}}` and `{{#if}}`; `variables`
+ * are the questions the player answers once when a chat starts, and the resolved
+ * text becomes a real persona. Absent or `enabled: false` means nothing is parsed.
+ */
+export interface CharacterOnboarding {
+  enabled: boolean;
+  description: string;
+  personality: string;
+  backstory: string;
+  appearance: string;
+  scenario: string;
+  variables: CharacterOnboardingVariable[];
+  /**
+   * Questions for the card's own fields. The answers are saved as chat variables,
+   * so a `{{name}}` in the card resolves per chat and the card itself never changes.
+   */
+  cardVariables: CharacterOnboardingVariable[];
+}
+
+/**
+ * One onboarding question, shaped like a preset variable. No options = free
+ * text; options = a choice whose first option is the default; options plus
+ * `allowCustom` = a choice that also accepts the player's own answer. A variable
+ * named `player` supplies the created persona's name.
+ */
+export interface CharacterOnboardingVariable {
+  id: string;
+  variableName: string;
+  question: string;
+  /** `description` is optional help text shown to the player under the option label. */
+  options: Array<ChoiceOption & { description?: string }>;
+  allowCustom: boolean;
+  multiSelect: boolean;
+  separator: string;
+  displayMode: ChoiceDisplayMode;
+  optionSort: ChoiceOptionSort;
 }
 
 /** Where a Convo-mode behavior directive is inserted into the conversation prompt. */
@@ -233,9 +280,9 @@ export interface PersonaCardSnapshot {
   scenario: string;
   backstory: string;
   appearance: string;
-  /** YunYun Engine: image-prompt override flag, stored as a string like its siblings. */
+  /** Marinara Engine: image-prompt override flag, stored as a string like its siblings. */
   imageAppearanceEnabled?: string;
-  /** YunYun Engine: appearance text used for image prompts while the override is on. */
+  /** Marinara Engine: appearance text used for image prompts while the override is on. */
   imageAppearance?: string;
   characterSheetImageId: string;
   useCharacterSheetAsReference: string;

@@ -2,7 +2,7 @@
 
 This guide covers the **Noodle settings** panel section by section, with every default and limit. It also explains how to connect Noodle to your chats. Two features do this: **Carryover to chats** and the per-chat **Allow Noodle references** toggle. They work in opposite directions.
 
-Noodle is the in-app social media timeline in YunYun Engine. If you are new to it, read [Noodle: The In-App Social Timeline](overview.md) first. A persona is the character you play as in a chat. A connection is a saved link to an AI provider that generates text or images. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).
+Noodle is the in-app social media timeline in Marinara Engine. If you are new to it, read [Noodle: The In-App Social Timeline](overview.md) first. A persona is the character you play as in a chat. A connection is a saved link to an AI provider that generates text or images. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).
 
 ## Opening the Noodle settings panel
 
@@ -10,13 +10,20 @@ Noodle is the in-app social media timeline in YunYun Engine. If you are new to i
 2. In the left sidebar, click the **Settings** button (the gear icon).
 3. The panel header reads **Noodle settings**.
 
+The settings are split into four pages. Pick one with the buttons under the header:
+
+- **General**: [Refresh](#refresh) and [Translation](#translation).
+- **Timeline**: [Activity](#activity) and [Image Generation](#image-generation).
+- **Participants**: [Invites](#invites), **Ambient Profiles** (see [Random users](#random-users)) and [Active Accounts](#active-accounts).
+- **Advanced**: **Noodle Prompt**, [Image Understanding](#image-understanding), [Timeline Writing](#timeline-writing), [World / Lore](#world--lore), [Carryover](#carryover) and [Reset Noodle](#reset-noodle).
+
 All Noodle settings are global. They apply to every persona and every chat, not to one chat at a time. Changes save as soon as you make them.
 
 ## Invites
 
 The **Invites** section chooses which characters can take part in a Noodle refresh. A refresh is when the AI writes a batch of posts, replies, reposts, and likes for the invited accounts.
 
-- **Professor YunYun participates**: a toggle, default **on**. Turn it off to hide Professor YunYun from Noodle account discovery and exclude her from future generated posts, replies, reactions, mentions, profile generation, and chat carryover. Existing timeline history is preserved, and turning the toggle back on restores her account.
+- **Professor Mari participates**: a toggle, default **on**. Turn it off to hide Professor Mari from Noodle account discovery and exclude her from future generated posts, replies, reactions, mentions, profile generation, and chat carryover. Existing timeline history is preserved, and turning the toggle back on restores her account.
 - **Characters to Invite**: a search box. Type here to filter both the folder list and the character list below it.
 - **Add from Folder**: click to expand a list of your character folders. Check one or more folders, then click the invite button at the bottom. The button label changes with your selection:
   - **Select folders to invite** when nothing is checked.
@@ -31,13 +38,13 @@ Inviting from a folder is a one-time bulk action. It is not a live sync. Charact
 The **Refresh** section controls the AI connection Noodle writes with, and how often Noodle refreshes on its own.
 
 - **Generation connection**: a dropdown. Pick the connection Noodle uses to write posts, replies, reposts, likes, and profile text. It starts unset with the placeholder **Choose connection**. You must pick one before any refresh will run. Vision-capable models also receive up to eight recent relevant images from Noodle posts and comments. Text-only models that reject those image inputs are retried automatically without the pictures.
-- **Refreshes/day**: a number, from 0 to 24, default **2**. This is how many automatic refreshes YunYun runs per day. Set it to 0 to turn automatic refreshes off. It does not limit how often you refresh by hand.
+- **Refreshes/day**: a number, from 0 to 24, default **2**. This is how many automatic refreshes Marinara runs per day. Set it to 0 to turn automatic refreshes off. It does not limit how often you refresh by hand.
 
 ### Automatic schedule
 
-When **Refreshes/day** is above 0, YunYun splits the day into equal windows and picks one random time inside each window. The planned times, with their timezone, show under **Automatic schedule**. Click the pencil next to a future time to move it to a different hour. Past times, completed times, and duplicate times cannot be picked.
+When **Refreshes/day** is above 0, Marinara splits the day into equal windows and picks one random time inside each window. The planned times, with their timezone, show under **Automatic schedule**. Click the pencil next to a future time to move it to a different hour. Past times, completed times, and duplicate times cannot be picked.
 
-Automatic refreshes run inside the YunYun server. The Noodle page does not need to stay open, but YunYun itself must be running. If a refresh fails, the schedule shows the error and retries later, waiting longer after repeated failures. If several planned times are missed, one successful catch-up refresh covers them instead of flooding the timeline.
+Automatic refreshes run inside the Marinara server. The Noodle page does not need to stay open, but Marinara itself must be running. If a refresh fails, the schedule shows the error and retries later, waiting longer after repeated failures. If several planned times are missed, one successful catch-up refresh covers them instead of flooding the timeline.
 
 ## Translation
 
@@ -56,7 +63,7 @@ The **Active Accounts** section sets how many eligible accounts take part in one
 - With **Exact count**, one field appears: **Active count** (1 to 100). It sets a fixed number of accounts.
 - With **All invited**, every eligible account takes part, with no cap.
 
-Your active persona is always eligible on top of these accounts. Professor YunYun is eligible while **Professor YunYun participates** is on.
+Your active persona is always eligible on top of these accounts. Professor Mari is eligible while **Professor Mari participates** is on.
 
 Noodle chooses the active accounts before it prepares first-time profiles. Only active characters without an existing generated Noodle profile receive a profile-generation request; inactive invited characters are not included. The timeline-writing request likewise receives character cards only for the accounts selected for that refresh.
 
@@ -77,18 +84,30 @@ Set a field to 0 to stop the AI from creating that kind of activity.
 
 The **Image Generation** section lets Noodle attach AI-made images to some posts. This needs an image-generation connection, which is a connection set up for making pictures. See [Supported AI Providers](../connections/providers-reference.md).
 
-- **Image generation**: a toggle, default **off**. Turn it on to let the AI generate post images.
+- **Noodle image generation**: a toggle, default **off**. Turn it on to let the AI generate post images.
 - When it is on, more controls appear:
-  - **Image generation connection**: a dropdown, default **Default image generation connection**. Leaving it on Default uses whichever connection is marked default for image generation in the Connections panel.
-  - **Prompt instructions**: a text box with built-in default text, up to 4000 characters. These extra notes are merged into the image prompt.
+  - **Image width** and **Image height**: the size of generated post images, from 64 to 4096 pixels. The defaults are **1024** by **1536**.
+  - **Noodle image generation connection**: a dropdown, default **Default image generation connection**. Leaving it on Default uses whichever connection is marked default for image generation in the Connections panel. A character can use its own connection instead; see [Profiles and following](overview.md#profiles-and-following).
+  - **Image instructions (sent to your LLM)**: a text box with built-in default text, up to 4000 characters. The timeline model follows these instructions when it writes each post's image description, so write them as directions, not as image tags. For style tags sent straight to the image model, use an image style profile instead.
   - **Use avatar references**: a toggle, default **on**. Sends the character's avatar or reference images to the image model.
-  - **Include descriptions**: a toggle, default **on**. Adds the character's written appearance notes to the image prompt.
+  - **Interpret image prompts**: a toggle, default **on**. A text model rewrites each image prompt, following your image connection's **Image Prompting Instructions** and your style profile's Style text. When it is off, the Image Prompting Instructions aren't used and the Style text is added as written.
+  - **Include descriptions**: a toggle, default **on**. Adds the character's written appearance notes to the image prompt. With **Interpret image prompts** on, the text model works them in instead of pasting them.
   - **Images/refresh**: a number, 0 to 50, default **3**. This caps generated post images separately for every manual or automatic refresh.
-- **Attach gallery images**: a separate toggle, default **off**. It stays visible even when **Image generation** is off. Instead of making a new image, it lets a post reuse an image from that character's gallery or from a chat they appear in.
+- **Attach gallery images**: a separate toggle, default **off**. It stays visible even when **Noodle image generation** is off. Instead of making a new image, it lets a post reuse an image from that character's gallery or from a chat they appear in.
 
-If you turn on **Image generation** but have no usable image connection, a refresh is blocked. You will see the message "Choose an image generation connection for Noodle first." A failed image is retried once. If the second attempt also fails, the refresh continues and publishes a clean text-only post instead of exposing the unused image prompt.
+If you turn on **Noodle image generation** but have no usable image connection, a refresh is blocked. You will see the message "Choose an image generation connection for Noodle first." A failed image is retried once. If the second attempt also fails, the refresh continues and publishes a clean text-only post instead of exposing the unused image prompt.
 
-The template Noodle uses to write these image prompts is called **Noodle Post Image**. You can edit it under **Settings** > **Generations** > **Image Generation Prompt Overrides**. Your **Prompt instructions** text is passed into that template, and the result then goes through your normal image style profile. See [Prompt Overrides for Image and Video](../prompts/prompt-overrides.md) and [Image Style Profiles](../media/style-profiles.md). Professor YunYun has no character card, so her image posts use her built-in avatar and reference art instead.
+The template Noodle uses to write these image prompts is called **Noodle Post Image**. You can edit it under **Settings** > **Generations** > **Image Generation Prompt Overrides**. Your **Image instructions (sent to your LLM)** text is passed into that template, and the result then goes through your normal image style profile. See [Prompt Overrides for Image and Video](../prompts/prompt-overrides.md) and [Image Style Profiles](../media/style-profiles.md). Professor Mari has no character card, so her image posts use her built-in avatar and reference art instead.
+
+## Image Understanding
+
+The **Image Understanding** section decides how the timeline writer sees pictures already on the timeline.
+
+- **Show images to the writer**: a toggle, default **on**. The writer model gets up to eight recent timeline images when it accepts pictures. Turn it off and the writer gets no timeline images.
+- **Image captioning**: a toggle. A vision-capable connection describes timeline images for the writer, so a text-only writer model can follow them too. Until you change it, it follows the captioning setting of Noodle's **Generation connection**, and **Use connection default** goes back to that.
+- **Captioning connection**: appears when captioning is on. **Use Noodle generation connection** uses the **Generation connection**; pick another connection when that model cannot see images.
+
+Image captioning still sends timeline images to the captioning connection when **Show images to the writer** is off.
 
 ## Timeline Writing
 
@@ -118,7 +137,7 @@ The **Carryover** section pushes recent Noodle activity into your chats. When on
 - **Carry items**: a number, 1 to 50, default **8**. This is the most activity summaries added to one chat turn.
 
 Carryover only pulls activity for characters who are invited on Noodle, plus the chat's active persona. Folder-only inclusion is not enough here.
-The complete wrapped carryover block has a separate hard 8,192-token budget per chat generation. If the item limit would exceed it, YunYun keeps the newest summaries that fit and renders them in chronological order.
+The complete wrapped carryover block has a separate hard 8,192-token budget per chat generation. If the item limit would exceed it, Marinara keeps the newest summaries that fit and renders them in chronological order.
 
 ## Reset Noodle
 
@@ -136,6 +155,8 @@ Random users are six built-in ambient accounts that are not from your library: T
 
 You turn them on with the **Random users** row at the top of the **Characters** list in the **Invites** section. It is **off** by default. Its subtitle reads **Enabled** when on, or **Ambient fake profiles** when off. When on, these accounts can post, like, repost, reply, and follow during a refresh. They can never be followed from a profile.
 
+The **Ambient Profiles** section on the **Participants** page lets you edit these identities or generate a different set. Rerolling keeps posts and relationships but removes profile images.
+
 ## Connecting Noodle to your chats
 
 Noodle and your chats can share context in two directions. These are two separate features. Turning one on does not turn on the other.
@@ -149,10 +170,10 @@ To make Noodle activity appear in a chat, turn on the matching **Carryover to ch
 ## Troubleshooting
 
 - **Refresh now generates nothing**: pick a **Generation connection**, invite at least one character (or turn on random users), and check the error shown in the **Refresh** section.
-- **Automatic refreshes are not happening**: set **Refreshes/day** above 0, keep the YunYun server running, and check the planned times and timezone under **Automatic schedule**. If the schedule shows an error, fix the connection or rate limit problem and let the retry run.
+- **Automatic refreshes are not happening**: set **Refreshes/day** above 0, keep the Marinara server running, and check the planned times and timezone under **Automatic schedule**. If the schedule shows an error, fix the connection or rate limit problem and let the retry run.
 - **Posts do not mention a recent chat**: turn on **Allow Noodle references** in that chat's settings, and make sure the character is invited. Chat context is guidance for the AI, not a guarantee.
 - **Noodle activity does not show in chats**: turn on the matching **Carryover to chats** mode, and raise **Carry hours** if the activity is too old.
-- **Posts have no images**: turn on **Image generation**, pick a working image connection, and check the **Images/refresh** limit.
+- **Posts have no images**: turn on **Noodle image generation**, pick a working image connection, and check the **Images/refresh** limit.
 
 ## Settings and defaults
 
@@ -161,7 +182,7 @@ This table lists every Noodle setting with its default and range.
 | Setting | Default | Range or options |
 |---|---|---|
 | **Generation connection** | none | any text connection (required for refresh) |
-| **Professor YunYun participates** | on | on or off |
+| **Professor Mari participates** | on | on or off |
 | **Refreshes/day** | 2 | 0 to 24 (0 turns automatic refreshes off) |
 | **Translate posts automatically** | off | on or off |
 | **Active selection** | Random range | Random range, Exact count, All invited |
@@ -172,13 +193,20 @@ This table lists every Noodle setting with its default and range.
 | **Replies** | 12 | 0 to 200 |
 | **Reposts** | 4 | 0 to 100 |
 | **Likes** | 18 | 0 to 500 |
-| **Image generation** | off | on or off |
-| **Image generation connection** | Default | any image-generation connection |
-| **Prompt instructions** | built-in text | up to 4000 characters |
+| **Noodle image generation** | off | on or off |
+| **Image width** | 1024 | 64 to 4096 |
+| **Image height** | 1536 | 64 to 4096 |
+| **Noodle image generation connection** | Default | any image-generation connection |
+| **Image instructions (sent to your LLM)** | built-in text | up to 4000 characters |
 | **Use avatar references** | on | on or off |
+| **Interpret image prompts** | on | on or off |
 | **Include descriptions** | on | on or off |
 | **Images/refresh** | 3 | 0 to 50 |
 | **Attach gallery images** | off | on or off |
+| **Show images to the writer** | on | on or off |
+| **Image captioning** | follows the Generation connection | on or off |
+| **Captioning connection** | Use Noodle generation connection | any vision-capable connection |
+| **Use connection default** | on | on or off; restores the Generation connection's captioning setting |
 | **Lorebook context** | off | on or off |
 | **Enhanced tone & continuity** | off | on or off |
 | **Carryover: Conversations** | off | on or off |

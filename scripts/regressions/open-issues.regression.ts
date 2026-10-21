@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,7 +46,12 @@ import {
   orderConversationRespondersByDelay,
   remainingConversationPresenceDelay,
 } from "../../packages/server/src/routes/generate/conversation-presence-runtime.js";
-import { AGENT_SUITE_TRACKER_SLICES } from "../../packages/client/src/lib/agent-suite-tracker-slices.js";
+import {
+  AGENT_SUITE_TRACKER_SLICES,
+  TRACKER_SLICE_ERROR_KEYS,
+  trackerSliceErrorMessage,
+  type TrackerSliceError,
+} from "../../packages/client/src/lib/agent-suite-tracker-slices.js";
 import type { GameState } from "../../packages/shared/src/types/game-state.js";
 
 const REPOSITORY_ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -159,10 +164,7 @@ import {
   stripConversationPromptTimestamps,
   stripConversationResponseEnvelope,
 } from "../../packages/server/src/services/conversation/transcript-sanitize.js";
-import {
-  GAME_SETUP_GENERATION_TIMEOUT_MS,
-  resolveInitialGameGmConnectionId,
-} from "../../packages/server/src/services/game/initial-game-setup.js";
+import { resolveInitialGameGmConnectionId } from "../../packages/server/src/services/game/initial-game-setup.js";
 import {
   resolveIllustratorPromptRuntime,
   type IllustratorPromptConnection,
@@ -401,7 +403,6 @@ import {
   filterAndSortBackgrounds,
   getNextBackgroundFolderName,
 } from "../../packages/client/src/lib/background-library.js";
-import { resolveProfessorMariNavigation } from "../../packages/client/src/lib/professor-mari-navigation.js";
 import { resolveCapabilityPackageDisplay } from "../../packages/client/src/lib/capability-package-localization.js";
 import { resolveFeatureAgentPackage } from "../../packages/client/src/lib/feature-agent-package.js";
 import { mergeEmbeddedCharacterCardFields } from "../../packages/client/src/lib/character-import.js";
@@ -586,7 +587,7 @@ const importedSpriteCard = structuredClone(compatibleSpriteCard) as unknown as R
 assert.deepEqual(
   takeEmbeddedMarinaraSprites(importedSpriteCard),
   portableSprites,
-  "YunYun must recover its embedded sprite set from a compatible PNG card",
+  "Marinara must recover its embedded sprite set from a compatible PNG card",
 );
 const importedSpriteExtensions = (importedSpriteCard.data as Record<string, unknown>).extensions as Record<
   string,
@@ -599,7 +600,7 @@ assert.equal(
 );
 assert.match(
   characterRoutesSource,
-  /const sprites = await readSpritesForId\(char\.id, true\);[\s\S]*if \(!sprites\)[\s\S]*status\(413\)[\s\S]*buildCompatibleCharacterExport\(charData, sprites\)/u,
+  /const sprites = await readSpritesForId\(char\.id, true\);[\s\S]*if \(!sprites\)[\s\S]*status\(413\)[\s\S]*buildCompatibleCharacterExport\(charData, sprites, \{ keepOnboarding: true \}\)/u,
   "PNG export must reject sprite collections that cannot round-trip before building the card envelope",
 );
 assert.match(
@@ -648,7 +649,7 @@ assert.match(
 );
 assert.match(
   importRoutesSource,
-  /app\.post\("\/marinara-package"[\s\S]*?for \(const entry of entries\)[\s\S]*?NATIVE_PACKAGE_ENTRY_LIMIT_BYTES[\s\S]*?totalUncompressedBytes > NATIVE_PACKAGE_UPLOAD_LIMIT_BYTES[\s\S]*?package contents are too large[\s\S]*?dataEntry\.getData\(\)/u,
+  /app\.post\("\/marinara-package"[\s\S]*?for \(const entry of entries\)[\s\S]*?NATIVE_PACKAGE_ENTRY_LIMIT_BYTES[\s\S]*?totalUncompressedBytes > NATIVE_PACKAGE_UPLOAD_LIMIT_BYTES[\s\S]*?package contents are too large[\s\S]*?dataEntry\.read\(NATIVE_PACKAGE_ENTRY_LIMIT_BYTES\)/u,
   "native package imports must validate ZIP entry sizes before extraction",
 );
 assert.match(
@@ -722,7 +723,7 @@ const copiedSupportDiagnostics = formatSupportDiagnostics({
   serverOs: "Linux 6.8.0 (x64)",
   serverMemory: { heapUsedMiB: 768, heapLimitMiB: 1536, rssMiB: 1024 },
   clientOs: "macOS 15.6",
-  browser: "YunYun test shell",
+  browser: "Marinara test shell",
   gpu: "Test GPU",
   connectionName: "Sol",
   connectionProvider: "openai",
@@ -737,7 +738,7 @@ for (const expectedLine of [
   "Background wake lock: not reported",
   "Last detected freeze: none detected",
   "Client OS: macOS 15.6",
-  "Browser / app shell: YunYun test shell",
+  "Browser / app shell: Marinara test shell",
   "GPU: Test GPU",
   "Active connection: Sol",
   "Connection provider: openai",
@@ -752,120 +753,19 @@ const professorMariWorkspaceSource = readFileSync(
 assert.match(
   professorMariWorkspaceSource,
   /description is a brief identity overview[\s\S]{0,220}backstory is[^\n]+history[\s\S]{0,180}appearance is physical features/u,
-  "Professor YunYun's workspace prompt must teach smaller models the distinct character-card field meanings",
+  "Professor Mari's workspace prompt must teach smaller models the distinct character-card field meanings",
 );
 assert.match(
   professorMariWorkspaceSource,
-  /updates are patches[\s\S]{0,400}read the entity back[\s\S]{0,300}requested value[\s\S]{0,220}Claim completion only/u,
-  "Professor YunYun must preserve unrelated fields and verify requested character edits before claiming completion",
+  /updates are patches[\s\S]{0,400}read the entity back[\s\S]{0,300}Claim completion only when every requested value matches/u,
+  "Professor Mari must preserve unrelated fields and verify requested character edits before claiming completion",
 );
 const professorMariSeedSource = readFileSync(join(REPOSITORY_ROOT, "packages/server/src/db/seed-mari.ts"), "utf8");
 assert.match(
   professorMariSeedSource,
   /Keep card fields distinct:[\s\S]{0,600}fetch the character again/u,
-  "The seeded Professor YunYun command guide must retain the same targeted character-field safeguards",
+  "The seeded Professor Mari command guide must retain the same targeted character-field safeguards",
 );
-
-assert.deepEqual(resolveProfessorMariNavigation("Where are the characters?"), {
-  kind: "panel",
-  panel: "characters",
-});
-assert.deepEqual(resolveProfessorMariNavigation("CHARS"), { kind: "panel", panel: "characters" });
-assert.deepEqual(resolveProfessorMariNavigation("Persona?"), { kind: "panel", panel: "personas" });
-for (const query of ["Chats", "conversations", "convo", "roleplay", "GAME"]) {
-  assert.deepEqual(resolveProfessorMariNavigation(query), { kind: "chats" });
-}
-assert.deepEqual(resolveProfessorMariNavigation("Can I talk to Professor YunYun?"), { kind: "professor" });
-assert.deepEqual(resolveProfessorMariNavigation("Where do I disable Professor YunYun navigation?"), {
-  kind: "settings",
-  tab: "general",
-  controlId: "professor-mari-navigation",
-});
-assert.deepEqual(resolveProfessorMariNavigation("change my theme"), { kind: "settings", tab: "appearance" });
-assert.deepEqual(resolveProfessorMariNavigation("image generation settings"), {
-  kind: "settings",
-  tab: "generations",
-});
-assert.deepEqual(resolveProfessorMariNavigation("open Discord"), { kind: "window", window: "discord" });
-assert.deepEqual(resolveProfessorMariNavigation("customize my home widgets"), {
-  kind: "window",
-  window: "widgets",
-});
-const professorMariNamedResources = [
-  { kind: "character" as const, id: "character-maukie", name: "Maukie" },
-  { kind: "persona" as const, id: "persona-echo", name: "Echo" },
-  { kind: "character" as const, id: "character-echo", name: "Echo" },
-  { kind: "preset" as const, id: "preset-cinema", name: "Cinematic RP" },
-  { kind: "lorebook" as const, id: "lorebook-snezhnaya", name: "Snezhnaya Archives" },
-  { kind: "agent" as const, id: "illustrator", name: "Illustrator", aliases: ["image agent"] },
-];
-assert.deepEqual(resolveProfessorMariNavigation("Maukie", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "character",
-  id: "character-maukie",
-});
-assert.deepEqual(resolveProfessorMariNavigation("Where is Maukie?", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "character",
-  id: "character-maukie",
-});
-assert.deepEqual(resolveProfessorMariNavigation("Mauk", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "character",
-  id: "character-maukie",
-});
-assert.deepEqual(resolveProfessorMariNavigation("edit the Echo persona", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "persona",
-  id: "persona-echo",
-});
-// An ambiguous name resolves to the first matching resource in supply order.
-assert.deepEqual(resolveProfessorMariNavigation("Echo", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "persona",
-  id: "persona-echo",
-});
-assert.deepEqual(resolveProfessorMariNavigation("open Cinematic RP preset", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "preset",
-  id: "preset-cinema",
-});
-assert.deepEqual(resolveProfessorMariNavigation("Snezhnaya Archives lorebook", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "lorebook",
-  id: "lorebook-snezhnaya",
-});
-assert.deepEqual(resolveProfessorMariNavigation("Illustrator", [], professorMariNamedResources), {
-  kind: "resource",
-  resource: "agent",
-  id: "illustrator",
-});
-assert.deepEqual(
-  resolveProfessorMariNavigation("Where did Noodle go?", [
-    { id: "official.noodle", label: "Noodle", aliases: ["NoodleR"] },
-  ]),
-  { kind: "package", packageId: "official.noodle" },
-);
-assert.equal(resolveProfessorMariNavigation("Where did Noodle go?"), null);
-assert.equal(resolveProfessorMariNavigation("quantum spaghetti cupboard"), null);
-assert.deepEqual(
-  resolveProfessorMariNavigation(
-    "Midnight at Zapolyarny",
-    [],
-    [],
-    [{ id: "chat-midnight", name: "Midnight at Zapolyarny" }],
-  ),
-  { kind: "chat", chatId: "chat-midnight" },
-);
-assert.deepEqual(resolveProfessorMariNavigation("CHAT", [], [], [{ id: "chat-generic", name: "Chat" }]), {
-  kind: "chats",
-});
-for (const name of ["Conversation", "Roleplay", "Game"]) {
-  assert.deepEqual(resolveProfessorMariNavigation(name, [], [], [{ id: `chat-${name}`, name }]), {
-    kind: "chat",
-    chatId: `chat-${name}`,
-  });
-}
 
 const localizedPackageManifest = {
   name: "Noodle",
@@ -1794,7 +1694,7 @@ try {
   );
   const knownPersonaReferenceId = "PriorPersonaRef123456";
   const referencedPersona = await characterStorage.createPersona(
-    "Professor YunYun",
+    "Professor Mari",
     "A brilliant engineer who understands every machine in the laboratory.",
     undefined,
     {
@@ -1807,7 +1707,7 @@ try {
   assert.ok(referencedPersona);
   const hiddenPersonaLorebook = await lorebookStorage.create(
     createLorebookSchema.parse({
-      name: "Professor YunYun's private notes",
+      name: "Professor Mari's private notes",
       personaIds: [referencedPersona.id],
       hiddenFromLibrary: true,
     }),
@@ -1836,7 +1736,7 @@ try {
     activeCharacterIds: [],
     sources: [`{{${countOnlyReferencedCharacter.id}}}`],
     chatMessages: [],
-    macroCtx: { user: "YunYun", char: "Character", characters: [], variables: {} },
+    macroCtx: { user: "Mari", char: "Character", characters: [], variables: {} },
     wrapFormat: "xml",
     chatId: "count-only-character-reference",
     includeLorebooks: false,
@@ -1850,7 +1750,7 @@ try {
     db,
     sources: [`{{persona-${countOnlyReferencedPersona.id}}}`],
     chatMessages: [],
-    macroCtx: { user: "YunYun", char: "Character", characters: [], variables: {} },
+    macroCtx: { user: "Mari", char: "Character", characters: [], variables: {} },
     wrapFormat: "xml",
     chatId: "count-only-persona-reference",
     includeLorebooks: false,
@@ -1951,7 +1851,7 @@ try {
       },
     ],
     macroCtx: {
-      user: "YunYun",
+      user: "Mari",
       char: "Version snapshot fixture",
       characters: ["Version snapshot fixture"],
       variables: {},
@@ -1977,7 +1877,7 @@ try {
       },
     ],
     macroCtx: {
-      user: "YunYun",
+      user: "Mari",
       char: "Version snapshot fixture",
       characters: ["Version snapshot fixture"],
       variables: {},
@@ -1986,7 +1886,7 @@ try {
     wrapFormat: "xml",
     chatId: "persona-reference-regression",
   });
-  assert.equal(referencedPersonaContext.references[referencedPersona.id], "Professor YunYun");
+  assert.equal(referencedPersonaContext.references[referencedPersona.id], "Professor Mari");
   assert.match(referencedPersonaContext.content, /A brilliant engineer who understands every machine/u);
   assert.match(referencedPersonaContext.content, /Warm, incisive, and knowingly amused\./u);
   assert.match(referencedPersonaContext.content, /with Ada\./u);
@@ -1998,7 +1898,7 @@ try {
     sources: [],
     chatMessages: [{ role: "user", content: `I am {{persona-${referencedPersona.id}}}.` }],
     macroCtx: {
-      user: "YunYun",
+      user: "Mari",
       char: "Version snapshot fixture",
       characters: ["Version snapshot fixture"],
       variables: {},
@@ -2006,7 +1906,7 @@ try {
     wrapFormat: "xml",
     chatId: "persona-reference-regression-active",
   });
-  assert.equal(activePersonaReferenceContext.references[referencedPersona.id], "YunYun");
+  assert.equal(activePersonaReferenceContext.references[referencedPersona.id], "Mari");
   assert.equal(activePersonaReferenceContext.content, "");
 
   const knownPersonaIds = new Set(
@@ -2142,7 +2042,7 @@ try {
       chatChoices: {},
       chatId,
       characterIds: [storageTrimFixture.id],
-      personaName: "YunYun",
+      personaName: "Mari",
       personaDescription: "",
       chatMessages: [{ role: "user", content }],
     });
@@ -2154,7 +2054,7 @@ try {
   assert.match(assembledReferenceText, /The cafe companion is Susie\./u);
   assert.match(assembledReferenceText, /A trusted friend from the western district\./u);
   assert.match(assembledReferenceText, /REFERENCED_EXAMPLE_SHOULD_APPEAR/u);
-  assert.match(assembledReferenceText, /The cafe specialist is Professor YunYun\./u);
+  assert.match(assembledReferenceText, /The cafe specialist is Professor Mari\./u);
   assert.match(assembledReferenceText, /A brilliant engineer who understands every machine/u);
   assert.match(assembledReferenceText, /REFERENCED_PERSONA_LOREBOOK_MEMORY/u);
   assert.doesNotMatch(assembledReferenceText, /REFERENCED_GREETING_MUST_STAY_OUT/u);
@@ -2469,12 +2369,12 @@ try {
     action: "lorebook.create",
     lorebookId: professorMariLorebookId,
     data: {
-      name: "Professor YunYun lorebook regression",
+      name: "Professor Mari lorebook regression",
       entries: [{ name: "Verified entry", content: professorMariFullEntryContent, keys: ["verified"] }],
     },
     apply: true,
   });
-  assert.equal(professorMariLorebookResult.ok, true, "Professor YunYun must create lorebooks after visibility was added");
+  assert.equal(professorMariLorebookResult.ok, true, "Professor Mari must create lorebooks after visibility was added");
   const professorMariLorebook = await lorebookStorage.getById(professorMariLorebookId);
   assert.equal(professorMariLorebook?.hiddenFromLibrary, false);
   const professorMariEntries = await lorebookStorage.listEntries(professorMariLorebookId);
@@ -2487,7 +2387,7 @@ try {
     lorebookId: professorMariLorebookId,
   });
   assert.equal(
-    (professorMariEntryIndex.output as Array<{ content: string }>)[0]?.content.endsWith("…"),
+    (professorMariEntryIndex.output as { items: Array<{ content: string }> }).items[0]?.content.endsWith("…"),
     true,
     "the lorebook entry index should remain compact",
   );
@@ -2499,7 +2399,7 @@ try {
   assert.equal(
     (professorMariFullEntry.output as { content?: string }).content,
     professorMariFullEntryContent,
-    "Professor YunYun's full-entry reader must preserve the complete lorebook body",
+    "Professor Mari's full-entry reader must preserve the complete lorebook body",
   );
   assert.ok(PROFESSOR_MARI_APP_DATA_ACTIONS.includes("lorebook.folder.create"));
   assert.ok(PROFESSOR_MARI_APP_DATA_ACTIONS.includes("lorebook.libraryFolder.create"));
@@ -2621,14 +2521,14 @@ try {
   assert.equal(await lorebookStorage.getById(professorMariLorebookId), null);
   assert.equal((await lorebookStorage.listEntries(professorMariLorebookId)).length, 0);
 
-  // #4791 — Professor YunYun's lorebook.create + updateEntry now persist the keyword-matching and
+  // #4791 — Professor Mari's lorebook.create + updateEntry now persist the keyword-matching and
   // selective fields that were previously hardcoded, so her authoring + fidelity pass can set them.
   const professorMariParamLorebookId = "professor-mari-param-lorebook-regression";
   const professorMariParamCreate = await mariDb.executeAction({
     action: "lorebook.create",
     lorebookId: professorMariParamLorebookId,
     data: {
-      name: "Professor YunYun parameterized entries",
+      name: "Professor Mari parameterized entries",
       entries: [
         {
           name: "Vlad",
@@ -2838,7 +2738,7 @@ try {
   );
   await lorebookStorage.remove(professorMariParamLorebookId);
 
-  // #4924: lorebook.deleteEntry removes exactly ONE entry (scoped), so YunYun never needs a raw
+  // #4924: lorebook.deleteEntry removes exactly ONE entry (scoped), so Mari never needs a raw
   // `mari db delete --where` that can mass-delete unrelated rows.
   const professorMariDeleteLorebookId = "professor-mari-delete-entry-regression";
   try {
@@ -2886,7 +2786,7 @@ try {
     await lorebookStorage.remove(professorMariDeleteLorebookId);
   }
 
-  // #4927: a YunYun lorebook entry mutation resyncs an embedded character's data.character_book on
+  // #4927: a Mari lorebook entry mutation resyncs an embedded character's data.character_book on
   // both apply and Restore. The generic mari-db mutation path used to skip
   // syncCharacterBookFromLorebook, so add/update/delete of an embedded lorebook's entries left the
   // character's derived copy stale.
@@ -2927,7 +2827,7 @@ try {
     assert.equal(embeddedSyncUpdate.ok, true);
     assert.ok(
       (await readEmbeddedBookContent()).includes("edited content"),
-      "applying a YunYun entry edit resyncs the embedded character_book",
+      "applying a Mari entry edit resyncs the embedded character_book",
     );
 
     const embeddedSyncApproval = mariDb.getPendingApprovals().find((approval) => !beforeEmbeddedSync.has(approval.id));
@@ -3505,7 +3405,7 @@ try {
   const rangedChatTimestamp = "2026-07-30T12:00:00.000Z";
   await db.insert(chats).values({
     id: rangedChatId,
-    name: "Professor YunYun range regression",
+    name: "Professor Mari range regression",
     mode: "roleplay",
     characterIds: "[]",
     metadata: "{}",
@@ -3537,7 +3437,7 @@ try {
       { postNumber: 5, content: "Message 5" },
       { postNumber: 6, content: "Message 6" },
     ],
-    "Professor YunYun must be able to retrieve exactly the last requested messages",
+    "Professor Mari must be able to retrieve exactly the last requested messages",
   );
   const afterPostResult = await mariDb.executeCli({
     argv: ["chats", "messages", rangedChatId, "--after-post", "2", "--limit", "2", "--offset", "1"],
@@ -3551,7 +3451,7 @@ try {
       { postNumber: 4, content: "Message 4" },
       { postNumber: 5, content: "Message 5" },
     ],
-    "Professor YunYun must page inside the requested post-number range",
+    "Professor Mari must page inside the requested post-number range",
   );
   const invalidRangeResult = await mariDb.executeCli({
     argv: ["chats", "messages", rangedChatId, "--last", "201"],
@@ -3923,7 +3823,7 @@ try {
   });
 
   const folderListResult = await mariDb.executeAction({ action: "character.folder.list" });
-  assert.equal(folderListResult.ok, true, "Professor YunYun must be able to list character folders");
+  assert.equal(folderListResult.ok, true, "Professor Mari must be able to list character folders");
   assert.deepEqual(
     (folderListResult.output as Array<{ id: string }>).map((folder) => folder.id),
     ["character-folder-source", "character-folder-target"],
@@ -3936,7 +3836,7 @@ try {
     reason: "Regression coverage for issue #4568",
     apply: true,
   });
-  assert.equal(folderMoveResult.ok, true, "Professor YunYun must be able to move a character into a named folder");
+  assert.equal(folderMoveResult.ok, true, "Professor Mari must be able to move a character into a named folder");
 
   const foldersAfterMove = await db.select().from(characterGroups);
   const sourceFolder = foldersAfterMove.find((folder) => folder.id === "character-folder-source");
@@ -4053,7 +3953,7 @@ try {
     apply: false,
   });
   assert.equal(widgetPreview.ok, true);
-  assert.equal(widgetPreview.mode, "dry-run", "Professor YunYun must preview a custom widget before confirmation");
+  assert.equal(widgetPreview.mode, "dry-run", "Professor Mari must preview a custom widget before confirmation");
   assert.deepEqual((await mariDb.executeAction({ action: "home_widget.list" })).output, []);
 
   const approvalsBeforeWidgetCreate = new Set(mariDb.getPendingApprovals().map((approval) => approval.id));
@@ -4101,8 +4001,8 @@ try {
     "A failed Home widget restore must remain available to retry or keep",
   );
 
-  // #4813 (PR 1): every Professor YunYun `*.create` now applies through the same Keep/Restore
-  // review as edits and deletes — so a creation YunYun made without being asked stays undoable in
+  // #4813 (PR 1): every Professor Mari `*.create` now applies through the same Keep/Restore
+  // review as edits and deletes — so a creation Mari made without being asked stays undoable in
   // chat — and a create may never overwrite an existing row.
   const pendingReviewIds = () => new Set(mariDb.getPendingApprovals().map((approval) => approval.id));
   const newestReviewSince = (baseline: Set<string>) =>
@@ -4135,7 +4035,7 @@ try {
   assert.equal(
     (await mariDb.executeAction({ action: "character.get", id: "mari-reviewable-character" })).ok,
     false,
-    "Restoring a create must delete the row YunYun added",
+    "Restoring a create must delete the row Mari added",
   );
   assert.equal(
     mariDb.getPendingApprovals().some((approval) => approval.id === reviewableApproval.id),
@@ -4342,7 +4242,7 @@ assert.equal(generatedLorebookEntry.selectiveLogic, "and");
 assert.equal(generatedLorebookEntry.matchWholeWords, "false");
 assert.equal(generatedLorebookEntry.caseSensitive, "false");
 assert.equal(generatedLorebookEntry.useRegex, "false");
-// #4791 — Professor YunYun can now set them explicitly (previously hardcoded and ignored).
+// #4791 — Professor Mari can now set them explicitly (previously hardcoded and ignored).
 const parameterizedLorebookEntry = buildLorebookEntryCreateRow(
   {
     name: "Vlad",
@@ -4736,7 +4636,7 @@ const completeProfessorMariPersona = buildPersonaCreateRow(
   {
     name: "Complete helper persona",
     phoneticName: "Professor Mah-ree",
-    convoDisplayName: "Prof. YunYun",
+    convoDisplayName: "Prof. Mari",
     aboutMe: "I help people build worlds.",
     convoBehavior: "Speak warmly and precisely.",
   },
@@ -4744,7 +4644,7 @@ const completeProfessorMariPersona = buildPersonaCreateRow(
   "2026-07-13T00:00:00.000Z",
 );
 assert.equal(completeProfessorMariPersona.phoneticName, "Professor Mah-ree");
-assert.equal(completeProfessorMariPersona.convoDisplayName, "Prof. YunYun");
+assert.equal(completeProfessorMariPersona.convoDisplayName, "Prof. Mari");
 assert.equal(completeProfessorMariPersona.aboutMe, "I help people build worlds.");
 assert.deepEqual(completeProfessorMariPersona.convoBehavior, {
   instruction: "Speak warmly and precisely.",
@@ -4771,7 +4671,6 @@ assert.equal(
   "roleplay-images",
 );
 assert.equal(resolveIllustratorImageConnectionId("game", {}, " agent-images "), "agent-images");
-assert.equal(GAME_SETUP_GENERATION_TIMEOUT_MS, 500_000);
 const previousGameDynamicImagePromptTimeout = process.env.GAME_DYNAMIC_IMAGE_PROMPT_TIMEOUT_MS;
 try {
   delete process.env.GAME_DYNAMIC_IMAGE_PROMPT_TIMEOUT_MS;
@@ -5500,6 +5399,17 @@ const professorMariHomeSource = readFileSync(
   new URL("../../packages/client/src/components/chat/HomeProfessorMariChat.tsx", import.meta.url),
   "utf8",
 );
+// Slice 82: the chat's parts live in components/chat/mari/; "nowhere" and count checks read all of them.
+const mariChatDir = new URL("../../packages/client/src/components/chat/mari/", import.meta.url);
+const mariChatPart = (name: string) => readFileSync(new URL(name, mariChatDir), "utf8");
+const mariChatAllSource = [professorMariHomeSource, ...readdirSync(mariChatDir).map(mariChatPart)].join("\n");
+const mariSeesPanelSource = mariChatPart("MariSeesPanel.tsx");
+const mariMessageActionsSource = mariChatPart("use-mari-message-actions.ts");
+const mariWorkspaceRunSource = mariChatPart("use-mari-workspace-run.ts");
+const mariChatHistoryActionsSource = mariChatPart("use-mari-chat-history-actions.ts");
+const mariWorkTimelineSource = mariChatPart("MariWorkTimeline.tsx");
+const mariTranscriptSource = mariChatPart("MariTranscript.tsx");
+const compactMariMessageSource = mariChatPart("CompactMariMessage.tsx");
 const contextBudgetChatInputSource = readFileSync(
   new URL("../../packages/client/src/components/chat/ChatInput.tsx", import.meta.url),
   "utf8",
@@ -5579,7 +5489,7 @@ assert.equal(
     32_000,
   )?.usedTokens,
   8_192,
-  "legacy Professor YunYun usage metadata should keep the context indicator available",
+  "legacy Professor Mari usage metadata should keep the context indicator available",
 );
 assert.equal(resolveProfessorMariContextBudget([], 128_000), null);
 for (const tokensContext of [230, 0, null, undefined]) {
@@ -5701,40 +5611,45 @@ for (const [name, source] of [
   assert.match(source, /<ContextBudgetIndicator budget=\{contextBudget\}/u, `${name} must show usage in its popup`);
   assert.match(source, /relative flex h-\[1\.875rem\] w-\[1\.875rem\]/u, `${name} must use the larger context gauge`);
 }
-assert.equal(
-  professorMariHomeSource.match(/<ContextBudgetIndicator budget=\{contextBudget\} \/>/gu)?.length,
-  2,
-  "Both Professor YunYun connection popups must show context usage",
-);
-assert.equal(
-  professorMariHomeSource.match(/relative flex h-\[1\.875rem\] w-\[1\.875rem\]/gu)?.length,
-  2,
-  "Both Professor YunYun connection buttons must use the larger context gauge",
+// Mari's context use moved out of the connection popups (69be7be17: it duplicated the status strip) into the
+// "how she works" connection row, behind the Show context usage setting.
+assert.match(
+  mariSeesPanelSource,
+  /showContextUsage && contextBudget\s*\?\s*localizeUi\("ui\.chat\.homeprofessormarichat\.awareOfContextUse"/u,
+  "Professor Mari's connection row must show context usage when the setting is on",
 );
 assert.match(professorMariHomeSource, /chatHistorySelectionMode/u);
 assert.match(
   professorMariHomeSource,
   /enterToSendProfessorMari/u,
-  "Professor YunYun must read her persisted Send on Enter preference",
+  "Professor Mari must read her persisted Send on Enter preference",
 );
+// One composer since the floating-mode branch was removed (f27ce165b).
 assert.equal(
-  professorMariHomeSource.match(
+  mariChatAllSource.match(
     /event\.key === "Enter" &&\s*!event\.shiftKey &&\s*\(enterToSend \|\| event\.metaKey \|\| event\.ctrlKey\)/gu,
   )?.length,
-  2,
-  "Both Professor YunYun composers must preserve Shift+Enter and require the configured send shortcut",
+  1,
+  "Professor Mari's composer must preserve Shift+Enter and require the configured send shortcut",
 );
 assert.match(professorMariHomeSource, /toggleProfessorChatSelection/u);
 assert.match(professorMariHomeSource, /handleBulkDeleteProfessorChats/u);
 assert.match(
-  professorMariHomeSource,
+  mariMessageActionsSource,
   /const handleEditMessage = useCallback\([\s\S]{0,180}if \(!chatId \|\| isBusy\) return;/u,
-  "Professor YunYun's first edit after generation must not be rejected by a stale busy ref",
+  "Professor Mari's first edit after generation must not be rejected by a stale busy ref",
 );
+// A failed send now keeps the message in the transcript with one Retry card (failRun) and never refills the
+// composer; Stop is not a failure, so failRun returns before it shows anything.
 assert.match(
-  professorMariHomeSource,
-  /catch \(error\) \{\s*if \(isProfessorMariAbortError\(error\)\) return;\s*setDraft\(text\)/u,
-  "Stopping Professor YunYun must not restore an already-submitted prompt to the composer",
+  mariWorkspaceRunSource,
+  /const failRun = useCallback\(\s*\([^)]*\) => \{\s*if \(isProfessorMariAbortError\(error\)\) return;/u,
+  "Stopping Professor Mari must not show a failure",
+);
+assert.doesNotMatch(
+  mariChatAllSource,
+  /catch \(error\) \{[^}]*setDraft\(/u,
+  "A failed or stopped Professor Mari send must not restore the submitted prompt to the composer",
 );
 assert.match(
   lorebookHooksSource,
@@ -5742,13 +5657,15 @@ assert.match(
   "Deleting a lorebook must refresh cached chat metadata so it leaves active context immediately",
 );
 assert.match(
-  professorMariHomeSource,
+  mariChatHistoryActionsSource,
   /handleDeleteProfessorChat[\s\S]{0,500}showConfirmDialog/u,
-  "Deleting one Professor YunYun chat must use the app confirmation dialog",
+  "Deleting one Professor Mari chat must use the app confirmation dialog",
 );
+// Every step row, failed ones included, opens to technical details with the tool's output (slice 72
+// moved the details into one `technicalDetails` helper that every step row renders).
 assert.match(
-  professorMariHomeSource,
-  /isError && tool\.output\?\.trim\(\)[\s\S]{0,200}<pre/u,
+  mariWorkTimelineSource,
+  /const technicalDetails = \(tool: WorkspaceToolCall\) =>[\s\S]{0,600}tool\.output !== null && tool\.output !== undefined \? <pre>/u,
   "Failed workspace tools must reveal their provider output in the transcript",
 );
 const professorMariTranscript = { clientHeight: 240, scrollHeight: 720, scrollTop: 0 };
@@ -5756,56 +5673,62 @@ scrollProfessorMariTranscriptToBottom(professorMariTranscript);
 assert.equal(
   professorMariTranscript.scrollTop,
   professorMariTranscript.scrollHeight,
-  "Professor YunYun transcript scrolling must align a mounted pane with its newest message",
+  "Professor Mari transcript scrolling must align a mounted pane with its newest message",
 );
 assert.equal(isProfessorMariTranscriptNearBottom(professorMariTranscript), true);
 professorMariTranscript.scrollTop = 200;
 assert.equal(
   isProfessorMariTranscriptNearBottom(professorMariTranscript),
   false,
-  "Professor YunYun streaming must stop following output after the reader scrolls away from the bottom",
+  "Professor Mari streaming must stop following output after the reader scrolls away from the bottom",
 );
 assert.match(
-  professorMariHomeSource,
+  mariTranscriptSource,
   /ref=\{setTranscriptScrollNode\}[\s\S]{0,100}data-component="HomeProfessorMariChat\.Transcript"/u,
-  "Professor YunYun transcript panes must trigger scrolling from their mounted ref",
+  "Professor Mari transcript panes must trigger scrolling from their mounted ref",
 );
 assert.match(
   professorMariHomeSource,
   /messageLoadAbortRef\.current !== controller[\s\S]{0,80}activeChatIdRef\.current !== id/u,
-  "Professor YunYun message loads must discard stale requests and inactive chat results",
+  "Professor Mari message loads must discard stale requests and inactive chat results",
 );
 assert.match(
   professorMariHomeSource,
-  /options\.shouldApply\?\.\(\) === false[\s\S]{0,160}setMessages/u,
-  "Professor YunYun message loads must recheck an operation guard before applying a response",
+  /options\.shouldApply\?\.\(\) === false[\s\S]{0,480}setMessages/u,
+  "Professor Mari message loads must recheck an operation guard before applying a response",
 );
 assert.match(
-  professorMariHomeSource,
+  mariWorkspaceRunSource,
   /loadMessages\(completedChatId, \{[\s\S]{0,160}workspaceRunIdRef\.current === runId[\s\S]{0,100}activeChatIdRef\.current === completedChatId/u,
-  "Professor YunYun background refreshes must not overwrite state after a newer operation starts",
+  "Professor Mari background refreshes must not overwrite state after a newer operation starts",
 );
 assert.match(
   professorMariHomeSource,
   // #5725 strengthened this guard: it also rejects responses requested for a
   // previous chat and holds mode fields across pending mode writes.
   /const refreshWorkspaceStatus = useCallback\(\s*async \(shouldApply\?: \(\) => boolean\)[\s\S]{0,700}if \(shouldApply\?\.\(\) === false \|\| activeChatIdRef\.current !== chatIdAtStart\) return status;[\s\S]{0,900}setWorkspaceStatus\(/u,
-  "Professor YunYun workspace status loads must recheck an operation guard before applying a response",
+  "Professor Mari workspace status loads must recheck an operation guard before applying a response",
 );
 assert.match(
-  professorMariHomeSource,
+  mariWorkspaceRunSource,
   /refreshWorkspaceStatus\([\s\S]{0,140}workspaceRunIdRef\.current === runId[\s\S]{0,100}activeChatIdRef\.current === completedChatId/u,
-  "Professor YunYun post-run status refreshes must not overwrite state after a newer operation starts",
+  "Professor Mari post-run status refreshes must not overwrite state after a newer operation starts",
+);
+// The work-stage layout (1a61247d1) replaced the user-message separators with a right-aligned bubble.
+assert.match(
+  compactMariMessageSource,
+  /message\.role === "user"[\s\S]{0,180}<TranscriptRow[^>]*className="mari-user-request/u,
+  "Professor Mari user messages must render as the user-request row",
 );
 assert.match(
-  professorMariHomeSource,
-  /message\.role === "user"[\s\S]{0,180}<TranscriptRow[\s\S]{0,100}border-y border-\[var\(--border\)\]\/60/u,
-  "Professor YunYun user messages must retain their theme-aware horizontal separators",
+  readFileSync(new URL("../../packages/client/src/styles/mari.css", import.meta.url), "utf8"),
+  /\.mari-user-request__bubble \{[^}]*background: color-mix\(in srgb, var\(--foreground\) \d+%, var\(--card\)\)/u,
+  "Professor Mari user bubbles must take their colour from the theme",
 );
 assert.match(
-  professorMariHomeSource,
+  mariChatHistoryActionsSource,
   /Promise\.allSettled\([\s\S]*?api\.delete\(`\/chats\/internal\/professor-mari\/chats\/\$\{id\}`\)/u,
-  "Professor YunYun chat history should delete all selected chats through the existing endpoint",
+  "Professor Mari chat history should delete all selected chats through the existing endpoint",
 );
 const roleplaySurfaceSource = readFileSync(
   new URL("../../packages/client/src/components/chat/ChatRoleplaySurface.tsx", import.meta.url),
@@ -5938,7 +5861,8 @@ assert.match(
 // Chat Summary is a Chat Settings drawer, so a request opens Chat Settings there (desktop window or phone sheet).
 assert.match(
   assignedSweepChatAreaSource,
-  /chatId !== useChatStore\.getState\(\)\.activeChatId\) return;\s*handleOpenSettingsPanel\(undefined, \{ initialSection: "summary" \}\)[\s\S]{0,120}CHAT_SUMMARY_OPEN_REQUEST_EVENT/u,
+  // One listener table now serves the summary, lorebook-entries and search drawers (omnibar chat tool rows).
+  /\[CHAT_SUMMARY_OPEN_REQUEST_EVENT, "summary"\][\s\S]{0,400}chatId !== useChatStore\.getState\(\)\.activeChatId\) return;\s*handleOpenSettingsPanel\(undefined, \{ initialSection \}\)/u,
   "Summary requests must open Chat Settings at the Chat Summary drawer for the active chat only",
 );
 assert.match(
@@ -6190,7 +6114,7 @@ assert.match(
   "Individual Conversation lorebook injection should happen separately for each provider generation",
 );
 assert.match(
-  conversationGenerationSource,
+  readFileSync(new URL("../../packages/server/src/routes/generate/reply-text-cleanup.ts", import.meta.url), "utf8"),
   /chatMode === "conversation" && otherNames\.length > 0[\s\S]{0,500}fullResponse = fullResponse\.slice\(0, nextSpeakerMatch\.index\)/u,
   "Individual Conversation generations should discard an extra character turn returned in the same completion",
 );
@@ -6220,7 +6144,12 @@ assert.match(
   /resolveIllustratorImageSize\(\s*requestChatMode === "game" \? imageSettings\.game : imageSettings\.illustration,\s*illData\.aspectRatio/u,
   "automatic Illustrator generation should use the Game scene canvas in Game mode and preserve the shared orientation resolver",
 );
-assert.match(professorMariHomeSource, /Math\.min\(textarea\.scrollHeight, 128\)/u);
+// R11: the composer cap is its CSS max-height now (8 lines, 6 on touch), not a hard-coded 128 px.
+assert.match(
+  professorMariHomeSource,
+  /const cap = Number\.parseFloat\(getComputedStyle\(textarea\)\.maxHeight\);\s*const to = Number\.isFinite\(cap\) \? Math\.min\(textarea\.scrollHeight, cap\)/u,
+  "Professor Mari's composer must stop growing at its max-height",
+);
 assert.equal(
   themesRouteSource.match(/requirePrivilegedAccess\(req, reply, \{ feature: "Theme install\/update\/delete" \}\)/gu)
     ?.length,
@@ -6255,6 +6184,20 @@ assert.notEqual(
   desktopPlaywrightProject.use?.baseURL,
   mobilePlaywrightProject.use?.baseURL,
   "desktop and mobile Playwright projects must use isolated app servers",
+);
+// Chromium runs with its audio output off, so opening an audio device cannot stall a headless page
+// (and the toasts with it); the switch is Chromium's own, so a WebKit project never gets it.
+for (const project of [desktopPlaywrightProject, mobilePlaywrightProject]) {
+  assert.ok(project.use?.launchOptions?.args?.includes("--disable-audio-output"), `${project.name} mutes Chromium`);
+}
+for (const project of playwrightConfig.projects ?? []) {
+  if (!/chromium/u.test(project.name ?? "")) assert.ok(!project.use?.launchOptions?.args?.length, project.name);
+}
+// WebKit on Linux opens its audio device through GStreamer on the page's main thread (the first tap's audio
+// unlock), and a hung audio stack froze that tap. The config ranks the fake audio sink first for every browser.
+assert.ok(
+  process.env.GST_PLUGIN_FEATURE_RANK?.split(",").includes("fakeaudiosink:MAX"),
+  "WebKit e2e browsers play to GStreamer's fake audio sink",
 );
 const playwrightServerSource = readFileSync(join(REPOSITORY_ROOT, "e2e/start-servers.mjs"), "utf8");
 assert.match(playwrightServerSource, /startProject\("mobile", mobileClientPort, mobileServerPort\)/u);
@@ -6292,10 +6235,10 @@ assert.equal(
   "Home effect pausing must keep one central visibility listener",
 );
 assert.match(appSource, /dispatchEvent\(new CustomEvent\("marinara:effects-paused"/u);
-assert.match(homeBrowserHubSource, /window\.removeEventListener\(MARINARA_EFFECTS_PAUSED_EVENT, sync\)/u);
+// Slice 85: the navigator is gone; the Home widget's blink is the Mari frame that pauses with the page.
 assert.match(
   globalStylesSource,
-  /data-marinara-effects-paused="true"[^}]+mari-home-professor-popup__sprite[\s\S]+animation-play-state: paused !important;/u,
+  /data-marinara-effects-paused="true"\] \.mari-home-professor-blink,[^}]+animation-play-state: paused !important;/u,
 );
 const agentEditorSource = readFileSync(
   new URL("../../packages/client/src/components/agents/AgentEditor.tsx", import.meta.url),
@@ -6364,10 +6307,13 @@ const gameJournalSource = readFileSync(
   new URL("../../packages/client/src/components/game/GameJournal.tsx", import.meta.url),
   "utf8",
 );
-const choiceSelectionModalSource = readFileSync(
-  new URL("../../packages/client/src/components/presets/ChoiceSelectionModal.tsx", import.meta.url),
-  "utf8",
-);
+// The modal renders each variable's options through the shared ChoiceOptionsField.
+const choiceSelectionModalSource =
+  readFileSync(
+    new URL("../../packages/client/src/components/presets/ChoiceSelectionModal.tsx", import.meta.url),
+    "utf8",
+  ) +
+  readFileSync(new URL("../../packages/client/src/components/presets/ChoiceOptionsField.tsx", import.meta.url), "utf8");
 const gameSurfaceSource = readFileSync(
   new URL("../../packages/client/src/components/game/GameSurface.tsx", import.meta.url),
   "utf8",
@@ -6543,10 +6489,14 @@ const illustratorReferencesSource = readFileSync(
   "utf8",
 );
 assert.match(appSource, /--marinara-app-accent-static-gradient/u);
-assert.match(appSource, /position=\{notificationPosition === "bottom" \? "bottom-center" : "top-center"\}/u);
+// While the omnibar is open, toasts move to the edge it does not cover; otherwise the user's position applies.
 assert.match(
   appSource,
-  /swipeDirections=\{\["left", "right", notificationPosition === "bottom" \? "bottom" : "top"\]\}/u,
+  /position=\{\s*omnibarOpen\s*\?[^:]+:[^:]+:\s*notificationPosition === "bottom"\s*\? "bottom-center"\s*: "top-center"\s*\}/u,
+);
+assert.match(
+  appSource,
+  /swipeDirections=\{\[\s*"left",\s*"right",\s*omnibarOpen \? \(isMobileShell \? "top" : "bottom"\) : notificationPosition === "bottom" \? "bottom" : "top",\s*\]\}/u,
 );
 assert.doesNotMatch(agentEditorSource, /fetch\(["']\/api\/game-assets\/pick-local-music-folder/u);
 assert.match(agentEditorSource, /api\.post<[^>]+>\(["']\/game-assets\/pick-local-music-folder["']\)/u);
@@ -6890,7 +6840,7 @@ assert.match(
   "prompt macro contexts must only scan lorebook counts when a source uses lorebooksize",
 );
 const staleLorebookCountContext = {
-  user: "YunYun",
+  user: "Mari",
   char: "Character",
   characters: ["Character"],
   variables: {},
@@ -6949,13 +6899,13 @@ assert.match(
   "LinkAPI actions must share the available banner width instead of overflowing it",
 );
 assert.equal(
-  resolvePresetArtwork({ name: "Marinara's Universal Preset", author: "YunYun" }),
+  resolvePresetArtwork({ name: "Marinara's Universal Preset", author: "Marinara" }),
   MARINARA_UNIVERSAL_PRESET_ARTWORK,
 );
 assert.equal(
   resolvePresetArtwork({
     name: "Marinara's Universal Preset",
-    author: "YunYun",
+    author: "Marinara",
     imagePath: "/api/prompts/images/file/custom.png",
   }),
   "/api/prompts/images/file/custom.png",
@@ -6963,15 +6913,15 @@ assert.equal(
 assert.match(presetsPanelSource, /data-preset-image-action/u);
 assert.match(presetsPanelSource, /data-preset-open-action/u);
 assert.equal(
-  existsSync(join(REPOSITORY_ROOT, "packages/client/public/sprites/yunyun/chibi-yunyun.png")),
+  existsSync(join(REPOSITORY_ROOT, "packages/client/public/illustrations/marinara-universal-preset.webp")),
   true,
 );
 assert.match(
   transcriptWindowControlsSource,
-  /const TRANSCRIPT_WINDOW_BUTTON_CLASS = "mari-chrome-control mari-chrome-control--small px-3 text-xs";/u,
+  /export const HISTORY_PAGER_BUTTON_CLASS =\s*"mari-chat-history-pager mari-chat-style-control mari-chrome-control mari-chrome-control--small px-3 text-xs";/u,
 );
 assert.equal(
-  transcriptWindowControlsSource.match(/className=\{cn\(TRANSCRIPT_WINDOW_BUTTON_CLASS, buttonClassName\)\}/gu)?.length,
+  transcriptWindowControlsSource.match(/className=\{cn\(HISTORY_PAGER_BUTTON_CLASS, buttonClassName\)\}/gu)?.length,
   3,
 );
 assert.doesNotMatch(transcriptWindowControlsSource, /text-\[var\(--muted-foreground\)\]/u);
@@ -6996,7 +6946,7 @@ assert.match(
 );
 assert.match(
   conversationSelfieRuntimeSource,
-  /selfieResolvedCharacterIds = Array\.from\([\s\S]{0,300}referenceResolution\.characterIds[\s\S]{0,4500}characterIds: selfieResolvedCharacterIds/u,
+  /selfieResolvedCharacterIds = Array\.from\([\s\S]{0,300}referenceResolution\.characterIds[\s\S]{0,5000}characterIds: selfieResolvedCharacterIds/u,
   "Conversation group selfies must be saved to every depicted character gallery",
 );
 assert.match(
@@ -7013,7 +6963,10 @@ const markdownBlockquoteStyles =
   globalStyles.match(/\.mari-message-content \.mari-md-blockquote \{[\s\S]*?\}/u)?.[0] ?? "";
 assert.match(markdownBlockquoteStyles, /color:\s*inherit;/u);
 assert.doesNotMatch(markdownBlockquoteStyles, /color:\s*var\(--muted-foreground\);/u);
-const markdownMessageStyles = globalStyles.match(/\.mari-message-content \{[\s\S]*?\}/u)?.[0] ?? "";
+// The workspace transcript adds its own earlier `.mari-message-content` rule (padding only); check every rule.
+const markdownMessageStyles = [...globalStyles.matchAll(/^\.mari-message-content \{[\s\S]*?\}/gmu)]
+  .map((match) => match[0])
+  .join("\n");
 const markdownMessageContainerStyles =
   globalStyles.match(/\.mari-message-body,\s*\.mari-message-bubble \{[\s\S]*?\}/u)?.[0] ?? "";
 const markdownCodeBlockStyles =
@@ -7159,10 +7112,10 @@ const annotatedPartiallyPrefixedReply = annotateContentWithReactions(
   partiallyPrefixedConversationReply,
   [{ emoji: "🔥", by: ["user"], segment: 0, segmentSpeaker: "Paige" }],
   new Map([["paige", "Paige"]]),
-  (reactorId) => (reactorId === "user" ? "YunYun" : reactorId),
+  (reactorId) => (reactorId === "user" ? "Mari" : reactorId),
   "Paige",
 );
-assert.equal(annotatedPartiallyPrefixedReply, `${partiallyPrefixedConversationReply}\n[YunYun reacted with 🔥]`);
+assert.equal(annotatedPartiallyPrefixedReply, `${partiallyPrefixedConversationReply}\n[Mari reacted with 🔥]`);
 
 assert.equal(resolveStandardEmojiShortcode("crying"), "😢");
 assert.equal(resolveStandardEmojiShortcode("test_tube"), "🧪");
@@ -7722,7 +7675,7 @@ assert.equal(
 assert.equal(
   pickSyncedSettings(projectionState).enterToSendProfessorMari,
   false,
-  "Professor YunYun's Send on Enter preference must be server-synced",
+  "Professor Mari's Send on Enter preference must be server-synced",
 );
 assert.deepEqual(
   pickSyncedSettings(projectionState).chatHelpSeenModes,
@@ -7989,7 +7942,7 @@ assert.throws(
 );
 assert.throws(
   () => parseGameSetupShareFileJson(JSON.stringify({ format: "other", version: 1 })),
-  /not a YunYun Game Mode setup file/u,
+  /not a Marinara Game Mode setup file/u,
 );
 assert.throws(
   () =>
@@ -8297,10 +8250,10 @@ assert.equal(Object.hasOwn(characterAssignedDuplicate, "characterId"), false);
 assert.deepEqual(characterAssignedDuplicate.characterIds, ["character-1"]);
 assert.equal(createLorebookSchema.safeParse(characterAssignedDuplicate).success, true);
 assert.equal(normalizeLorebookCategory("World"), "world");
-assert.equal(normalizeLorebookCategory("Professor YunYun's Experimental Category"), "uncategorized");
+assert.equal(normalizeLorebookCategory("Professor Mari's Experimental Category"), "uncategorized");
 assert.equal(
   updateLorebookSchema.safeParse({
-    category: normalizeLorebookCategory("Professor YunYun's Experimental Category"),
+    category: normalizeLorebookCategory("Professor Mari's Experimental Category"),
     isGlobal: false,
     enabled: true,
     scanDepth: 2,
@@ -9187,7 +9140,7 @@ const repositoryDefinition = {
   id: "continuity-helper",
   name: "Continuity Helper",
   description: "Checks recent turns for contradictions.",
-  author: "YunYun",
+  author: "Mari",
   phase: "post_processing" as const,
   enabledByDefault: false,
   defaultInjectAsSection: true,
@@ -9308,6 +9261,20 @@ assert.equal(
   }),
   128,
   "The Tracker should use the matching right chat gutter",
+);
+assert.equal(
+  resolveTrackerPanelDesktopWidth({
+    preferredWidth: 340,
+    mainLeft: 0,
+    mainRight: 1024,
+    chatColumnLeft: 19,
+    chatColumnRight: 1005,
+    side: "right",
+    gap: 8,
+    minWidth: 96,
+  }),
+  96,
+  "A docked Tracker in a gutter too narrow for it keeps its minimum width instead of a sliver (#7188)",
 );
 assert.equal(resolveTrackerPanelContentScale(340, 340), 1);
 assert.equal(resolveTrackerPanelContentScale(340, 255), 0.75);
@@ -10209,7 +10176,7 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
 {
   // #4704: the background-autonomous poller's server-side candidate filter
   // must mirror the legacy client filter exactly (conversation mode with
-  // autonomousMessages enabled, excluding the Professor YunYun home assistant;
+  // autonomousMessages enabled, excluding the Professor Mari home assistant;
   // bad or missing metadata disqualifies).
   const { isBackgroundAutonomousCandidate } =
     await import("../../packages/server/src/services/conversation/autonomous-candidates.js");
@@ -10228,7 +10195,7 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
   assert.equal(
     isBackgroundAutonomousCandidate({ mode: "conversation", metadata: meta({ internalAssistant: "professor-mari" }) }),
     false,
-    "Professor YunYun home chat excluded",
+    "Professor Mari home chat excluded",
   );
   assert.equal(
     isBackgroundAutonomousCandidate({ mode: "conversation", metadata: JSON.stringify({ autonomousMessages: false }) }),
@@ -10414,7 +10381,7 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
     "Persona inventory edits must preserve skills, status, and other player stats",
   );
   assert.deepEqual(AGENT_SUITE_TRACKER_SLICES["world-state"]!.buildPatch(gameState, { worldCustomFields: "invalid" }), {
-    error: "World custom fields must be a JSON array",
+    error: { code: "notArray", field: "worldCustomFields" },
   });
   assert.deepEqual(
     AGENT_SUITE_TRACKER_SLICES["persona-stats"]!.buildPatch(gameState, { personaStats: [] }),
@@ -10430,25 +10397,73 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
     currencies: [],
     equipped: [],
     inventory: [{ foo: 1 }],
-  }) as { error?: string };
-  assert.match(
-    String(malformedRows.error),
-    /inventory/iu,
+  });
+  assert.deepEqual(
+    malformedRows,
+    { error: { code: "invalidInventoryRow", group: "inventory", problem: { code: "missingName", index: 0 } } },
     "a row without a name must be reported, naming the group it came from",
   );
-  assert.match(
-    String(
-      (
-        inventorySlice.buildPatch(gameState, {
-          currencies: [],
-          equipped: [],
-          inventory: [{ name: "Rope", qty: 0 }],
-        }) as { error?: string }
-      ).error,
-    ),
-    /qty/iu,
+  assert.deepEqual(
+    inventorySlice.buildPatch(gameState, {
+      currencies: [],
+      equipped: [],
+      inventory: [{ name: "Rope", qty: 0 }],
+    }),
+    { error: { code: "invalidInventoryRow", group: "inventory", problem: { code: "qtyBelowOne", index: 0 } } },
     "a quantity below 1 must be reported rather than silently clamped",
   );
+
+  // #7738: slice errors are codes the UI localizes. Every code must name an English key, and the
+  // English text must read as it did before the errors were localized.
+  const collectKeys = (value: unknown): string[] =>
+    typeof value === "string" ? [value] : Object.values(value as object).flatMap(collectKeys);
+  const trackerErrorKeys = collectKeys(TRACKER_SLICE_ERROR_KEYS);
+  assert.equal(trackerErrorKeys.length, 17, "every tracker slice error code has a key");
+  for (const key of trackerErrorKeys) {
+    assert.equal(typeof englishLocale[key], "string", `${key} must exist in en.json`);
+  }
+  const renderEnglish = (error: TrackerSliceError) =>
+    trackerSliceErrorMessage(error, (key, values) =>
+      englishLocale[key]!.replace(/\{\{(\w+)\}\}/gu, (_, name: string) => {
+        const value = (values as Record<string, unknown> | undefined)?.[name];
+        assert.ok(value !== undefined, `${key} needs {{${name}}}`);
+        return String(value);
+      }),
+    );
+  const sliceError = (slice: string, parsed: unknown) =>
+    (AGENT_SUITE_TRACKER_SLICES[slice]!.buildPatch(gameState, parsed) as { error: TrackerSliceError }).error;
+  const inventoryRows = (inventory: unknown[]) =>
+    sliceError("inventory-tracker", { currencies: [], equipped: [], inventory });
+  for (const [error, english] of [
+    [sliceError("world-state", []), "Scene data must be a JSON object"],
+    [sliceError("world-state", { worldCustomFields: "invalid" }), "World custom fields must be a JSON array"],
+    [sliceError("character-tracker", {}), "Present characters must be a JSON array"],
+    [sliceError("persona-stats", []), "Persona stats data must be a JSON object"],
+    [sliceError("persona-stats", { personaStats: {} }), "Persona stats must be a JSON array"],
+    [sliceError("persona-stats", { inventory: {} }), "Inventory must be a JSON array"],
+    [sliceError("custom-tracker", {}), "Custom tracker fields must be a JSON array"],
+    [sliceError("inventory-tracker", null), "Inventory Tracker data must be a JSON object"],
+    [
+      sliceError("inventory-tracker", { currencies: [] }),
+      "Inventory Tracker data must include currencies, equipped, and inventory arrays",
+    ],
+    [
+      { code: "invalidInventoryRow", group: "currencies", problem: { code: "notArray" } },
+      'Inventory Tracker "currencies": must be an array',
+    ],
+    [inventoryRows(["Rope"]), 'Inventory Tracker "inventory": row 0 must be an object'],
+    [inventoryRows([{ foo: 1 }]), 'Inventory Tracker "inventory": row 0 is missing a string "name"'],
+    [inventoryRows([{ name: "Rope" }, { name: "  " }]), 'Inventory Tracker "inventory": row 1 has an empty "name"'],
+    [
+      inventoryRows([{ name: "Rope", location: 3 }]),
+      'Inventory Tracker "inventory": row 0 has a non-string "location"',
+    ],
+    [inventoryRows([{ name: "Rope", qty: "lots" }]), 'Inventory Tracker "inventory": row 0 has a non-numeric "qty"'],
+    [inventoryRows([{ name: "Rope", qty: 0 }]), 'Inventory Tracker "inventory": row 0 has a "qty" below 1'],
+    [sliceError("quest", {}), "Active quests must be a JSON array"],
+  ] as const) {
+    assert.equal(renderEnglish(error), english);
+  }
 
   // Accepted payloads still get the shared invariants applied.
   const equippedWins = inventorySlice.buildPatch(gameState, {
@@ -10724,7 +10739,7 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
   assert.doesNotMatch(
     appSource,
     /const paused = !\([\s\S]{0,220}!reduceAmbientEffects/u,
-    "Reduced ambient motion must not pause Desktop YunYun's functional navigation callbacks",
+    "Reduced ambient motion must not pause Desktop Mari's functional navigation callbacks",
   );
   assert.match(
     generateRouteSource,

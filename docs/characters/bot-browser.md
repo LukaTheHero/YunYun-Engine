@@ -1,19 +1,19 @@
 # Card Browser: Finding and Importing Characters
 
-This guide explains the **Card Browser** in YunYun Engine, the built-in tool for finding character cards on public sites and importing them into your library. It covers the sources, how to search and filter, and how adult content works on each source. It also covers how to import a character or save it as a file. Older versions called this tab **Bot Browser** or **Browser**.
+This guide explains the **Card Browser** in Marinara Engine, the built-in tool for finding character cards on public sites and importing them into your library. It covers the sources, how to search and filter, and how adult content works on each source. It also covers how to import a character or save it as a file. Older versions called this tab **Bot Browser** or **Browser**.
 
-A character card is a file that holds one character's name, personality, greeting, and other details. Normally you would download a card from a website and then upload it into YunYun. The **Card Browser** does both steps for you in one place.
+A character card is a file that holds one character's name, personality, greeting, and other details. Normally you would download a card from a website and then upload it into Marinara. The **Card Browser** does both steps for you in one place.
 
 ## What the Card Browser is
 
-The **Card Browser** searches several public character-card sites from inside YunYun. It supports five sources: **ChubAI**, **JannyAI**, **Pygmalion**, **Wyvern**, and **DataCat**. **CharacterTavern** is still listed, but it can't be browsed for now (see [CharacterTavern](#charactertavern)). You can search a source, filter the results, and preview a character's full details. Then you can import that character into your library or save it as a PNG file. You do not need an account or an API key to browse and import character cards at the default settings.
+The **Card Browser** searches several public character-card sites from inside Marinara. It supports six sites: **ChubAI**, **JannyAI**, **Pygmalion**, **Wyvern**, **DataCat**, and **PlotLight**. PlotLight has two sources, one for characters and one for personas (see [PlotLight](#plotlight)). **CharacterTavern** is still listed, but it can't be browsed for now (see [CharacterTavern](#charactertavern)). You can search a source, filter the results, and preview a character's full details. Then you can import that character into your library or save it as a PNG file. You do not need an account or an API key to browse and import character cards at the default settings.
 
 ## Opening the Card Browser
 
 There are two ways to open the **Card Browser**.
 
-1. Click the **Card Browser** icon in the top bar. It sits in the row of panel buttons on the right side.
-2. Or open the **Card Browser** panel in the right sidebar, then click the **Download Cards** button at the top of that panel.
+1. Open the **Characters** panel and click the **Download** button at the top. Its tooltip reads **Download character cards**.
+2. Or click the same **Download** button at the top of the **Personas** panel.
 
 Either way, the whole content area switches to the full **Card Browser** view. This view replaces the chat area. It is not a small pop-up window.
 
@@ -23,7 +23,7 @@ The **Card Browser** stays loaded while the app is open. If you close it and ope
 
 ## Choosing a source
 
-Click the source button in the header. It shows the current source name and a small arrow. A menu opens with the sources in this order: **ChubAI**, **JannyAI**, **CharacterTavern**, **Pygmalion**, **Wyvern**, and **DataCat**. **CharacterTavern** is marked **Unavailable**.
+Click the source button in the header. It shows the current source name and a small arrow. A menu opens with the sources in this order: **ChubAI**, **JannyAI**, **CharacterTavern**, **Pygmalion**, **Wyvern**, **DataCat**, **PlotLight**, and **PlotLight Personas**. **CharacterTavern** is marked **Unavailable**.
 
 **ChubAI** is selected the first time you open the **Card Browser**. When you switch sources, your search text, tags, and filters are cleared. Each source remembers its own adult-content setting and login separately, so a change on one source does not affect the others.
 
@@ -31,9 +31,9 @@ One naming note: the menu lists **ChubAI**, but on a character's detail page the
 
 ## CharacterTavern
 
-CharacterTavern rebuilt its website and no longer offers the connection YunYun used to search and download cards. When you pick **CharacterTavern**, the **Card Browser** shows a short notice instead of search results. Browsing may return if CharacterTavern offers API access.
+CharacterTavern rebuilt its website and no longer offers the connection Marinara used to search and download cards. When you pick **CharacterTavern**, the **Card Browser** shows a short notice instead of search results. Browsing may return if CharacterTavern offers API access.
 
-Until then, you can still bring CharacterTavern characters into YunYun by hand:
+Until then, you can still bring CharacterTavern characters into Marinara by hand:
 
 1. Click **Open CharacterTavern** in the notice. The site opens in a new tab.
 2. Download the character card file from character-tavern.com.
@@ -41,23 +41,39 @@ Until then, you can still bring CharacterTavern characters into YunYun by hand:
 
 Characters you already imported from CharacterTavern stay in your library.
 
+## PlotLight
+
+PlotLight shares its public characters and personas with apps like Marinara. It has two sources in the menu:
+
+- **PlotLight** lists character cards.
+- **PlotLight Personas** lists personas. A persona is the character that represents you in chats.
+
+You don't need a PlotLight account. Each result keeps its creator's name, and the detail view has a **View on PlotLight** link to the original page.
+
+When you import from PlotLight, Marinara downloads the file PlotLight offers for it. A character card usually comes as a PNG with its portrait and any lorebook the creator allows inside. A persona comes as a text file, and Marinara copies its picture separately. You can import either kind as a character or as a persona.
+
+PlotLight limits how often apps can ask it for things. If you search or import too quickly, Marinara says **PlotLight is busy** and how many seconds to wait. It waits that long before asking again. Searching and importing have separate limits, so one doesn't hold up the other.
+
+Some cards and personas can't be downloaded, for example when the creator doesn't allow it. Marinara then says **PlotLight doesn't offer this for download.** You can't import that one or see its full details, but its picture, creator, and **View on PlotLight** link stay on screen.
+
 ## Searching, sorting, and pages
 
-Type in the **Search characters...** box to search. You do not need to press Enter. YunYun waits a moment (about half a second) after you stop typing, then searches automatically. Clearing the box or changing a filter also searches again.
+Type in the **Search characters...** box to search. You do not need to press Enter. Marinara waits a moment (about half a second) after you stop typing, then searches automatically. Clearing the box or changing a filter also searches again.
 
 Next to the search box is a sort dropdown. The options are different on each source, and each source starts on its own default sort:
 
-| Source    | Default sort    |
-| --------- | --------------- |
-| ChubAI    | Most Downloaded |
-| JannyAI   | Newest          |
-| Pygmalion | Downloads       |
-| Wyvern    | Popular         |
-| DataCat   | Relevance       |
+| Source                         | Default sort    |
+| ------------------------------ | --------------- |
+| ChubAI                         | Most Downloaded |
+| JannyAI                        | Newest          |
+| Pygmalion                      | Downloads       |
+| Wyvern                         | Popular         |
+| DataCat                        | Relevance       |
+| PlotLight / PlotLight Personas | Popular         |
 
 Click the **Refresh** button (the circular-arrow icon) to run the current search again.
 
-Below the results are **Previous** and **Next** buttons with a page label such as **Page 2**. When the source cannot report an exact total, only the current page number is shown.
+Below the results are **Previous** and **Next** buttons with a page label such as **Page 2**. When the source cannot report an exact total, only the current page number is shown. **PlotLight** never reports a total, so the header reads **Browsing PlotLight**, and **Next** turns off on the last page. A PlotLight page can hold fewer cards than usual, or none, and still have more pages after it. **Next** then stays on, so you can keep going.
 
 One note on **DataCat**: its **Fresh** sort only shows fresh results when you have no tag filter and no search text. As soon as you type a search or pick a tag, **DataCat** falls back to normal relevance results.
 
@@ -74,9 +90,11 @@ On most sources the tag list is built from the characters in your recent searche
 
 **DataCat** works differently. It loads the most popular tags right away, because it has a very large tag list. You can still type any other tag name by hand.
 
+On **PlotLight**, pick tags from the list or type one by hand, such as **Elf**. Marinara looks each tag up in PlotLight's own tag list. A typed tag that PlotLight doesn't have matches nothing.
+
 ## More filters
 
-Some sources add a **Filters** button in the toolbar. It only appears when the source has filters to offer, so it does not show for **DataCat**. A small badge shows how many filters are active.
+Some sources add a **Filters** button in the toolbar. It only appears when the source has filters to offer, so it does not show for **DataCat** or **PlotLight**. A small badge shows how many filters are active.
 
 The filter panel can include:
 
@@ -95,6 +113,7 @@ Adult content is labeled **NSFW** in the app. There is a single **NSFW** checkbo
 - **Pygmalion**: the **NSFW** checkbox is greyed out until you log in. Its tooltip tells you to log in first. After you log in, the app follows your account settings on Pygmalion. The checkbox then reads **NSFW depends on your account settings**. There is no separate on and off switch after login.
 - **Wyvern**: the **NSFW** checkbox is always greyed out. A notice reads **Use "🔞 Popular NSFW" sort for NSFW content**. To see adult content on **Wyvern**, pick the **🔞 Popular NSFW** option in the sort dropdown.
 - **DataCat**: every character is adult-tagged, so the checkbox is locked on. The first time you pick **DataCat**, a dialog titled **DataCat is NSFW only** appears. Click **Continue to DataCat** to browse it, or **Don't continue to DataCat** to go back.
+- **PlotLight** and **PlotLight Personas**: the **NSFW** checkbox is always greyed out. Its tooltip reads **PlotLight decides what you can see without an account, and adult-tagged results are marked NSFW.** PlotLight applies its own rules for visitors without an account. Some results it shares are still tagged as adult content, and those get the **NSFW** badge.
 
 Adult characters show a small red **NSFW** badge in the corner of their thumbnail.
 
@@ -102,7 +121,7 @@ Adult characters show a small red **NSFW** badge in the corner of their thumbnai
 
 **Pygmalion** hides its adult content behind a login. You do not need to log in for normal, public characters. Logging in only unlocks adult content.
 
-To log in, click the **Log In** button in the toolbar. A login window opens. You paste a value copied from your own Pygmalion account. YunYun does not ask for your password.
+To log in, click the **Log In** button in the toolbar. A login window opens. You paste a value copied from your own Pygmalion account. Marinara does not ask for your password.
 
 For **Pygmalion**, the window is titled **Pygmalion Authentication** and asks for an **Auth Token**:
 
@@ -110,16 +129,16 @@ For **Pygmalion**, the window is titled **Pygmalion Authentication** and asks fo
 2. Open your browser's developer tools. On most browsers you press the F12 key. Developer tools are a built-in browser panel for advanced users.
 3. Open the **Application** tab, then **Local Storage**.
 4. Find the entry named `authn` and copy its value.
-5. Paste the value into the **Auth Token** box in YunYun. The box hides what you paste.
+5. Paste the value into the **Auth Token** box in Marinara. The box hides what you paste.
 6. Click **Save & Connect**. You should see a message that NSFW content is enabled.
 
 The window has a help section that repeats these steps, and a **Website** link that opens pygmalion.chat.
 
-This is your Pygmalion account login. YunYun keeps it in memory until restart or **Log Out**. To sign out, open the login window again and click **Log Out**. To fully sign out, also log out on pygmalion.chat.
+This is your Pygmalion account login. Marinara keeps it in memory until restart or **Log Out**. To sign out, open the login window again and click **Log Out**. To fully sign out, also log out on pygmalion.chat.
 
-YunYun checks the token with Pygmalion before keeping it. If Pygmalion doesn't accept it, nothing is saved and a message says why. If Pygmalion stops accepting it later, YunYun logs you out and asks you to log in again.
+Marinara checks the token with Pygmalion before keeping it. If Pygmalion doesn't accept it, nothing is saved and a message says why. If Pygmalion stops accepting it later, Marinara logs you out and asks you to log in again.
 
-Important: this login is held in the server's memory only. It is never saved to a file. If you restart the YunYun server, you are logged out and must paste the token again. YunYun shows a message telling you to log in again when this happens.
+Important: this login is held in the server's memory only. It is never saved to a file. If you restart the Marinara server, you are logged out and must paste the token again. Marinara shows a message telling you to log in again when this happens.
 
 ## Reviewing a character before import
 
@@ -133,7 +152,7 @@ Some sources do not always return full details. If nothing loads, the view says 
 
 ## Importing or downloading a character
 
-The detail view gives you two buttons. **Import** adds the character to your YunYun library. **Download as PNG** saves the character as a file on your device without adding it to your library.
+The detail view gives you two buttons. **Import** adds the character to your Marinara library. **Download as PNG** saves the character as a file on your device without adding it to your library.
 
 To import character cards into your library:
 
@@ -153,11 +172,11 @@ The **Imported tags** panel next to the avatar controls which tags come along wi
 | ------------- | -------------------------------------------- |
 | All tags      | Keeps the source's tags.                     |
 | No tags       | Skips the source's tags.                     |
-| Existing only | Keeps only tags you already use in YunYun. |
+| Existing only | Keeps only tags you already use in Marinara. |
 
 ### Embedded lorebook prompt
 
-If the character carries an embedded lorebook, importing shows a small confirm box from your web browser. It asks if you also want to save the lorebook as a separate, standalone YunYun lorebook. Click **OK** to create the separate lorebook plus the copy attached to the character. Click **Cancel** to keep the lorebook attached to the character only.
+If the character carries an embedded lorebook, importing shows a small confirm box from your web browser. It asks if you also want to save the lorebook as a separate, standalone Marinara lorebook. Click **OK** to create the separate lorebook plus the copy attached to the character. Click **Cancel** to keep the lorebook attached to the character only.
 
 ### Download as PNG
 
@@ -165,22 +184,17 @@ Click **Download as PNG** to save the character as a standard PNG character card
 
 JSON and PNG are two common formats for the same character data. JSON is a plain text format. A PNG card is an image file with the character data stored inside it. Both hold the full character.
 
-## Your imported characters
-
-The **Card Browser** panel in the right sidebar keeps a separate list of characters you imported through the **Card Browser**. Characters you made by hand or imported another way do not appear here. All of them still appear in the main **Characters** library.
-
-- The **Download Cards** button opens the full **Card Browser** view.
-- The **Search imported...** box filters this list.
-- The sort dropdown offers **A-Z**, **Z-A**, **Newest**, and **Oldest**.
-- Right-click a row, or use its buttons, to find **Quick Start Roleplay** and **Quick Start Conversation**. These open a new chat with that character. You can also delete the character from this list here.
-
 ## Troubleshooting
 
-**JannyAI search or details fail with a Cloudflare error.** Some sites block automated requests. Visit jannyai.com once in the same web browser, pass any challenge it shows, then return to YunYun and search again.
+**JannyAI search or details fail with a Cloudflare error.** Some sites block automated requests. Visit jannyai.com once in the same web browser, pass any challenge it shows, then return to Marinara and search again.
 
-**My Pygmalion login stopped working.** Restarting the YunYun server clears this login. Open the **Log In** window again and paste your token once more.
+**My Pygmalion login stopped working.** Restarting the Marinara server clears this login. Open the **Log In** window again and paste your token once more.
 
 **CharacterTavern only shows a notice.** That is expected. See [CharacterTavern](#charactertavern) for how to import its cards as files.
+
+**PlotLight says it's busy.** PlotLight limits how often apps can ask it for things. Wait the number of seconds in the message, then try again.
+
+**PlotLight doesn't offer a card or persona for download.** The creator may not allow downloads, or it may no longer be public. Use **View on PlotLight** to check it on the site.
 
 **A search fails or a source stops working.** Public sites can change their pages or block access at any time. Try again later. If a source keeps failing, open the character on the site directly and download the card yourself. Then bring it in through the normal import flow. See [Importing and Exporting Character Cards](import-export.md).
 

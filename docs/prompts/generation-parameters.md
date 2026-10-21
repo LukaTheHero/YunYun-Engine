@@ -1,6 +1,6 @@
 # Generation Parameters
 
-This guide explains the generation parameters in YunYun Engine. These are the settings that control how the AI writes each reply, such as **Temperature** and **Max Output Tokens**. Presets and connections provide defaults; the **Advanced Parameters** panel provides overrides for each chat.
+This guide explains the generation parameters in Marinara Engine. These are the settings that control how the AI writes each reply, such as **Temperature** and **Max Output Tokens**. Presets and connections provide defaults; the **Advanced Parameters** panel provides overrides for each chat.
 
 ## What generation parameters do
 
@@ -12,7 +12,7 @@ Change these settings only when you want to fix a specific problem. This guide l
 
 ## Where to find them
 
-Edit base values under **Presets > Parameters**, connection values under **Connections > Default Parameters**, and chat overrides under **Chat Settings > Advanced Parameters**.
+Edit base values under **Presets > Parameters**, connection values under **Connections > Default Chat Parameters**, and chat overrides under **Chat Settings > Advanced Parameters**.
 
 1. Open the chat you want to change.
 2. Open **Chat Settings** (the **Chat Settings** button in the chat, at the top right unless you moved it).
@@ -40,9 +40,9 @@ Each numeric parameter has an input box and its own on and off switch. That swit
 
 Together, **Frequency** and **Presence** are the repetition penalties.
 
-**Reasoning Effort** tells a thinking-capable model how much to reason before it answers. A thinking-capable model is one that works through a problem in hidden steps first. The choices are **None**, **Low**, **Medium**, **High**, **Xhigh**, and **Maximum**. If the model does not support the tier you pick, YunYun lowers it to the strongest tier that model allows.
+**Reasoning Effort** tells a thinking-capable model how much to reason before it answers. A thinking-capable model is one that works through a problem in hidden steps first. The choices are **Off**, **Low**, **Medium**, **High**, **Extra high**, and **Maximum**. If the model does not support the tier you pick, Marinara lowers it to the strongest tier that model allows. Once a connection is chosen, the buttons are named after the level that model gets, so **Maximum** can show as **Max**, **Extra high**, or **High**, and levels that send the same thing show as one button.
 
-When the parameter switch is on, **None** asks the provider to disable thinking explicitly instead of merely leaving out the effort setting. YunYun sends the provider-specific off control only to models known to support it. Some reasoning-mandatory models cannot turn thinking off and may still return reasoning; choose a non-reasoning model when thinking must be absent. Turning the parameter switch itself off is different: it sends no reasoning preference and leaves the provider's default behavior unchanged.
+When the parameter switch is on, **Off** asks the provider to disable thinking explicitly instead of merely leaving out the effort setting. Marinara sends the provider-specific off control only to models known to support it. Some reasoning-mandatory models cannot turn thinking off and may still return reasoning; choose a non-reasoning model when thinking must be absent. Turning the parameter switch itself off is different: it sends no reasoning preference and leaves the provider's default behavior unchanged.
 
 **Verbosity** controls how long and detailed replies should be. The choices are **None**, **Low**, **Medium**, and **High**. **Low** keeps replies short. **High** encourages longer, more descriptive replies. Only some models use this setting.
 
@@ -50,7 +50,7 @@ When the parameter switch is on, **None** asks the provider to disable thinking 
 
 Every numeric parameter, plus **Reasoning Effort** and **Verbosity**, has a small on and off switch next to its name. The switch has no text label in the app; this guide calls it the Send switch. Hover it to see "This parameter is sent to the model" or "This parameter is not sent to the model."
 
-When a parameter's Send switch is on, YunYun includes that parameter in the request to the provider. When it is off, YunYun leaves that parameter out completely. The provider then uses its own default for that setting.
+When a parameter's Send switch is on, Marinara includes that parameter in the request to the provider. When it is off, Marinara leaves that parameter out completely. The provider then uses its own default for that setting.
 
 Turning the Send switch off is different from setting a value like 1 or 0. A value of 1 still tells the provider what to use. Turning the switch off tells the provider nothing, so the model decides.
 
@@ -89,27 +89,29 @@ Use it only for models that support a separate reasoning prefill, such as Kimi K
 
 ## Thinking Tags
 
-**Thinking Tags** tell YunYun how a model marks its hidden reasoning inside plain text. Some models wrap their reasoning in tags. If YunYun knows those tags, it can hide that reasoning behind the **View thoughts** action instead of showing it in the reply.
+**Thinking Tags** tell Marinara how a model marks its hidden reasoning inside plain text. Some models wrap their reasoning in tags. If Marinara knows those tags, it can hide that reasoning behind the **View model thoughts** action instead of showing it in the reply.
 
 You write one wrapper per line, with a slot in the middle for the hidden text. Common wrappers such as think, thinking, thought, pipe, channel, and bracket pairs are already recognized. You only need this field for models that use an unusual wrapper.
 
 ## Custom Parameters
 
-**Custom Parameters** lets you add raw settings that YunYun does not show as its own field. You type a JSON object, and YunYun merges it into the request sent to the provider.
+**Custom Parameters** lets you add raw settings that Marinara does not show as its own field. You type a JSON object, and Marinara merges it into the request sent to the provider.
 
 Custom Parameters saved as connection defaults are sent for every API-backed text generation that uses that connection, including Conversation, Roleplay, Game, Noodle, summaries, agents, and installed agent packages. This also applies to custom endpoints running on your own machine. Per-chat Custom Parameters are added for that chat and override matching connection-level keys.
 
 This is an advanced field. A wrong key can make the provider reject the request. The object must use lowercase `true`, `false`, and `null`. Leave this empty unless a provider's guide tells you to add a specific key.
 
-## OpenRouter Service Tier
+## Service Tier
 
-**OpenRouter Service Tier** only appears when the chat's connection uses the OpenRouter provider. It picks how OpenRouter routes your request. The choices are **Default**, **Flex**, and **Priority**. **Flex** can be cheaper and slower. **Priority** can be faster and cost more. **Default** sends no tier at all.
+**Service Tier** only appears when the chat's connection uses the OpenRouter or NanoGPT provider. It picks how the provider routes your request. The choices are **Default**, **Flex**, and **Priority**. **Flex** can be cheaper and slower. **Priority** can be faster and cost more. **Default** sends no tier at all.
 
 ## Context message limit
 
 **Limit Context Messages** controls how much chat history is sent to the model. Turn it on to send only the last N messages instead of the whole chat.
 
 When you enable it, the count starts at 50. You can set any number from 1 to 9999. A smaller number sends less history, which can lower cost and speed things up. It also means the AI remembers less of the older conversation. This setting is off by default.
+
+In a Roleplay chat with **Advanced Memory Recall** on, this limit is not used. Advanced Memory decides how much history to send with its **Maximum allowed context before compression (tokens)** setting, and older scenes come back as summaries and excerpts. To send less history there, lower that setting in **Chat Settings → Memory Recall**. A note under **Limit Context Messages** says so while both are on. See [Advanced Memory Recall](../agents/memory.md#advanced-memory-recall-roleplay).
 
 ## Exclude Past Reasoning
 
@@ -121,13 +123,13 @@ Leave it on unless you have a clear reason to feed old reasoning back into the m
 
 ## Image Captioning
 
-**Image Captioning** changes how the AI handles image attachments. When it is on, YunYun describes each attached image in text using a connection you choose, instead of sending the image itself.
+**Image Captioning** changes how the AI handles image attachments. When it is on, Marinara describes each attached image in text using a connection you choose, instead of sending the image itself.
 
 Use this for models that cannot see images. When you turn it on, pick a connection in the **Captioning Connection** dropdown. A text-only endpoint may fail if you point it at the wrong connection. This setting is off by default.
 
 The **Captioning Prompt** box below the dropdown holds the instructions sent with each image. Edit it to change the descriptions, for example to ask for more detail. The reset button next to the label brings back the default prompt, and so does clearing the box. The prompt is saved for this chat only, and **Save as Connection Default** does not copy it.
 
-If captioning fails, for example because the captioning connection is broken, deleted, or sends back nothing, the reply stops with an **Image captioning failed** error. YunYun does not send the image itself instead. Fix or change the captioning connection, or turn Image Captioning off.
+If captioning fails, for example because the captioning connection is broken, deleted, or sends back nothing, the reply stops with an **Image captioning failed** error. Marinara does not send the image itself instead. Fix or change the captioning connection, or turn Image Captioning off.
 
 ## Save as Connection Default
 
@@ -142,7 +144,7 @@ The **Reset to Defaults** button below it clears every per-chat parameter change
 Parameters are resolved one field at a time, in this order:
 
 1. The selected preset's **Parameters**, or built-in generation defaults when no preset is used (temperature `1`, maximum output `4096`). In Roleplay, a connection's preset override takes precedence over the chat's selected preset.
-2. The connection's **Default Parameters**.
+2. The connection's **Default Chat Parameters**.
 3. This chat's **Advanced Parameters**.
 4. Mode rules: an active scene chat sets output to `8192`, reasoning to **Maximum**, and verbosity to **High**. Game uses the saved connection and chat parameters without forcing sampling, reasoning, or a minimum output size. Its helper calls also honor saved parameters; task defaults apply only when a value is not configured.
 5. Output limits: Game applies the model's known output limit, and the connection's **Max Output Tokens override** caps requests in every mode. Available context can reduce the output budget further.
@@ -153,19 +155,19 @@ For example, a preset at `8192` and this chat at `16384` show **Effective: 16384
 
 ## Parameters for agents
 
-Agent calls use the **Default Parameters** saved on the connection they run on: the agent's own connection, or the chat's connection when the agent has none. YunYun applies them with the same rules as a chat reply, including the Send switches and the model limits below. Presets and a chat's **Advanced Parameters** do not change agent calls, apart from the temperature rule below.
+Agent calls use the **Default Chat Parameters** saved on the connection they run on: the agent's own connection, or the chat's connection when the agent has none. Marinara applies them with the same rules as a chat reply, including the Send switches and the model limits below. Presets and a chat's **Advanced Parameters** do not change agent calls, apart from the temperature rule below.
 
-- **Sent to agents**: Temperature, Top P, Top K, Frequency, Presence, Reasoning Effort, Verbosity, OpenRouter Service Tier, Custom Parameters, custom headers, and the extra parameters you add under **Settings**, then **Advanced**, then **Parameters** (such as Top A or a seed). A parameter whose Send switch is off is not sent.
+- **Sent to agents**: Temperature, Top P, Top K, Frequency, Presence, Reasoning Effort, Verbosity, Service Tier, Custom Parameters, custom headers, and the extra parameters you add under **Settings**, then **Advanced**, then **Parameters** (such as Top A or a seed). A parameter whose Send switch is off is not sent.
 - **Not sent to agents**: Max Output Tokens, stop sequences, prefills, Thinking Tags, and other prompt-format settings. Each agent keeps its own **Max Output Tokens**.
 - **Temperature**: an agent uses the connection's temperature, or `0.7` when none is saved. Beholder always uses `0`, and the Illustrator's prompt writer uses its own value. During a chat reply, agents on the chat's connection take the temperature and Send switches the chat resolved, as before, but a parameter switched off on the connection is still not sent. Retries use the connection's saved values and Send switches, not the chat's.
 - **Reasoning Effort**: a level you pick, or **Off**, applies to every agent on that connection whose model takes Reasoning Effort. Turning on **Use custom defaults for this connection** starts Reasoning Effort at **Maximum** on most connections (**Default** on Codex), so agents on it think at the model's highest level, which is slower and costs more. Pick a lower level, or turn its Send switch off, if agents should think less. With no level saved (custom defaults off, or **Default** on a Codex connection), agents that answer in JSON ask for thinking off and other agents leave the model's default.
-- **Room to think**: when the connection saves a Reasoning Effort for the model, YunYun adds room for thinking on top of the agent's **Max Output Tokens**, so the answer is not cut short. The room stays within the connection's output cap, the model's limit, and the context the prompt leaves free. A custom endpoint gets it even when it does not send the level, because a local model may think on its own.
+- **Room to think**: when the connection saves a Reasoning Effort for the model, Marinara adds room for thinking on top of the agent's **Max Output Tokens**, so the answer is not cut short. The room stays within the connection's output cap, the model's limit, and the context the prompt leaves free. A custom endpoint gets it even when it does not send the level, because a local model may think on its own.
 
 Installed agent packages follow the same connection values. A value the connection saves and sends replaces what the package asks for, and anything the connection leaves unset keeps the package's own setting. A **Reasoning Effort** or **Max Output Tokens** switched off on the connection is not sent, even when the package asks for it. Temperature and Verbosity start switched off, so for those the package's own value stays. Packages keep their own output budget, plus room to think when the connection's Reasoning Effort applies.
 
 ## Some models ignore some parameters
 
-Not every model accepts every parameter. When YunYun knows a model rejects a setting, it leaves that setting out of the request. The slider or box still shows in the app, but changing it has no effect for that model.
+Not every model accepts every parameter. When Marinara knows a model rejects a setting, it leaves that setting out of the request. The slider or box still shows in the app, but changing it has no effect for that model.
 
 This is common with certain reasoning and thinking models, which refuse sampling settings like temperature. If a setting seems to do nothing, the model may not accept it. Model behavior also depends heavily on which model you picked, so the same value can feel different across models.
 

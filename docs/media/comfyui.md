@@ -1,32 +1,32 @@
 # ComfyUI Workflow Setup
 
-YunYun Engine can send image- and video-generation requests to a local ComfyUI server, and image requests to a RunPod Serverless endpoint that runs ComfyUI. A local image connection can use YunYun's built-in basic workflow, while video connections and advanced image setups use a custom API-format workflow.
+Marinara Engine can send image- and video-generation requests to a local ComfyUI server, and image requests to a RunPod Serverless endpoint that runs ComfyUI. A local image connection can use Marinara's built-in basic workflow, while video connections and advanced image setups use a custom API-format workflow.
 
-The workflow JSON pasted into YunYun is a snapshot. YunYun does not keep a live link to the workflow open in ComfyUI. Whenever you change the workflow in ComfyUI, test it again, export it again, and replace the JSON saved on the YunYun connection.
+The workflow JSON pasted into Marinara is a snapshot. Marinara does not keep a live link to the workflow open in ComfyUI. Whenever you change the workflow in ComfyUI, test it again, export it again, and replace the JSON saved on the Marinara connection.
 
 ## Before you begin
 
 Install ComfyUI, add the checkpoints and custom nodes your workflow needs, and start its server. The usual local address is `http://127.0.0.1:8188`.
 
-If ComfyUI runs on a different computer on your home network, its server must listen on an address that YunYun can reach. Image connections also require `IMAGE_LOCAL_URLS_ENABLED=true` in YunYun's `.env`; see the [Server Configuration Reference](../CONFIGURATION.md). Check the other computer's firewall if the connection still fails.
+If ComfyUI runs on a different computer on your home network, its server must listen on an address that Marinara can reach. Image connections also require `IMAGE_LOCAL_URLS_ENABLED=true` in Marinara's `.env`; see the [Server Configuration Reference](../CONFIGURATION.md). Check the other computer's firewall if the connection still fails.
 
-A local language model and an image model may not fit in GPU memory at the same time, especially on an 8 GB card. YunYun's image queue prevents multiple image jobs from running together, but it cannot make two loaded models fit into the same VRAM. If you run out of memory, use a cloud or separately hosted language model, run ComfyUI on another device, or unload one model before using the other.
+A local language model and an image model may not fit in GPU memory at the same time, especially on an 8 GB card. Marinara's image queue prevents multiple image jobs from running together, but it cannot make two loaded models fit into the same VRAM. If you run out of memory, use a cloud or separately hosted language model, run ComfyUI on another device, or unload one model before using the other.
 
-## Create the YunYun connection
+## Create the Marinara connection
 
 1. Open **Connections** and create a new **Image Generation** connection.
 2. Choose **ComfyUI** for a local server or **RunPod Serverless (ComfyUI)** for a RunPod endpoint.
-3. For local ComfyUI, enter its Base URL. No API key is required. If the **ComfyUI Workflow** field is empty, YunYun uses a built-in basic text-to-image workflow.
+3. For local ComfyUI, enter its Base URL. No API key is required. If the **ComfyUI Workflow** field is empty, Marinara uses a built-in basic text-to-image workflow.
 4. For RunPod, enter your API key and Endpoint ID. A custom workflow is required.
 5. Configure **Local Image Defaults**. These values replace the matching placeholders in your workflow.
 6. Save the connection and use **Test Image** after adding the workflow.
 
 ## Build and export a workflow
 
-1. Create a separate workflow in ComfyUI for YunYun.
+1. Create a separate workflow in ComfyUI for Marinara.
 2. Configure and connect your checkpoint, LoRAs, VAE, prompt encoders, latent-image or image-input nodes, sampler, and output nodes as usual.
 3. Queue the workflow in ComfyUI and confirm that it produces the expected image.
-4. Include an output node. **SaveImage** is the safest choice because YunYun reads completed images or animations from ComfyUI's workflow history.
+4. Include an output node. **SaveImage** is the safest choice because Marinara reads completed images or animations from ComfyUI's workflow history.
 5. Save the editable workflow under a recognizable name, such as `Marinara_Workflow`.
 6. Export the workflow in API format. Depending on the ComfyUI frontend version, this action may be named **Save (API Format)**, **Export (API)**, or **Export to API**. If it is hidden, enable ComfyUI's developer or dev-mode options.
 7. Open the exported `.json` file in a text editor.
@@ -39,7 +39,7 @@ Create a **Video Generation** connection, choose **ComfyUI**, and paste an API-f
 
 Video workflows can use these quoted placeholders:
 
-| Placeholder              | Value supplied by YunYun                                          |
+| Placeholder              | Value supplied by Marinara                                          |
 | ------------------------ | ------------------------------------------------------------------- |
 | `%prompt%`               | The compiled scene or animation prompt.                             |
 | `%width%`, `%height%`    | `832×480` for 480p or `1280×720` for 720p, swapped for 9:16.        |
@@ -48,17 +48,17 @@ Video workflows can use these quoted placeholders:
 | `%model%`                | The connection's Model value, when one is set.                      |
 | `%reference_image_name%` | The uploaded first-frame filename for a ComfyUI **LoadImage** node. |
 
-YunYun queues the workflow through `/prompt`, polls `/history`, and downloads the MP4 named in a `gifs` or `images` output. Image-to-video actions provide `%reference_image_name%`; text-only connection tests do not, so keep that input optional when the same workflow must support both.
+Marinara queues the workflow through `/prompt`, polls `/history`, and downloads the MP4 named in a `gifs` or `images` output. Image-to-video actions provide `%reference_image_name%`; text-only connection tests do not, so keep that input optional when the same workflow must support both.
 
-Local WAN renders can exceed 30 minutes on mid-range GPUs. ComfyUI video jobs use `VIDEO_GEN_TIMEOUT_MS`, not the image-only `COMFYUI_GEN_TIMEOUT`; raise the video timeout and restart YunYun if a valid workflow is cut off early.
+Local WAN renders can exceed 30 minutes on mid-range GPUs. ComfyUI video jobs use `VIDEO_GEN_TIMEOUT_MS`, not the image-only `COMFYUI_GEN_TIMEOUT`; raise the video timeout and restart Marinara if a valid workflow is cut off early.
 
-## Add YunYun placeholders
+## Add Marinara placeholders
 
-Replace the values that YunYun should control with the placeholders below.
+Replace the values that Marinara should control with the placeholders below.
 
-For a **local ComfyUI** connection, keep every placeholder inside JSON quotes. YunYun parses the workflow first, then converts an exact numeric placeholder such as `"%width%"` to a real number. It therefore remains valid for nodes that require numeric input.
+For a **local ComfyUI** connection, keep every placeholder inside JSON quotes. Marinara parses the workflow first, then converts an exact numeric placeholder such as `"%width%"` to a real number. It therefore remains valid for nodes that require numeric input.
 
-For a **RunPod Serverless (ComfyUI)** connection, keep text placeholders such as `"%prompt%"`, `"%model%"`, and `"%sampler%"` quoted, but leave numeric placeholders such as `%width%`, `%height%`, `%seed%`, `%steps%`, `%cfg%`, `%denoise%`, and `%clip_skip%` unquoted. RunPod substitution happens before YunYun parses the workflow, so the inserted number makes the submitted JSON valid. The connection editor may temporarily mark this template as invalid JSON because the unquoted token is not replaced until generation time; this warning does not prevent it from being saved.
+For a **RunPod Serverless (ComfyUI)** connection, keep text placeholders such as `"%prompt%"`, `"%model%"`, and `"%sampler%"` quoted, but leave numeric placeholders such as `%width%`, `%height%`, `%seed%`, `%steps%`, `%cfg%`, `%denoise%`, and `%clip_skip%` unquoted. RunPod substitution happens before Marinara parses the workflow, so the inserted number makes the submitted JSON valid. The connection editor may temporarily mark this template as invalid JSON because the unquoted token is not replaced until generation time; this warning does not prevent it from being saved.
 
 The relevant parts of a basic **local** API workflow may look like this:
 
@@ -98,9 +98,9 @@ The relevant parts of a basic **local** API workflow may look like this:
 }
 ```
 
-This is only a fragment: keep the node links and other inputs from your exported workflow. You may embed prompt placeholders inside a longer string to prepend or append fixed tags. A numeric placeholder should normally be the entire value. In a RunPod copy of the workflow, remove the quotes around those numeric tokens. You can also leave any setting hard-coded when you do not want YunYun's connection defaults to change it.
+This is only a fragment: keep the node links and other inputs from your exported workflow. You may embed prompt placeholders inside a longer string to prepend or append fixed tags. A numeric placeholder should normally be the entire value. In a RunPod copy of the workflow, remove the quotes around those numeric tokens. You can also leave any setting hard-coded when you do not want Marinara's connection defaults to change it.
 
-| Placeholder           | Value supplied by YunYun                                                                  |
+| Placeholder           | Value supplied by Marinara                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------- |
 | `%prompt%`            | Positive image prompt. The connection editor warns if this is missing.                      |
 | `%negative_prompt%`   | Negative image prompt.                                                                      |
@@ -118,7 +118,7 @@ After editing, save the JSON, copy the entire file, paste it into **ComfyUI Work
 
 ## Use reference images
 
-YunYun can provide up to four reference images when the feature starting the generation has images to send. A custom workflow must contain compatible input nodes and placeholders; adding a placeholder does not create or connect those nodes automatically.
+Marinara can provide up to four reference images when the feature starting the generation has images to send. A custom workflow must contain compatible input nodes and placeholders; adding a placeholder does not create or connect those nodes automatically.
 
 ### Local ComfyUI: upload filenames for LoadImage
 
@@ -136,9 +136,9 @@ For a standard ComfyUI **LoadImage** node, use a filename placeholder:
 }
 ```
 
-YunYun uploads the reference to ComfyUI's input directory and replaces the placeholder with the filename returned by ComfyUI. `%reference_image_name%` means the first image. Workflows with several reference inputs can use `%reference_image_name_01%` through `%reference_image_name_04%`.
+Marinara uploads the reference to ComfyUI's input directory and replaces the placeholder with the filename returned by ComfyUI. `%reference_image_name%` means the first image. Workflows with several reference inputs can use `%reference_image_name_01%` through `%reference_image_name_04%`.
 
-If the workflow always requires an image input, enable **Upload a 1x1 placeholder when no reference image is provided** in **Local Image Defaults**. YunYun then supplies a tiny placeholder image when the request has no real reference.
+If the workflow always requires an image input, enable **Upload a 1x1 placeholder when no reference image is provided** in **Local Image Defaults**. Marinara then supplies a tiny placeholder image when the request has no real reference.
 
 ### Raw base64 image data
 
@@ -148,7 +148,7 @@ RunPod workflows support the raw base64 placeholders. The filename-upload placeh
 
 ## Keep character-specific workflows
 
-You can create a separate exported workflow and YunYun image connection for each character that needs a particular checkpoint, LoRA stack, ControlNet setup, or reference-image layout. Select the appropriate image connection wherever that character or image feature lets you choose one.
+You can create a separate exported workflow and Marinara image connection for each character that needs a particular checkpoint, LoRA stack, ControlNet setup, or reference-image layout. Select the appropriate image connection wherever that character or image feature lets you choose one.
 
 This can produce more consistent results than one generic workflow, but each connection still holds its own copied JSON. After changing a character's workflow in ComfyUI, repeat the export, edit, copy, and paste steps for that connection.
 
@@ -156,16 +156,17 @@ This can produce more consistent results than one generic workflow, but each con
 
 | Problem                                          | What to check                                                                                                                                                                                                                 |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| YunYun reports invalid workflow JSON           | For local ComfyUI, check quotes, commas, and brackets after adding placeholders. For RunPod, only numeric placeholders should be unquoted; all text placeholders and the rest of the template still need correct JSON syntax. |
+| Marinara reports invalid workflow JSON           | For local ComfyUI, check quotes, commas, and brackets after adding placeholders. For RunPod, only numeric placeholders should be unquoted; all text placeholders and the rest of the template still need correct JSON syntax. |
 | The literal prompt or placeholder reaches a node | Confirm that the token is spelled exactly as listed and that the pasted workflow is the newly exported API version.                                                                                                           |
 | The image ignores the requested dimensions       | Put `%width%` and `%height%` in the latent-image or equivalent size node that actually feeds the sampler.                                                                                                                     |
 | ComfyUI cannot find the model                    | Use the exact checkpoint name expected by the loader, or keep the checkpoint hard-coded in the workflow instead of using `%model%`.                                                                                           |
 | ComfyUI reports a missing node or input          | Install the same custom-node packages used when the workflow was built and confirm their input names have not changed.                                                                                                        |
-| The job completes but YunYun receives no image | Add a connected **SaveImage** output and test the workflow directly in ComfyUI again.                                                                                                                                         |
-| A reference-image node fails                     | For a normal local **LoadImage** node, use a `%reference_image_name...%` placeholder. Use raw base64 only with a node designed for it, and confirm that the YunYun feature actually supplied a reference.                   |
+| The job completes but Marinara receives no image | Add a connected **SaveImage** output and test the workflow directly in ComfyUI again.                                                                                                                                         |
+| A reference-image node fails                     | For a normal local **LoadImage** node, use a `%reference_image_name...%` placeholder. Use raw base64 only with a node designed for it, and confirm that the Marinara feature actually supplied a reference.                   |
 | A remote/LAN ComfyUI URL is blocked              | For image connections, enable `IMAGE_LOCAL_URLS_ENABLED`. Make ComfyUI listen on the network interface and check the host firewall. Do not expose an unauthenticated ComfyUI server to the public internet.                   |
-| A long image generation times out                | Increase `COMFYUI_GEN_TIMEOUT` in YunYun's `.env`. The value is measured in seconds and defaults to `2400`.                                                                                                                 |
-| A long video generation times out                | Increase `VIDEO_GEN_TIMEOUT_MS` in YunYun's `.env`. The value is measured in milliseconds and defaults to `1800000` (30 minutes).                                                                                           |
+| Error: `Outbound response exceeded N bytes`      | The response exceeded the configured limit, which defaults to 30 MiB. Embedded workflow or reference-image metadata can cause this. Turn off metadata in ComfyUI, or raise `IMAGE_GEN_MAX_RESPONSE_BYTES` in Marinara's `.env` and restart Marinara.          |
+| A long image generation times out                | Increase `COMFYUI_GEN_TIMEOUT` in Marinara's `.env`. The value is measured in seconds and defaults to `2400`.                                                                                                                 |
+| A long video generation times out                | Increase `VIDEO_GEN_TIMEOUT_MS` in Marinara's `.env`. The value is measured in milliseconds and defaults to `1800000` (30 minutes).                                                                                           |
 | Generation runs out of GPU memory                | Reduce image dimensions or model size, unload the local language model, use a remote language model, or move ComfyUI to another device.                                                                                       |
 
 ## Related guides
@@ -173,7 +174,7 @@ This can produce more consistent results than one generic workflow, but each con
 - [Image Generation Providers and Setup](image-providers.md) covers all supported image services and shared image settings.
 - [Scene Video Generation](scene-video.md) covers video connections and every scene-video surface.
 - [LTX 2.3 Storyboards in Game Mode](../game/ltx-2-3-storyboards.md) covers an LTX Director API workflow, placeholders, and the recommended Game settings.
-- [Image Style Profiles](style-profiles.md) explains YunYun's reusable prompt styles.
+- [Image Style Profiles](style-profiles.md) explains Marinara's reusable prompt styles.
 - [Illustrator Agent](illustrator-agent.md) covers automatic scene illustration.
 - [Server Configuration Reference](../CONFIGURATION.md) documents local-network access and ComfyUI timeouts.
 - [ComfyUI workflow concepts](https://docs.comfy.org/development/core-concepts/workflow) explains workflows in the official ComfyUI documentation.

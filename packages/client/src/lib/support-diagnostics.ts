@@ -68,7 +68,7 @@ export interface SupportDiagnostics {
    */
   sidecars?: SidecarHealthSection;
   /**
-   * #5740: the phrase Professor YunYun reported acting on in her most recent
+   * #5740: the phrase Professor Mari reported acting on in her most recent
    * mutating round, for triaging "she edited something I never asked for"
    * reports. Latest round only; undefined when the status fetch failed.
    */
@@ -124,7 +124,7 @@ export const SERVER_UNREACHABLE_DIAGNOSTIC = "Unreachable (request timed out)";
  * #5740: the acting-on phrase is model-authored free text - the only such
  * field in this line-oriented report. Flatten it (a multi-line quote would
  * forge extra report lines and orphan the [mode: ...] metadata) and cap it to
- * a report-appropriate length; the full text stays in the YunYun transcript.
+ * a report-appropriate length; the full text stays in the Mari transcript.
  */
 function reportPhrase(text: string): string {
   const flattened = text.replace(/\s+/gu, " ").trim();
@@ -259,7 +259,7 @@ export function formatSupportDiagnostics(diagnostics: SupportDiagnostics): strin
   const freeze = diagnostics.lastFreeze;
   const unreachable = diagnostics.serverUnreachable === true;
   return [
-    "YunYun Engine diagnostics",
+    "Marinara Engine diagnostics",
     `Version: ${available(diagnostics.version)}`,
     `Build: ${available(diagnostics.build)}`,
     `Commit: ${available(diagnostics.commit)}`,
@@ -315,9 +315,9 @@ export function formatSupportDiagnostics(diagnostics: SupportDiagnostics): strin
     `Active connection: ${available(diagnostics.connectionName)}`,
     `Connection provider: ${available(diagnostics.connectionProvider)}`,
     `LLM model: ${available(diagnostics.model)}`,
-    // #5740 triage line: what YunYun last reported acting on. undefined = the
+    // #5740 triage line: what Mari last reported acting on. undefined = the
     // status fetch failed (say so); null = no mutating round recorded yet.
-    `YunYun last acted on: ${
+    `Professor Mari last acted on: ${
       diagnostics.mariActingOn === undefined
         ? "Unavailable (workspace status not reachable)"
         : diagnostics.mariActingOn === null

@@ -1,6 +1,7 @@
 // ──────────────────────────────────────────────
 // Server Entry Point
 // ──────────────────────────────────────────────
+import "./lib/compromised-certificate-authorities.js";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { buildApp } from "./app.js";
@@ -17,6 +18,7 @@ import {
   shutdownDeadlinesFor,
 } from "./lib/shutdown-signals.js";
 import { setRuntimeStopBudgetMs } from "./lib/shutdown-steps.js";
+import { isSharpLoaderRejection } from "./services/image/sharp-runtime.js";
 import { flushDB } from "./db/connection.js";
 import {
   getHost,
@@ -97,6 +99,13 @@ async function main() {
     process.exit(1);
   });
   process.on("unhandledRejection", (reason) => {
+    if (isSharpLoaderRejection(reason)) {
+      logger.warn(
+        reason as Error,
+        "[image] sharp's image runtime failed to start; image processing stays off until dependencies are reinstalled",
+      );
+      return;
+    }
     logFatalProcessError(reason, "[process] Unhandled rejection; reaping sidecar before exit");
     noteSessionExitKind("crash");
     reapSidecar();

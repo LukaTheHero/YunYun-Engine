@@ -73,7 +73,7 @@ export interface AgentDebugEntry {
 function logAgentDebugToBrowserConsole(entry: AgentDebugEntry) {
   const call = entry.agentCall;
   if (!call) {
-    console.debug("[YunYun Agent Debug]", entry);
+    console.debug("[Marinara Agent Debug]", entry);
     return;
   }
 
@@ -87,7 +87,7 @@ function logAgentDebugToBrowserConsole(entry: AgentDebugEntry) {
   const usage = usageParts.length > 0 ? ` | ${usageParts.join(", ")} tokens` : "";
   const duration = call.durationMs != null ? ` | ${call.durationMs}ms` : "";
   const elapsed = call.elapsedMs != null ? ` | ${call.elapsedMs}ms total` : "";
-  const label = `[YunYun Agent Debug] ${call.stage}${round}: ${call.agentName} (${call.agentType}) | ${call.model}${usage}${duration}${elapsed}`;
+  const label = `[Marinara Agent Debug] ${call.stage}${round}: ${call.agentName} (${call.agentType}) | ${call.model}${usage}${duration}${elapsed}`;
 
   console.groupCollapsed(label);
   console.debug("Event", call);
@@ -134,6 +134,8 @@ interface AgentState {
   failedAgentChatId: string | null;
   /** Rich failure details for the retry UI and troubleshooting copy */
   failedAgentFailures: AgentFailure[];
+  /** Agent activity was on screen since the last failure, so its icon drops the failure dot (#7322). */
+  failedAgentsSeen: boolean;
   thoughtBubbles: Array<{
     agentId: string;
     agentName: string;
@@ -155,7 +157,7 @@ interface AgentState {
   mariChips: MariSuggestionChip[];
   mariChipsChatId: string | null;
   /**
-   * A guided-creation plan YunYun returned in one call: an ordered list of question+chip
+   * A guided-creation plan Mari returned in one call: an ordered list of question+chip
    * steps. The client walks these locally (see recordMariPlanAnswer) with zero further
    * LLM calls until the plan is exhausted and a summary message is sent back to her.
    */
@@ -183,6 +185,7 @@ interface AgentState {
   setFailedAgentTypes: (types: string[], chatId?: string | null) => void;
   setFailedAgentFailures: (failures: AgentFailure[], chatId?: string | null) => void;
   clearFailedAgentTypes: (chatId?: string | null) => void;
+  markFailedAgentsSeen: (chatId: string) => void;
   addThoughtBubble: (agentId: string, agentName: string, content: string) => void;
   dismissThoughtBubble: (index: number) => void;
   clearThoughtBubbles: () => void;
@@ -214,7 +217,7 @@ interface AgentState {
   enqueuePendingAgentWriteApproval: (entry: PendingAgentWriteApproval) => void;
   dismissPendingAgentWriteApproval: (id: string) => void;
   clearPendingAgentWriteApprovals: () => void;
-  /** Clear chat-runtime Agent state while retaining Professor YunYun's chat-scoped continuation UI. */
+  /** Clear chat-scoped Agent state, including Professor Mari's suggestions and guided plan, so they cannot leak into another chat. */
   resetForChatChange: () => void;
   reset: () => void;
 }
@@ -232,6 +235,7 @@ type AgentDataState = Pick<
   | "failedAgentTypes"
   | "failedAgentChatId"
   | "failedAgentFailures"
+  | "failedAgentsSeen"
   | "thoughtBubbles"
   | "echoMessages"
   | "echoVisibleCount"
@@ -266,6 +270,7 @@ function createInitialAgentDataState(): AgentDataState {
     failedAgentTypes: [],
     failedAgentChatId: null,
     failedAgentFailures: [],
+    failedAgentsSeen: false,
     thoughtBubbles: [],
     echoMessages: [],
     echoVisibleCount: 0,
@@ -407,18 +412,24 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         reasonLabel: null,
         retryTarget: null,
       })),
+      failedAgentsSeen: false,
     }),
   setFailedAgentFailures: (failures, chatId = null) =>
     set({
       failedAgentTypes: Array.from(new Set(failures.map((failure) => failure.agentType))),
       failedAgentChatId: chatId,
       failedAgentFailures: failures,
+      failedAgentsSeen: false,
     }),
   clearFailedAgentTypes: (chatId = null) =>
     set((s) => {
       if (chatId && s.failedAgentChatId && s.failedAgentChatId !== chatId) return {};
       return { failedAgentTypes: [], failedAgentChatId: null, failedAgentFailures: [] };
     }),
+  markFailedAgentsSeen: (chatId) =>
+    set((s) =>
+      s.failedAgentsSeen || (s.failedAgentChatId && s.failedAgentChatId !== chatId) ? s : { failedAgentsSeen: true },
+    ),
 
   addThoughtBubble: (agentId, agentName, content) =>
     set((s) => ({
@@ -527,15 +538,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     })),
   clearPendingAgentWriteApprovals: () => set({ pendingAgentWriteApprovals: [] }),
 
-  resetForChatChange: () =>
-    set((state) => ({
-      ...createInitialAgentDataState(),
-      mariChips: state.mariChips,
-      mariChipsChatId: state.mariChipsChatId,
-      mariPlan: state.mariPlan,
-      mariPlanChatId: state.mariPlanChatId,
-      mariPlanCursor: state.mariPlanCursor,
-      mariPlanAnswers: state.mariPlanAnswers,
-    })),
+  resetForChatChange: () => set(createInitialAgentDataState()),
   reset: () => set(createInitialAgentDataState()),
 }));
+
+/** How many of the chat's failed agents Agent activity has not shown yet: its icon's failure dot (#7322). */
+export function selectUnseenAgentFailureCount(state: AgentState, chatId: string): number {
+  if (state.failedAgentsSeen || (state.failedAgentChatId && state.failedAgentChatId !== chatId)) return 0;
+  return state.failedAgentTypes.length;
+}

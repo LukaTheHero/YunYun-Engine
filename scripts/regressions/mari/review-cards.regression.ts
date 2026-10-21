@@ -1,6 +1,9 @@
-// #6842: Professor YunYun's Keep/Restore cards piled up in every chat and some could not be
+// #6842: Professor Mari's Keep/Restore cards piled up in every chat and some could not be
 // cleared. Drives the real MariDbService against a file-native store and asserts that:
-//   - YunYun's own built-in card cannot be edited or deleted, by action or raw db command,
+//   - (slice 71 F3) a sensitive file or install review belongs to its chat too, and the status filters it,
+//   - (slice 71 F1) a delete waits on the user like an install or a file; an applied edit does not,
+//   - (slice 71 N3) a held change is saved as what it would change, and read back in plain words,
+//   - Mari's own built-in card cannot be edited or deleted, by action or raw db command,
 //   - a write that changes nothing is not applied and makes no card,
 //   - a card belongs to the chat that made it, and deleting that chat keeps its reviews,
 //   - a refused Restore tells the user Keep dismisses the card,
@@ -19,6 +22,13 @@ import {
   mariWorkspaceSessionId,
 } from "../../../packages/server/src/services/professor-mari/mari-session.js";
 import { reviewActionFailure } from "../../../packages/server/src/routes/professor-mari-workspace.routes.js";
+import { WorkspaceChangeReviewService } from "../../../packages/server/src/services/professor-mari/workspace-change-review.service.js";
+import { describeHeldCommands } from "../../../packages/server/src/services/professor-mari/workspace-agent.service.js";
+import {
+  countBlockingReviews,
+  describeMariHeldChanges,
+  isMariReviewWaiting,
+} from "../../../packages/client/src/lib/professor-mari-presentation.js";
 
 const previousFileStorageDir = process.env.FILE_STORAGE_DIR;
 const dir = mkdtempSync(join(tmpdir(), "marinara-mari-review-cards-"));
@@ -34,7 +44,7 @@ try {
   const character = async (id: string) =>
     (await mari.executeAction({ action: "character.get", id })).output as Record<string, unknown> | undefined;
 
-  // ── YunYun's own built-in card is off limits, by action and by raw db command ──
+  // ── Mari's own built-in card is off limits, by action and by raw db command ──
   {
     const before = JSON.stringify(await character(PROFESSOR_MARI_ID));
     const viaAction = await mari.executeAction({
@@ -43,15 +53,15 @@ try {
       patch: { description: "Rewritten." },
       apply: true,
     });
-    assert.equal(viaAction.ok, false, "character.update refuses YunYun's own card");
+    assert.equal(viaAction.ok, false, "character.update refuses Mari's own card");
     assert.ok(
-      viaAction.validation?.errors.some((issue) => /built-in card is managed by YunYun/u.test(issue.message)),
+      viaAction.validation?.errors.some((issue) => /built-in card is managed by Marinara/u.test(issue.message)),
       "and says why",
     );
     const viaRaw = await mari.executeCli({
       argv: ["db", "patch", "characters", PROFESSOR_MARI_ID, "--json", JSON.stringify({ comment: "raw" }), "--apply"],
     });
-    assert.equal(viaRaw.ok, false, "a raw db patch of YunYun's card is refused too");
+    assert.equal(viaRaw.ok, false, "a raw db patch of Mari's card is refused too");
     const viaDelete = await mari.executeCli({ argv: ["db", "delete", "characters", PROFESSOR_MARI_ID, "--apply"] });
     assert.equal(viaDelete.ok, false, "and so is deleting it");
     assert.equal(JSON.stringify(await character(PROFESSOR_MARI_ID)), before, "the card is untouched");
@@ -78,7 +88,7 @@ try {
     });
     assert.equal(same.ok, true, "an unchanged update is not an error");
     assert.equal(same.approval?.status, "not_required", "and needs no review");
-    assert.match(String(same.output), /^No changes/u, "YunYun is told nothing changed");
+    assert.match(String(same.output), /^No changes/u, "Mari is told nothing changed");
     assert.equal(mari.getPendingApprovals().length, 0, "no empty card");
     assert.equal((await character("plain-character"))?.updatedAt, stampBefore, "nothing was written");
 
@@ -146,7 +156,7 @@ try {
       apply: true,
     });
     const reviewId = created.approval!.id!;
-    // A newer edit lands after YunYun's change, outside the review (the user's editor).
+    // A newer edit lands after Mari's change, outside the review (the user's editor).
     const { characters } = await import("../../../packages/server/src/db/schema/characters.js");
     const { eq } = await import("../../../packages/server/src/db/file-query.js");
     await db.update(characters).set({ comment: "edited by the user" }).where(eq(characters.id, "edited-later"));
@@ -193,7 +203,7 @@ try {
     await mari.keepAppliedReview(reviewId);
   }
 
-  // ── Reviews of YunYun's own card saved before the fix are retired on load ──
+  // ── Reviews of Mari's own card saved before the fix are retired on load ──
   {
     // Such a review can no longer be made, so build one from an ordinary review's file,
     // the way an install that ran the old build has them on disk.
@@ -221,22 +231,108 @@ try {
 
     const restarted = new MariDbService(db);
     const loadedIds = new Set(restarted.getPendingApprovals().map((review) => review.id));
-    assert.equal(loadedIds.has(legacyId), false, "an old review of YunYun's own card is retired on load");
+    assert.equal(loadedIds.has(legacyId), false, "an old review of Mari's own card is retired on load");
     assert.equal(existsSync(join(pendingDir, `${legacyId}.json`)), false, "its file is gone");
     assert.ok(loadedIds.has(ordinaryId), "an ordinary review is still there to Keep or Restore");
     await restarted.keepAppliedReview(ordinaryId);
   }
 
-  // ── Wiring: YunYun's commands name their chat, status filters, deletion keeps ──
+  // ── Slice 71 F3: a file or install review stays in the chat that made it ──
   {
-    const agent = source("services/professor-mari/workspace-agent.service.ts");
+    const workspace = mkdtempSync(join(tmpdir(), "marinara-mari-review-file-"));
+    try {
+      writeFileSync(join(workspace, "package.json"), '{ "name": "scratch" }\n');
+      const reviews = new WorkspaceChangeReviewService(workspace);
+      const staged = await reviews.stageSensitiveFileChange({
+        absolutePath: join(workspace, "package.json"),
+        afterContent: '{ "name": "scratch", "scripts": { "start": "node index.js" } }\n',
+        reason: null,
+        sessionId: mariWorkspaceSessionId("chat-a"),
+      });
+      const fileVisibleIn = (chatId: string) =>
+        [...mari.getPendingApprovals(), ...reviews.getPendingApprovals()]
+          .filter((review) => isMariReviewVisibleInChat(review.sessionId, chatId))
+          .some((review) => review.id === staged.id);
+      assert.equal(fileVisibleIn("chat-a"), true, "the file review shows in the chat that made it");
+      assert.equal(fileVisibleIn("chat-new"), false, "and not in a new chat");
+      reviews.clear();
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  }
+
+  // ── Slice 71 F1: what waits on the user ──
+  {
+    const row = (action: string, table = "lorebook_entries") => ({ table, id: `${table}-1`, action });
+    const deleteReview = { kind: "applied_review", affectedRows: 2, diffPreview: [row("delete"), row("delete")] };
+    const editReview = { kind: "applied_review", affectedRows: 1, diffPreview: [row("update", "characters")] };
+    assert.equal(isMariReviewWaiting(deleteReview), true, "a delete waits: its rows stay hidden until you choose");
+    assert.equal(isMariReviewWaiting(editReview), false, "an applied edit only offers Undo");
+    assert.equal(isMariReviewWaiting({ kind: "sensitive_file" }), true, "a file review waits");
+    assert.equal(countBlockingReviews([deleteReview, editReview, { kind: "dependency_install" }]), 2);
+    const mariChat = readFileSync(
+      new URL("../../../packages/client/src/components/chat/HomeProfessorMariChat.tsx", import.meta.url),
+      "utf8",
+    );
+    assert.match(
+      mariChat,
+      /const waiting = entries\.filter\(\(\{ approval, outcome \}\) => !outcome && isMariReviewWaiting\(approval\)\);/u,
+      "the turn files a waiting delete under Needs you, not Changed",
+    );
+  }
+
+  // ── Slice 71 N3: a held change in plain words ──
+  {
+    const held = describeHeldCommands([
+      {
+        id: "c1",
+        name: "app_data",
+        arguments: {
+          action: "character.update",
+          characterId: "shrek",
+          patch: { description: "An ogre.", personality: "Blunt.", first_mes: "What broke?" },
+          apply: true,
+        },
+      },
+    ]);
+    assert.deepEqual(
+      held[0]?.fields?.map(({ key }) => key),
+      ["description", "personality", "first_mes"],
+    );
+    const said = describeMariHeldChanges(held, (id) => (id === "shrek" ? "Shrek" : undefined));
+    assert.deepEqual([said.kind, said.name, said.count], ["update", "Shrek", 3], "Rewrite 3 fields of Shrek");
+    const many = describeHeldCommands([
+      { id: "d1", name: "app_data", arguments: { action: "lorebook.deleteEntry", entryId: "e1" } },
+      { id: "w1", name: "write", arguments: { path: "/work/package.json", content: "{}" } },
+    ]);
+    assert.equal(many[1]?.name, "package.json", "a file command is named by its file");
+    assert.equal(describeMariHeldChanges(many, () => undefined).kind, "many");
+    assert.equal(describeMariHeldChanges(null, () => undefined).kind, "change", "an old turn still gets a card");
+  }
+
+  // ── Wiring: Mari's commands name their chat, status filters, deletion keeps ──
+  {
+    const agent =
+      source("services/professor-mari/workspace-agent.service.ts") +
+      source("services/professor-mari/workspace-commands.ts") +
+      source("services/professor-mari/workspace-message-store.ts");
     assert.equal(
       (agent.match(/sessionId: this\.runSessionId\(\)/gu) ?? []).length,
-      2,
-      "executeCli and executeAction carry the run's chat",
+      6,
+      "executeCli, executeAction and (slice 71 F3) every file and install review carry the run's chat",
     );
-    assert.match(agent, /env\.MARI_WORKSPACE_SESSION_ID = this\.runSessionId\(\);/u, "so does YunYun's shell");
-    assert.match(agent, /filter\(\(approval\) => isMariReviewVisibleInChat\(approval\.sessionId, chatId\)\)/u);
+    assert.doesNotMatch(agent, /sessionId: SESSION_ID/u, "no review is staged without its chat");
+    assert.match(agent, /env\.MARI_WORKSPACE_SESSION_ID = this\.runSessionId\(\);/u, "so does Mari's shell");
+    assert.match(
+      agent,
+      /\.\.\.this\.commands\.workspaceChangeReviews\.getPendingApprovals\(\),\s*\]\.filter\(\(approval\) => isMariReviewVisibleInChat\(approval\.sessionId, chatId\)\)/u,
+      "the status filters file and install reviews by chat too",
+    );
+    assert.match(
+      agent,
+      /if \(run\.endedWithDeferral && run\.heldChanges\.length > 0\) extraUpdate\.mariHeldChanges = run\.heldChanges;/u,
+      "a held change is saved on her turn for the card",
+    );
     const chats = source("routes/chats.routes.ts");
     const deleteRoute = chats.slice(
       chats.indexOf('app.delete<{ Params: { id: string } }>("/internal/professor-mari/chats/:id"'),
@@ -244,7 +340,7 @@ try {
     assert.match(
       deleteRoute.slice(0, deleteRoute.indexOf("return reply.status(204)")),
       /keepReviewsForChat\(target\.id\)/u,
-      "deleting a YunYun chat keeps its reviews",
+      "deleting a Mari chat keeps its reviews",
     );
     const routes = source("routes/professor-mari-workspace.routes.ts");
     assert.equal(

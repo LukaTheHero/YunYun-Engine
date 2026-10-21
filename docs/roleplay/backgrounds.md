@@ -4,7 +4,7 @@ This guide covers the scene backdrop in Roleplay Mode: the **Background** agent 
 
 ## The scene background
 
-Roleplay Mode shows a full scene backdrop behind your messages. When the backdrop changes, YunYun cross-fades smoothly from the old image to the new one, so scene changes feel gentle instead of jumpy.
+Roleplay Mode shows a full scene backdrop behind your messages. When the backdrop changes, Marinara cross-fades smoothly from the old image to the new one, so scene changes feel gentle instead of jumpy.
 
 You do not need image generation for this to work. If you have not set up an image generation connection, the backdrop shows as a solid color. Your chat still works as normal text chat.
 
@@ -23,7 +23,7 @@ After that, the scene backdrop updates on its own as your story moves between pl
 
 ## Generate a background by hand
 
-You can also make a new backdrop yourself, without the agent. YunYun builds an image prompt from the scene (its genre, setting, current location, weather, and time) and creates a fresh backdrop.
+You can also make a new backdrop yourself, without the agent. Marinara builds an image prompt from the scene (its genre, setting, current location, weather, and time) and creates a fresh backdrop. The **Background** button needs the **Illustrator** agent installed, but you do not need to add it to the chat.
 
 1. Open **Chat Settings** and expand the **Gallery** section.
 2. Click the **Background** button.
@@ -31,7 +31,7 @@ You can also make a new backdrop yourself, without the agent. YunYun builds an i
 
 While it runs, you see this note: "AI background generation is running. The new background will be applied when it finishes." The new image is added to your background library and applied to the scene.
 
-Manual generation uses the **Illustrator** agent's image connection, then falls back to your default image generation connection. The **Background** agent does not need an image connection because it only selects images already in your library. If YunYun cannot find a connection, generation fails with this message: "Choose an image generation connection for the Illustrator agent, or mark one as the default image connection."
+Manual generation uses the **Illustrator** agent's image connection, then falls back to your default image generation connection. The **Background** agent does not need an image connection because it only selects images already in your library. If Marinara cannot find a connection, generation fails with this message: "Choose an image generation connection for the Illustrator agent, or mark one as the default image connection."
 
 Scene background generation works only in Roleplay and Game modes. It is not available in Conversation mode.
 

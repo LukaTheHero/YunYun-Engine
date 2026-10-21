@@ -1,4 +1,4 @@
-// #5740: the "understood request" triage tool - YunYun reports the phrase she
+// #5740: the "understood request" triage tool - Mari reports the phrase she
 // treated as the request/permission for mutating commands; it is persisted as
 // ONE latest-round in-memory record (maintainer call: no growing history),
 // shown under the matching reply (truncated, expandable), and included in
@@ -89,16 +89,16 @@ assert.doesNotMatch(
 // so a superseded run can never stamp or relabel another run's record.
 assert.match(
   workspaceAgent,
-  /if \(parsedAction\.commands\.some\(isMutatingWorkspaceCommand\)\) \{\s*\n\s*runUnderstoodRequest = \{/u,
+  /if \(parsedAction\.commands\.some\(isMutatingWorkspaceCommand\)\) \{\s*\n\s*recordUnderstood\(/u,
 );
 // The outcome is OBSERVED, never asserted up front: the record starts as
 // held/interrupted and only the command batch's own results upgrade it -
 // a Plan-floor refusal must never read as an execution in a pasted report.
-assert.match(workspaceAgent, /outcome: shouldDeferMutations \? "held" : "interrupted"/u);
+assert.match(workspaceAgent, /outcome: held \? "held" : "interrupted"/u);
 // #5756: a staged sensitive change applied nothing, so the upgrade reports
 // "held" for it - "applied" stays reserved for batches that actually applied.
-assert.match(workspaceAgent, /outcome: anyMutatingFailed \? "failed" : anyStaged \? "held" : "applied"/u);
-assert.match(workspaceAgent, /const anyStaged = commandResults\.some\(isStagedSensitiveMutation\);/u);
+assert.match(workspaceAgent, /outcome: failed \? "failed" : staged \? "held" : "applied"/u);
+assert.match(workspaceAgent, /commandResults\.some\(isStagedSensitiveMutation\),/u);
 // Model-authored command labels are flattened and capped before entering the
 // record (they feed a line-oriented diagnostics report).
 assert.match(workspaceAgent, /label\.replace\(\/\\s\+\/gu, " "\)\.trim\(\)\.slice\(0, 80\)/u);
@@ -106,7 +106,7 @@ assert.match(workspaceAgent, /label\.replace\(\/\\s\+\/gu, " "\)\.trim\(\)\.slic
 assert.match(workspaceAgent, /runUnderstoodRequest = \{ \.\.\.runUnderstoodRequest, messageId: message\.id \};/u);
 // Status carries it.
 assert.match(workspaceAgent, /latestUnderstoodRequest: this\.latestUnderstoodRequest,/u);
-// Read-back (maintainer call): the chat's record is shown to YunYun herself so
+// Read-back (maintainer call): the chat's record is shown to Mari herself so
 // "why did you treat that as permission?" is answered from the actual record,
 // framed as a record - never an instruction.
 assert.match(workspaceAgent, /<mari_understood_request_record>/u);
@@ -128,11 +128,11 @@ const conditionalHeads = [...workspaceAgent.matchAll(/if\s*\([^)]*[Uu]nderstoodR
 assert.deepEqual(
   conditionalHeads,
   [
+    // settleUnderstood (classic batch and pi turn): upgrade the run's OWN record with the observed outcome.
+    "if (runUnderstoodRequest === null || this.latestUnderstoodRequest !== runUnderstoodRequest",
     // persistAssistantMessage: bind the run's OWN record to its message.
     "if ( runUnderstoodRequest !== null && this.latestUnderstoodRequest === runUnderstoodRequest && runUnderstoodRequest.messageId === null",
-    // post-batch: upgrade the run's OWN record with the observed outcome.
-    "if ( runUnderstoodRequest !== null && this.latestUnderstoodRequest === runUnderstoodRequest && action.commands.some(isMutatingWorkspaceCommand",
-    // prompt build: read the chat's record back to YunYun as context so she can
+    // prompt build: read the chat's record back to Mari as context so she can
     // explain her own interpretation when asked - inclusion-only, never a gate.
     "if (understoodRequestRecord !== null && understoodRequestRecord.chatId === chatId",
   ],
@@ -159,15 +159,16 @@ for (const file of [
 }
 
 // ── Client: visible by default, truncated one row, expandable ───────────────
+// M5a (slice 36): the line is the turn's "Goal" (renderGoal); its expansion state is `expanded`.
 const mariChat = readSource("packages/client/src/components/chat/HomeProfessorMariChat.tsx");
 assert.match(
   mariChat,
-  /latestUnderstoodRequest\.messageId === message\.id/u,
+  /latestUnderstoodRequest\?\.messageId === message\.id/u,
   "the line anchors to the reply its round produced",
 );
 assert.match(
   mariChat,
-  /understoodRequestExpanded \? "min-w-0 whitespace-pre-wrap break-words" : "min-w-0 truncate"/u,
+  /expanded \? "min-w-0 whitespace-pre-wrap break-words" : "min-w-0 truncate"/u,
   "one-row truncation with click-to-expand; break-words so an unbreakable token cannot widen the transcript",
 );
 // Expansion is keyed by messageId, so it can never carry over to the next
@@ -179,22 +180,17 @@ assert.match(mariChat, /MARI_PERMISSIONS_MODE_LABELS\[understoodRequest\.permiss
 assert.match(mariChat, /actingOnOutcomeApplied/u);
 assert.match(mariChat, /actingOnOutcomeFailed/u);
 assert.match(mariChat, /actingOnOutcomeInterrupted/u);
+assert.match(mariChat, /aria-expanded=\{expanded\}/u, "the disclosure exposes its expanded state to assistive tech");
 assert.match(
   mariChat,
-  /aria-expanded=\{understoodRequestExpanded\}/u,
-  "the disclosure exposes its expanded state to assistive tech",
-);
-assert.match(
-  mariChat,
-  /actingOnCollapse"\s*\n?\s*: "ui\.chat\.homeprofessormarichat\.actingOnExpand"/u,
+  /expanded \? "ui\.chat\.homeprofessormarichat\.actingOnCollapse" : "ui\.chat\.homeprofessormarichat\.actingOnExpand"/u,
   "the tooltip switches between expand and collapse wording",
 );
 assert.match(mariChat, /understoodRequest\.outcome === "held"/u);
 
 const enJson = JSON.parse(readSource("packages/client/src/localization/locales/en.json")) as Record<string, string>;
 for (const key of [
-  "ui.chat.homeprofessormarichat.actingOnValue1",
-  "ui.chat.homeprofessormarichat.actingOnNothingReported",
+  "ui.chat.homeprofessormarichat.goalQuote",
   "ui.chat.homeprofessormarichat.actingOnExpand",
   "ui.chat.homeprofessormarichat.actingOnCollapse",
   "ui.chat.homeprofessormarichat.actingOnModeOutcomeValue1Value2",
@@ -207,13 +203,13 @@ for (const key of [
 }
 assert.match(
   enJson["ui.panels.advancedsettings.supportDiagnosticsDescription"] ?? "",
-  /Professor YunYun/u,
-  "the Support Diagnostics description discloses that the copy can carry the YunYun phrase",
+  /Professor Mari/u,
+  "the Support Diagnostics description discloses that the copy can carry the Mari phrase",
 );
 
 // ── Diagnostics: the triage line distinguishes unreachable / none / recorded ─
 const diagnostics = readSource("packages/client/src/lib/support-diagnostics.ts");
-assert.match(diagnostics, /YunYun last acted on:/u);
+assert.match(diagnostics, /Professor Mari last acted on:/u);
 assert.match(diagnostics, /Unavailable \(workspace status not reachable\)/u);
 assert.match(diagnostics, /none recorded this session/u);
 // The phrase is flattened and capped for the line-oriented report (a
@@ -242,4 +238,4 @@ assert.match(
   "the status fetch carries a deadline - a frozen host must not leave the copy button disabled (#5657)",
 );
 
-console.log("YunYun understood-request regression passed.");
+console.log("Mari understood-request regression passed.");

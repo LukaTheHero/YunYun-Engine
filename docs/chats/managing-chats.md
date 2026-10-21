@@ -1,6 +1,6 @@
 # Managing Your Chat List
 
-This guide covers the chat list in YunYun Engine. It explains the three mode tabs and how to create, import, rename, delete, organize, search, and bulk-manage your chats. It also covers the recent chats row on the Home screen.
+This guide covers the chat list in Marinara Engine. It explains the three mode tabs and how to create, import, rename, delete, organize, search, and bulk-manage your chats. It also covers the recent chats widget on the Home screen.
 
 ## The chat list and mode tabs
 
@@ -24,19 +24,19 @@ Some rows show a small branch icon with a number. This means the chat has more t
 
 The new chat is named **New Conversation**, **New Roleplay**, or **New Game**. You can rename it later (see Renaming a chat below).
 
-You need at least one connection before a chat will open. A connection links YunYun to an AI provider. If you have no connection yet, a **Set Up** window appears instead of the chat. It asks you to choose a connection first. If you have none at all, it shows **No connections found** with an **Open Connections** button. To set one up, see [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).
+You need at least one connection before a chat will open. A connection links Marinara to an AI provider. If you have no connection yet, a **Set Up** window appears instead of the chat. It asks you to choose a connection first. If you have none at all, it shows **No connections found** with an **Open Connections** button. To set one up, see [Connecting to an AI Provider](../connections/connecting-to-a-provider.md).
 
-If you saved a starred default settings profile for that mode, YunYun applies it to the new chat automatically. See [Chat Settings Overview](chat-settings.md).
+If you saved a starred default settings profile for that mode, Marinara applies it to the new chat automatically. See [Chat Settings Overview](chat-settings.md).
 
 ## Importing a chat
 
-You can import a chat log saved as a `.jsonl` file, from SillyTavern or from YunYun.
+You can import a chat log saved as a `.jsonl` file, from SillyTavern or from Marinara.
 
 1. Pick the mode tab you want the imported chat to land in.
-2. Click the **Import** button near the top of the panel. Its tooltip reads **Import SillyTavern or YunYun chat JSONL**.
+2. Click the **Import** button near the top of the panel. Its tooltip reads **Import SillyTavern or Marinara chat JSONL**.
 3. Choose your `.jsonl` file.
 
-YunYun creates a new chat in the current tab's mode and opens it. You should see a message that reads **Imported N messages**, where N is the message count.
+Marinara creates a new chat in the current tab's mode and opens it. You should see a message that reads **Imported N messages**, where N is the message count.
 
 For all the ways to import and export chats, including bulk import and export formats, see [Exporting and Importing Chats](export-import.md).
 
@@ -81,7 +81,7 @@ To rename a folder, double-click it, double-tap it, or focus it and press F2. Re
 
 To delete a folder, click the trash button on the folder row. A dialog titled **Delete Folder** confirms it. Deleting a folder never deletes the chats inside it. Those chats move back to the top level.
 
-To reorder folders, drag them up or down by the grip handle.
+To reorder folders, drag a folder row up or down. A gap opens where it will land. The sort menu then switches to **Custom**, which keeps your folder order.
 
 To move a chat into a folder, drag its row onto the folder. To take a chat out of every folder, drag it onto the empty area below the folders. On a touch screen, press and hold a chat for about half a second to start dragging. If you have several chats selected, dragging one of them moves the whole selection.
 
@@ -91,10 +91,13 @@ Chats that are not in any folder appear in a plain list below the folders.
 
 Each mode tab has its own search box at the top of the list. The placeholder text changes per tab: **Search conversations...**, **Search roleplays...**, or **Search games...**. The search matches the chat name, its tags, and the names of its characters. It does not search inside message text.
 
-Next to the search box is a sort menu with the tooltip **Sort chats**. It has four options:
+Next to the search box is a sort menu with the tooltip **Sort chats**. It has these options:
 
-- **Newest**, the default, shows the most recently active chats first.
-- **Oldest** shows the least recently active first.
+- **Custom** keeps your folders in the order you dragged them into.
+- **Manual order** lets you drag chats into your own order. With a keyboard, focus a chat and press Alt+Up or Alt+Down.
+- **Recent**, the default, shows the most recently active chats first.
+- **Newest** shows the most recently created chats first.
+- **Oldest** shows the oldest chats first.
 - **A-Z** sorts by name from A to Z.
 - **Z-A** sorts by name from Z to A.
 
@@ -118,7 +121,7 @@ To leave selection mode without acting, click the select button again. Switching
 
 ## Recent Chats on the Home screen
 
-The Home screen shows a compact **Recent Chats** row with your three most recently active chats. Each chat appears as a small chip with an avatar, a mode badge, and the chat name. Click a chip to open that chat. If you have no chats yet, the row reads **No chats yet**.
+The Home screen has a **Recent chats** widget with your most recently active chats. Each chat shows its name, a mode badge and its last message. Click a chat to open it, or click an empty part of the widget to open the chat list. If you have no chats yet, the widget reads **Your chats will show here**. See [Home widgets](../home/welcome.md#home-widgets).
 
 ## Related guides
 
