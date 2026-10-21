@@ -197,11 +197,12 @@ async function setStore(page: Page, updates: Record<string, string>) {
   }, updates);
 }
 
-for (const [preset, theme] of [
-  ["dottore", "dark"],
-  ["mari", "light"],
+for (const [preset, theme, shape] of [
+  ["mari", "dark", "cut-corner"],
+  ["mari", "light", "preset"],
 ] as const) {
-  test(`Game widgets, side remarks, sheets, logs, Inventory and Journal follow ${preset} styling in ${theme} mode`, async ({
+  const cut = shape === "cut-corner";
+  test(`Game widgets, side remarks, sheets, logs, Inventory and Journal follow ${preset}${cut ? " cut-corner" : ""} styling in ${theme} mode`, async ({
     page,
     request,
     isMobile,
@@ -368,6 +369,10 @@ for (const [preset, theme] of [
       // A preset alone styles windows, not chat surfaces.
       await setStore(page, { setChatWidgetPreset: preset });
       await expect(page.locator("html")).toHaveAttribute("data-chat-widget-preset", preset);
+      if (cut) {
+        await setStore(page, { setChatWidgetShape: shape });
+        await expect(page.locator("html")).toHaveAttribute("data-chat-widget-shape", shape);
+      }
       await expectBaseline(await measure());
       await closeSheet();
       const [journalText, windowText] = await journalWhite();
@@ -389,7 +394,7 @@ for (const [preset, theme] of [
       await application(page, ["shape"]);
       const shaped = await measure();
       const reference = shaped.get("narration")!;
-      if (preset === "dottore") expect(reference.clip).toContain("polygon");
+      if (cut) expect(reference.clip).toContain("polygon");
       else expect(reference.radius).not.toBe(baseline.get("narration")!.radius);
       for (const [name, value] of shaped) {
         if (name === "narration") continue;
@@ -398,13 +403,13 @@ for (const [preset, theme] of [
         const [paint, oldPaint] = await pixels(page, [value.background, old.background]);
         expect(paint, `${name} keeps its fill`).toBe(oldPaint);
         // A cut control paints its corner marks as images on the same layer.
-        if (name !== "pill" || preset !== "dottore") expect(value.image).toBe(old.image);
+        if (name !== "pill" || !cut) expect(value.image).toBe(old.image);
         if (name === "pill") {
-          if (preset === "dottore") expect(value.clip).toContain("polygon");
+          if (cut) expect(value.clip).toContain("polygon");
           else expect(value.radius).not.toBe(old.radius);
-        } else if (preset === "dottore") expect(value.clip, `${name} has cut corners`).toBe(reference.clip);
+        } else if (cut) expect(value.clip, `${name} has cut corners`).toBe(reference.clip);
         else expect(value.radius, `${name} has the arched shape`).toBe(reference.radius);
-        if (isSection(name) && preset === "dottore") expect(value.sectionClip, `${name} is cut`).toContain("polygon");
+        if (isSection(name) && cut) expect(value.sectionClip, `${name} is cut`).toContain("polygon");
       }
       await shoot("shape-sheet");
       await closeSheet();
@@ -448,7 +453,7 @@ for (const [preset, theme] of [
         if (name === "narration" || name === "pill") continue;
         expect(value.font).toBe(font);
         expect(value.textFill).toBe(palette.textFill);
-        if (preset === "dottore") expect(value.clip).toBe(reference.clip);
+        if (cut) expect(value.clip).toBe(reference.clip);
         else {
           expect(value.radius).toBe(reference.radius);
           expect(value.background).toBe(palette.background);
@@ -668,8 +673,9 @@ for (const mode of ["classic", "tactical"] as const) {
       await page.screenshot({ path: info.outputPath(`combat-${mode}-default.png`), animations: "disabled" });
 
       // A preset alone keeps them as they are, like the other chat surfaces.
-      await setStore(page, { setChatWidgetPreset: "dottore" });
-      await expect(page.locator("html")).toHaveAttribute("data-chat-widget-preset", "dottore");
+      await setStore(page, { setChatWidgetPreset: "mari", setChatWidgetShape: "cut-corner" });
+      await expect(page.locator("html")).toHaveAttribute("data-chat-widget-preset", "mari");
+      await expect(page.locator("html")).toHaveAttribute("data-chat-widget-shape", "cut-corner");
       expect(await read()).toEqual(baseline);
 
       await application(page, ["font", "shape", "colors"]);
@@ -678,12 +684,12 @@ for (const mode of ["classic", "tactical"] as const) {
         return [root.getPropertyValue("--mari-widget-bg"), root.getPropertyValue("--mari-widget-text")];
       });
       const styled = await read();
-      await page.screenshot({ path: info.outputPath(`combat-${mode}-dottore.png`), animations: "disabled" });
+      await page.screenshot({ path: info.outputPath(`combat-${mode}-mari-cut-corner.png`), animations: "disabled" });
       for (const name of expected) {
         const value = styled[name]!;
-        expect(value.font, `${name} uses the Dottore font`).toContain("monospace");
+        expect(value.font, `${name} uses the YunYun font`).toContain("Iowan Old Style");
         expect(value.sectionClip, `${name} has cut corners`).toContain("polygon");
-        expect(await pixels(page, [value.background, value.textFill]), `${name} uses the Dottore colors`).toEqual(
+        expect(await pixels(page, [value.background, value.textFill]), `${name} uses the YunYun colors`).toEqual(
           await pixels(page, palette),
         );
       }

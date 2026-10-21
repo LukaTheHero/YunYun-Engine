@@ -26,7 +26,7 @@ test.use({
 const version = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string })
   .version;
 const REPLY = [
-  'Maukie beams at you, delighted. "This is wonderful, I am so happy you came!"',
+  'Tobias beams at you, delighted. "This is wonderful, I am so happy you came!"',
   'Then her face falls and she sobs quietly. "But I miss him so much, it hurts."',
   'She clenches her fists, furious. "I am furious, I hate them!"',
 ].join("\n\n");
@@ -292,7 +292,7 @@ for (const kind of ["2d", "3d"] as const) {
           treatAsLocalEndpoint: true,
           maxContext: 32768,
         });
-        const character = await create("/api/characters", { data: { name: "Maukie", first_mes: "" } });
+        const character = await create("/api/characters", { data: { name: "Tobias", first_mes: "" } });
         if (kind === "2d") {
           for (const [expression, [r, g, b]] of Object.entries(SPRITES)) {
             const png = await paintPng(50, 100, solid(r, g, b));
@@ -305,7 +305,7 @@ for (const kind of ["2d", "3d"] as const) {
           const imported = await request.post(`/api/avatar-models/character/${character.id}/import`, {
             multipart: {
               kind: "vrm",
-              file: { name: "maukie.vrm", mimeType: "model/gltf-binary", buffer: expressiveVrm() },
+              file: { name: "tobias.vrm", mimeType: "model/gltf-binary", buffer: expressiveVrm() },
             },
           });
           expect(imported.ok(), await imported.text()).toBeTruthy();
@@ -338,8 +338,8 @@ for (const kind of ["2d", "3d"] as const) {
           role: "assistant",
           content:
             mode === "game"
-              ? '[Maukie] [happy]: "Ah, I am so happy you came. This is wonderful, and I have so much to tell you about today."'
-              : "Maukie waits by the window.",
+              ? '[Tobias] [happy]: "Ah, I am so happy you came. This is wonderful, and I have so much to tell you about today."'
+              : "Tobias waits by the window.",
         });
 
         await page.route("**/api/app-settings/ui", (route) => route.fulfill({ json: { value: "" } }));
@@ -415,7 +415,7 @@ for (const kind of ["2d", "3d"] as const) {
 
         if (mode === "game") releaseGameVoice();
         else {
-          await page.locator("textarea[data-chat-composer]").fill("Hi Maukie.");
+          await page.locator("textarea[data-chat-composer]").fill("Hi Tobias.");
           await page.locator("button.mari-chat-send-btn").click();
         }
         const sentAt = (await read(page)).frames.at(-1)?.[0] ?? 0;

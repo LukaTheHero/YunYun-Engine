@@ -6,7 +6,7 @@ test.use({ actionTimeout: 10000 });
 
 const readMetadata = (chat: any) => (typeof chat.metadata === "string" ? JSON.parse(chat.metadata) : chat.metadata);
 const version = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
-async function fixture(request: APIRequestContext, mode: "conversation" | "roleplay" | "game", name = "Dottore") {
+async function fixture(request: APIRequestContext, mode: "conversation" | "roleplay" | "game", name = "Leopold") {
   const character = await (await request.post("/api/characters", { data: { data: { name, first_mes: "" } } })).json();
   const chat = await (
     await request.post("/api/chats", { data: { name: "The experiment", mode, characterIds: [character.id] } })
@@ -212,7 +212,7 @@ for (const [mode, style] of [
       await page.reload();
       const quote = page.locator("[data-message-reply]");
       await expect(quote).toContainText("selected phrase");
-      await expect(quote).toContainText("Dottore");
+      await expect(quote).toContainText("Leopold");
       await row.hover();
       if (!isMobile) {
         await expect(row.locator(".mari-message-actions")).toHaveCSS("opacity", "1");
@@ -359,8 +359,8 @@ test("4K maximum display and chat font keep the composer and scrolling usable", 
 });
 
 test("Game setup offers library cards in both the GM and party pickers", async ({ page, request }, info) => {
-  // A name of its own: the pickers list the whole library, which may hold another spec's leftover Dottore.
-  const name = `Dottore ${Date.now()}`;
+  // A name of its own: the pickers list the whole library, which may hold another spec's leftover Leopold.
+  const name = `Leopold ${Date.now()}`;
   const data = await fixture(request, "game", name);
   try {
     // A new game deliberately starts with no active party.

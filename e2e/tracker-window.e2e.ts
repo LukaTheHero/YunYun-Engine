@@ -452,16 +452,24 @@ test("detached tracker lists retain their final border in every widget preset an
     const window = page.locator('.mari-window[data-window="drawer:trackers:tracker-world"]');
     const fields = window.locator('.mari-drawer[data-detached="true"]');
     await expect(window.getByText("Harbor market", { exact: true })).toBeVisible();
-    for (const preset of ["default", "dottore", "mari"] as const) {
-      await page.evaluate(async (preset) => {
-        const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
-        useUIStore.getState().setChatWidgetPreset(preset);
-      }, preset);
+    for (const [preset, shape] of [
+      ["default", "preset"],
+      ["mari", "preset"],
+      ["mari", "cut-corner"],
+    ] as const) {
+      await page.evaluate(
+        async ({ preset, shape }) => {
+          const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
+          useUIStore.getState().setChatWidgetPreset(preset);
+          useUIStore.getState().setChatWidgetShape(shape);
+        },
+        { preset, shape },
+      );
       await expect(fields).toHaveCSS("border-bottom-width", "1px");
       await expect(fields).toHaveCSS("border-bottom-style", "solid");
       await expect(fields).not.toHaveCSS("border-bottom-color", "rgba(0, 0, 0, 0)");
       await window.screenshot({
-        path: testInfo.outputPath(`detached-tracker-border-${preset}.png`),
+        path: testInfo.outputPath(`detached-tracker-border-${preset}-${shape}.png`),
         animations: "disabled",
       });
       await page.evaluate(async () => {

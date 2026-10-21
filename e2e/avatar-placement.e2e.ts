@@ -164,15 +164,15 @@ for (const mode of ["roleplay", "game"] as const) {
     test.setTimeout(180_000);
     const mobile = isMobile ? browserName : null;
     const characters: Array<{ id: string }> = [];
-    for (const name of ["Maukie", "Pip"]) {
+    for (const name of ["Tobias", "Pip"]) {
       const created = await request.post("/api/characters", { data: { data: { name } } });
       expect(created.ok(), await created.text()).toBeTruthy();
       characters.push((await created.json()) as { id: string });
     }
-    const [maukie, pip] = characters as [{ id: string }, { id: string }];
+    const [tobias, pip] = characters as [{ id: string }, { id: string }];
     let chatId: string | undefined;
     try {
-      const imported = await request.post(`/api/avatar-models/character/${maukie.id}/import`, {
+      const imported = await request.post(`/api/avatar-models/character/${tobias.id}/import`, {
         multipart: {
           kind: "vrm",
           file: { name: "uploaded.vrm", mimeType: "model/gltf-binary", buffer: tripoMadeVrm() },
@@ -180,7 +180,7 @@ for (const mode of ["roleplay", "game"] as const) {
       });
       expect(imported.ok(), await imported.text()).toBeTruthy();
       const createdChat = await request.post("/api/chats", {
-        data: { name: `Avatar layout ${mode}`, mode, characterIds: [maukie.id, pip.id] },
+        data: { name: `Avatar layout ${mode}`, mode, characterIds: [tobias.id, pip.id] },
       });
       expect(createdChat.ok(), await createdChat.text()).toBeTruthy();
       chatId = ((await createdChat.json()) as { id: string }).id;
@@ -209,7 +209,7 @@ for (const mode of ["roleplay", "game"] as const) {
       await page.route("**/api/avatar-models", async (route) => {
         const response = await route.fetch();
         const rows = (await response.json()) as Array<{ owner: { ownerId: string } }>;
-        await route.fulfill({ response, json: rows.filter((row) => row.owner.ownerId === maukie.id) });
+        await route.fulfill({ response, json: rows.filter((row) => row.owner.ownerId === tobias.id) });
       });
       // Pip's expression sprites make a 2D (PNGTuber) avatar.
       await page.route(`**/api/sprites/${pip.id}`, (route) =>
@@ -241,8 +241,8 @@ for (const mode of ["roleplay", "game"] as const) {
       );
       await page.goto("/");
       const stage = page.locator("[data-avatar-stage]");
-      const vrm = stage.locator(`[data-avatar-owner="${maukie.id}"]`);
-      const vrmCanvas = vrm.getByRole("img", { name: "Maukie's avatar" });
+      const vrm = stage.locator(`[data-avatar-owner="${tobias.id}"]`);
+      const vrmCanvas = vrm.getByRole("img", { name: "Tobias's avatar" });
       const png = stage.locator(`[data-avatar-owner="${pip.id}"]`);
       const pngCanvas = png.getByRole("img", { name: "Pip's avatar" });
       const narration = page.locator('[data-component="GameNarration.ActivePanel"]');
@@ -289,7 +289,7 @@ for (const mode of ["roleplay", "game"] as const) {
       // Framing is for 3D avatars only.
       await pick(pip.id);
       await expect(framing("Full body")).toHaveCount(0);
-      await pick(maukie.id);
+      await pick(tobias.id);
       await expect(framing("Portrait")).toHaveAttribute("aria-pressed", "true");
       await framing("Full body").click();
       await expect(framing("Full body")).toHaveAttribute("aria-pressed", "true");
@@ -304,7 +304,7 @@ for (const mode of ["roleplay", "game"] as const) {
       // The size slider resizes both kinds, and the 3D canvas redraws at its new size instead of stretching.
       const heights = { vrm: (await vrmCanvas.boundingBox())!.height, png: (await pngCanvas.boundingBox())!.height };
       for (const [ownerId, name] of [
-        [maukie.id, "Maukie"],
+        [tobias.id, "Tobias"],
         [pip.id, "Pip"],
       ] as const) {
         await pick(ownerId);
@@ -401,13 +401,13 @@ for (const mode of ["roleplay", "game"] as const) {
       await expect(vrm).toHaveCSS("pointer-events", "none");
       await expect(page.getByRole("button", { name: /arrange/i })).toHaveCount(0);
       await openAvatars();
-      await pick(maukie.id);
+      await pick(tobias.id);
       await expect(framing("Full body")).toHaveAttribute("aria-pressed", "true");
-      await expect(avatars.getByRole("slider", { name: "Maukie's avatar size" })).toHaveValue("70");
+      await expect(avatars.getByRole("slider", { name: "Tobias's avatar size" })).toHaveValue("70");
       await page.screenshot({ path: info.outputPath(`${mode}-${isMobile ? "phone" : "desktop"}-restored.png`) });
     } finally {
       if (chatId) await request.delete(`/api/chats/${chatId}`).catch(() => undefined);
-      await request.delete(`/api/avatar-models/character/${maukie.id}`).catch(() => undefined);
+      await request.delete(`/api/avatar-models/character/${tobias.id}`).catch(() => undefined);
       for (const character of characters)
         await request.delete(`/api/characters/${character.id}`).catch(() => undefined);
     }

@@ -26,7 +26,7 @@ const IMMERSIVE_HTML = [
   `<p>${CORA.name} says "Fine silks" softly.</p>`,
 ].join("\n");
 type Theme = "dark" | "light";
-const PRESETS = ["default", "mari", "dottore"] as const;
+const PRESETS = ["default", "mari"] as const;
 
 async function createFixture(request: APIRequestContext, mode: "roleplay" | "game") {
   const ids: { characters: string[]; chat?: string; persona?: string } = { characters: [] };
@@ -181,7 +181,7 @@ async function expectOwnColor(target: Locator, rgb: string, label: string) {
   expect(await paint(target), label).toEqual({ color: rgb, fill: rgb, image: "none" });
 }
 
-async function setPreset(page: Page, preset: "default" | "mari" | "dottore", applyColors: boolean) {
+async function setPreset(page: Page, preset: (typeof PRESETS)[number], applyColors: boolean) {
   await setStore(page, { setChatWidgetPreset: preset, setChatWidgetApplyColors: applyColors });
   if (preset === "default") await expect(page.locator("html")).not.toHaveAttribute("data-chat-widget-preset");
   else await expect(page.locator("html")).toHaveAttribute("data-chat-widget-preset", preset);

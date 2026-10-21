@@ -9,7 +9,7 @@ const APP_VERSION = (
 ).version;
 const UI_SETTINGS_PATH = "/api/app-settings/ui";
 const CHAT_NAME_WINDOW = "drawer:chat-settings:chat-name";
-type Preset = "default" | "dottore" | "mari";
+type Preset = "default" | "mari";
 const EMPTY_COLORS = { border: "", background: "", text: "" };
 const APPLY_NONE = { font: false, shape: false, colors: false };
 const GRADIENT_COLORS = {
@@ -19,15 +19,9 @@ const GRADIENT_COLORS = {
 };
 const PALETTES = {
   dark: {
-    dottore: { background: "oklch(0.235 0.03 252)", accent: "oklch(0.83 0.095 218)", field: "oklch(0.275 0.035 250)" },
     mari: { background: "oklch(0.235 0.035 275)", accent: "oklch(0.8 0.08 82)", field: "oklch(0.27 0.035 275)" },
   },
   light: {
-    dottore: {
-      background: "oklch(0.965 0.014 238)",
-      accent: "oklch(0.415 0.075 230)",
-      field: "oklch(0.935 0.023 243)",
-    },
     mari: { background: "oklch(0.975 0.012 80)", accent: "oklch(0.425 0.088 253)", field: "oklch(0.95 0.018 268)" },
   },
 } as const;
@@ -115,13 +109,13 @@ async function openAppearance(page: Page) {
   await expect(controls).toBeVisible();
   await expect(controls).toHaveCSS("border-top-width", "0px");
   const cards = controls.locator("[data-chat-widget-preset-option]");
-  await expect(cards).toHaveCount(3);
+  await expect(cards).toHaveCount(2);
   await expect
     .poll(() =>
       cards.evaluateAll((elements) => Math.min(...elements.map((element) => element.getBoundingClientRect().width))),
     )
     .toBeGreaterThanOrEqual(150);
-  for (const preset of ["dottore", "mari"]) {
+  for (const preset of ["mari"]) {
     const insets = await controls
       .locator(`[data-chat-widget-preset-option="${preset}"] .mari-window`)
       .evaluate((element) => {
@@ -138,7 +132,7 @@ async function openAppearance(page: Page) {
   const theme = (await root.getAttribute("data-theme")) as "dark" | "light";
   await root.evaluate((element) => element.setAttribute("data-marinara-accent-animation", "pulse"));
   try {
-    for (const preset of ["dottore", "mari"] as const) {
+    for (const preset of ["mari"] as const) {
       const preview = controls.locator(`[data-chat-widget-preview][data-chat-widget-preset="${preset}"]`);
       const customBorder = await preview.evaluate((element) =>
         getComputedStyle(element).getPropertyValue("--mari-widget-custom-border-solid").trim(),
@@ -318,7 +312,7 @@ async function expectButtonRing(page: Page, bubble: Locator, preset: Preset) {
 async function exerciseColorControls(page: Page, preset: Preset, theme: "dark" | "light") {
   let controls = await openAppearance(page);
   const untouched = [];
-  for (const other of ["default", "dottore", "mari"] as const) {
+  for (const other of ["default", "mari"] as const) {
     if (other !== preset) {
       const preview = controls.locator(`[data-chat-widget-preview][data-chat-widget-preset="${other}"]`);
       untouched.push({ preset: other, appearance: await previewAppearance(preview) });
@@ -392,7 +386,7 @@ async function exerciseColorControls(page: Page, preset: Preset, theme: "dark" |
     await expect.poll(async () => (await readPreferences(page)).colors).toEqual(remaining);
     await expect(page.locator("html")).not.toHaveAttribute("data-chat-widget-colors", new RegExp(`\\b${role}\\b`));
   }
-  if (preset === "dottore") {
+  if (preset === "mari") {
     const textPicker = controls.locator('[data-chat-widget-color="text"]');
     const trigger = textPicker.locator(":scope > div > button");
     await trigger.click();
@@ -453,6 +447,23 @@ async function drag(page: Page, element: Locator, dx: number, dy: number) {
   await page.mouse.down();
   await page.mouse.move(x + dx, y + dy, { steps: 8 });
   await page.mouse.up();
+}
+
+async function chooseShape(page: Page, shape: "preset" | "cut-corner") {
+  const controls = await openAppearance(page);
+  await controls.locator("#chat-widget-shape").selectOption(shape);
+  await expect.poll(async () => (await readPreferences(page)).shape).toBe(shape);
+  await clickTopbarPanel(page, "settings");
+  await expect(controls).toBeHidden();
+}
+
+async function expectCutCornerFrame(page: Page) {
+  const settings = await openChatSettings(page);
+  // The shadow must follow the painted cut frame, while handles and the crest stay unclipped.
+  await expect(settings).toHaveCSS("box-shadow", "none");
+  await expect(settings).toHaveCSS("filter", /drop-shadow\(/);
+  await expect(settings).toHaveCSS("clip-path", "none");
+  await closeChatSettings(page);
 }
 
 async function expectCustomColorsKeepCutCorners(page: Page) {
@@ -524,7 +535,7 @@ async function exerciseWindow(page: Page, desktop: boolean) {
   await expect(settings.locator('[data-drawer="chat-name"]')).toBeVisible();
 }
 
-async function expectCompactFramedWidgets(page: Page, preset: "dottore" | "mari", theme: string) {
+async function expectCompactFramedWidgets(page: Page, preset: "mari", theme: string) {
   const settings = await openChatSettings(page);
   const header = settings.locator(".mari-window__header");
   const grip = settings.locator(".mari-window__resize-grip");
@@ -539,12 +550,6 @@ async function expectCompactFramedWidgets(page: Page, preset: "dottore" | "mari"
     "url(",
   );
   expect(await header.evaluate((element) => getComputedStyle(element, "::after").content)).not.toBe("none");
-  if (preset === "dottore") {
-    // The shadow must follow the painted cut frame, while handles and the crest stay unclipped.
-    await expect(settings).toHaveCSS("box-shadow", "none");
-    await expect(settings).toHaveCSS("filter", /drop-shadow\(/);
-    await expect(settings).toHaveCSS("clip-path", "none");
-  }
   // Read both rows in one frame while the phone sheet animates into place.
   await expect
     .poll(() =>
@@ -630,11 +635,9 @@ for (const theme of ["dark", "light"] as const) {
       expect(baseline.header.background).toBe("rgba(0, 0, 0, 0)");
       expect(baseline.drawer.background).toBe("rgba(0, 0, 0, 0)");
       expect(baseline.bubble.radius).toBe(await resolvedStyle(page, "border-radius", "calc(var(--radius) + 0.125rem)"));
-      const appearances: Awaited<ReturnType<typeof measureWidgets>>[] = [];
-      for (const preset of ["dottore", "mari"] as const) {
+      for (const preset of ["mari"] as const) {
         await choosePreset(page, preset);
         const appearance = await measureWidgets(page);
-        appearances.push(appearance);
         const palette = PALETTES[theme][preset];
         expect(
           await page
@@ -644,14 +647,22 @@ for (const theme of ["dark", "light"] as const) {
         expect(appearance.frame.background).toBe(await resolvedStyle(page, "color", palette.background));
         expect(appearance.title.color).toBe(await resolvedStyle(page, "color", palette.accent));
         expect(appearance.drawer.background).toBe(await resolvedStyle(page, "color", palette.field));
-        expect(appearance.title.font).toContain(preset === "dottore" ? "monospace" : "serif");
+        expect(appearance.title.font).toContain("serif");
         expect(appearance.frame.background).not.toBe(baseline.frame.background);
         expect(appearance.window.clip).toBe("none");
-        if (preset === "dottore") expect(appearance.frame.clip).toContain("polygon(");
         expect(appearance.header).not.toEqual(baseline.header);
         expect(appearance.drawer).not.toEqual(baseline.drawer);
         expect(appearance.bubble).not.toEqual(baseline.bubble);
-        if (preset === "dottore") await expectCustomColorsKeepCutCorners(page);
+        // Cut corners are an explicit shape choice; the preset's palette must survive the cut frame.
+        await chooseShape(page, "cut-corner");
+        const cut = await measureWidgets(page);
+        expect(cut.window.clip).toBe("none");
+        expect(cut.frame.clip).toContain("polygon(");
+        expect(cut.frame.background).toBe(appearance.frame.background);
+        await expectCutCornerFrame(page);
+        await expectCustomColorsKeepCutCorners(page);
+        await chooseShape(page, "preset");
+        expect(await measureWidgets(page)).toEqual(appearance);
         await exerciseWindow(page, testInfo.project.name.includes("desktop"));
         await expectCompactFramedWidgets(page, preset, theme);
         await page.screenshot({
@@ -661,7 +672,6 @@ for (const theme of ["dark", "light"] as const) {
         await closeChatSettings(page);
         await exerciseColorControls(page, preset, theme);
       }
-      expect(appearances[0]).not.toEqual(appearances[1]);
       await choosePreset(page, "default");
       expect(await measureWidgets(page)).toEqual(baseline);
       if (theme === "light" && testInfo.project.name.includes("desktop")) {
@@ -699,7 +709,7 @@ test("widget font, shape and color choices survive reload and a fresh browser, a
       .poll(() => readPreferences(page))
       .toEqual({ preset: "default", font: "", shape: "preset", colors: EMPTY_COLORS, apply: APPLY_NONE, ready: true });
     const baseline = await measureWidgets(page);
-    await choosePreset(page, "dottore");
+    await choosePreset(page, "mari");
     const preset = await measureWidgets(page);
     let controls = await openAppearance(page);
     for (const role of ["font", "shape", "colors"] as const) {
@@ -711,22 +721,22 @@ test("widget font, shape and color choices survive reload and a fresh browser, a
     await setChatStyleApplication(controls, "colors", true);
     const apply = { font: true, shape: true, colors: true };
     // Changing the visual preset must not silently opt the chat back out of any selected scope.
+    await controls.locator('[data-chat-widget-preset-option="default"]').click();
+    await expect.poll(async () => (await readPreferences(page)).apply).toEqual(apply);
     await controls.locator('[data-chat-widget-preset-option="mari"]').click();
     await expect.poll(async () => (await readPreferences(page)).apply).toEqual(apply);
-    await controls.locator('[data-chat-widget-preset-option="dottore"]').click();
-    await expect.poll(async () => (await readPreferences(page)).apply).toEqual(apply);
-    await controls.locator("#chat-widget-font").selectOption("@serif");
+    await controls.locator("#chat-widget-font").selectOption("@mono");
     await controls.locator("#chat-widget-shape").selectOption("square");
     await setGradientColors(controls);
     await clickTopbarPanel(page, "settings");
     const square = await measureWidgets(page);
-    expect(square.title.font).toContain("serif");
+    expect(square.title.font).toContain("monospace");
     expect(square.title.font).not.toBe(preset.title.font);
     expect(square.window.radius).toBe("0px");
     expect(square.bubble.radius).toBe("0px");
     const expected = {
-      preset: "dottore",
-      font: "@serif",
+      preset: "mari",
+      font: "@mono",
       shape: "square",
       colors: GRADIENT_COLORS,
       apply,
@@ -752,7 +762,7 @@ test("widget font, shape and color choices survive reload and a fresh browser, a
           },
         };
       })
-      .toEqual({ preset: "dottore", font: "@serif", shape: "square", colors: GRADIENT_COLORS, apply });
+      .toEqual({ preset: "mari", font: "@mono", shape: "square", colors: GRADIENT_COLORS, apply });
     await page.reload();
     await expect.poll(() => readPreferences(page)).toEqual(expected);
     expect(await measureWidgets(page)).toEqual(square);
@@ -944,11 +954,12 @@ async function originalOutline(element: Locator, ring = false) {
   }, ring);
 }
 
-for (const [preset, theme] of [
-  ["dottore", "dark"],
-  ["mari", "light"],
+for (const [preset, theme, shape] of [
+  ["mari", "dark", "cut-corner"],
+  ["mari", "light", "preset"],
 ] as const) {
-  test(`chat style switches independently extend ${preset} to each chat mode in ${theme} mode`, async ({
+  const cut = shape === "cut-corner";
+  test(`chat style switches independently extend ${preset}${cut ? " with cut corners" : ""} to each chat mode in ${theme} mode`, async ({
     page,
     request,
   }, info) => {
@@ -1005,6 +1016,7 @@ for (const [preset, theme] of [
       await page.screenshot({ path: baselinePath, animations: "disabled" });
       await info.attach("Chat style before enabling", { path: baselinePath, contentType: "image/png" });
       await choosePreset(page, preset);
+      if (cut) await chooseShape(page, shape);
       let scope = await showStyleScope(page, fixture.chats[0]!);
       const original = baseline.get("classic")!;
       const swipes = page.locator('[data-chat-mode="roleplay"] .mari-message-swipes').first();
@@ -1047,7 +1059,7 @@ for (const [preset, theme] of [
         const shaped = await surfaceAppearance(target);
         expect(shaped.background).toBe(old.background);
         expect(shaped.image).toBe(old.image);
-        if (preset === "dottore") expect(shaped.clip).toContain("polygon");
+        if (cut) expect(shaped.clip).toContain("polygon");
         else expect(shaped.radius).not.toBe(old.radius);
       }
       await expect(scope.text).toHaveCSS("font-family", original.font);
@@ -1058,10 +1070,10 @@ for (const [preset, theme] of [
       ] as const) {
         const shaped = await surfaceAppearance(target);
         expect(shaped.background).toBe(old.background);
-        if (preset === "dottore") expect(shaped.clip).toContain("polygon");
+        if (cut) expect(shaped.clip).toContain("polygon");
         else expect(shaped.radius).not.toBe(old.radius);
       }
-      if (preset === "dottore") {
+      if (cut) {
         expect(await send.evaluate((node) => getComputedStyle(node, "::after").backgroundColor)).toBe(sendFill);
         const frame = (element: Locator) =>
           element.evaluate((node) => getComputedStyle(node, "::before").backgroundColor);
@@ -1076,7 +1088,7 @@ for (const [preset, theme] of [
         page,
         fixture.chats.find((chat) => chat.mode === "game")!,
       );
-      if (preset === "dottore") {
+      if (cut) {
         for (const [element, color] of [
           [gameScope.surface, outlines.get("game")!.surface],
           [gameLog, gameLogOutline],
@@ -1145,7 +1157,7 @@ for (const [preset, theme] of [
           await expect(control).toHaveCSS("font-family", selectedFont);
           const painted = await surfaceAppearance(control);
           expect(painted.background).toBe(colored.background);
-          if (preset === "dottore") expect(painted.clip).toContain("polygon");
+          if (cut) expect(painted.clip).toContain("polygon");
         }
         const path = info.outputPath(`chat-style-${preset}-${chat.view}.png`);
         await page.screenshot({ path, animations: "disabled" });
@@ -1348,12 +1360,12 @@ test("movable button pixel size is independent, stays reachable and restores the
         return useUIStore.getState().fontSize;
       }),
     ).toBe(originalFont);
-    for (const preset of ["dottore", "mari"] as const) {
+    for (const preset of ["mari", "default"] as const) {
       await controls.locator(`[data-chat-widget-preset-option="${preset}"]`).click();
       await expect(field).toHaveValue("64");
       await expect(settingsButton).toHaveCSS("width", "64px");
     }
-    await controls.locator('[data-chat-widget-preset-option="dottore"]').click();
+    await controls.locator('[data-chat-widget-preset-option="mari"]').click();
     await field.scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath("button-size-setting.png"), animations: "disabled" });
     await closeAppearance();

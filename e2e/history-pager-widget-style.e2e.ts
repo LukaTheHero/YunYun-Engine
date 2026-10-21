@@ -117,12 +117,19 @@ async function resolvedStyle(page: Page, property: string, value: string) {
   );
 }
 
-async function setStyle(page: Page, preset: "default" | "dottore" | "mari", axes: Axis[], colors = false) {
+async function setStyle(
+  page: Page,
+  preset: "default" | "mari",
+  axes: Axis[],
+  colors = false,
+  shape: "preset" | "cut-corner" = "preset",
+) {
   await page.evaluate(
-    async ({ preset, axes, colors, gradients }) => {
+    async ({ preset, shape, axes, colors, gradients }) => {
       const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
       const ui = useUIStore.getState();
       ui.setChatWidgetPreset(preset);
+      ui.setChatWidgetShape(shape);
       ui.setChatWidgetApplyFont(axes.includes("font"));
       ui.setChatWidgetApplyShape(axes.includes("shape"));
       ui.setChatWidgetApplyColors(axes.includes("colors"));
@@ -130,9 +137,11 @@ async function setStyle(page: Page, preset: "default" | "dottore" | "mari", axes
       ui.setChatWidgetBorderColor(colors ? gradients.border : "");
       ui.setChatWidgetTextColor(colors ? gradients.text : "");
     },
-    { preset, axes, colors, gradients: GRADIENTS },
+    { preset, shape, axes, colors, gradients: GRADIENTS },
   );
   const html = page.locator("html");
+  if (shape === "preset") await expect(html).not.toHaveAttribute("data-chat-widget-shape", "cut-corner");
+  else await expect(html).toHaveAttribute("data-chat-widget-shape", shape);
   for (const axis of ["font", "shape", "colors"] as const) {
     if (axes.includes(axis)) await expect(html).toHaveAttribute(`data-chat-widget-apply-${axis}`, "true");
     else await expect(html).not.toHaveAttribute(`data-chat-widget-apply-${axis}`);
@@ -143,11 +152,12 @@ async function setStyle(page: Page, preset: "default" | "dottore" | "mari", axes
   await page.mouse.move(1, 1);
 }
 
-for (const [preset, theme] of [
-  ["dottore", "dark"],
-  ["mari", "light"],
+for (const [preset, theme, shape] of [
+  ["mari", "dark", "cut-corner"],
+  ["mari", "light", "preset"],
 ] as const) {
-  test(`Load More and Show older follow ${preset} chat styling in ${theme} mode`, async ({
+  const cut = shape === "cut-corner";
+  test(`Load More and Show older follow ${preset}${cut ? " cut-corner" : ""} chat styling in ${theme} mode`, async ({
     page,
     request,
     isMobile,
@@ -204,25 +214,25 @@ for (const [preset, theme] of [
           const baseline = await appearance(loadMore);
           // Load More shares Show older's look, so the pair reads as one control set.
           expect(await appearance(showOlder)).toEqual(baseline);
-          await setStyle(page, preset, []);
+          await setStyle(page, preset, [], false, shape);
           for (const pager of pagers) expect(await appearance(pager)).toEqual(baseline);
 
-          await setStyle(page, preset, ["font"]);
+          await setStyle(page, preset, ["font"], false, shape);
           const composer = area.locator("textarea[data-chat-composer]").first();
           const lettering = await composer.evaluate((element) => getComputedStyle(element).fontFamily);
           expect(lettering).not.toBe(baseline.font);
           for (const pager of pagers) expect(await appearance(pager)).toEqual({ ...baseline, font: lettering });
 
-          await setStyle(page, preset, ["shape"]);
+          await setStyle(page, preset, ["shape"], false, shape);
           for (const pager of pagers) {
             const shaped = await appearance(pager);
             expect(shaped.background).toBe(baseline.background);
             expect(shaped.color).toBe(baseline.color);
-            if (preset === "dottore") expect(shaped.clip).toContain("polygon(");
+            if (cut) expect(shaped.clip).toContain("polygon(");
             else expect(shaped.radius).not.toBe(baseline.radius);
           }
 
-          await setStyle(page, preset, ["colors"]);
+          await setStyle(page, preset, ["colors"], false, shape);
           const paint = await resolvedStyle(page, "background-color", "var(--mari-widget-bg)");
           const ink = await resolvedStyle(page, "color", "var(--mari-widget-accent)");
           for (const pager of pagers) {
@@ -238,18 +248,18 @@ for (const [preset, theme] of [
               .toBe(await resolvedStyle(page, "background-color", "var(--mari-widget-soft)"));
           }
 
-          await setStyle(page, preset, ["font", "shape", "colors"]);
+          await setStyle(page, preset, ["font", "shape", "colors"], false, shape);
           const styled = await appearance(loadMore);
           expect(await appearance(showOlder)).toEqual(styled);
           if (reference) expect(styled).toEqual(reference);
           else reference = styled;
           await loadMore.scrollIntoViewIfNeeded();
           await page.screenshot({
-            path: info.outputPath(`history-pager-${preset}-${theme}-${chat.mode}.png`),
+            path: info.outputPath(`history-pager-${preset}-${shape}-${theme}-${chat.mode}.png`),
             animations: "disabled",
           });
 
-          await setStyle(page, preset, ["font", "shape", "colors"], true);
+          await setStyle(page, preset, ["font", "shape", "colors"], true, shape);
           for (const pager of pagers) {
             const painted = await appearance(pager);
             expect(painted.image).toContain("102, 126, 234");
@@ -258,7 +268,7 @@ for (const [preset, theme] of [
           expect(await focusRing(page, loadMore)).toBe("rgb(255, 107, 107)");
           await loadMore.scrollIntoViewIfNeeded();
           await page.screenshot({
-            path: info.outputPath(`history-pager-${preset}-${theme}-${chat.mode}-custom.png`),
+            path: info.outputPath(`history-pager-${preset}-${shape}-${theme}-${chat.mode}-custom.png`),
             animations: "disabled",
           });
 

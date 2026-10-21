@@ -126,11 +126,12 @@ async function inViewport(target: Locator) {
   await expect(target).toBeInViewport({ ratio: 1 });
 }
 
-for (const [preset, theme] of [
-  ["dottore", "dark"],
-  ["mari", "light"],
+for (const [preset, theme, widgetShape] of [
+  ["mari", "dark", "cut-corner"],
+  ["mari", "light", "preset"],
 ] as const) {
-  test(`input popups independently follow ${preset} styling in ${theme} mode`, async ({
+  const cut = widgetShape === "cut-corner";
+  test(`input popups independently follow ${preset}${cut ? " cut-corner" : ""} styling in ${theme} mode`, async ({
     page,
     request,
     isMobile,
@@ -188,11 +189,16 @@ for (const [preset, theme] of [
       const before = info.outputPath(`input-popup-${preset}-before.png`);
       await page.screenshot({ path: before, animations: "disabled" });
       await info.attach("Input popup with styling disabled", { path: before, contentType: "image/png" });
-      await page.evaluate(async (selected) => {
-        const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
-        useUIStore.getState().setChatWidgetPreset(selected);
-      }, preset);
+      await page.evaluate(
+        async ({ selected, shape }) => {
+          const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
+          useUIStore.getState().setChatWidgetPreset(selected);
+          useUIStore.getState().setChatWidgetShape(shape);
+        },
+        { selected: preset, shape: widgetShape },
+      );
       await expect(page.locator("html")).toHaveAttribute("data-chat-widget-preset", preset);
+      if (cut) await expect(page.locator("html")).toHaveAttribute("data-chat-widget-shape", widgetShape);
       expect(await appearance(characterPopup)).toEqual(baseline);
 
       await application(page, ["font"]);
@@ -332,7 +338,7 @@ for (const [preset, theme] of [
             await diceField.getByRole("textbox").fill("");
             const frameWidth = () =>
               diceField.evaluate((element) => getComputedStyle(element, "::after").borderTopWidth);
-            if (preset === "dottore") {
+            if (cut) {
               await expect(diceField).toHaveCSS("box-shadow", "none");
               await expect.poll(frameWidth).toBe("2px");
               await diceField.screenshot({
@@ -340,7 +346,7 @@ for (const [preset, theme] of [
               });
             }
             await diceField.getByRole("textbox").blur();
-            if (preset === "dottore") {
+            if (cut) {
               await expect.poll(frameWidth).toBe("1px");
               await diceField.screenshot({
                 path: info.outputPath(`dice-input-${gradients ? "gradient" : "preset"}-normal.png`),
@@ -378,7 +384,7 @@ for (const [preset, theme] of [
             await input.fill("/");
             const commands = page.locator('[data-chat-input-popup="commands"]');
             await check(commands);
-            if (preset === "dottore") {
+            if (cut) {
               expect(
                 await commands.evaluate((element) => {
                   const rect = element.getBoundingClientRect();

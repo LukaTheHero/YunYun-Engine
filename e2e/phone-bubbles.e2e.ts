@@ -397,12 +397,11 @@ test.describe("phone bubbles", () => {
         await expect(buttons).toHaveCount(GAME_CONTROLS.length + 2);
         for (const [preset, shape] of [
           ["default", "preset"],
-          ["dottore", "preset"],
           ["mari", "preset"],
-          ["dottore", "rounded"],
+          ["mari", "rounded"],
           ["mari", "square"],
           ["mari", "cut-corner"],
-          ["dottore", "arched"],
+          ["mari", "arched"],
         ] as const) {
           for (const gradient of [false, true]) {
             await test.step(`${preset}/${shape}, ${gradient ? "custom gradients" : "preset colors"}`, async () => {
@@ -418,8 +417,7 @@ test.describe("phone bubbles", () => {
                 },
                 { preset, shape, gradient },
               );
-              const resolvedShape =
-                shape !== "preset" ? shape : preset === "dottore" ? "cut-corner" : preset === "mari" ? "arched" : null;
+              const resolvedShape = shape !== "preset" ? shape : preset === "mari" ? "arched" : null;
               if (resolvedShape)
                 await expect(page.locator("html")).toHaveAttribute("data-chat-widget-shape", resolvedShape);
               else await expect(page.locator("html")).not.toHaveAttribute("data-chat-widget-shape");
@@ -446,7 +444,7 @@ test.describe("phone bubbles", () => {
                   expect(paint.innerClip).toBe(expected.innerClip);
                   expect(paint.border).toContain("linear-gradient");
                   expect(paint.background).toContain("linear-gradient");
-                  // YunYun's and Dottore's thin inner ring survives custom border paint on every shape (#7244):
+                  // YunYun's thin inner ring survives custom border paint on every shape (#7244):
                   // a gap in the background's first stop, then a ring in the border's first stop.
                   expect(paint.ring).toBe(
                     preset === "default"
@@ -481,7 +479,7 @@ test.describe("phone bubbles", () => {
     const chat = await createChat(request, "game", {}, { connected: true });
     const cdp = nativeTouch ? await page.context().newCDPSession(page) : null;
     try {
-      await prepare(page, chat.id, { chatWidgetPreset: "dottore" });
+      await prepare(page, chat.id, { chatWidgetPreset: "mari", chatWidgetShape: "cut-corner" });
       await page.goto("/");
       await expect(page.locator('[data-chat-mode="game"]')).toBeVisible({ timeout: 30_000 });
       const launcher = bubble(page, TOOLS_MENU);
@@ -630,9 +628,9 @@ test.describe("phone bubbles", () => {
     }
   });
 
-  for (const [theme, preset] of [
-    ["dark", "dottore"],
-    ["light", "mari"],
+  for (const [theme, preset, shape] of [
+    ["dark", "mari", "cut-corner"],
+    ["light", "mari", "preset"],
   ] as const) {
     test(`separate phone trackers use ${preset} styling and keep moved buttons and edits in ${theme} mode`, async ({
       page,
@@ -658,6 +656,7 @@ test.describe("phone bubbles", () => {
         await prepare(page, chat.id, {
           theme,
           chatWidgetPreset: preset,
+          chatWidgetShape: shape,
           chatWidgetFont: "@mono",
           chatWidgetBorderColor: "#f4cb78",
           chatWidgetBackgroundColor: "#14243b",
@@ -833,7 +832,9 @@ test.describe("phone bubbles", () => {
     try {
       await prepare(page, chat.id, {
         theme: "dark",
-        chatWidgetPreset: "dottore",
+        chatWidgetPreset: "mari",
+        chatWidgetShape: "cut-corner",
+        chatWidgetFont: "@mono",
         chatWidgetBorderColor: "#ccaa77",
         chatWidgetBackgroundColor: "#112233",
         chatWidgetTextColor: "#e6efff",
@@ -958,16 +959,16 @@ test.describe("phone bubbles", () => {
       // let the launcher dock high on either edge, with the menu's room below it, at the large size too.
       await dragBubble(page, bubble(page, "chat-settings-button"), { x: viewport.width / 2 - 48, y: 200 });
       await dragBubble(page, bubble(page, "control:map"), { x: viewport.width / 2 - 48, y: 320 });
-      for (const [preset, size] of [
-        ["dottore", null],
-        ["mari", 96],
+      for (const [preset, shape, size] of [
+        ["mari", "cut-corner", null],
+        ["mari", "preset", 96],
       ] as const) {
         await page.evaluate(
-          async ({ preset, size }) => {
+          async ({ preset, shape, size }) => {
             const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
-            useUIStore.setState({ chatWidgetPreset: preset, chatWidgetButtonSize: size });
+            useUIStore.setState({ chatWidgetPreset: preset, chatWidgetShape: shape, chatWidgetButtonSize: size });
           },
-          { preset, size },
+          { preset, shape, size },
         );
         await expect(launcher).toHaveCSS("width", `${size ?? 36}px`);
         // A new size moves the launcher back inside the chat a frame after its width changes (#7220). Wait until every
@@ -1000,7 +1001,7 @@ test.describe("phone bubbles", () => {
               element.scrollTop = element.scrollHeight;
             });
             await page.screenshot({
-              path: testInfo.outputPath(`edge-tools-${preset}-${edge}-${direction}.png`),
+              path: testInfo.outputPath(`edge-tools-${preset}-${shape}-${edge}-${direction}.png`),
               animations: "disabled",
             });
             const trigger = await box(launcher);
@@ -1049,21 +1050,22 @@ test.describe("phone bubbles", () => {
       const launcher = bubble(page, TOOLS_MENU);
       await expect(launcher).toHaveCSS("width", "96px");
       await dragBubble(page, launcher, { x: 20, y: 170 });
-      for (const [preset, theme] of [
-        ["dottore", "dark"],
-        ["mari", "light"],
+      for (const [preset, theme, shape] of [
+        ["mari", "dark", "cut-corner"],
+        ["mari", "light", "preset"],
       ] as const) {
         await page.evaluate(
-          async ({ preset, theme }) => {
+          async ({ preset, theme, shape }) => {
             const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
             useUIStore.setState({
               chatWidgetPreset: preset,
+              chatWidgetShape: shape,
               theme,
               chatWidgetBorderColor: "linear-gradient(90deg, #cca077, #88ccdd)",
               chatWidgetBackgroundColor: "linear-gradient(135deg, #202838, #384050)",
             });
           },
-          { preset, theme },
+          { preset, theme, shape },
         );
         await launcher.click();
         const menu = page.locator("[data-chat-tools-menu]");
@@ -1094,7 +1096,7 @@ test.describe("phone bubbles", () => {
         ).toContain("linear-gradient");
         await expectComposerClearAndNoSideScroll(page);
         await page.screenshot({
-          path: testInfo.outputPath(`themed-tools-${preset}-${theme}.png`),
+          path: testInfo.outputPath(`themed-tools-${preset}-${shape}-${theme}.png`),
           animations: "disabled",
         });
         const id = await last.getAttribute("data-chat-tools-menu-tool");

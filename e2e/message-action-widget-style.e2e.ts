@@ -145,11 +145,12 @@ async function application(page: Page, axes: Axis[]) {
   }
 }
 
-for (const [preset, theme] of [
-  ["dottore", "dark"],
-  ["mari", "light"],
+for (const [preset, theme, shape] of [
+  ["mari", "dark", "cut-corner"],
+  ["mari", "light", "preset"],
 ] as const) {
-  test(`message action panels independently follow ${preset} styling in ${theme} mode`, async ({
+  const cut = shape === "cut-corner";
+  test(`message action panels independently follow ${preset}${cut ? " cut-corner" : ""} styling in ${theme} mode`, async ({
     page,
     request,
     isMobile,
@@ -307,8 +308,9 @@ for (const [preset, theme] of [
             // Cut corners must retain the light gradient chrome when Colors remains disabled.
             await page.evaluate(async () => {
               const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
-              useUIStore.getState().setChatWidgetPreset("dottore");
+              useUIStore.getState().setChatWidgetShape("cut-corner");
             });
+            await expect(page.locator("html")).toHaveAttribute("data-chat-widget-shape", "cut-corner");
             await application(page, ["shape"]);
             const shaped = await appearance(surface.panel);
             expect(shaped.clip).toContain("polygon(");
@@ -320,6 +322,11 @@ for (const [preset, theme] of [
               animations: "disabled",
             });
             await application(page, []);
+            await page.evaluate(async () => {
+              const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
+              useUIStore.getState().setChatWidgetShape("preset");
+            });
+            await expect(page.locator("html")).not.toHaveAttribute("data-chat-widget-shape");
           }
           if (surface.name === "thoughts") {
             // The Default preset has no widget palette. Enabling Colors must keep its fallback paint readable.
@@ -335,11 +342,16 @@ for (const [preset, theme] of [
             await application(page, []);
             expect(await appearance(surface.panel)).toEqual(baseline);
           }
-          await page.evaluate(async (preset) => {
-            const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
-            useUIStore.getState().setChatWidgetPreset(preset);
-          }, preset);
+          await page.evaluate(
+            async ({ preset, shape }) => {
+              const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
+              useUIStore.getState().setChatWidgetPreset(preset);
+              useUIStore.getState().setChatWidgetShape(shape);
+            },
+            { preset, shape },
+          );
           await expect(page.locator("html")).toHaveAttribute("data-chat-widget-preset", preset);
+          if (cut) await expect(page.locator("html")).toHaveAttribute("data-chat-widget-shape", shape);
           expect(await appearance(surface.panel)).toEqual(baseline);
           if (surface.axes) {
             await page.screenshot({
@@ -351,18 +363,18 @@ for (const [preset, theme] of [
             expect(lettering.font).not.toBe(baseline.font);
             expect({ ...lettering, font: baseline.font }).toEqual(baseline);
             await application(page, ["shape"]);
-            const shape = await appearance(surface.panel);
-            expect(shape.font).toBe(baseline.font);
-            expect(shape.background).toBe(baseline.background);
-            expect(shape.image).toBe(baseline.image);
-            expect([shape.radius, shape.clip]).not.toEqual([baseline.radius, baseline.clip]);
+            const shaped = await appearance(surface.panel);
+            expect(shaped.font).toBe(baseline.font);
+            expect(shaped.background).toBe(baseline.background);
+            expect(shaped.image).toBe(baseline.image);
+            expect([shaped.radius, shaped.clip]).not.toEqual([baseline.radius, baseline.clip]);
             await application(page, ["colors"]);
             const colors = await appearance(surface.panel);
             expect(colors.font).toBe(baseline.font);
             expect([colors.radius, colors.clip]).toEqual([baseline.radius, baseline.clip]);
             expect(colors.background).not.toBe(baseline.background);
           }
-          if (surface.name === "delete" && preset === "dottore") {
+          if (surface.name === "delete" && cut) {
             const action = surface.panel.locator(".mari-chrome-control").first();
             await action.hover();
             const hover = await appearance(action);

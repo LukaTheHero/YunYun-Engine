@@ -1654,7 +1654,7 @@ test("Author's Notes keeps its expand and full macro guide inside the field", as
     await expect(macroReference.getByText("{{charPostHistory}}", { exact: true })).toBeVisible();
     await expect(macroReference.getByText("{{agent::TYPE}}", { exact: true })).toBeVisible();
     await expect(macroReference.getByText(/Conditional block with/)).toBeVisible();
-    const negationSyntax = '{{#if character != "Maukie"}}...{{/if}}';
+    const negationSyntax = '{{#if character != "Tobias"}}...{{/if}}';
     await expect(macroReference.getByText(negationSyntax, { exact: true })).toBeVisible();
     await expect(macroReference.getByText(/"is not", "not contains", and "not includes"/u)).toBeVisible();
     const macroHelp = await page.evaluate(async () => {
@@ -7223,7 +7223,8 @@ test("desktop Echo Chamber shares widget styling, window controls and per-chat l
         echoChamberOpen: true,
         echoChamberSide: "bottom-right",
         echoChamberSizeByChatId: { [chat.id]: { width: 300, height: 180 } },
-        chatWidgetPreset: "dottore",
+        chatWidgetPreset: "mari",
+        chatWidgetShape: "cut-corner",
         chatWidgetBackgroundColor: "#183844",
         chatWidgetTextColor: "#d4f7ec",
       },
@@ -12451,7 +12452,10 @@ test(
     await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("tab", { name: "Home", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/home");
-    await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
+    await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute(
+      "src",
+      "/yunyun-favicon.png",
+    );
     await expect(page.locator('.mari-home-browser-chrome img[src="/yunyun-logo-splash.gif"]')).toBeVisible();
     await expect(page.locator('.mari-home-hero img[src="/yunyun-logo-splash.gif"]')).toHaveCount(0);
     await expect(page.locator('[data-tour="noodle-tab"]')).toHaveCount(0);
@@ -12810,7 +12814,10 @@ test("installed Home destinations appear as browser tabs without returning to th
   await expect(page.getByRole("region", { name: "Noodle package surface" })).toHaveText("Familiar Noodle interface");
   await expect(noodleTab).toHaveAttribute("aria-selected", "true");
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/noodle");
-  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute("src", "/yunyun-favicon.png");
+  await expect(page.locator('[data-component="HomeBrowserHub.Address"] img')).toHaveAttribute(
+    "src",
+    "/yunyun-favicon.png",
+  );
   await page.getByRole("tab", { name: "Home", exact: true }).click();
   await expect(page.locator('[data-component="HomeBrowserHub.Address"]')).toContainText("marinara/home");
   await expect(page.getByRole("heading", { name: "What shall we cook tonight?" })).toBeVisible();
@@ -13129,7 +13136,7 @@ test("new Professor YunYun Home widgets receive a movable layout slot immediatel
 });
 
 test("Professor YunYun opens a named character directly in its editor", async ({ page }, testInfo) => {
-  const resourceName = `Maukie Navigator ${Date.now()}`;
+  const resourceName = `Tobias Navigator ${Date.now()}`;
   const characterResponse = await page.request.post("/api/characters", {
     data: { data: { name: resourceName } },
   });
@@ -19646,10 +19653,7 @@ test("Home Community and clock widgets are useful, timezone-aware, and optional"
 
   const community = page.locator('[data-home-widget-id="community"]');
   await expect(community.getByRole("heading", { name: "Around the table" })).toBeVisible();
-  await expect(community.getByRole("link", { name: /Discord/ })).toHaveAttribute(
-    "href",
-    "https://discord.gg/canalpa",
-  );
+  await expect(community.getByRole("link", { name: /Discord/ })).toHaveAttribute("href", "https://discord.gg/canalpa");
   await expect(community.getByRole("link", { name: /Support/ })).toHaveAttribute(
     "href",
     "https://ko-fi.com/lukathehero",
@@ -20218,7 +20222,7 @@ test("home browser hub scales cleanly and opens FAQ as a bookmark window", async
   await expect(page.getByRole("heading", { name: "Character of the Day", exact: true })).toBeVisible();
   await expect(
     page.getByText(
-      "Feeling a little lost? It's not a skill issue yet, I am here to help! Ask me about the app, your setup, or what to do next. I can also create characters, lorebooks, agents, and extensions for you! Looking for a page? Press Ctrl+K and type it.",
+      "Feeling a little lost? Don't worry, I am here to help! Ask me about the app, your setup, or what to do next. I can also create characters, lorebooks, agents, and extensions for you! Looking for a page? Press Ctrl+K and type it.",
       { exact: true },
     ),
   ).toBeVisible();

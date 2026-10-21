@@ -261,7 +261,7 @@ for (const style of ["classic", "bubble"] as const) {
               sceneRequest: {
                 prompt: "A quiet laboratory",
                 planHint: "Inspect the instruments",
-                initiatorCharName: "Dottore",
+                initiatorCharName: "Leopold",
               },
             },
           })

@@ -258,20 +258,20 @@ test("mobile Echo can move, resize, lock and restore its saved window", async ({
     await expect.poll(async () => (await box(panel)).width).toBe(240);
     await expect.poll(async () => (await box(panel)).height).toBe(112);
     const phoneViewport = page.viewportSize()!;
-    for (const [theme, preset] of [
-      ["dark", "default"],
-      ["dark", "dottore"],
-      ["dark", "mari"],
-      ["light", "dottore"],
-      ["light", "mari"],
+    for (const [theme, preset, shape] of [
+      ["dark", "default", "preset"],
+      ["dark", "mari", "cut-corner"],
+      ["dark", "mari", "preset"],
+      ["light", "mari", "preset"],
     ] as const) {
       await page.evaluate(
-        async ({ theme, preset }) => {
+        async ({ theme, preset, shape }) => {
           const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
           useUIStore.getState().setChatWidgetPreset(preset);
+          useUIStore.getState().setChatWidgetShape(shape);
           useUIStore.setState({ theme });
         },
-        { theme, preset },
+        { theme, preset, shape },
       );
       const frame = await box(panel);
       for (const control of await panel.locator(".mari-window__control").all()) {
@@ -281,13 +281,13 @@ test("mobile Echo can move, resize, lock and restore its saved window", async ({
       }
       await panel.getByText("Reaction 20.", { exact: true }).scrollIntoViewIfNeeded();
       await expect(panel.getByText("Reaction 20.", { exact: true })).toBeInViewport();
-      await page.screenshot({ path: testInfo.outputPath(`mobile-echo-minimum-${preset}-${theme}.png`) });
+      await page.screenshot({ path: testInfo.outputPath(`mobile-echo-minimum-${preset}-${shape}-${theme}.png`) });
       if (preset === "default") continue;
       for (const mobile of [true, false]) {
         await page.setViewportSize(mobile ? phoneViewport : { width: 1024, height: phoneViewport.height });
         await expect(panel).toHaveAttribute("data-presentation", "window");
         await page.screenshot({
-          path: testInfo.outputPath(`echo-crest-${preset}-${theme}-${mobile ? "phone" : "desktop"}.png`),
+          path: testInfo.outputPath(`echo-crest-${preset}-${shape}-${theme}-${mobile ? "phone" : "desktop"}.png`),
         });
         const crest = await header.evaluate((element) => {
           const style = getComputedStyle(element, "::after");

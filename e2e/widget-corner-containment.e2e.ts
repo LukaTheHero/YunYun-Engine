@@ -103,7 +103,7 @@ async function expectClearCorner(page: Page, window: Locator, label: string, exp
   }
 }
 
-test("Dottore windows keep scene blur and custom paint inside their cut corners", async ({ page, request }) => {
+test("cut-corner windows keep scene blur and custom paint inside their cut corners", async ({ page, request }) => {
   test.setTimeout(120_000);
   const original = (await (await request.get(UI_SETTINGS_PATH)).json()) as { value: string | null };
   let chatId: string | undefined;
@@ -149,8 +149,10 @@ test("Dottore windows keep scene blur and custom paint inside their cut corners"
       .toBe(true);
     await page.evaluate(async () => {
       const { useUIStore } = await import("/src/stores/ui.store.ts" as string);
-      useUIStore.getState().setChatWidgetPreset("dottore");
+      useUIStore.getState().setChatWidgetPreset("mari");
+      useUIStore.getState().setChatWidgetShape("cut-corner");
     });
+    await expect(page.locator("html")).toHaveAttribute("data-chat-widget-shape", "cut-corner");
     for (const theme of ["dark", "light"] as const) {
       await page.evaluate(async (theme) => {
         const { useUIStore } = await import("/src/stores/ui.store.ts" as string);

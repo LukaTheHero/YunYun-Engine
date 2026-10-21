@@ -87,6 +87,7 @@ try {
     "even current-version invalid browser preferences restore unchanged defaults",
   );
   assert.equal(normalizeChatWidgetPreset(null), "default");
+  assert.equal(normalizeChatWidgetPreset("leopold"), "default", "the removed Leopold preset falls back to Default");
   assert.equal(normalizeChatWidgetShape("triangle"), "preset");
   for (const invalidSize of [null, undefined, "64", NaN, Infinity, {}, false]) {
     assert.equal(normalizeChatWidgetButtonSize(invalidSize), null);
@@ -123,14 +124,14 @@ try {
   useUIStore.getState().setChatWidgetApplyColors(true);
   const applied = { chatWidgetApplyFont: true, chatWidgetApplyShape: true, chatWidgetApplyColors: true };
   useUIStore.getState().setChatWidgetButtonSize(64);
-  useUIStore.getState().setChatWidgetPreset("dottore");
+  useUIStore.getState().setChatWidgetPreset("mari");
   useUIStore.getState().setChatWidgetFont("custom: Times New Roman ");
   useUIStore.getState().setChatWidgetShape("square");
   useUIStore.getState().setChatWidgetBorderColor(" #123456 ");
   useUIStore.getState().setChatWidgetBackgroundColor(" linear-gradient(135deg, #112233, #445566) ");
   useUIStore.getState().setChatWidgetTextColor(" #ABCDEF ");
   const selected = {
-    chatWidgetPreset: "dottore",
+    chatWidgetPreset: "mari",
     chatWidgetFont: "custom:Times New Roman",
     chatWidgetShape: "square",
     chatWidgetButtonSize: 64,
@@ -148,10 +149,10 @@ try {
   const saved = stored.get(UI_PERSISTENCE.name)!;
   for (const [key, value] of Object.entries(selected)) assert.equal(JSON.parse(saved).state[key], value);
 
-  useUIStore.getState().setChatWidgetPreset("mari");
+  useUIStore.getState().setChatWidgetPreset("default");
   assert.deepEqual(
     selection(),
-    { ...defaults, ...applied, chatWidgetButtonSize: 64, chatWidgetPreset: "mari" },
+    { ...defaults, ...applied, chatWidgetButtonSize: 64 },
     "preset changes clear overrides and retain the independent application switches",
   );
   stored.set(UI_PERSISTENCE.name, saved);
