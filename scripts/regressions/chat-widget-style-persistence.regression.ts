@@ -87,7 +87,13 @@ try {
     "even current-version invalid browser preferences restore unchanged defaults",
   );
   assert.equal(normalizeChatWidgetPreset(null), "default");
-  assert.equal(normalizeChatWidgetPreset("leopold"), "default", "the removed Leopold preset falls back to Default");
+  // Spelled in two parts so scripts/yunyun-rebrand.mjs, which renames upstream's example cast, leaves the stored id alone.
+  const removedUpstreamPreset = "dott" + "ore";
+  assert.equal(
+    normalizeChatWidgetPreset(removedUpstreamPreset),
+    "default",
+    "the removed upstream preset falls back to Default",
+  );
   assert.equal(normalizeChatWidgetShape("triangle"), "preset");
   for (const invalidSize of [null, undefined, "64", NaN, Infinity, {}, false]) {
     assert.equal(normalizeChatWidgetButtonSize(invalidSize), null);
