@@ -2,10 +2,8 @@
 // Personal Extension Schemas
 // ──────────────────────────────────────────────
 import { z } from "zod";
-import { PERSONAL_EXTENSION_CAPABILITIES } from "../types/personal-extension.js";
+import { PERSONAL_EXTENSION_CAPABILITIES, PERSONAL_EXTENSION_UI_LIMITS } from "../types/personal-extension.js";
 import { cssByteLimit, cssByteMessage } from "./css-size.js";
-
-const MAX_EXTENSION_JS_BYTES = 1024 * 1024;
 
 function utf8ByteLength(value: string): number {
   let bytes = 0;
@@ -28,14 +26,39 @@ function utf8ByteLength(value: string): number {
   return bytes;
 }
 
-const jsByteLimit = (value: string | null | undefined) =>
-  value == null || utf8ByteLength(value) <= MAX_EXTENSION_JS_BYTES;
-const jsByteMessage = `JavaScript must be at most ${MAX_EXTENSION_JS_BYTES} bytes`;
 const extensionRuntimeSchema = z.enum(["client", "server"]);
 const extensionCapabilitySchema = z.enum(PERSONAL_EXTENSION_CAPABILITIES);
 const extensionVersionSchema = z
   .union([z.string().trim().min(1).max(64), z.number().finite().nonnegative().transform(String)])
   .nullable();
+
+const personalExtensionContributionIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(PERSONAL_EXTENSION_UI_LIMITS.idLength)
+  .regex(/^[A-Za-z0-9._-]+$/);
+
+export const personalExtensionCommandContributionSchema = z
+  .object({
+    id: personalExtensionContributionIdSchema,
+    kind: z.literal("command"),
+    label: z.string().trim().min(1).max(PERSONAL_EXTENSION_UI_LIMITS.labelLength),
+    description: z.string().trim().max(PERSONAL_EXTENSION_UI_LIMITS.descriptionLength).optional(),
+    icon: z
+      .string()
+      .max(PERSONAL_EXTENSION_UI_LIMITS.iconLength)
+      .regex(/^[a-z0-9-]+$/)
+      .optional(),
+    targetContributionId: personalExtensionContributionIdSchema,
+  })
+  .strict()
+  .refine((value) => value.targetContributionId !== value.id, {
+    path: ["targetContributionId"],
+    message: "Command contribution cannot target itself",
+  });
+
+export type PersonalExtensionCommandContribution = z.infer<typeof personalExtensionCommandContributionSchema>;
 
 const personalExtensionPayloadSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -44,8 +67,8 @@ const personalExtensionPayloadSchema = z.object({
   runtime: extensionRuntimeSchema.optional().default("client"),
   capabilities: z.array(extensionCapabilitySchema).max(PERSONAL_EXTENSION_CAPABILITIES.length).default([]),
   css: z.string().nullable().optional().refine(cssByteLimit, { message: cssByteMessage }),
-  js: z.string().nullable().optional().refine(jsByteLimit, { message: jsByteMessage }),
-  serverJs: z.string().nullable().optional().refine(jsByteLimit, { message: jsByteMessage }),
+  js: z.string().nullable().optional(),
+  serverJs: z.string().nullable().optional(),
 });
 
 function validateRuntimePayload(

@@ -6,24 +6,24 @@ This guide shows you how to run YunYun Engine on an Android phone or tablet. Yun
 
 Termux is a free app that gives your phone a small Linux system and a command line. YunYun Engine needs it because YunYun is a Linux server, not a native Android app.
 
-F-Droid is a free, open-source app store for Android. You install Termux from F-Droid.
+F-Droid is a free, open-source app store for Android. YunYun's automatic setup downloads the stable F-Droid build of Termux. Termux also has a separate experimental Google Play build; if it is already installed, YunYun recognizes its official signer, but F-Droid remains the recommended path for this guide.
 
-Install Termux from F-Droid here: [Termux on F-Droid](https://f-droid.org/en/packages/com.termux/). Do not use the Play Store version of Termux. It is outdated and does not work with YunYun.
+Install Termux from F-Droid here: [Termux on F-Droid](https://f-droid.org/en/packages/com.termux/). Do not mix Termux or its plugin apps from different sources because their signatures must match. See [Termux's official installation notes](https://github.com/termux/termux-app#installation) for the source-specific details.
 
 ## Install with the Android app (APK)
 
-The easiest path uses the YunYun Engine Android app. An APK is an Android app install file. This app is a small helper: it sets up Termux for you, then opens YunYun once the local server is running. It still needs Termux to do the real work, so Android will ask you to approve a few prompts.
+The easiest path uses the YunYun Engine Android app. An APK is an Android app install file. This app is a small helper: it sets up Termux for you, then opens YunYun once the local server is running. It still needs Termux to do the real work, so Android will ask you to approve a few system prompts. Installing the pre-built APK does not require a signing key, password, local-access secret, or `CSRF_TRUSTED_ORIGINS` change. The app generates and exchanges its private localhost credential automatically. Do not add `null` to `CSRF_TRUSTED_ORIGINS`; it is intentionally treated as unset and is not needed by the APK handshake.
 
-1. Download the Android APK from the [latest GitHub Release](https://github.com/Pasta-Devs/Marinara-Engine/releases).
+1. Tap [Download the latest Android APK](https://github.com/Pasta-Devs/Marinara-Engine/releases/latest/download/marinara-engine-android.apk).
 2. Install the APK, then open the app.
 3. Tap **Install / Start YunYun**.
 4. If Termux is not installed yet, approve Android's install prompts so the app can download and install Termux from F-Droid.
 5. When Android asks, grant the **Run commands in Termux environment** permission.
 6. If Termux blocks the setup, the app copies an `allow-external-apps` command for you. Paste that command into Termux once, then tap **Install / Start YunYun** again.
 7. Wait while Termux installs the dependencies and builds YunYun. The first build takes a few minutes.
-8. The app opens YunYun for you once the local server is ready.
+8. Return to the YunYun Engine app when Termux finishes. It connects and signs in automatically once the local server is ready. Select **Open in browser** on its launcher if you prefer your browser; the choice is remembered and sign-in is automatic there too.
 
-If you prefer a home-screen icon that opens YunYun like a normal app, this same Android app provides it. It is a wrapper around the Termux server, so the server must be set up first. It cannot skip Android's install and permission prompts.
+If you prefer a home-screen icon that opens YunYun like a normal app, this same Android app provides it. It is a wrapper around the Termux server, so the server must be set up first. It cannot skip Android's install and permission prompts, but it does not ask you to configure any YunYun installation secret.
 
 ## Install manually in Termux
 
@@ -43,6 +43,8 @@ This one command does five things:
 
 The launcher installs the app's dependencies, builds YunYun on your device, and starts the local server. It also upgrades Node.js for you if your version is too old. The first run is slow because it builds the app. Later runs are much faster.
 
+The low-memory build includes all required client assets. Sharp's WebAssembly image-processing fallback is installed automatically and kept through updates; you do not need to install a separate Android Sharp version.
+
 When it finishes, open this address in your Android browser:
 
 ```
@@ -55,7 +57,9 @@ Tip: to get an app-like icon, open your browser menu and choose the option that 
 
 ## Start YunYun again
 
-After the first setup, you do not repeat the install. Open Termux and run:
+With the APK, open YunYun and tap **Install / Start YunYun** if the server is stopped. It reuses an authenticated running server. To change between app and browser, use **Open in browser** on the launcher, then **Retry connection**. From inside the app, return there through **Settings > General > App Behavior > Open Android launcher (app or browser)**. This automatic browser sign-in needs an updated APK and Engine; do not reuse an expired one-time browser link from history.
+
+For a manual Termux install, after the first setup, you do not repeat the install. Open Termux and run:
 
 ```
 cd Marinara-Engine

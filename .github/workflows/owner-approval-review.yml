@@ -36,6 +36,18 @@ jobs:
               );
               pullRequests = response.data;
             }
+            // Fork commits are in neither list: match the reviewed commit against open PR heads.
+            if (pullRequests.length === 0) {
+              const openPullRequests = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+              });
+              pullRequests = openPullRequests.filter(
+                (pullRequest) => pullRequest.head.sha === context.payload.workflow_run.head_sha,
+              );
+            }
 
             const pullNumbers = [...new Set(pullRequests.map((pullRequest) => pullRequest.number))];
             if (pullNumbers.length === 0) {
@@ -51,14 +63,14 @@ jobs:
 
       - name: Checkout trusted default branch
         if: steps.pull-request.outputs.number != ''
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
       - name: Set up Node.js
         if: steps.pull-request.outputs.number != ''
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
 

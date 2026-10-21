@@ -37,10 +37,15 @@ export const sceneAnalysisContextSchema = z.object({
   recentSpotifyTracks: z.array(z.string().max(300)).max(20).optional().default([]),
   currentAmbient: z.string().nullable().optional().default(null),
   currentLocation: z.string().nullable().optional().default(null),
+  /** Encounter tier while in combat (#5161); selects a music:tier:<tier> context track. Scoring-only — never sent to the analyzer LLM. */
+  enemyTier: z.string().max(40).nullable().optional().default(null),
   currentWeather: z.string().nullable(),
   currentTimeOfDay: z.string().nullable(),
   genre: z.string().nullable().optional().default(null),
   setting: z.string().nullable().optional().default(null),
+  /** The game's art family (worldgen W6f), from its setting kit: music of another family is left out.
+   *  Scoring-only, never sent to the analyzer model. */
+  artFamily: z.string().max(40).nullable().optional().default(null),
   worldOverview: z.string().nullable().optional().default(null),
   canGenerateBackgrounds: z.boolean().optional(),
   canGenerateIllustrations: z.boolean().optional(),

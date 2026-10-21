@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ExternalLink, MapPinned, Swords, type LucideIcon } from "lucide-react";
+import { ExternalLink, type LucideIcon } from "lucide-react";
 import { APP_VERSION } from "@marinara-engine/shared";
 import { useUIStore } from "../../stores/ui.store";
 import { Modal } from "../ui/Modal";
@@ -42,274 +42,11 @@ type ReleaseAnnouncement = {
 
 type ReleaseCopy = string | { key: string };
 
-function localizedCopy(key: string): ReleaseCopy {
-  return { key };
-}
-
 // Add each release here before its version ships. Versions without a tailored
 // entry still get a one-time update notice and a link to their full release.
-const RELEASE_ANNOUNCEMENTS: Record<string, ReleaseAnnouncement> = {
-  "2.4.2": {
-    headline: localizedCopy("ui.modals.whatsnewmodal.release242.headline"),
-    intro: localizedCopy("ui.modals.whatsnewmodal.release242.intro"),
-    highlights: [],
-    story: [
-      {
-        id: "home-widgets",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.homeWidgets",
-        media: [
-          {
-            url: "/releases/2.4.2/home-widgets.mp4",
-            altKey: "ui.modals.whatsnewmodal.release242.media.homeWidgets",
-            kind: "video",
-          },
-          {
-            url: "/releases/2.4.2/home-widgets-custom.mp4",
-            altKey: "ui.modals.whatsnewmodal.release242.media.homeWidgetsCustom",
-            kind: "video",
-          },
-        ],
-      },
-      {
-        id: "home-navigator",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.homeNavigator",
-        media: [
-          {
-            url: "/releases/2.4.2/home-navigator.mp4",
-            altKey: "ui.modals.whatsnewmodal.release242.media.homeNavigator",
-            kind: "video",
-          },
-        ],
-      },
-      {
-        id: "handle-with-care",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.handleWithCare",
-      },
-      {
-        id: "professor-mari-memories",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.professorMariMemories",
-        media: [
-          {
-            url: "/releases/2.4.2/professor-mari-memories.png",
-            altKey: "ui.modals.whatsnewmodal.release242.media.professorMariMemories",
-          },
-        ],
-      },
-      {
-        id: "noodle-agent",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.noodleAgent",
-        media: [
-          {
-            url: "/releases/2.4.2/noodle-agent.png",
-            altKey: "ui.modals.whatsnewmodal.release242.media.noodleAgent",
-          },
-        ],
-      },
-      {
-        id: "character-downloads",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.characterDownloads",
-        media: [
-          {
-            url: "/releases/2.4.2/character-downloads.png",
-            altKey: "ui.modals.whatsnewmodal.release242.media.characterDownloads",
-          },
-        ],
-      },
-      {
-        id: "full-changelog",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.fullChangelog",
-      },
-      {
-        id: "release-link",
-        copyKey: "ui.modals.whatsnewmodal.release242.paragraphs.releaseLink",
-        linkUrl: "https://github.com/Pasta-Devs/Marinara-Engine/releases/tag/v2.4.2",
-      },
-    ],
-    outro: localizedCopy("ui.modals.whatsnewmodal.release242.outro"),
-  },
-  "2.4.1": {
-    headline: localizedCopy("ui.modals.whatsnewmodal.release241.headline"),
-    intro: localizedCopy("ui.modals.whatsnewmodal.release241.intro"),
-    highlights: [],
-  },
-  "2.4.0": {
-    headline: localizedCopy("ui.modals.whatsnewmodal.release240.headline"),
-    highlights: [],
-    story: [
-      {
-        id: "extensions",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.extensions",
-      },
-      {
-        id: "personas",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.personas",
-        media: [
-          {
-            url: "https://i.imgur.com/K4Z9rSA.png",
-            altKey: "ui.modals.whatsnewmodal.release240.media.personasIcon",
-          },
-        ],
-      },
-      {
-        id: "direct-editing",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.directEditing",
-        media: [
-          {
-            url: "https://i.imgur.com/HI1lGvM.gif",
-            altKey: "ui.modals.whatsnewmodal.release240.media.directEditingFirst",
-          },
-          {
-            url: "https://i.imgur.com/FHh9LNz.gif",
-            altKey: "ui.modals.whatsnewmodal.release240.media.directEditingSecond",
-          },
-        ],
-      },
-      {
-        id: "drag-and-drop",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.dragAndDrop",
-        media: [
-          {
-            url: "https://i.imgur.com/xnFqaJO.gif",
-            altKey: "ui.modals.whatsnewmodal.release240.media.dragAndDrop",
-          },
-        ],
-      },
-      {
-        id: "custom-parameters",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.customParameters",
-        media: [
-          {
-            url: "https://i.imgur.com/NxRyymz.png",
-            altKey: "ui.modals.whatsnewmodal.release240.media.customParameters",
-          },
-        ],
-      },
-      {
-        id: "bulk-lorebooks",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.bulkLorebooks",
-        media: [
-          {
-            url: "https://i.imgur.com/FkWaDdZ.gif",
-            altKey: "ui.modals.whatsnewmodal.release240.media.bulkLorebooks",
-          },
-        ],
-      },
-      {
-        id: "agent-intro",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.agentIntro",
-      },
-      {
-        id: "world-maps",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.worldMaps",
-        media: [
-          {
-            url: "https://i.imgur.com/Q7IGDN0.png",
-            altKey: "ui.modals.whatsnewmodal.release240.media.worldMapsFirst",
-          },
-          {
-            url: "https://i.imgur.com/a0N8bKP.png",
-            altKey: "ui.modals.whatsnewmodal.release240.media.worldMapsSecond",
-          },
-        ],
-      },
-      {
-        id: "storyboard",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.storyboard",
-        media: [
-          {
-            url: "https://i.imgur.com/TFQddVx.png",
-            altKey: "ui.modals.whatsnewmodal.release240.media.storyboardFirst",
-          },
-          {
-            url: "https://i.imgur.com/zcqJuI2.jpeg",
-            altKey: "ui.modals.whatsnewmodal.release240.media.storyboardSecond",
-          },
-        ],
-      },
-      {
-        id: "long-term-memory",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.longTermMemory",
-        media: [
-          {
-            url: "https://i.imgur.com/wVFQNbC.png",
-            altKey: "ui.modals.whatsnewmodal.release240.media.longTermMemoryFirst",
-          },
-          {
-            url: "https://i.imgur.com/3ymbbOm.png",
-            altKey: "ui.modals.whatsnewmodal.release240.media.longTermMemorySecond",
-          },
-        ],
-      },
-      {
-        id: "download-agents",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.downloadAgents",
-      },
-      {
-        id: "fixes-and-qol",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.fixesAndQol",
-      },
-      {
-        id: "thanks",
-        copyKey: "ui.modals.whatsnewmodal.release240.paragraphs.thanks",
-      },
-    ],
-  },
-  "2.3.5": {
-    headline: "More control, polished down to the card.",
-    intro:
-      "Professor YunYun here! This release adds custom quick replies, richer translation controls, Atlas image and video generation, interface localization, stronger update and extension protections, and a substantial collection of chat, card, launcher, image, and settings fixes. Character and Persona cards also keep their creator and version neatly beside the name, even when space is tight.",
-    highlights: [],
-  },
-  "2.3.4": {
-    headline: "A safer engine with finer control.",
-    intro:
-      "Professor YunYun here! I removed Extensions, sealed their unsafe code path, and arranged for every old record to be cleared automatically. I also added new prompt macros, character-specific Hide From AI controls, and Grouped or Individual response handling for multi-character Conversations, then corrected a generous stack of smaller regressions. Every good experiment deserves a clean bench.",
-    highlights: [],
-  },
-  "2.3.3": {
-    headline: "We fixed the most glaring issues.",
-    intro:
-      "We’re sorry for the inconvenience caused by the last update. This release fixes the most disruptive Hierarchical Maps, Game message sending, Character library, and Accent Pulse problems, along with several smaller regressions.",
-    highlights: [],
-  },
-  "2.3.2": {
-    headline: "A quick patch with bug fixes!",
-    highlights: [],
-  },
-  "2.3.1": {
-    headline: "A quick patch with bug fixes!",
-    highlights: [],
-  },
-  "2.3.0": {
-    headline: "Choose the Agents you want.",
-    intro:
-      "We reworked how Agents work! You can now browse and install only the Agents you would like to use, then uninstall any you no longer want. Fresh installs start with no Agents, so be sure to head to Agents → Download Agents to get them!",
-    highlights: [
-      {
-        id: "hierarchical-maps",
-        label: "New Agent",
-        title: "Hierarchical Maps",
-        description:
-          "Adds persistent hierarchical locations, spatial context, map authoring, and movement to Roleplay and Game modes.",
-        icon: MapPinned,
-      },
-      {
-        id: "tactical-combat",
-        label: "New Feature",
-        title: "Tactical Combat Mode in Games",
-        description:
-          "Completely new way to handle battles in game mode, inspired by the Fire Emblem series, with a grid, movements, terrain and forecasts.",
-        icon: Swords,
-        media: [
-          {
-            url: "https://i.imgur.com/tMhfbej.jpeg",
-            alt: "Tactical Combat Mode battlefield with a terrain grid, units, and battle controls",
-          },
-        ],
-      },
-    ],
-  },
-};
+// The fork ships none of upstream's announcements: they were written in the voice
+// of upstream's original assistant and illustrated with upstream's characters.
+const RELEASE_ANNOUNCEMENTS: Record<string, ReleaseAnnouncement> = {};
 
 const FALLBACK_ANNOUNCEMENT: ReleaseAnnouncement = {
   headline: "YunYun Engine has been updated.",
@@ -344,6 +81,7 @@ export function WhatsNewModal({
 }) {
   const { t: localizeUi } = useUiTranslation();
   const hasCompletedOnboarding = useUIStore((state) => state.hasCompletedOnboarding);
+  const whatsNewRequested = useUIStore((state) => state.whatsNewRequested);
   const [open, setOpen] = useState(false);
   const announcement = RELEASE_ANNOUNCEMENTS[APP_VERSION] ?? FALLBACK_ANNOUNCEMENT;
   const releaseUrl = `${RELEASES_URL}/tag/v${encodeURIComponent(APP_VERSION)}`;
@@ -359,6 +97,13 @@ export function WhatsNewModal({
     }
     onResolved?.();
   }, [hasCompletedOnboarding, presentationAllowed, onResolved]);
+
+  // Reopened on request (the Home widget): the same window, and the seen marker stays as it is.
+  useEffect(() => {
+    if (!whatsNewRequested) return;
+    useUIStore.getState().consumeWhatsNewRequest();
+    setOpen(true);
+  }, [whatsNewRequested]);
 
   useEffect(() => {
     onOpenChange?.(open);

@@ -6,16 +6,23 @@ interface TrackerPanelDesktopWidthInput {
   chatColumnRight: number;
   side: "left" | "right";
   gap?: number;
+  /** Never narrower than this; AppShell narrows the chat column to leave that room. */
+  minWidth?: number;
 }
 
-/** Preserve the requested Tracker width, constraining it only to the main viewport. */
+/** Keep the desktop Tracker inside the free gutter beside the centered Roleplay chat column. */
 export function resolveTrackerPanelDesktopWidth({
   preferredWidth,
   mainLeft,
   mainRight,
+  chatColumnLeft,
+  chatColumnRight,
+  side,
   gap = 0,
+  minWidth = 0,
 }: TrackerPanelDesktopWidthInput) {
-  return Math.max(0, Math.min(preferredWidth, Math.floor(mainRight - mainLeft - gap)));
+  const gutterWidth = side === "left" ? chatColumnLeft - mainLeft : mainRight - chatColumnRight;
+  return Math.max(minWidth, Math.min(preferredWidth, Math.floor(gutterWidth - gap)));
 }
 
 /** Scale constrained Tracker contents while retaining a readable lower bound and responsive reflow. */

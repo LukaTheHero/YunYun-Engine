@@ -4,8 +4,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "../../packages/server/src/db/file-query.js";
 import { fileTable, isFileUniqueConstraintError, text } from "../../packages/server/src/db/file-schema.js";
-import { createFileNativeDB } from "../../packages/server/src/db/file-backed-store.js";
+// Exercise storage shutdown without pino-pretty's unrelated worker lifetime.
+// Keep error logs, but use the same stdout transport as the production server.
+process.env.NODE_ENV = "production";
+const { createFileNativeDB, encodeShardKey } = await import("../../packages/server/src/db/file-backed-store.js");
+const beforeExitListeners = process.listenerCount("beforeExit");
 import { appSettings, customStickers, noodleInteractions } from "../../packages/server/src/db/schema/index.js";
+
+const appSettingsShardPath = (root: string, key: string) =>
+  join(root, "tables", "app_settings", `${encodeShardKey(key)}.json`);
+const readAppSettingsRows = (root: string, keys: string[]) =>
+  keys.flatMap(
+    (key) => JSON.parse(readFileSync(appSettingsShardPath(root, key), "utf8")) as Array<{ key: string; value: string }>,
+  );
 
 const storageDir = mkdtempSync(join(tmpdir(), "marinara-file-close-"));
 process.env.FILE_STORAGE_DIR = storageDir;
@@ -23,7 +34,7 @@ let blockedFirstSettingsWrite = false;
 try {
   const db = await createFileNativeDB({
     beforeTableWrite: async (table) => {
-      if (table !== "app_settings" || blockedFirstSettingsWrite) return;
+      if (!table.startsWith("app_settings/") || blockedFirstSettingsWrite) return;
       blockedFirstSettingsWrite = true;
       capturedWrite();
       await writeGate;
@@ -35,6 +46,7 @@ try {
   await writeCaptured;
 
   await db.insert(appSettings).values({ key: "queued-during-flush", value: "two", updatedAt: "2026-07-14" });
+  const queuedFlush = db._fileStore.flush();
   let closeResolved = false;
   const close = db._fileStore.close().then(() => {
     closeResolved = true;
@@ -43,20 +55,61 @@ try {
   assert.equal(closeResolved, false, "close must wait for the active table write");
 
   releaseWrite();
-  await Promise.all([activeFlush, close]);
+  await Promise.all([activeFlush, queuedFlush, close]);
 
-  const persisted = JSON.parse(readFileSync(join(storageDir, "tables", "app_settings.json"), "utf8")) as Array<{
-    key: string;
-  }>;
+  const persisted = readAppSettingsRows(storageDir, ["before-active-flush", "queued-during-flush"]);
   assert.deepEqual(persisted.map((row) => row.key).sort(), ["before-active-flush", "queued-during-flush"]);
   if (process.platform !== "win32") {
     assert.equal(statSync(join(storageDir, "tables")).mode & 0o777, 0o700);
-    assert.equal(statSync(join(storageDir, "tables", "app_settings.json")).mode & 0o777, 0o600);
+    assert.equal(statSync(appSettingsShardPath(storageDir, "before-active-flush")).mode & 0o777, 0o600);
   }
   console.info("File-backed graceful shutdown regression passed.");
 } finally {
   releaseWrite();
   rmSync(storageDir, { recursive: true, force: true });
+}
+
+const retryStorageDir = mkdtempSync(join(tmpdir(), "marinara-file-close-retry-"));
+process.env.FILE_STORAGE_DIR = retryStorageDir;
+try {
+  const expectedFailure = new Error("first admitted batch failed");
+  let release!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const ready = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let first = true;
+  const db = await createFileNativeDB({
+    beforeTableWrite: async (table) => {
+      if (!table.startsWith("app_settings/") || !first) return;
+      first = false;
+      started();
+      await gate;
+      throw expectedFailure;
+    },
+  });
+  await db.insert(appSettings).values({ key: "retry-on-close", value: "saved", updatedAt: "2026-09-17" });
+  const active = db._fileStore.flush();
+  await ready;
+  const queued = db._fileStore.flush();
+  const closed = db._fileStore.close();
+  const results = Promise.allSettled([active, queued, closed]);
+  release();
+  assert.deepEqual(
+    await results,
+    [
+      { status: "rejected", reason: expectedFailure },
+      { status: "rejected", reason: expectedFailure },
+      { status: "fulfilled", value: undefined },
+    ],
+    "successful shutdown retry must not hide an admitted flush error",
+  );
+  assert.equal(readAppSettingsRows(retryStorageDir, ["retry-on-close"])[0]?.value, "saved");
+} finally {
+  rmSync(retryStorageDir, { recursive: true, force: true });
 }
 
 const malformedRowStorageDir = mkdtempSync(join(tmpdir(), "marinara-file-malformed-row-"));
@@ -74,20 +127,25 @@ try {
   }
 
   const db = await createFileNativeDB();
+  const validShardPath = appSettingsShardPath(malformedRowStorageDir, "valid-setting");
   if (process.platform !== "win32") {
     assert.equal(statSync(malformedRowStorageDir).mode & 0o777, 0o700);
     assert.equal(statSync(tablesDir).mode & 0o777, 0o700);
-    assert.equal(statSync(settingsPath).mode & 0o777, 0o600);
+    assert.equal(statSync(join(tablesDir, "app_settings")).mode & 0o777, 0o700);
+    assert.equal(statSync(validShardPath).mode & 0o777, 0o600);
   }
   const rows = await db.select().from(appSettings);
-  assert.deepEqual(rows, [{ key: "valid-setting", value: "preserved", updatedAt: "2026-08-01" }]);
+  assert.deepEqual(
+    rows.filter((row) => row.key === "valid-setting"),
+    [{ key: "valid-setting", value: "preserved", updatedAt: "2026-08-01" }],
+  );
 
   const quarantined = db._fileStore.getQuarantinedTables().find((entry) => entry.table === "app_settings");
   assert.equal(quarantined?.files.length, 1);
   const preservedPath = quarantined?.files[0]?.to;
   assert.ok(preservedPath);
   assert.deepEqual(JSON.parse(readFileSync(preservedPath, "utf8")), originalRows);
-  assert.deepEqual(JSON.parse(readFileSync(settingsPath, "utf8")), [originalRows[0]]);
+  assert.deepEqual(JSON.parse(readFileSync(validShardPath, "utf8")), [originalRows[0]]);
 
   await db._fileStore.close();
   console.info("File-backed malformed-row recovery regression passed.");
@@ -101,7 +159,7 @@ try {
   const expectedFailure = new Error("simulated persistent write failure");
   const db = await createFileNativeDB({
     beforeTableWrite: (table) => {
-      if (table === "app_settings") throw expectedFailure;
+      if (table.startsWith("app_settings/")) throw expectedFailure;
     },
   });
   await db.insert(appSettings).values({ key: "must-report-failure", value: "one", updatedAt: "2026-07-14" });
@@ -152,9 +210,7 @@ try {
   const rows = await db.select().from(appSettings);
   assert.equal(rows.find((row) => row.key === "transaction-value")?.value, "live");
   assert.equal(rows.find((row) => row.key === "outside-write")?.value, "preserved");
-  const persistedRows = JSON.parse(
-    readFileSync(join(transactionStorageDir, "tables", "app_settings.json"), "utf8"),
-  ) as Array<{ key: string; value: string }>;
+  const persistedRows = readAppSettingsRows(transactionStorageDir, ["transaction-value", "outside-write"]);
   assert.equal(persistedRows.find((row) => row.key === "transaction-value")?.value, "live");
   assert.equal(persistedRows.find((row) => row.key === "outside-write")?.value, "preserved");
   await db._fileStore.close();
@@ -170,7 +226,7 @@ try {
   const expectedFailure = new Error("simulated transaction flush failure");
   const db = await createFileNativeDB({
     beforeTableWrite: (table) => {
-      if (table !== "app_settings" || !rejectNextTransactionWrite) return;
+      if (!table.startsWith("app_settings/") || !rejectNextTransactionWrite) return;
       rejectNextTransactionWrite = false;
       throw expectedFailure;
     },
@@ -189,9 +245,7 @@ try {
 
   const rows = await db.select().from(appSettings);
   assert.equal(rows.find((row) => row.key === "flush-rollback")?.value, "live");
-  const persistedRows = JSON.parse(
-    readFileSync(join(transactionFlushFailureDir, "tables", "app_settings.json"), "utf8"),
-  ) as Array<{ key: string; value: string }>;
+  const persistedRows = readAppSettingsRows(transactionFlushFailureDir, ["flush-rollback"]);
   assert.equal(persistedRows.find((row) => row.key === "flush-rollback")?.value, "live");
   await db._fileStore.close();
   console.info("File-backed failed transaction flush rollback regression passed.");
@@ -307,3 +361,9 @@ try {
 } finally {
   rmSync(uniqueStorageDir, { recursive: true, force: true });
 }
+
+assert.equal(
+  process.listenerCount("beforeExit"),
+  beforeExitListeners,
+  "every closed store releases its autosave exit hook, including failed closes",
+);

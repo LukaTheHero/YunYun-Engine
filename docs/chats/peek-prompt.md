@@ -14,10 +14,13 @@ A source badge sits at the top next to the title. It tells you which version of 
 - **Live Preview**: a fresh preview built right now.
 - **Raw Messages**: the raw list of messages.
 - **Prompt Preview**: a general preview.
+- **Decision test preview**: a prompt assembled with the answers from an explicit decision test. It has not been sent to the chat model.
 
-Below the badge is a generation info panel. It can show the provider and model name, an estimated token count, and the real prompt token count once a reply has finished. A token is a small chunk of text that models count instead of words. This panel also shows small tags for the values used, such as **Temperature**, **Max Output Tokens**, **Thinking**, **Reasoning**, **Verbosity**, **Service Tier**, and **Assistant Prefill**. Sampling values like **Top P**, **Top K**, and **Min P** can also appear here.
+Below the badge is a generation info panel. It can show the provider and model name, an estimated token count, and the real prompt token count once a reply has finished. A token is a small chunk of text that models count instead of words. This panel also shows small tags for the values used, such as **Temperature**, **Max Output Tokens**, **Thinking**, **Reasoning**, **Verbosity**, **Service Tier**, and **Assistant Prefill**. Sampling values like **Top P**, **Top K**, and **Min P** can also appear here. If the connection the reply was meant for failed and your fallback connection wrote it instead, the panel also names the connection that failed, its model and a short reason, such as "key rejected" or "rate limited".
 
 The rest of the window is the prompt itself, split into collapsible sections. Each section has a label and its own rough token estimate. The chat messages are grouped under one **Chat History** section. For an exact saved request, the provider may have combined several chat turns into one provider block. Expand each block to inspect all model-visible text inside it. Click any section header to open or close it.
+
+To take the whole prompt somewhere else, click the copy button next to the close button at the top of the window. It copies every section and chat message as plain text, in the order they were sent, including sections you have not opened. Each message starts with a line naming its role, such as `[system]`, `[user]` or `[assistant]`. For an exact saved request, it copies that saved request as it was sent. Copying does not send anything to the model or change the prompt.
 
 ## Opening Peek Prompt
 
@@ -71,9 +74,26 @@ Open the **Assembled Prompt** window and check these things:
 
 Once you know what the model actually received, you can fix the cause. You might edit a character card, adjust a lorebook entry, or change a value in your generation parameters.
 
+## Testing decision statements
+
+Open **Decision diagnostics** inside Peek Prompt to inspect the current chat's prompt statements and lorebook decisions. Opening the panel or choosing **Preview inputs** prepares the request bodies without asking the Decision model or starting a local model. Expand **Prepared request bodies** to see the recent messages, resolved statements, options, and model-specific request format. Further lorebook statements may become reachable only after an earlier decision is answered.
+
+Choose **Test decisions** to run the eligible questions against your selected Decision model. This makes real decision requests, so a hosted model may charge for them. It does not generate a chat reply, run agents, change game state, or save the test's answers or timers to the chat.
+
+An explicit test can wait for a local reasoning model even when ordinary pre-reply decisions are deferred. This does not change your preference for live replies; previewing inputs still sends no model requests.
+
+Each result shows its score when available, the threshold used for a yes/no statement, and the resulting answer. A model that returns only a yes/no word is labeled accordingly; its answer is not presented as a probability. Choice results show the selected option. Held, deferred, over-limit, unavailable, and failed decisions have separate explanations, so a missing answer is not mistaken for a low score.
+
+After a test, the prompt below uses the test's answers. Use **Show original prompt** to return to the content you originally opened, or **Show tested prompt** to switch back. **Requests sent and results** shows the actual decision request bodies and returned results, without authentication headers.
+
+Tests use the current chat and current settings, even when you opened Peek Prompt from a historical reply. They do not reconstruct the original decision requests. Tests cover prompt statements and lorebook decisions; they do not run agent activation or post-reply decisions. Ordinary Peek Prompt remains passive until you explicitly choose **Test decisions**.
+
+When **Use Decision model** is enabled for Advanced Memory, the panel also shows **Advanced Memory activity**. These saved reports identify the latest recall and scene-end check, with their model, time, scores, selections and fallback status. They can appear even when the prompt has no decision statements. They describe actual past calls, not the current preview or a replay of the selected historical reply. Compatible swipes can reuse an earlier recall report. Up to 128 results are saved per report, with selected results first; omitted results are counted. New reports appear after the next eligible Decision model call, and viewing them makes no model requests.
+
 ## Related guides
 
 - [Generation Parameters](../prompts/generation-parameters.md)
 - [Preset Editor and Prompt Manager](../prompts/presets.md)
+- [Decision Models](../connections/decision-models.md)
 - [Guided Generation and Impersonate](guided-and-impersonate.md)
 - [Message Actions: Edit, Delete, Swipe, Regenerate](messages.md)

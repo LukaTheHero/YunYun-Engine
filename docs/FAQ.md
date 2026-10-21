@@ -34,7 +34,7 @@ Replace `192.168.1.42` with your own host IP address.
 
 5. Sign in if the browser asks for the Basic Auth username and password. If you see an **Access blocked** page instead, finish step 2 on the host first.
 
-On ordinary desktop installs, the same computer (`127.0.0.1`) does not need a password. APK-managed Android installs add a private localhost login so another Android app cannot impersonate YunYun. Other devices are blocked until you set up access control (Basic Auth or an IP allowlist). Each option is explained in [Remote Access](REMOTE_ACCESS.md).
+On ordinary desktop installs, the same computer (`127.0.0.1`) does not need a password. APK-managed Android installs add a private localhost login so another Android app cannot impersonate YunYun, but the Android wrapper creates and uses that credential automatically. Other devices are blocked until you set up access control (Basic Auth or an IP allowlist). Each option is explained in [Remote Access](REMOTE_ACCESS.md).
 
 If the two devices are not on the same network, a tool like Tailscale can help. Tailscale gives each device a stable private address. You can then connect from anywhere without exposing YunYun to the public internet. If you cannot connect, see [Troubleshooting](TROUBLESHOOTING.md).
 
@@ -42,9 +42,15 @@ If the two devices are not on the same network, a tool like Tailscale can help. 
 
 There is no separate native mobile app. On a phone or tablet, you use the same web app in a browser. Most mobile browsers offer an **Add to Home Screen** or **Install App** option that makes it feel like a real app, with no browser bar. This is called a PWA (Progressive Web App, a website you can install like an app).
 
-On Android, you can also install an APK, the installable app file for Android. It runs YunYun locally on the phone. See [Android Installation](installation/android-termux.md). On iPhone and iPad, see the [iOS PWA Guide](installation/ios-pwa.md).
+On Android, you can also [download the latest APK directly](https://github.com/Pasta-Devs/Marinara-Engine/releases/latest/download/marinara-engine-android.apk). It runs YunYun locally on the phone through Termux. Installing it does not require a signing key, password, or local-access secret; see [Android Installation](installation/android-termux.md) for the Android permission prompts. On iPhone and iPad, see the [iOS PWA Guide](installation/ios-pwa.md).
 
-The Android wrapper signs in automatically when it opens its APK-managed Termux server. To use another browser on that phone, open `/android-login`, run `cat ~/.marinara-engine/android-secret` in Termux, and paste the displayed secret. The local `mari` CLI reads that same launcher-managed secret automatically. Manual Termux installs keep the normal localhost and network-access rules.
+The Android wrapper signs in automatically in the app or your browser. Select **Open in browser** on its launcher and tap **Retry connection**; use **Install / Start YunYun** when the server is stopped. This choice is remembered. In the app, **Settings > General > App Behavior > Open Android launcher (app or browser)** returns to that choice. Update both the APK and Engine to use the automatic browser handoff. Older APKs still offer manual sign-in at `/android-login`. The local `mari` CLI reads the launcher-managed secret automatically, and manual Termux installs retain normal localhost rules.
+
+## Can I play with other people?
+
+Optional multiplayer creates a fresh shared Conversation, Roleplay or Game without a fixed human or AI roster cap. Every participant enables the environment prerequisite and the separate Settings switch, then explicitly hosts or joins using their own trusted client. Guests need no AI key; the host controls generation and approval. Game waits for every required player's action or explicit pass before resolving a round.
+
+A password does not make an unknown host safe. Shared rooms accept text only and keep the guest view isolated from files, native integrations and local APIs. The Android native wrapper cannot join. Read [multiplayer setup, warnings and limits](CONFIGURATION.md#optional-multiplayer) before enabling it.
 
 ## What are the three chat modes?
 
@@ -60,6 +66,16 @@ Each mode has its own getting-started guide. Start with the mode you want, then 
 
 Open a Conversation and choose **Schedule timezone** in Chat Settings, or choose it while creating schedules in the Conversation setup flow. YunYun starts with the timezone reported by your device, but you can select any supported IANA timezone or choose **Use device** to reset it. This is one global preference for all Conversation chats, including server-side autonomous messages, and it syncs to other devices connected to the same YunYun server.
 
+## Does each Conversation chat have its own schedule?
+
+No. A schedule belongs to the character, and every Conversation chat with that character uses the same one. Edit it in **Character Editor -> Convo -> Weekly schedule**, or from the schedule controls in Chat Settings; either way the change applies everywhere.
+
+To get instant replies in one chat, open its Chat Settings and turn **Conversation schedules** off. That switch is per chat. The character stays available in that chat, keeps its schedule, and your other chats do not change. An active manual status override still takes precedence and applies in that chat, including an override such as **dnd**.
+
+Existing chats that never used schedules stay off until you turn them on. New chats you start with a character that has a schedule use it from the start.
+
+A manual status override also belongs to the character. If you set a character to **online** in one chat, the character is online in every chat. Use **clear** to remove the override.
+
 ## Do I need an API key to use YunYun?
 
 Almost always, yes. A **connection** is a saved link that tells YunYun how to reach one AI service: which provider, which model, and your login for it. An **API key** is a secret code, a bit like a password. You get it from an AI provider so YunYun can talk to that provider for you.
@@ -72,11 +88,11 @@ A few providers do not use an API key at all. The subscription options (Claude, 
 
 YunYun supports many providers. You pick one per connection.
 
-For chat and roleplay text, the choices are **OpenAI**, **OpenAI (ChatGPT)**, **Anthropic**, **Claude (Subscription)**, **Grok CLI (Subscription)**, **Google Gemini**, **Google Vertex AI**, **Mistral**, **Cohere**, **OpenRouter**, **NanoGPT**, **xAI / Grok**, and **Custom (OAI-Compatible)** for local or self-hosted models such as Ollama, LM Studio, and KoboldCpp.
+For chat and roleplay text, the choices are **OpenAI**, **OpenAI (ChatGPT)**, **Anthropic**, **Claude (Subscription)**, **Grok CLI (Subscription)**, **Google Gemini**, **Google Vertex AI**, **Mistral**, **Cohere**, **OpenRouter**, **NanoGPT**, **xAI / Grok**, **Arli AI**, **Z.AI**, **DeepSeek**, and **Custom (OAI-Compatible)** for local or self-hosted models such as Ollama, LM Studio, and KoboldCpp.
 
 For image generation, the choices include **OpenAI (DALL-E)**, **Stability AI**, **Together AI**, **NovelAI**, **OpenRouter Images**, **xAI / Grok Imagine**, **Venice.ai**, **Atlas Cloud**, **Pollinations**, **Stable Horde**, **SD Web UI (AUTOMATIC1111 / Forge)**, **ComfyUI**, **RunPod Serverless (ComfyUI)**, **Draw Things**, **NanoGPT**, and **Block Entropy**.
 
-For video generation, the choices are **Google AI Studio**, **xAI Imagine**, **OpenRouter Video**, **Atlas Cloud**, **Seedance 2.0**, and local **ComfyUI** API-format workflows.
+For video generation, the choices are **Google AI Studio**, **xAI Imagine**, **OpenRouter Video**, **NanoGPT**, **Atlas Cloud**, **Seedance 2.0**, and local **ComfyUI** API-format workflows.
 
 You can save many connections at once and assign a different one to each chat. See [Connecting to an AI Provider](connections/connecting-to-a-provider.md).
 
@@ -89,7 +105,7 @@ Some options cost nothing to try. **Pollinations** image generation needs no key
 ## Are my API keys safe?
 
 Yes. Every API key is encrypted with AES-256 before it is saved on disk. Connection and profile exports strip secret
-values. A full backup is different: it contains the encrypted records and, when present, the encryption-key file
+values. Chat and settings profile exports also leave out a chat's **DeepL API Key** and **Discord Mirror** webhook. A full backup is different: it contains the encrypted records and, when present, the encryption-key file
 needed to unlock them, so keep full backup ZIPs private.
 
 Because profile import intentionally leaves secret values out, you must re-enter each API key after importing a
@@ -112,11 +128,11 @@ For the full feature, see [Lorebooks](lorebooks/overview.md).
 
 ## What is an agent?
 
-An **agent** is an optional AI helper that runs during a chat to do a focused job. Examples include tracking the current scene, watching writing quality, adding maps or calls, or running a Conversation table game. Fresh installations have no optional agents. Open the **Agents** panel, click **Download Agents**, read an item's details, and install it. Then enable compatible agents per chat in **Chat Settings**. When an installed official package has a compatible update, YunYun asks before downloading it. Choosing **No** keeps the current version and leaves **Update** available in Download Agents for later. If the host is offline or verification fails, the installed version keeps working. The catalog also handles complete package removal. See [Agents](agents/agents-overview.md) and the public [Marinara-Agents repository](https://github.com/Pasta-Devs/Marinara-Agents).
+An **agent** is an optional AI helper that runs during a chat to do a focused job. Examples include tracking the current scene, watching writing quality, adding maps or calls, or running a Conversation table game. Fresh installations have no optional agents. Open the **Agents** panel, click **Download Agents**, read an item's details, and install it. Then enable compatible agents per chat in **Chat Settings**. When an installed official package has a compatible update, YunYun asks before downloading it and lists what each update changed when the package publishes release notes. A dot marks a version the publisher flagged as a change you will notice. Choosing **No** keeps the current version and leaves **Update** available in Download Agents for later. If the host is offline or verification fails, the installed version keeps working. The catalog also handles complete package removal. See [Agents](agents/agents-overview.md) and the public [Marinara-Agents repository](https://github.com/Pasta-Devs/Marinara-Agents).
 
 ## How do I set up Noodle?
 
-Noodle is YunYun's local, fictional social network for your characters. First open **Agents** → **Download Agents** and install **Noodle & NoodleR**, then restart YunYun when prompted. Open **Home** → **Noodle**, enter its **Settings**, invite characters or character folders, choose a generation connection under **Refresh**, then select **Refresh now** to generate the first activity. You can also set automatic refresh times, image generation, random users, and carryover into your chats.
+Noodle is YunYun's local, fictional social network for your characters. First open **Agents** → **Download Agents** and install **Noodle**, then restart YunYun when prompted. Open **Home** → **Noodle**, enter its **Settings**, invite characters or character folders, choose a generation connection under **Refresh**, then select **Refresh now** to generate the first activity. You can also set automatic refresh times, image generation, random users, and carryover into your chats.
 
 See [Noodle: The In-App Social Timeline](noodle/overview.md) and [Noodle Settings and Chat Carryover](noodle/settings.md) for the full guides.
 
@@ -125,7 +141,9 @@ See [Noodle: The In-App Social Timeline](noodle/overview.md) and [Noodle Setting
 AI models can only hold so much text at once, so old messages fall out of view in long chats. YunYun has two memory systems that help:
 
 - **Memory Recall** searches earlier messages and quietly adds the most relevant bits back into the prompt. Turn it on in **Chat Settings** under **Memory Recall**.
-- Summaries compress old messages into short recaps. Roleplay chats use **Chat Summary**, and Conversation chats use **Automatic Summarization**.
+- Summaries compress old messages into short recaps. Roleplay chats use **Chat Summary**, and Conversation chats use **Automatic Summarization**. Both are in **Chat Settings**.
+
+For automatic Roleplay context management, enable **Advanced Memory Recall** in **Chat Settings → Memory Recall**. It keeps recent history, maintains bounded continuity, and selectively recalls older scenes within your chosen estimated context cap. Setup, progress and editing stay in the drawer. Older Individual group chats may need one-time confirmation of each character's knowledge range. The optional **Use Decision model** toggle lets a saved Decision connection detect scenes and select memories; the Helper model still writes summaries.
 
 For setup and details, see [Memory and Summaries](agents/memory.md).
 
@@ -154,7 +172,7 @@ Everything lives on the computer running YunYun, inside the `data` folder in you
 
 ## Will I lose my data when I update?
 
-No. Updating YunYun keeps your characters, chats, and settings in place. It is still smart to make a backup before a big update, just in case. For update steps on each platform, see [Upgrading](UPGRADING.md).
+No. Updating YunYun keeps your characters, chats, and settings in place. It is still smart to make a backup before a big update, just in case. For update steps on each platform, see [Upgrading](UPGRADING.md). Going back to an older version afterwards can lose data that only the newer version stores; see [Downgrading to an older version](UPGRADING.md#downgrading-to-an-older-version).
 
 ## What can Professor YunYun do?
 
@@ -172,7 +190,7 @@ Note: on an ordinary remote address, Professor YunYun's data-changing actions ne
 
 The downloadable **Storyboard** Agent turns completed story text into an ordered sequence of keyframe images and can animate each keyframe into a short clip. In **Game Mode**, it storyboards one finished GM narration turn and displays the frames in a floating viewer or as the Game background. In **Roleplay**, it combines newly completed exchanges into an inline episode.
 
-To use it in Game Mode, install **Storyboard** from **Agents > Download Agents**. Open the Game, go to **Chat Settings > Agents**, turn on **Enable Agents** and **Enable Storyboards**, and set an image connection in the Game or the global Storyboard setup. Finish a GM narration turn, then open the **Gallery** and click **Create storyboard**. Use **View storyboard** to reopen its viewer.
+To use it in Game Mode, install **Storyboard** from **Agents > Download Agents**. Open the Game, go to **Chat Settings > Agents**, turn on **Enable Agents** and **Enable Storyboards**, and set an image connection in the Game or the global Storyboard setup. Finish a GM narration turn, then open **Chat Settings > Gallery** and click **Create storyboard**. Use **View storyboard** to reopen its viewer.
 
 For automatic Game Storyboards, turn on **Automatic Storyboard Illustrations**. Also turn on **Automatic Storyboard Animations** and select a Video Generation connection when you want clips. The new-game wizard's **Storyboard Optimized** presentation only shapes GM narration; it does not install or activate the Agent. For Game and Roleplay setup, prompts, viewers, migration behavior, and troubleshooting, see the [Storyboard Agent Guide](game/storyboard.md).
 
@@ -190,14 +208,14 @@ Yes. Add an image generation connection, for example **Pollinations** (needs no 
 
 Every install ships with the full set of guides. You can read them without leaving the app:
 
-- On the Home screen, click the **Documentation** button in the footer, next to **Replay Tutorial**.
+- On the Home screen, click **Documentation** in the bookmarks bar, next to **Tutorial**. On a phone, open the bookmarks menu first.
 - In the Home FAQ, open the documentation question and click **Open Documentation**.
 
 Both buttons open the same in-app viewer. It lists every guide and renders it inside YunYun.
 
 ## Where do I get help or report a bug?
 
-Start with [Troubleshooting](TROUBLESHOOTING.md), which is organized by symptom. On the Home screen footer, the **Discord** button opens the community chat and the **Support** button opens the project's support page. For bugs and feature requests, use the project's GitHub page.
+Start with [Troubleshooting](TROUBLESHOOTING.md), which is organized by symptom. In the Home screen's bookmarks bar, **Discord** opens the community chat and **Support** opens the project's support page. For bugs and feature requests, use the project's GitHub page.
 
 ## Related guides
 

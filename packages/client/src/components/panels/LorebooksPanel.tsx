@@ -1,3 +1,5 @@
+import { useLibraryFolderDrag } from "../../hooks/use-library-folder-drag";
+import { useLibraryOrder } from "../../hooks/use-library-order";
 // ──────────────────────────────────────────────
 // Panel: Lorebooks (overhauled)
 // Category tabs, search, click-to-edit, AI generate
@@ -32,6 +34,7 @@ import {
   Camera,
 } from "lucide-react";
 import { useUIStore, type LorebookPanelCategory, type LorebookPanelSort } from "../../stores/ui.store";
+import { sortPanelFolders } from "../../lib/panel-sort";
 import { useChatStore } from "../../stores/chat.store";
 import {
   fetchAllLorebookPages,
@@ -47,6 +50,7 @@ import type { Lorebook, LorebookCategory, LorebookEntry, LorebookFolder } from "
 import { confirmNonEmptyFolderDelete, showConfirmDialog } from "../../lib/app-dialogs";
 import { cn } from "../../lib/utils";
 import { api } from "../../lib/api-client";
+import { EXPORT_FAILED_TOAST_ID } from "../../lib/file-download";
 import { getChatCharacterIds } from "../../lib/chat-macros";
 import { buildLorebookDuplicateInput } from "../../lib/lorebook-duplicate";
 import {
@@ -61,7 +65,7 @@ import { handleFolderRenameKeyDown, useFolderRenameGesture } from "../../hooks/u
 import { useTouchFolderDrag } from "../../hooks/use-touch-folder-drag";
 import { SelectionActionBar } from "../ui/SelectionActionBar";
 import { SmoothFolderContent } from "../ui/SmoothFolderContent";
-import { TouchDragHandle } from "../ui/TouchDragHandle";
+import { LorebookSelectionEnableActions } from "./library/LorebookSelectionEnableActions";
 import { useLocalizedUiText } from "../../localization/use-localized-ui-text";
 import { useTranslation as useUiTranslation } from "react-i18next";
 import { PanelLoadMoreBar } from "./PanelLoadMoreBar";
@@ -122,6 +126,9 @@ function remapLorebookEntryRelationships(
 }
 
 export function LorebooksPanel() {
+  const manualOrder = useLibraryOrder("lorebook");
+  const { active: manualOrderActive, orderItems: orderLibraryItems } = manualOrder;
+  const folderDrag = useLibraryFolderDrag("lorebook");
   const { t: localizeUi } = useUiTranslation();
   const localize = useLocalizedUiText();
   const activeCategory = useUIStore((s) => s.lorebookPanelCategory);
@@ -235,9 +242,9 @@ export function LorebooksPanel() {
     async (tag: string) => {
       if (
         !(await showConfirmDialog({
-          title:localizeUi("ui.panels.characterspanel.removeTag"),
-          message:localizeUi("ui.panels.lorebookspanel.removeTagValue1FromAllLorebooks", { value1: tag }),
-          confirmLabel:localizeUi("settings.notifications.customSound.actions.remove"),
+          title: localizeUi("ui.panels.characterspanel.removeTag"),
+          message: localizeUi("ui.panels.lorebookspanel.removeTagValue1FromAllLorebooks", { value1: tag }),
+          confirmLabel: localizeUi("settings.notifications.customSound.actions.remove"),
           tone: "destructive",
         }))
       ) {
@@ -303,7 +310,7 @@ export function LorebooksPanel() {
     getPersonaNames,
   ]);
 
-  const sorted = useMemo(() => {
+  const sortedBySort = useMemo(() => {
     const list = [...filtered];
     switch (sort) {
       case "name-asc":
@@ -320,8 +327,18 @@ export function LorebooksPanel() {
         return list;
     }
   }, [filtered, sort]);
+  const sorted = useMemo(() => orderLibraryItems(sortedBySort), [orderLibraryItems, sortedBySort]);
 
-  const lorebookById = useMemo(() => new Map(sorted.map((lorebook) => [lorebook.id, lorebook])), [sorted]);
+  const sortedFolders = useMemo(() => {
+    const folders = sortPanelFolders(lorebookFolders, sort === "tokens" ? "name-asc" : sort);
+    if (sort !== "tokens") return folders;
+    const tokens = new Map(sorted.map((lorebook) => [lorebook.id, lorebook.tokenBudget ?? 0]));
+    const totals = new Map(
+      folders.map((folder) => [folder.id, folder.itemIds.reduce((total, id) => total + (tokens.get(id) ?? 0), 0)]),
+    );
+    return folders.sort((a, b) => totals.get(b.id)! - totals.get(a.id)!);
+  }, [lorebookFolders, sort, sorted]);
+
   const folderFilterActive = searchQuery.trim().length > 0 || activeCategory !== "all" || activeTag !== null;
 
   const folderedLorebookIds = useMemo(() => {
@@ -336,19 +353,6 @@ export function LorebooksPanel() {
     () => sorted.filter((lorebook) => !folderedLorebookIds.has(lorebook.id)),
     [sorted, folderedLorebookIds],
   );
-
-  // Group by category for "all" view
-  const grouped = useMemo(() => {
-    if (activeCategory !== "all") return null;
-    const map = new Map<string, LorebookListItem[]>();
-    for (const lb of rootLorebooks) {
-      const cat = lb.category || "uncategorized";
-      const list = map.get(cat) ?? [];
-      list.push(lb);
-      map.set(cat, list);
-    }
-    return map;
-  }, [rootLorebooks, activeCategory]);
 
   const exitSelectionMode = useCallback(() => {
     setSelectionMode(false);
@@ -368,14 +372,23 @@ export function LorebooksPanel() {
     if (selectedLorebookIds.size === 0) return;
     setExportingSelected(true);
     try {
-      await api.downloadPost(
+      const saveStatus = await api.downloadPost(
         "/lorebooks/export-bulk",
         { ids: [...selectedLorebookIds], format: "native" },
         "marinara-lorebooks.zip",
       );
-      toast.success(localizeUi("ui.panels.lorebookspanel.exportedValue1LorebookValue2", { value1: selectedLorebookIds.size, value2: selectedLorebookIds.size === 1 ? "" :localizeUi("ui.noodle.stageprofileview.s") }));
+      if (saveStatus === "saved")
+        toast.success(
+          localizeUi("ui.panels.lorebookspanel.exportedValue1LorebookValue2", {
+            value1: selectedLorebookIds.size,
+            value2: selectedLorebookIds.size === 1 ? "" : localizeUi("ui.noodle.stageprofileview.s"),
+          }),
+        );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message :localizeUi("ui.panels.lorebookspanel.failedToExportLorebooks"));
+      toast.error(
+        error instanceof Error ? error.message : localizeUi("ui.panels.lorebookspanel.failedToExportLorebooks"),
+        { id: EXPORT_FAILED_TOAST_ID },
+      );
     } finally {
       setExportingSelected(false);
     }
@@ -387,9 +400,12 @@ export function LorebooksPanel() {
 
     if (
       !(await showConfirmDialog({
-        title:localizeUi("ui.panels.lorebookspanel.deleteLorebooks"),
-        message:localizeUi("ui.panels.lorebookspanel.deleteValue1LorebookValue2AllEntriesInsideThemWill", { value1: ids.length, value2: ids.length === 1 ? "" :localizeUi("ui.noodle.stageprofileview.s") }),
-        confirmLabel:localizeUi("lorebook.editor.batch.delete"),
+        title: localizeUi("ui.panels.lorebookspanel.deleteLorebooks"),
+        message: localizeUi("ui.panels.lorebookspanel.deleteValue1LorebookValue2AllEntriesInsideThemWill", {
+          value1: ids.length,
+          value2: ids.length === 1 ? "" : localizeUi("ui.noodle.stageprofileview.s"),
+        }),
+        confirmLabel: localizeUi("lorebook.editor.batch.delete"),
         tone: "destructive",
       }))
     ) {
@@ -401,12 +417,22 @@ export function LorebooksPanel() {
     const deletedCount = ids.length - failedIds.length;
 
     if (deletedCount > 0) {
-      toast.success(localizeUi("ui.panels.lorebookspanel.deletedValue1LorebookValue2", { value1: deletedCount, value2: deletedCount === 1 ? "" :localizeUi("ui.noodle.stageprofileview.s") }));
+      toast.success(
+        localizeUi("ui.panels.lorebookspanel.deletedValue1LorebookValue2", {
+          value1: deletedCount,
+          value2: deletedCount === 1 ? "" : localizeUi("ui.noodle.stageprofileview.s"),
+        }),
+      );
     }
 
     if (failedIds.length > 0) {
       setSelectedLorebookIds(new Set(failedIds));
-      toast.error(localizeUi("ui.panels.lorebookspanel.failedToDeleteValue1LorebookValue2", { value1: failedIds.length, value2: failedIds.length === 1 ? "" :localizeUi("ui.noodle.stageprofileview.s") }));
+      toast.error(
+        localizeUi("ui.panels.lorebookspanel.failedToDeleteValue1LorebookValue2", {
+          value1: failedIds.length,
+          value2: failedIds.length === 1 ? "" : localizeUi("ui.noodle.stageprofileview.s"),
+        }),
+      );
       return;
     }
 
@@ -495,7 +521,9 @@ export function LorebooksPanel() {
         toast.success(localizeUi("ui.panels.agentspanel.copiedValue1", { value1: lorebook.name }));
         openLorebookDetail(createdId);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message :localizeUi("ui.panels.lorebookspanel.failedToCopyLorebook"));
+        toast.error(
+          error instanceof Error ? error.message : localizeUi("ui.panels.lorebookspanel.failedToCopyLorebook"),
+        );
       }
     },
     [createLorebook, openLorebookDetail, localizeUi],
@@ -525,7 +553,11 @@ export function LorebooksPanel() {
           await uploadLorebookImage.mutateAsync({ id: lorebookId, image });
           toast.success(localizeUi("ui.panels.lorebookspanel.lorebookPictureUpdated"));
         } catch (error) {
-          toast.error(error instanceof Error ? error.message :localizeUi("ui.panels.lorebookspanel.failedToUploadLorebookPicture"));
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : localizeUi("ui.panels.lorebookspanel.failedToUploadLorebookPicture"),
+          );
         } finally {
           imageTargetLorebookIdRef.current = null;
         }
@@ -583,14 +615,14 @@ export function LorebooksPanel() {
   );
 
   const finishLorebookTouchDrag = useCallback(
-    (lorebookId: string, x: number, y: number) => {
+    (lorebookId: string, x: number, y: number, dragIds?: string[]) => {
       const target = document.elementFromPoint(x, y);
       const folderElement = target?.closest("[data-lorebook-folder-id]") as HTMLElement | null;
       const rootElement = target?.closest("[data-lorebook-folder-root]") as HTMLElement | null;
       if (folderElement?.dataset.lorebookFolderId) {
-        moveLorebooksToFolder(getDraggedLorebookIds(lorebookId), folderElement.dataset.lorebookFolderId);
-      } else if (rootElement) {
-        moveLorebooksToFolder(getDraggedLorebookIds(lorebookId), null);
+        moveLorebooksToFolder(dragIds ?? getDraggedLorebookIds(lorebookId), folderElement.dataset.lorebookFolderId);
+      } else if (rootElement || target?.closest('[data-drag-kind="lorebook"]')) {
+        moveLorebooksToFolder(dragIds ?? getDraggedLorebookIds(lorebookId), null);
       }
       setDraggedLorebookId(null);
       window.setTimeout(() => {
@@ -612,6 +644,8 @@ export function LorebooksPanel() {
   }, []);
 
   const { startTouchDrag: startLorebookTouchDrag } = useTouchFolderDrag({
+    getDragIds: getDraggedLorebookIds,
+    onReorder: manualOrder.reorder,
     onActivate: (lorebookId) => {
       suppressLorebookClickRef.current = true;
       setDraggedLorebookId(lorebookId);
@@ -636,9 +670,9 @@ export function LorebooksPanel() {
           onDelete={async () => {
             if (
               await showConfirmDialog({
-                title:localizeUi("ui.panels.lorebookspanel.deleteLorebook"),
-                message:localizeUi("ui.panels.lorebookspanel.deleteValue1AllEntriesWillBeLost", { value1: lb.name }),
-                confirmLabel:localizeUi("lorebook.editor.batch.delete"),
+                title: localizeUi("ui.panels.lorebookspanel.deleteLorebook"),
+                message: localizeUi("ui.panels.lorebookspanel.deleteValue1AllEntriesWillBeLost", { value1: lb.name }),
+                confirmLabel: localizeUi("lorebook.editor.batch.delete"),
                 tone: "destructive",
               })
             ) {
@@ -675,7 +709,6 @@ export function LorebooksPanel() {
           }}
           onTouchStart={(event) => {
             startLorebookTouchDrag(event, lb.id, {
-              allowInteractiveTarget: true,
               chatResourcePayload: {
                 version: 1,
                 kind: "lorebook",
@@ -706,7 +739,8 @@ export function LorebooksPanel() {
       selectedLorebookIds,
       selectionMode,
       startLorebookTouchDrag,
-      toggleSelection, localizeUi,
+      toggleSelection,
+      localizeUi,
     ],
   );
 
@@ -768,11 +802,18 @@ export function LorebooksPanel() {
         </div>
         <div className="relative">
           <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as LorebookPanelSort)}
+            value={manualOrderActive || folderDrag.active ? "custom" : sort}
+            onChange={(e) => {
+              manualOrder.setActive(e.target.value === "custom");
+              folderDrag.setActive(e.target.value === "custom");
+              if (e.target.value !== "custom") setSort(e.target.value as LorebookPanelSort);
+            }}
             className="mari-chrome-field mari-chrome-sort-field mari-accent-animated h-10 appearance-none py-0 pl-2.5 pr-7 text-[0.6875rem] md:h-9"
             title={localizeUi("ui.panels.agentspanel.sortOrder")}
           >
+            <option value="custom" title={localizeUi("dragDrop.manualOrderHelp")}>
+              {localizeUi("dragDrop.manualOrder")}
+            </option>
             <option value="name-asc">{localizeUi("ui.panels.backgroundpicker.aZ")}</option>
             <option value="name-desc">{localizeUi("ui.panels.backgroundpicker.zA")}</option>
             <option value="newest">{localizeUi("ui.panels.backgroundpicker.newest")}</option>
@@ -792,16 +833,22 @@ export function LorebooksPanel() {
             onClick={handleCreateFolder}
             className="mari-chrome-control mari-chrome-control--small flex-1 justify-start text-[0.6875rem]"
           >
-            <FolderPlus size="0.75rem" />{localizeUi("ui.panels.backgroundpicker.newFolder")}</button>
+            <FolderPlus size="0.75rem" />
+            {localizeUi("ui.panels.backgroundpicker.newFolder")}
+          </button>
         </div>
         {lorebookFolders.length > 0 && (
-          <p className="mari-folder-helper">{localizeUi("ui.panels.lorebookspanel.dragAndDropLorebooksToFoldersDoubleClickOr")}</p>
+          <p className="mari-folder-helper">
+            {localizeUi("ui.panels.lorebookspanel.dragAndDropLorebooksToFoldersDoubleClickOr")}
+          </p>
         )}
       </div>
 
       {/* Filters */}
       <div className="flex gap-1 md:hidden">
-        <label htmlFor="lorebook-category-filter" className="sr-only">{localizeUi("ui.panels.lorebookspanel.lorebookCategory")}</label>
+        <label htmlFor="lorebook-category-filter" className="sr-only">
+          {localizeUi("ui.panels.lorebookspanel.lorebookCategory")}
+        </label>
         <div className="relative min-w-0 flex-1">
           <select
             id="lorebook-category-filter"
@@ -827,9 +874,15 @@ export function LorebooksPanel() {
             "mari-chrome-control mari-chrome-control--small shrink-0 whitespace-nowrap px-2 text-[0.6875rem]",
             tagFilterActive && "mari-chrome-control--selected",
           )}
-          title={tagsExpanded ?localizeUi("ui.panels.lorebookspanel.collapseTags") :localizeUi("ui.panels.lorebookspanel.expandTags")}
+          title={
+            tagsExpanded
+              ? localizeUi("ui.panels.lorebookspanel.collapseTags")
+              : localizeUi("ui.panels.lorebookspanel.expandTags")
+          }
         >
-          <Tag size="0.6875rem" />{localizeUi("ui.characters.metadatatab.tags")}{tagsExpanded ? <ChevronUp size="0.625rem" /> : <ChevronDown size="0.625rem" />}
+          <Tag size="0.6875rem" />
+          {localizeUi("ui.characters.metadatatab.tags")}
+          {tagsExpanded ? <ChevronUp size="0.625rem" /> : <ChevronDown size="0.625rem" />}
         </button>
       </div>
 
@@ -855,9 +908,15 @@ export function LorebooksPanel() {
             "mari-chrome-control mari-chrome-control--small whitespace-nowrap text-[0.6875rem]",
             tagFilterActive && "mari-chrome-control--selected",
           )}
-          title={tagsExpanded ?localizeUi("ui.panels.lorebookspanel.collapseTags") :localizeUi("ui.panels.lorebookspanel.expandTags")}
+          title={
+            tagsExpanded
+              ? localizeUi("ui.panels.lorebookspanel.collapseTags")
+              : localizeUi("ui.panels.lorebookspanel.expandTags")
+          }
         >
-          <Tag size="0.6875rem" />{localizeUi("ui.characters.metadatatab.tags")}{tagsExpanded ? <ChevronUp size="0.625rem" /> : <ChevronDown size="0.625rem" />}
+          <Tag size="0.6875rem" />
+          {localizeUi("ui.characters.metadatatab.tags")}
+          {tagsExpanded ? <ChevronUp size="0.625rem" /> : <ChevronDown size="0.625rem" />}
         </button>
       </div>
 
@@ -871,7 +930,8 @@ export function LorebooksPanel() {
               }}
               className="mari-chrome-control mari-chrome-control--compact mari-chrome-control--danger"
             >
-              <X size="0.5rem" /> {localizeUi("lorebook.editor.batch.clear")}</button>
+              <X size="0.5rem" /> {localizeUi("lorebook.editor.batch.clear")}
+            </button>
           )}
           {TAGGED_CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.id;
@@ -924,16 +984,19 @@ export function LorebooksPanel() {
       )}
 
       <div className="flex flex-col gap-0.5">
-        {lorebookFolders.map((folder) => {
+        {folderDrag.orderItems(sortedFolders).map((folder) => {
           const isEditing = editingFolderId === folder.id;
-          const folderItems = folder.itemIds
-            .map((id) => lorebookById.get(id))
-            .filter((item): item is LorebookListItem => Boolean(item));
+          const memberIds = new Set(folder.itemIds);
+          const folderItems = sorted.filter((item) => memberIds.has(item.id));
           if (folderFilterActive && folderItems.length === 0) return null;
           const isExpanded = (folderFilterActive && folderItems.length > 0) || expandedFolderId === folder.id;
+          // Use the visible list when complete; unloaded pages cannot establish a folder's full count.
+          const folderCount =
+            folderFilterActive || !lorebookPages.hasNextPage ? folderItems.length : folder.itemIds.length;
           return (
             <div
               key={folder.id}
+              {...folderDrag.bind(folder.id)}
               data-lorebook-folder-id={folder.id}
               onDragOver={(event) => {
                 if (draggedLorebookId) {
@@ -950,10 +1013,16 @@ export function LorebooksPanel() {
               className="flex flex-col rounded-lg transition-colors"
             >
               <div
+                data-drag-surface
                 role="button"
                 tabIndex={0}
                 aria-expanded={isExpanded}
-                aria-label={localizeUi("ui.panels.agentspanel.value1FolderValue2DoubleTapOrPressF2To", { value1: isExpanded ?localizeUi("ui.panels.ttsconfigcard.collapse") :localizeUi("ui.panels.ttsconfigcard.expand"), value2: folder.name })}
+                aria-label={localizeUi("ui.panels.agentspanel.value1FolderValue2DoubleTapOrPressF2To", {
+                  value1: isExpanded
+                    ? localizeUi("ui.panels.ttsconfigcard.collapse")
+                    : localizeUi("ui.panels.ttsconfigcard.expand"),
+                  value2: folder.name,
+                })}
                 title={localizeUi("ui.panels.backgroundpicker.doubleClickDoubleTapOrPressF2ToRename")}
                 className="group relative flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 transition-all hover:bg-[var(--sidebar-accent)]/40 max-md:pr-12 [@media(pointer:coarse)]:pr-12"
                 onClick={(event) =>
@@ -992,6 +1061,7 @@ export function LorebooksPanel() {
                       onKeyDown={(event) => {
                         if (event.key === "Enter") event.currentTarget.blur();
                         if (event.key === "Escape") {
+                          event.preventDefault();
                           setEditingFolderId(null);
                           setEditFolderName("");
                         }
@@ -1004,24 +1074,24 @@ export function LorebooksPanel() {
                     <div className="mari-chrome-text-muted truncate text-xs font-medium">{folder.name}</div>
                   )}
                 </div>
-                {(folderFilterActive ? folderItems.length : folder.itemIds.length) > 0 && (
+                {folderCount > 0 && (
                   <span
                     data-folder-item-count="inline"
                     className="shrink-0 text-[0.5625rem] text-[var(--muted-foreground)] max-md:hidden [@media(pointer:coarse)]:hidden"
                   >
-                    {folderFilterActive ? folderItems.length : folder.itemIds.length}
+                    {folderCount}
                   </span>
                 )}
                 <div
                   data-folder-actions
                   className="pointer-events-none absolute right-2 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-0.5 rounded-lg bg-[var(--sidebar)] px-1 py-0.5 opacity-0 shadow-sm ring-1 ring-[var(--border)] transition-opacity group-hover:opacity-100 [@media(pointer:fine)]:group-focus-within:opacity-100 max-md:opacity-100 [@media(pointer:coarse)]:opacity-100 group-hover:[&_button]:pointer-events-auto [@media(pointer:fine)]:group-focus-within:[&_button]:pointer-events-auto max-md:[&_button]:pointer-events-auto [@media(pointer:coarse)]:[&_button]:pointer-events-auto"
                 >
-                  {(folderFilterActive ? folderItems.length : folder.itemIds.length) > 0 && (
+                  {folderCount > 0 && (
                     <span
                       data-folder-item-count="actions"
                       className="hidden px-1 text-[0.5625rem] text-[var(--muted-foreground)] max-md:inline [@media(pointer:coarse)]:inline"
                     >
-                      {folderFilterActive ? folderItems.length : folder.itemIds.length}
+                      {folderCount}
                     </span>
                   )}
                   <button
@@ -1053,7 +1123,9 @@ export function LorebooksPanel() {
                 innerClassName="flex flex-col gap-0.5"
               >
                 {folderItems.length === 0 ? (
-                  <p className="mari-chrome-text-muted py-2 text-[0.625rem] italic">{localizeUi("ui.panels.lorebookspanel.dropLorebooksHere")}</p>
+                  <p className="mari-chrome-text-muted py-2 text-[0.625rem] italic">
+                    {localizeUi("ui.panels.lorebookspanel.dropLorebooksHere")}
+                  </p>
                 ) : (
                   folderItems.map((lb) => renderLorebookRow(lb))
                 )}
@@ -1079,7 +1151,9 @@ export function LorebooksPanel() {
             <BookOpen size="1.25rem" className="text-amber-400" />
           </div>
           <p className="mari-chrome-text-muted text-xs">
-            {searchQuery ?localizeUi("ui.panels.lorebookspanel.noLorebooksMatchYourSearch") :localizeUi("ui.panels.lorebookspanel.noLorebooksYet")}
+            {searchQuery
+              ? localizeUi("ui.panels.lorebookspanel.noLorebooksMatchYourSearch")
+              : localizeUi("ui.panels.lorebookspanel.noLorebooksYet")}
           </p>
         </div>
       )}
@@ -1100,26 +1174,13 @@ export function LorebooksPanel() {
                 handleLorebookDrop(null, payload ? (JSON.parse(payload) as string[]) : undefined);
               }}
               className="rounded-xl border border-dashed border-amber-400/35 bg-amber-400/5 px-3 py-2 text-[0.625rem] text-amber-300"
-            >{localizeUi("ui.panels.agentspanel.dropHereToMoveOutOfFolder")}</div>
+            >
+              {localizeUi("ui.panels.agentspanel.dropHereToMoveOutOfFolder")}
+            </div>
           )}
 
           <div className="stagger-children flex min-h-8 flex-col gap-1 rounded-xl transition-colors">
-            {activeCategory === "all" && grouped
-              ? // Grouped view
-                Array.from(grouped.entries()).map(([category, books]) => {
-                  const catMeta = CATEGORIES.find((c) => c.id === category) ?? CATEGORIES[6];
-                  return (
-                    <div key={category} className="mb-2">
-                      <div className="mb-1 flex items-center gap-1.5 px-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
-                        {catMeta.label}
-                        <span className="ml-auto text-[0.625rem] font-normal">{books.length}</span>
-                      </div>
-                      {books.map((lb) => renderLorebookRow(lb))}
-                    </div>
-                  );
-                })
-              : // Flat view
-                rootLorebooks.map((lb) => renderLorebookRow(lb))}
+            {rootLorebooks.map((lb) => renderLorebookRow(lb))}
           </div>
         </>
       )}
@@ -1129,7 +1190,9 @@ export function LorebooksPanel() {
           onLoadMore={() => void lorebookPages.fetchNextPage()}
           disabled={lorebookPages.isFetchingNextPage}
         >
-          {lorebookPages.isFetchingNextPage ?localizeUi("ui.characters.characterlibraryview.loading") :localizeUi("ui.panels.characterspanel.loadMoreValue1Loaded", { value1: lorebooks.length })}
+          {lorebookPages.isFetchingNextPage
+            ? localizeUi("ui.characters.characterlibraryview.loading")
+            : localizeUi("ui.panels.characterspanel.loadMoreValue1Loaded", { value1: lorebooks.length })}
         </PanelLoadMoreBar>
       )}
 
@@ -1137,6 +1200,7 @@ export function LorebooksPanel() {
         <SelectionActionBar
           placement="panel"
           selectedCount={selectedLorebookIds.size}
+          extraAction={<LorebookSelectionEnableActions selectedIds={selectedLorebookIds} />}
           onExport={() => void handleExportSelected()}
           onDelete={handleDeleteSelected}
           exporting={exportingSelected}
@@ -1175,7 +1239,7 @@ function LorebookRow({
   isDragging?: boolean;
   onDragStart?: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd?: () => void;
-  onTouchStart?: (event: TouchEvent<HTMLButtonElement>) => void;
+  onTouchStart?: (event: TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => void;
 }) {
   const { t: localizeUi } = useUiTranslation();
   const gradient = CATEGORY_COLORS[lorebook.category] ?? CATEGORY_COLORS.uncategorized;
@@ -1192,8 +1256,16 @@ function LorebookRow({
   return (
     <div
       data-touch-drag-card="lorebook"
+      data-drag-id={lorebook.id}
+      aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+      data-drag-kind="lorebook"
+      data-drag-payload={JSON.stringify({ version: 1, kind: "lorebook", ids: [lorebook.id], label: lorebook.name })}
+      onMouseDown={onTouchStart}
+      onTouchStart={(event) => {
+        onTouchStart?.(event);
+      }}
       className={cn(
-        "group relative flex touch-pan-y cursor-pointer items-center gap-3 rounded-xl p-2.5 transition-all hover:bg-[var(--sidebar-accent)]",
+        "group relative flex touch-pan-y cursor-grab active:cursor-grabbing items-center gap-3 rounded-xl p-2.5 transition-all hover:bg-[var(--sidebar-accent)]",
         selectionMode &&
           isSelected &&
           "bg-[var(--marinara-chat-chrome-highlight-bg)] ring-1 ring-[var(--marinara-chat-chrome-button-border-active)]",
@@ -1217,19 +1289,16 @@ function LorebookRow({
               ? "border-[var(--marinara-chat-chrome-button-border-active)] bg-[var(--marinara-chat-chrome-button-bg-active)] text-[var(--marinara-chat-chrome-button-text-active)]"
               : "border-[var(--muted-foreground)]/40 bg-[var(--secondary)] text-transparent",
           )}
-          aria-label={isSelected ?localizeUi("ui.panels.lorebookrow.deselectLorebook") :localizeUi("ui.panels.lorebookrow.selectLorebook")}
+          aria-label={
+            isSelected
+              ? localizeUi("ui.panels.lorebookrow.deselectLorebook")
+              : localizeUi("ui.panels.lorebookrow.selectLorebook")
+          }
         >
           <span className="text-[0.75rem]">✓</span>
         </button>
       )}
-      {onTouchStart && (
-        <TouchDragHandle
-          label={localizeUi("ui.panels.lorebookrow.dragLorebook")}
-          onTouchStart={(event) => {
-            onTouchStart(event);
-          }}
-        />
-      )}
+
       {selectionMode ? (
         <div className={imageClasses}>{imageContent}</div>
       ) : (
@@ -1243,8 +1312,16 @@ function LorebookRow({
             imageClasses,
             "transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[var(--marinara-chat-chrome-focus-ring)]",
           )}
-          title={lorebook.imagePath ?localizeUi("ui.panels.lorebookrow.replaceLorebookPicture") :localizeUi("ui.panels.lorebookrow.uploadLorebookPicture")}
-          aria-label={lorebook.imagePath ?localizeUi("ui.panels.lorebookrow.replaceLorebookPicture") :localizeUi("ui.panels.lorebookrow.uploadLorebookPicture")}
+          title={
+            lorebook.imagePath
+              ? localizeUi("ui.panels.lorebookrow.replaceLorebookPicture")
+              : localizeUi("ui.panels.lorebookrow.uploadLorebookPicture")
+          }
+          aria-label={
+            lorebook.imagePath
+              ? localizeUi("ui.panels.lorebookrow.replaceLorebookPicture")
+              : localizeUi("ui.panels.lorebookrow.uploadLorebookPicture")
+          }
         >
           {imageContent}
           <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
@@ -1252,16 +1329,13 @@ function LorebookRow({
           </span>
         </button>
       )}
-      <div
-        className={cn(
-          "min-w-0 flex-1",
-          !selectionMode && "pr-0 max-md:pr-24 [@media(pointer:coarse)]:pr-24",
-        )}
-      >
-        <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-medium">{lorebook.name}</span>
+      <div className={cn("min-w-0 flex-1", !selectionMode && "pr-0 max-md:pr-24 [@media(pointer:coarse)]:pr-24")}>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate text-sm font-medium">{lorebook.name}</span>
           {!lorebook.enabled && (
-            <span className="rounded bg-[var(--muted)]/50 px-1 py-0.5 text-[0.5625rem] text-[var(--muted-foreground)]">{localizeUi("ui.panels.lorebookrow.off")}</span>
+            <span className="rounded bg-[var(--muted)]/50 px-1 py-0.5 text-[0.5625rem] text-[var(--muted-foreground)]">
+              {localizeUi("ui.panels.lorebookrow.off")}
+            </span>
           )}
         </div>
         <div className="truncate text-[0.6875rem] text-[var(--muted-foreground)]">
@@ -1269,7 +1343,7 @@ function LorebookRow({
             <span className="inline-flex items-center gap-1">
               <UserRound size="0.625rem" className="shrink-0" />
               {characterName}
-              {lorebook.description ?localizeUi("ui.panels.lorebookrow.value1", { value1: lorebook.description }) : ""}
+              {lorebook.description ? localizeUi("ui.panels.lorebookrow.value1", { value1: lorebook.description }) : ""}
             </span>
           ) : (
             lorebook.description || "No description"

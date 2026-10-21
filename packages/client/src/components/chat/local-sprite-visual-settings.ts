@@ -1,4 +1,5 @@
 import type { SpriteCharacterVisualSettings, SpriteSide } from "@marinara-engine/shared";
+import { AVATAR_FRAMINGS, type AvatarFraming } from "../../features/avatars/contract";
 import { normalizeSpritePlacements, type SpritePlacementMap } from "./sprite-placement";
 import {
   SPRITE_DISPLAY_OPACITY_MAX,
@@ -19,6 +20,8 @@ export type LocalSpriteVisualSettings = {
   fullBodySpriteOpacity?: number;
   expressionAvatarsEnabled?: boolean;
   characterOverrides?: Record<string, SpriteCharacterVisualSettings>;
+  /** Each 3D avatar's framing, by owner id. */
+  avatarFramings?: Record<string, AvatarFraming>;
 };
 
 function canUseLocalStorage(): boolean {
@@ -88,6 +91,16 @@ export function normalizeSpriteCharacterVisualSettingsMap(raw: unknown): Record<
   );
 }
 
+function normalizeAvatarFramings(raw: unknown): Record<string, AvatarFraming> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter(
+      (entry): entry is [string, AvatarFraming] =>
+        entry[0].trim().length > 0 && AVATAR_FRAMINGS.includes(entry[1] as AvatarFraming),
+    ),
+  );
+}
+
 function normalizeLocalSpriteVisualSettings(raw: unknown): LocalSpriteVisualSettings {
   if (!raw || typeof raw !== "object") return {};
 
@@ -138,6 +151,10 @@ function normalizeLocalSpriteVisualSettings(raw: unknown): LocalSpriteVisualSett
     next.characterOverrides = normalizeSpriteCharacterVisualSettingsMap(record.characterOverrides);
   }
 
+  if (Object.prototype.hasOwnProperty.call(record, "avatarFramings")) {
+    next.avatarFramings = normalizeAvatarFramings(record.avatarFramings);
+  }
+
   return next;
 }
 
@@ -174,6 +191,12 @@ function writeAllLocalSpriteVisualSettings(settings: Record<string, LocalSpriteV
 export function loadLocalSpriteVisualSettings(chatId: string | null | undefined): LocalSpriteVisualSettings {
   if (!chatId) return {};
   return readAllLocalSpriteVisualSettings()[chatId] ?? {};
+}
+
+export function copyLocalSpriteVisualSettings(sourceChatId: string, targetChatId: string): void {
+  const source = loadLocalSpriteVisualSettings(sourceChatId);
+  if (Object.keys(source).length === 0) return;
+  saveLocalSpriteVisualSettings(targetChatId, source);
 }
 
 export function saveLocalSpriteVisualSettings(

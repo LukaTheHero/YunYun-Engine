@@ -32,15 +32,22 @@
 // - [create_character: name="...", description="...", personality="...", first_message="...", scenario="...", backstory="...", appearance="...", about_me="...", mes_example="...", creator_notes="...", system_prompt="...", post_history_instructions="...", creator="...", character_version="...", tags="tag1, tag2", alternate_greetings="hello || hi", talkativeness=0.5, fav=true, world="...", depth_prompt="...", depth_prompt_depth=4, depth_prompt_role="system"]
 // - [update_character: name="...", description="...", personality="...", first_message="...", scenario="...", backstory="...", appearance="...", about_me="...", mes_example="...", creator_notes="...", system_prompt="...", post_history_instructions="...", creator="...", character_version="...", tags="tag1, tag2", alternate_greetings="hello || hi", talkativeness=0.5, fav=true, world="...", depth_prompt="...", depth_prompt_depth=4, depth_prompt_role="system"]
 // - [update_persona: name="...", description="...", personality="...", appearance="...", scenario="...", backstory="...", about_me="..."]
-// - <create_lorebook>{"name":"...","description":"...","category":"...","tags":["..."],"entries":[{"name":"...","content":"...","keys":["..."],"tag":"..."}]}</create_lorebook>
-// - <update_lorebook>{"name":"Existing","description":"...","entries":[{"name":"Entry","content":"refined content","keys":["..."]}]}</update_lorebook>
+// - <create_lorebook>{"name":"...","folders":["Characters/Ada"],"entries":[{"name":"...","path":"Characters/Ada","content":"..."}]}</create_lorebook>
+// - <update_lorebook>{"name":"Existing","folders":["Places/Arcadia"],"entries":[{"name":"Entry","path":"Places/Arcadia","content":"refined content"}]}</update_lorebook>
 // - <create_preset>{"name":"...","description":"...","sections":[{"name":"...","content":"...","role":"system"}],"choiceBlocks":[{"variableName":"...","question":"...","options":[{"label":"...","value":"..."}]}]}</create_preset>
 // - <suggestions>[{"label":"...","prompt":"...","entity":"characters"}]</suggestions>
 // - [create_chat: character="...", mode="conversation|roleplay"]
 // - [navigate: panel="...", tab="..."]
 // - [fetch: type="character|persona|lorebook|chat|preset", name="..."]
 
-import { normalizeTextForMatch, stripLeadingMessageTimestamps } from "@marinara-engine/shared";
+import {
+  normalizeHapticAction,
+  normalizeHapticPattern,
+  normalizeTextForMatch,
+  stripLeadingMessageTimestamps,
+  type HapticDeviceAction,
+  type HapticFeedbackPattern,
+} from "@marinara-engine/shared";
 
 import { stripConversationPromptTimestamps } from "./transcript-sanitize.js";
 import {
@@ -157,11 +164,13 @@ export interface DirectMessageCommand {
 export interface HapticCommand {
   type: "haptic";
   /** Device action */
-  action: "vibrate" | "oscillate" | "rotate" | "position" | "stop";
+  action: HapticDeviceAction;
   /** Intensity / speed (0.0-1.0) */
   intensity?: number;
   /** Duration in seconds */
   duration?: number;
+  /** Named output pattern. */
+  pattern?: HapticFeedbackPattern;
 }
 
 export interface SpotifyCommand {
@@ -205,6 +214,7 @@ export interface CreatePersonaCommand {
 export interface CreateCharacterCommand {
   type: "create_character";
   name: string;
+  summary?: string;
   description?: string;
   personality?: string;
   firstMessage?: string;
@@ -231,6 +241,7 @@ export interface CreateCharacterCommand {
 export interface UpdateCharacterCommand {
   type: "update_character";
   name: string;
+  summary?: string;
   description?: string;
   personality?: string;
   firstMessage?: string;
@@ -267,6 +278,8 @@ export interface UpdatePersonaCommand {
 
 export interface CreateLorebookEntryCommand {
   name: string;
+  /** Forward-slash folder path inside the lorebook. Missing folders are created. */
+  path?: string;
   content?: string;
   description?: string;
   keys?: string[];
@@ -287,6 +300,7 @@ export interface CreateLorebookCommand {
   description?: string;
   category?: string;
   tags?: string[];
+  folders?: string[];
   entries?: CreateLorebookEntryCommand[];
 }
 
@@ -299,6 +313,7 @@ export interface UpdateLorebookCommand {
   description?: string;
   category?: string;
   tags?: string[];
+  folders?: string[];
   entries?: UpdateLorebookEntryCommand[];
 }
 
@@ -313,6 +328,7 @@ export interface CreatePresetSectionCommand {
   injectionDepth?: number;
   injectionOrder?: number;
   forbidOverrides?: boolean;
+  skipWrap?: boolean;
 }
 
 export interface CreatePresetGroupCommand {
@@ -537,7 +553,7 @@ const QUOTE_PAIRS: Record<string, string> = {
   "\u2019": "\u2019",
 };
 
-function parseQuotedParam(params: string, key: string, allowEmpty = false): string | undefined {
+export function parseQuotedParam(params: string, key: string, allowEmpty = false): string | undefined {
   const match = params.match(new RegExp(`${key}\\s*=\\s*(["\u201c\u201d\u2018\u2019])`));
   if (!match || match.index === undefined) return undefined;
 
@@ -611,6 +627,15 @@ function parseUnknownStringList(raw: unknown): string[] | undefined {
   if (typeof raw !== "string") return undefined;
   const values = parseStringList(raw);
   return values && values.length ? values : undefined;
+}
+
+function parseFolderPathList(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const values = raw
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return values.length ? values : undefined;
 }
 
 function parseLorebookEntriesParam(raw: string): CreateLorebookEntryCommand[] | undefined {
@@ -775,6 +800,7 @@ function parseLorebookBlock(raw: string): CreateLorebookCommand | null {
         if (!entryName) return null;
         return {
           name: entryName,
+          path: typeof data.path === "string" ? data.path.trim() : undefined,
           content: typeof data.content === "string" ? data.content : "",
           description: typeof data.description === "string" ? data.description : undefined,
           keys: parseUnknownStringList(data.keys),
@@ -792,6 +818,7 @@ function parseLorebookBlock(raw: string): CreateLorebookCommand | null {
       description: typeof parsed.description === "string" ? parsed.description : undefined,
       category: typeof parsed.category === "string" ? parsed.category : undefined,
       tags: parseUnknownStringList(parsed.tags),
+      folders: parseFolderPathList(parsed.folders),
       entries: entries.length ? entries : undefined,
     };
   } catch {
@@ -821,6 +848,12 @@ function parseUpdateLorebookBlock(raw: string): UpdateLorebookCommand | null {
         return {
           name: entryName,
           matchName: typeof data.matchName === "string" ? data.matchName.trim() : undefined,
+          path:
+            typeof data.path === "string"
+              ? data.path.trim()
+              : typeof nestedEntry.path === "string"
+                ? nestedEntry.path.trim()
+                : undefined,
           content:
             typeof data.content === "string"
               ? data.content
@@ -860,6 +893,7 @@ function parseUpdateLorebookBlock(raw: string): UpdateLorebookCommand | null {
       description: typeof parsed.description === "string" ? parsed.description : undefined,
       category: typeof parsed.category === "string" ? parsed.category : undefined,
       tags: parseUnknownStringList(parsed.tags),
+      folders: parseFolderPathList(parsed.folders),
       entries: entries.length ? entries : undefined,
     };
   } catch {
@@ -934,6 +968,7 @@ function parseCreatePresetBlock(raw: string): CreatePresetCommand | null {
           injectionDepth: parseOptionalInteger(data.injectionDepth),
           injectionOrder: parseOptionalInteger(data.injectionOrder),
           forbidOverrides: typeof data.forbidOverrides === "boolean" ? data.forbidOverrides : undefined,
+          skipWrap: typeof data.skipWrap === "boolean" ? data.skipWrap : undefined,
         } satisfies CreatePresetSectionCommand;
       })
       .filter((section): section is CreatePresetSectionCommand => section !== null);
@@ -1012,8 +1047,7 @@ function parseCreatePresetBlock(raw: string): CreatePresetCommand | null {
             data.displayMode === "auto" || data.displayMode === "buttons" || data.displayMode === "listbox"
               ? data.displayMode
               : undefined,
-          optionSort:
-            data.optionSort === "manual" || data.optionSort === "alphabetical" ? data.optionSort : undefined,
+          optionSort: data.optionSort === "manual" || data.optionSort === "alphabetical" ? data.optionSort : undefined,
         };
       })
       .filter((choiceBlock): choiceBlock is CreatePresetChoiceBlockCommand => choiceBlock !== null);
@@ -1057,6 +1091,7 @@ function applyCommonCharacterFields(
   };
 
   assignText("description", "description");
+  assignText("summary", "summary");
   assignText("personality", "personality");
   assignText("firstMessage", "first_message");
   assignText("scenario", "scenario");
@@ -1205,14 +1240,10 @@ export function parseCharacterCommands(content: string): {
   // Parse haptic commands
   for (const match of content.matchAll(HAPTIC_RE)) {
     const params = match[1]!;
-    const cmd: HapticCommand = { type: "haptic", action: "vibrate" };
     const actionMatch = params.match(/action="([^"]+)"/);
-    if (actionMatch) {
-      const a = actionMatch[1]!.toLowerCase();
-      if (["vibrate", "oscillate", "rotate", "position", "stop"].includes(a)) {
-        cmd.action = a as HapticCommand["action"];
-      }
-    }
+    const action = normalizeHapticAction(actionMatch?.[1] ?? "vibrate");
+    if (!action) continue;
+    const cmd: HapticCommand = { type: "haptic", action };
     const intensityMatch = params.match(/intensity=([0-9.]+)/);
     if (intensityMatch) {
       const v = parseFloat(intensityMatch[1]!);
@@ -1223,6 +1254,8 @@ export function parseCharacterCommands(content: string): {
       const v = parseFloat(durationMatch[1]!);
       if (Number.isFinite(v)) cmd.duration = Math.max(0, v);
     }
+    const pattern = normalizeHapticPattern(params.match(/pattern="([^"]+)"/)?.[1]);
+    if (pattern) cmd.pattern = pattern;
     commands.push(cmd);
   }
 
@@ -1430,8 +1463,12 @@ export function parseCharacterCommands(content: string): {
     .replace(FETCH_RE, "")
     .replace(/\n{3,}/g, "\n\n") // collapse excessive newlines left by removals
     .trim();
-  cleanContent = stripBracketJsonCommandBlocks(cleanContent, "suggestions").replace(/\n{3,}/g, "\n\n").trim();
-  cleanContent = stripBracketJsonCommandBlocks(cleanContent, "plan").replace(/\n{3,}/g, "\n\n").trim();
+  cleanContent = stripBracketJsonCommandBlocks(cleanContent, "suggestions")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  cleanContent = stripBracketJsonCommandBlocks(cleanContent, "plan")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   return { cleanContent, commands };
 }
@@ -1566,16 +1603,20 @@ export function parseDirectMessageCommands(content: string): {
 }
 
 /**
- * Parse a duration string like "2h", "30m", "1h30m" into minutes.
+ * Parse a duration string like "2h", "1.5h", "30m", "1h30m" into minutes.
+ * A bare number is hours, as the command prompt asks for "number of hours".
  * Returns null if unparseable.
  */
 export function parseDuration(duration: string): number | null {
-  const hourMatch = duration.match(/(\d+)\s*h/i);
-  const minMatch = duration.match(/(\d+)\s*m/i);
+  const bareHours = duration.match(/^\s*(\d+(?:\.\d+)?)\s*$/);
+  // A unit must end at a non-letter, so "months" is not minutes and "1h30m" still splits.
+  const hourMatch = bareHours ?? duration.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)(?![a-z])/i);
+  const minMatch = bareHours ? null : duration.match(/(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)(?![a-z])/i);
 
   let total = 0;
-  if (hourMatch) total += parseInt(hourMatch[1]!) * 60;
-  if (minMatch) total += parseInt(minMatch[1]!);
+  if (hourMatch) total += Number(hourMatch[1]) * 60;
+  if (minMatch) total += Number(minMatch[1]);
 
+  total = Math.round(total);
   return total > 0 ? total : null;
 }

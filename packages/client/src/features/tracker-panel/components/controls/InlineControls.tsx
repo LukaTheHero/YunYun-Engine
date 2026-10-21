@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Lock, Pencil, Plus, Unlock } from "lucide-react";
 import { cn } from "../../../../lib/utils";
 import { TRACKER_TEXT_MICRO } from "../../lib/tracker-panel.constants";
 import { getNumberValueWidth } from "../../lib/tracker-display";
@@ -216,10 +216,21 @@ export function InlineEdit({
       onFocus={measureScrollOverflow}
       onMouseLeave={resetScrollOverflow}
       onBlur={resetScrollOverflow}
-      title={lockToggleActive ? (locked ?localizeUi("ui.trackerPanel.inlinenumber.unlockField") :localizeUi("ui.trackerPanel.inlinenumber.lockField")) : (title ?? currentValue)}
+      title={
+        lockToggleActive
+          ? locked
+            ? localizeUi("ui.trackerPanel.inlinenumber.unlockField")
+            : localizeUi("ui.trackerPanel.inlinenumber.lockField")
+          : (title ?? currentValue)
+      }
       aria-label={
         lockToggleActive
-          ?localizeUi("ui.trackerPanel.inlineedit.value1Value2", { value1: locked ?localizeUi("ui.noodle.lockednoodlerpostcard.unlock") :localizeUi("ui.trackerPanel.inlineedit.lock"), value2: (ariaLabel ?? title ?? currentValue) || placeholder })
+          ? localizeUi("ui.trackerPanel.inlineedit.value1Value2", {
+              value1: locked
+                ? localizeUi("ui.noodle.lockednoodlerpostcard.unlock")
+                : localizeUi("ui.trackerPanel.inlineedit.lock"),
+              value2: (ariaLabel ?? title ?? currentValue) || placeholder,
+            })
           : ariaLabel
       }
       aria-pressed={lockToggleActive ? locked : undefined}
@@ -292,13 +303,28 @@ export function InlineEdit({
           )}
         </span>
       )}
-      {!(lockMode || locked) && (
-        <Pencil
+      {lockToggleActive ? (
+        // Lock mode marks each field it can lock with a padlock, as the World State tiles do (#7689).
+        <span
+          aria-hidden="true"
+          data-tracker-lock-badge={locked ? "locked" : "unlocked"}
           className={cn(
-            "pointer-events-none absolute right-0.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 shrink-0 text-[color:var(--tracker-inline-muted,var(--muted-foreground))] opacity-0 transition-opacity group-hover/inline:opacity-60",
-            (!showEditHint || fullPreview) && "hidden",
+            "pointer-events-none absolute right-0.5 z-[1] flex h-3 w-3 items-center justify-center rounded-[2px] bg-[var(--background)]/58 ring-1 ring-[var(--border)]",
+            multilinePreviewLineCount ? "top-0.5" : "top-1/2 -translate-y-1/2",
+            locked ? "text-[var(--foreground)] opacity-90" : "text-[var(--muted-foreground)] opacity-60",
           )}
-        />
+        >
+          {locked ? <Lock className="h-2 w-2" /> : <Unlock className="h-2 w-2" />}
+        </span>
+      ) : (
+        !(lockMode || locked) && (
+          <Pencil
+            className={cn(
+              "pointer-events-none absolute right-0.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 shrink-0 text-[color:var(--tracker-inline-muted,var(--muted-foreground))] opacity-0 transition-opacity group-hover/inline:opacity-60 max-md:hidden",
+              (!showEditHint || fullPreview) && "hidden",
+            )}
+          />
+        )
       )}
     </button>
   );
@@ -378,8 +404,17 @@ export function InlineNumber({
       <button
         type="button"
         onClick={onToggleLock}
-        title={locked ?localizeUi("ui.trackerPanel.inlinenumber.unlockField") :localizeUi("ui.trackerPanel.inlinenumber.lockField")}
-        aria-label={localizeUi("ui.trackerPanel.inlineedit.value1Value2", { value1: locked ?localizeUi("ui.noodle.lockednoodlerpostcard.unlock") :localizeUi("ui.trackerPanel.inlineedit.lock"), value2: title?.toLowerCase() ??localizeUi("ui.trackerPanel.inlinenumber.field") })}
+        title={
+          locked
+            ? localizeUi("ui.trackerPanel.inlinenumber.unlockField")
+            : localizeUi("ui.trackerPanel.inlinenumber.lockField")
+        }
+        aria-label={localizeUi("ui.trackerPanel.inlineedit.value1Value2", {
+          value1: locked
+            ? localizeUi("ui.noodle.lockednoodlerpostcard.unlock")
+            : localizeUi("ui.trackerPanel.inlineedit.lock"),
+          value2: title?.toLowerCase() ?? localizeUi("ui.trackerPanel.inlinenumber.field"),
+        })}
         aria-pressed={locked}
         style={{ width }}
         className={cn(

@@ -28,10 +28,8 @@ From a phone, tablet, or any other device, backup and restore need the **Admin A
 3. Find the **Backup & Export** section.
 4. Click **Download Backup**.
 5. The button shows **Creating backup…** while it works.
-6. On desktop Chrome or Edge, a **Save As** dialog opens so you pick where the file goes. Choose a folder and save.
-7. You should see **Backup saved!** or **Backup downloaded!** when it finishes.
-
-On some browsers the **Save As** dialog is not available. In that case the file goes to your normal Downloads folder instead.
+6. When the archive is ready, YunYun streams it straight to your browser without holding the whole file in page memory.
+7. Your browser either opens its normal **Save As** dialog or puts the file in your Downloads folder, depending on your download settings.
 
 This step matters most on Android and iOS. On those devices the app's own data folder is usually not reachable. That makes **Download Backup** the only easy way to get a copy off the device. Save it somewhere safe and private, like your own cloud storage.
 
@@ -50,6 +48,10 @@ Automatic backups are stored inside `backups/` in YunYun's data folder. The newe
 restorable, streamed archive format as **Download Backup**, including uploaded media and the encryption-key file when
 one exists. Keep a separate copy outside YunYun's data folder if you need protection from a lost disk, erased app
 storage, or a device reset.
+
+Each run needs free space for one more full archive on the disk that holds `backups/`, because the previous archive
+is kept until the new one is complete. If there is not enough room, YunYun skips that run and shows the reason next
+to the Automatic Backups control; it tries again on the next check once space is freed.
 
 ## Export Profile
 
@@ -110,11 +112,13 @@ A **Download Backup** archive is different. YunYun does not remove secrets from 
 
 After you import a profile, do this:
 
-1. Open **Settings**.
-2. Go to the **Connections** tab.
-3. Re-enter the API key for each provider you use.
+1. Open the **Connections** panel from the top bar.
+2. Open each connection you use.
+3. Re-enter its API key and save it.
 
 If you use custom tools that call a webhook link, re-enter that link on each tool too.
+
+A few addresses saved with a chat are also left out of the profile file: the Discord mirror webhook, the DeepLX address, the DeepL key and the Intiface address. This also applies to settings profiles and to the translation defaults for new chats. When you import a profile on another install, enter them again in each chat's **Chat Settings**.
 
 Importing does not erase keys you have already set. If you re-import an old profile, YunYun keeps the live keys and webhook links on items that still exist. A re-import will not blank them.
 

@@ -18,7 +18,7 @@ You can move the data folder to another location by setting `DATA_DIR` yourself.
 
 Inside the data folder, your data is split into a `storage` folder and several asset folders.
 
-The `storage` folder holds your text data: characters, chats, messages, lorebooks, presets, and connections. YunYun saves these as files here, so this is the folder that holds most of your work.
+The `storage` folder holds your text data: characters, chats, messages, lorebooks, presets, and connections. YunYun saves each table as smaller ownership-grouped files—for example, one chat's messages or one lorebook's entries—so changing one item does not rewrite an ever-growing global JSON file. During the one-time upgrade from older storage, YunYun preserves the original table files beside the new folders with a `.pre-shard` suffix.
 
 Your images, audio, and other media files live in their own folders, each named for what it holds. The main asset folders are:
 
@@ -26,6 +26,7 @@ Your images, audio, and other media files live in their own folders, each named 
 | --- | --- |
 | `avatars` | Character and persona avatars |
 | `sprites` | Character sprite art |
+| `avatar-models` | Files for the **2D Avatars** and **3D Avatars** agents, such as PNGTuber pictures and 3D models |
 | `backgrounds` | Chat backgrounds you uploaded |
 | `gallery` | Gallery images |
 | `fonts` | Custom fonts you added |

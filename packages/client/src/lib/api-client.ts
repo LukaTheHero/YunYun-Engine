@@ -3,6 +3,9 @@
 // ──────────────────────────────────────────────
 
 import { CSRF_HEADER, CSRF_HEADER_VALUE } from "@marinara-engine/shared";
+import { toast } from "sonner";
+import { i18n } from "../localization/i18n";
+import { saveExportFile, showExportError, type ExportSaveStatus } from "./file-download";
 import { showGenerationFallbackHeader, showGenerationFallbackToast } from "./generation-fallback-notice";
 
 const BASE = "/api";
@@ -41,6 +44,65 @@ export class StreamResumeDisconnectError extends Error {
     super("Stream disconnected while the tab was in the background");
     this.name = "StreamResumeDisconnectError";
   }
+}
+
+/**
+ * True when a stream error is best explained by the browser tearing down a
+ * backgrounded tab's connection rather than by a real failure: the resume
+ * watchdog tripped, or the page was hidden at some point during the stream and
+ * the error is a plain transport error (Firefox's "NetworkError when
+ * attempting to fetch resource", Chrome's "Failed to fetch") rather than a
+ * caller abort or an HTTP-level ApiError. The server-side run keeps going in
+ * that case, so the caller should wait for it to settle and refetch the
+ * persisted result instead of surfacing an error.
+ */
+export function isPassiveStreamDisconnect(
+  error: unknown,
+  pageWasHiddenDuringStream: boolean,
+  signal: AbortSignal,
+): boolean {
+  if (error instanceof StreamResumeDisconnectError) return true;
+  if (!pageWasHiddenDuringStream || signal.aborted) return false;
+  if (error instanceof DOMException && error.name === "AbortError") return false;
+  if (error instanceof ApiError) return false;
+  return error instanceof Error;
+}
+
+/**
+ * Compose an AbortSignal that fires after `timeoutMs` — with a "TimeoutError"
+ * DOMException reason so callers can tell "server never answered" from a real
+ * failure — while still honouring an upstream signal (e.g. React Query's
+ * unmount cancellation). Hand-rolled because the native way to combine an
+ * upstream signal with a deadline is AbortSignal.any + AbortSignal.timeout,
+ * and AbortSignal.any has a meaningfully higher engine floor; one code path
+ * for both the composed and the standalone case also keeps the TimeoutError
+ * reason contract in a single place (#5657).
+ */
+export function requestTimeoutSignal(timeoutMs: number, upstream?: AbortSignal | null): AbortSignal {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException(`The server did not respond within ${timeoutMs}ms`, "TimeoutError"));
+  }, timeoutMs);
+  const clear = () => clearTimeout(timer);
+  controller.signal.addEventListener("abort", clear, { once: true });
+  if (upstream) {
+    if (upstream.aborted) {
+      clear();
+      controller.abort(upstream.reason);
+    } else {
+      upstream.addEventListener("abort", () => controller.abort(upstream.reason), { once: true });
+    }
+  }
+  return controller.signal;
+}
+
+/**
+ * True when a request failed because the server never answered inside the
+ * deadline — the frozen-host state (#5657/#5658) — as opposed to a refusal,
+ * network error, or deliberate cancellation.
+ */
+export function isRequestTimeoutError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "TimeoutError";
 }
 
 export const PRIVILEGED_ACCESS_HINT =
@@ -165,10 +227,6 @@ async function releaseSseReader(reader: ReadableStreamDefaultReader<Uint8Array>,
   }
 }
 
-function getSseErrorMessage(parsed: Record<string, unknown>): string {
-  return typeof parsed.data === "string" ? parsed.data : "Generation error";
-}
-
 export function getJsonRepairRequest(error: unknown): JsonRepairRequest | null {
   if (!(error instanceof ApiError) || !isRecord(error.payload)) return null;
   const repair = error.payload.jsonRepair;
@@ -212,6 +270,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(res.status, getApiErrorMessage(body.error, res.statusText), body);
   }
 
+  const ltmRefresh = res.headers.get("X-Marinara-LTM-Refresh");
+  if (ltmRefresh === "refreshed") {
+    toast.success(i18n.t("agents.longTermMemory.embeddingRefresh.refreshed"));
+  } else if (ltmRefresh && ["deferred", "failed", "timeout", "unavailable"].includes(ltmRefresh)) {
+    toast.warning(i18n.t(`agents.longTermMemory.embeddingRefresh.${ltmRefresh}`));
+  }
+
   // 204 No Content
   if (res.status === 204) return undefined as T;
 
@@ -226,6 +291,13 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const method = (init?.method ?? "GET").toUpperCase();
   if (UNSAFE_METHODS.has(method)) {
     headers.set(CSRF_HEADER, CSRF_HEADER_VALUE);
+    if (init?.body instanceof FormData) {
+      // Check the same unsafe-request gate before a proxy buffers a large upload.
+      await request<void>("/csrf/upload-preflight", {
+        method: "POST",
+        signal: requestTimeoutSignal(10_000, init.signal),
+      });
+    }
   }
 
   // Only default string bodies to JSON; FormData/Blob/etc. need browser-managed headers.
@@ -240,67 +312,6 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   });
 }
 
-type SaveFilePickerWindow = Window &
-  typeof globalThis & {
-    showSaveFilePicker?: (options?: {
-      suggestedName?: string;
-      types?: Array<{
-        description?: string;
-        accept: Record<string, string[]>;
-      }>;
-    }) => Promise<{
-      createWritable: () => Promise<{
-        write: (data: Blob) => Promise<void>;
-        close: () => Promise<void>;
-      }>;
-    }>;
-  };
-
-function triggerBrowserDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
-
-function getSavePickerTypes(blob: Blob, filename: string) {
-  const extension = filename.includes(".") ? filename.slice(filename.lastIndexOf(".")).toLowerCase() : "";
-  if (!extension) return undefined;
-  const mimeType = blob.type || "application/octet-stream";
-  return [
-    {
-      description: extension ? `${extension.slice(1).toUpperCase()} file` : "Export file",
-      accept: { [mimeType]: [extension] },
-    },
-  ];
-}
-
-async function saveBlob(blob: Blob, filename: string) {
-  const pickerWindow = window as SaveFilePickerWindow;
-  if (!window.isSecureContext || typeof pickerWindow.showSaveFilePicker !== "function") {
-    triggerBrowserDownload(blob, filename);
-    return;
-  }
-
-  try {
-    const handle = await pickerWindow.showSaveFilePicker({
-      suggestedName: filename,
-      types: getSavePickerTypes(blob, filename),
-    });
-    const writable = await handle.createWritable();
-    await writable.write(blob);
-    await writable.close();
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") return;
-    triggerBrowserDownload(blob, filename);
-  }
-}
-
 async function readDownloadFilename(res: Response, fallbackFilename: string) {
   const disposition = res.headers.get("Content-Disposition");
   if (!disposition) return fallbackFilename;
@@ -310,6 +321,31 @@ async function readDownloadFilename(res: Response, fallbackFilename: string) {
 
   const match = disposition.match(/filename="?([^";\n]+)"?/);
   return match?.[1] ? decodeURIComponent(match[1]) : fallbackFilename;
+}
+
+/**
+ * Fetch and save an export. A failed request or body read shows one error toast and rejects; otherwise the
+ * save's status says whether the file was saved, offered for a later tap on iOS, cancelled or failed.
+ */
+async function saveDownload(
+  fetchResponse: () => Promise<Response>,
+  fallbackFilename: string,
+): Promise<ExportSaveStatus> {
+  let blob: Blob;
+  let filename: string;
+  try {
+    const res = await fetchResponse();
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, payload.error ?? "Download failed", payload);
+    }
+    filename = await readDownloadFilename(res, fallbackFilename);
+    blob = await res.blob();
+  } catch (error) {
+    await showExportError(error);
+    throw error;
+  }
+  return saveExportFile(blob, filename, { savePicker: true });
 }
 
 export const api = {
@@ -341,105 +377,19 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 
   /** Download a JSON endpoint as a file (triggers browser save-as). */
-  download: async (path: string, fallbackFilename = "export.json", init?: RequestInit) => {
-    const res = await apiFetch(path, init);
-    if (!res.ok) {
-      const payload = await res.json().catch(() => ({ error: res.statusText }));
-      throw new ApiError(res.status, payload.error ?? "Download failed", payload);
-    }
-    const filename = await readDownloadFilename(res, fallbackFilename);
-    const blob = await res.blob();
-    await saveBlob(blob, filename);
-  },
+  download: (path: string, fallbackFilename = "export.json", init?: RequestInit) =>
+    saveDownload(() => apiFetch(path, init), fallbackFilename),
 
   /** Download a POST endpoint as a file (useful for bulk exports). */
-  downloadPost: async (path: string, body: unknown, fallbackFilename = "export.bin") => {
-    const res = await apiFetch(path, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    showGenerationFallbackHeader(res);
-    if (!res.ok) {
-      const payload = await res.json().catch(() => ({ error: res.statusText }));
-      throw new ApiError(res.status, payload.error ?? "Download failed", payload);
-    }
-    const filename = await readDownloadFilename(res, fallbackFilename);
-    const blob = await res.blob();
-    await saveBlob(blob, filename);
-  },
-
-  /**
-   * Stream an SSE endpoint. Returns an async iterable of parsed events.
-   */
-  stream: async function* (path: string, body?: unknown, signal?: AbortSignal): AsyncGenerator<string> {
-    const res = await apiFetch(path, {
-      method: "POST",
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal,
-    });
-    showGenerationFallbackHeader(res);
-
-    if (!res.ok || !res.body) {
-      let detail = `HTTP ${res.status}`;
-      let payload: unknown;
-      try {
-        const text = await res.text();
-        const json = JSON.parse(text) as unknown;
-        payload = json;
-        if (isRecord(json)) detail = findNestedApiErrorMessage(json.error ?? json.message) || text.slice(0, 200);
-        else detail = text.slice(0, 200);
-      } catch {
-        /* couldn't parse body */
-      }
-      throw new ApiError(res.status, detail, payload);
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let completed = false;
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          completed = true;
-          buffer += decoder.decode();
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const parsedBuffer = readSseDataPayloads(buffer);
-        buffer = parsedBuffer.rest;
-
-        for (const data of parsedBuffer.payloads) {
-          if (data === "[DONE]") return;
-          const parsed = parseSseJsonPayload(data);
-          if (!parsed) continue;
-          if (parsed.type === "fallback_used") showGenerationFallbackToast(parsed.data);
-          else if (parsed.type === "token" && typeof parsed.data === "string") yield parsed.data;
-          else if (parsed.type === "error") throw new ApiError(500, getSseErrorMessage(parsed), parsed);
-          else if (parsed.type === "done") return;
-        }
-      }
-
-      for (const data of readSseDataPayloads(buffer, true).payloads) {
-        if (data === "[DONE]") return;
-        const parsed = parseSseJsonPayload(data);
-        if (!parsed) continue;
-        if (parsed.type === "fallback_used") showGenerationFallbackToast(parsed.data);
-        else if (parsed.type === "token" && typeof parsed.data === "string") yield parsed.data;
-        else if (parsed.type === "error") throw new ApiError(500, getSseErrorMessage(parsed), parsed);
-        else if (parsed.type === "done") return;
-      }
-    } finally {
-      await releaseSseReader(reader, completed);
-    }
-  },
+  downloadPost: (path: string, body: unknown, fallbackFilename = "export.bin") =>
+    saveDownload(async () => {
+      const res = await apiFetch(path, { method: "POST", body: JSON.stringify(body) });
+      showGenerationFallbackHeader(res);
+      return res;
+    }, fallbackFilename),
 
   /**
    * Stream an SSE endpoint. Returns an async iterable of all typed events.
-   * Unlike `stream()`, this does NOT filter to only token events.
    */
   streamEvents: async function* (
     path: string,
@@ -456,14 +406,26 @@ export const api = {
 
     if (!res.ok || !res.body) {
       let detail = `HTTP ${res.status}`;
+      let payload: unknown;
       try {
         const text = await res.text();
-        const json = JSON.parse(text);
-        detail = json.error || json.message || text.slice(0, 200);
+        try {
+          const json = JSON.parse(text) as Record<string, unknown>;
+          payload = json;
+          detail =
+            (typeof json.error === "string" && json.error) ||
+            (typeof json.message === "string" && json.message) ||
+            text.slice(0, 200);
+        } catch {
+          detail = text.slice(0, 200) || detail;
+        }
       } catch {
-        /* couldn't parse body */
+        /* couldn't read body */
       }
-      throw new ApiError(res.status, detail);
+      // Carry the parsed body: pre-stream rejections (e.g. a spatial owner-turn
+      // 409) put their machine-readable `code` there, and the generate catch
+      // path forwards it into the synthesized capability event.
+      throw new ApiError(res.status, detail, payload);
     }
 
     const reader = res.body.getReader();

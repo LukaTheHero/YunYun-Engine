@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { api } from "../lib/api-client";
+import { chatKeys } from "./use-chats";
 import type { ChatGalleryIndex } from "../lib/card-asset-links";
 import { useUIStore } from "../stores/ui.store";
 import {
@@ -24,8 +25,11 @@ import { achievementKeys, trackAchievementEvent } from "./use-achievements";
 import { cleanTrackerCardColorConfig } from "../lib/tracker-card-colors";
 import { personaCacheKeys, syncCachedPersona } from "../lib/persona-cache";
 import {
+  GREETING_IMAGE_BAKE_MAX_PER_REQUEST,
   PROFESSOR_MARI_ID,
   type CharacterData,
+  type CharacterCatalogEntry,
+  type CharacterCatalogPage,
   type CharacterCardVersion,
   type Persona,
   type PersonaCardVersion,
@@ -64,7 +68,6 @@ export const characterKeys = {
   personaCallVideos: (id: string) => ["conversation-calls", "persona-videos", id] as const,
   personas: personaCacheKeys.list,
   personaPages: () => [...characterKeys.personas, "page"] as const,
-  personaActive: personaCacheKeys.active,
   personaDetail: personaCacheKeys.detail,
   personaVersions: (id: string) => [...characterKeys.personaDetail(id), "versions"] as const,
   groups: ["character-groups"] as const,
@@ -89,11 +92,8 @@ type UseCharactersOptions =
       includeBuiltIn?: boolean;
     };
 
-export function useCharacters(options: UseCharactersOptions = true) {
-  const enabled = typeof options === "boolean" ? options : (options.enabled ?? true);
-  const includeBuiltIn = typeof options === "object" ? options.includeBuiltIn === true : false;
-
-  return useQuery({
+function characterListQuery(includeBuiltIn: boolean) {
+  return {
     queryKey: includeBuiltIn ? characterKeys.listWithBuiltIns() : characterKeys.list(),
     queryFn: async () => {
       const characters = await api.get<Array<{ id?: unknown }>>(
@@ -102,9 +102,15 @@ export function useCharacters(options: UseCharactersOptions = true) {
       if (includeBuiltIn) return characters;
       return characters.filter((character) => character.id !== PROFESSOR_MARI_ID);
     },
-    enabled,
     staleTime: 5 * 60_000,
-  });
+  };
+}
+
+export function useCharacters(options: UseCharactersOptions = true) {
+  const enabled = typeof options === "boolean" ? options : (options.enabled ?? true);
+  const includeBuiltIn = typeof options === "object" ? options.includeBuiltIn === true : false;
+
+  return useQuery({ ...characterListQuery(includeBuiltIn), enabled });
 }
 
 export function useCharacterPages(options: {
@@ -123,7 +129,7 @@ export function useCharacterPages(options: {
   return useInfiniteQuery({
     queryKey: characterKeys.page(includeBuiltIn, search, sort, favoriteFilter),
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => {
+    queryFn: ({ pageParam, signal }) => {
       const params = new URLSearchParams({
         limit: String(LIBRARY_PAGE_SIZE),
         offset: String(Number(pageParam) || 0),
@@ -132,9 +138,37 @@ export function useCharacterPages(options: {
       if (search) params.set("search", search);
       if (sort) params.set("sort", sort);
       if (favoriteFilter) params.set("favoriteFilter", favoriteFilter);
-      return api.get<PaginatedList<Record<string, unknown>>>(`/characters?${params.toString()}`);
+      return api.get<CharacterCatalogPage>(`/characters/catalog?${params.toString()}`, { signal });
     },
     getNextPageParam: getNextPageOffset,
+    placeholderData: (previousData) => previousData,
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Compact character rows for surfaces that need search and navigation only. */
+export function useAllCharacterCatalog(enabled = true) {
+  return useQuery({
+    queryKey: [...characterKeys.list(), "catalog", "all"] as const,
+    queryFn: async ({ signal }) => {
+      const items: CharacterCatalogEntry[] = [];
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        items.length = 0;
+        let offset = 0;
+        let generation: number | undefined;
+        while (true) {
+          const params = new URLSearchParams({ limit: String(LIBRARY_PAGE_SIZE), offset: String(offset) });
+          const page = await api.get<CharacterCatalogPage>(`/characters/catalog?${params.toString()}`, { signal });
+          generation ??= page.catalogGeneration;
+          if (page.catalogGeneration !== generation) break;
+          items.push(...page.items);
+          if (!page.hasMore) return items;
+          offset += page.limit;
+        }
+      }
+      throw new Error("Character catalog changed repeatedly while loading.");
+    },
     enabled,
     staleTime: 5 * 60_000,
   });
@@ -250,6 +284,59 @@ export function useUpdateCharacter() {
   });
 }
 
+export interface CharacterSummaryDraft {
+  name?: string;
+  description?: string;
+  personality?: string;
+  scenario?: string;
+  backstory?: string;
+}
+
+/** Shared by the editor's single Generate action and the library's bulk run. */
+export function generateCharacterSummary(id: string, draft?: CharacterSummaryDraft) {
+  return api.post<{ summary: string }>(`/characters/${encodeURIComponent(id)}/summary/generate`, {
+    debugMode: useUIStore.getState().debugMode,
+    draft,
+  });
+}
+
+export function useGenerateCharacterSummary() {
+  return useMutation({
+    mutationFn: ({ id, draft }: { id: string; draft?: CharacterSummaryDraft }) => generateCharacterSummary(id, draft),
+  });
+}
+
+export type CharacterConvoProfileTarget = "aboutMe" | "behavior";
+
+export interface CharacterConvoProfileDraft {
+  name?: string;
+  description?: string;
+  personality?: string;
+  scenario?: string;
+  backstory?: string;
+  appearance?: string;
+}
+
+/** Generates one Conversation profile field from the current character card draft. */
+export function useGenerateCharacterConvoProfile() {
+  return useMutation({
+    mutationFn: ({
+      id,
+      target,
+      draft,
+    }: {
+      id: string;
+      target: CharacterConvoProfileTarget;
+      draft: CharacterConvoProfileDraft;
+    }) =>
+      api.post<{ text: string }>(`/characters/${encodeURIComponent(id)}/convo-profile/generate`, {
+        target,
+        draft,
+        debugMode: useUIStore.getState().debugMode,
+      }),
+  });
+}
+
 export function useCharacterVersions(id: string | null) {
   return useQuery({
     queryKey: characterKeys.versions(id ?? ""),
@@ -338,6 +425,8 @@ export function useDeleteCharacter() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: characterKeys.list() });
       qc.invalidateQueries({ queryKey: characterKeys.summariesRoot() });
+      qc.invalidateQueries({ queryKey: characterKeys.groups });
+      qc.invalidateQueries({ queryKey: chatKeys.all });
     },
   });
 }
@@ -523,6 +612,27 @@ export function useDeleteSprite() {
   return useMutation({
     mutationFn: ({ characterId, expression }: { characterId: string; expression: string }) =>
       api.delete(`/sprites/${characterId}/${expression}`),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: spriteKeys.list(variables.characterId) });
+    },
+  });
+}
+
+export function useRenameSprite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      characterId,
+      expression,
+      nextExpression,
+    }: {
+      characterId: string;
+      expression: string;
+      nextExpression: string;
+    }) =>
+      api.patch<SpriteInfo>(`/sprites/${characterId}/${encodeURIComponent(expression)}`, {
+        expression: nextExpression,
+      }),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: spriteKeys.list(variables.characterId) });
     },
@@ -817,6 +927,35 @@ export function useUploadCharacterGalleryImage(characterId: string) {
   });
 }
 
+export type GreetingImageBakeResult = { url: string; file?: string; error?: string };
+
+/** Downloads web images into the character gallery, a few per request; a failed request fails only its own images. */
+export function useBakeCharacterGalleryImages(characterId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (urls: string[]) => {
+      const results: GreetingImageBakeResult[] = [];
+      for (let start = 0; start < urls.length; start += GREETING_IMAGE_BAKE_MAX_PER_REQUEST) {
+        const batch = urls.slice(start, start + GREETING_IMAGE_BAKE_MAX_PER_REQUEST);
+        try {
+          const response = await api.post<{ results: GreetingImageBakeResult[] }>(
+            `/characters/${characterId}/gallery/bake`,
+            { urls: batch },
+          );
+          results.push(...response.results);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          results.push(...batch.map((url) => ({ url, error: message })));
+        }
+      }
+      return results;
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: characterKeys.gallery(characterId) });
+    },
+  });
+}
+
 export function useDeleteCharacterGalleryImage(characterId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -1015,17 +1154,16 @@ type PersonaUpdateMutationInput = { id: string } & PersonaUpdateInput & PersonaS
 type PersonaTrackerCardMutationInput = {
   id: string;
   keepalive?: boolean;
-} &
-  (
-    | {
-        trackerCardPaint: TrackerCardPaintConfig;
-        trackerCardPortrait?: never;
-      }
-    | {
-        trackerCardPaint?: never;
-        trackerCardPortrait: PersonaTrackerPortrait;
-      }
-  );
+} & (
+  | {
+      trackerCardPaint: TrackerCardPaintConfig;
+      trackerCardPortrait?: never;
+    }
+  | {
+      trackerCardPaint?: never;
+      trackerCardPortrait: PersonaTrackerPortrait;
+    }
+);
 
 function invalidatePersonaPages(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: characterKeys.personaPages() });
@@ -1035,13 +1173,22 @@ function invalidatePersonaVersions(qc: QueryClient, id: string) {
   return qc.invalidateQueries({ queryKey: characterKeys.personaVersions(id), exact: true });
 }
 
+const personaListQuery = {
+  queryKey: characterKeys.personas,
+  queryFn: () => api.get<Persona[]>("/characters/personas/list"),
+  staleTime: 5 * 60_000,
+};
+
 export function usePersonas(enabled = true) {
-  return useQuery({
-    queryKey: characterKeys.personas,
-    queryFn: () => api.get<Persona[]>("/characters/personas/list"),
-    enabled,
-    staleTime: 5 * 60_000,
-  });
+  return useQuery({ ...personaListQuery, enabled });
+}
+
+/**
+ * Waits for the character and persona lists while they are still loading (right after the page
+ * opens), so a sent message fills {{char}} and {{user}} with real names, not "Character" and "User".
+ */
+export async function ensureCharacterAndPersonaLists(qc: QueryClient) {
+  await Promise.allSettled([qc.ensureQueryData(characterListQuery(false)), qc.ensureQueryData(personaListQuery)]);
 }
 
 export function usePersonaPages(options: { enabled?: boolean; search?: string; sort?: string }) {
@@ -1091,16 +1238,6 @@ export function usePersona(id: string | null) {
     queryKey: characterKeys.personaDetail(id ?? ""),
     queryFn: () => api.get<Persona>(`/characters/personas/${id}`),
     enabled: !!id,
-    retry: false,
-    staleTime: 5 * 60_000,
-  });
-}
-
-export function useActivePersona(enabled = true) {
-  return useQuery({
-    queryKey: characterKeys.personaActive(),
-    queryFn: () => api.get<Persona | null>("/characters/personas/active"),
-    enabled,
     retry: false,
     staleTime: 5 * 60_000,
   });
@@ -1169,7 +1306,6 @@ export function useRestorePersonaVersion() {
       api.post<Persona>(`/characters/personas/${id}/versions/${versionId}/restore`, {}),
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: characterKeys.personas });
-      qc.invalidateQueries({ queryKey: characterKeys.personaActive() });
       qc.invalidateQueries({ queryKey: characterKeys.personaDetail(variables.id) });
       qc.invalidateQueries({ queryKey: characterKeys.personaVersions(variables.id) });
     },
@@ -1204,7 +1340,6 @@ export function useResetPersonaVersions() {
     mutationFn: (id: string) => api.post<Persona>(`/characters/personas/${id}/versions/reset`, {}),
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: characterKeys.personas });
-      qc.invalidateQueries({ queryKey: characterKeys.personaActive() });
       qc.invalidateQueries({ queryKey: characterKeys.personaDetail(id) });
       qc.invalidateQueries({ queryKey: characterKeys.personaVersions(id) });
     },
@@ -1217,7 +1352,6 @@ export function useDeletePersona() {
     mutationFn: (id: string) => api.delete(`/characters/personas/${id}`),
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: characterKeys.personas });
-      qc.invalidateQueries({ queryKey: characterKeys.personaActive() });
       qc.removeQueries({ queryKey: characterKeys.personaDetail(id) });
     },
   });
@@ -1228,18 +1362,6 @@ export function useDuplicatePersona() {
   return useMutation({
     mutationFn: (id: string) => api.post<Persona>(`/characters/personas/${id}/duplicate`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: characterKeys.personas }),
-  });
-}
-
-export function useActivatePersona() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => api.put<{ success: true }>(`/characters/personas/${id}/activate`, {}),
-    onSuccess: (_data, id) => {
-      qc.invalidateQueries({ queryKey: characterKeys.personas });
-      qc.invalidateQueries({ queryKey: characterKeys.personaActive() });
-      qc.invalidateQueries({ queryKey: characterKeys.personaDetail(id) });
-    },
   });
 }
 
@@ -1323,5 +1445,38 @@ export function useDeletePersonaGroup() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/characters/persona-groups/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: characterKeys.personaGroups }),
+  });
+}
+
+// ── Library maintenance: bulk tags ──
+
+export function useBulkEditCharacterTags() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      ids: string[];
+      add?: string[];
+      remove?: string[];
+      rename?: Array<{ from: string; to: string }>;
+    }) => {
+      const merged = { updatedIds: [] as string[], unchangedIds: [] as string[], failedIds: [] as string[] };
+      for (let start = 0; start < input.ids.length; start += 5000) {
+        const ids = input.ids.slice(start, start + 5000);
+        try {
+          const result = await api.post<typeof merged>("/characters/bulk-tags", { ...input, ids });
+          merged.updatedIds.push(...result.updatedIds);
+          merged.unchangedIds.push(...result.unchangedIds);
+          merged.failedIds.push(...result.failedIds);
+        } catch {
+          merged.failedIds.push(...ids);
+        }
+      }
+      return merged;
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: characterKeys.list() });
+      qc.invalidateQueries({ queryKey: characterKeys.summariesRoot() });
+      qc.invalidateQueries({ queryKey: [...characterKeys.all, "detail"] });
+    },
   });
 }

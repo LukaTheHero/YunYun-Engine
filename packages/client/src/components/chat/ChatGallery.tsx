@@ -33,14 +33,15 @@ import {
   type ChatAssetBrowserItem,
   type ChatImage,
 } from "../../hooks/use-gallery";
-import type { GeneratedSceneVideo } from "@marinara-engine/shared";
+import { BACKGROUND_THUMBNAIL_WIDTH, type GeneratedSceneVideo } from "@marinara-engine/shared";
+import { ChatImagePreview } from "./ChatImagePreview";
 import { useGalleryStore } from "../../stores/gallery.store";
 import { toast } from "sonner";
 import { ImageUploadDropzone } from "../ui/ImageUploadDropzone";
 import { buildCardAssetMarkdown, dispatchCardAssetInsert } from "../../lib/card-asset-links";
 import { showConfirmDialog } from "../../lib/app-dialogs";
 import { cn, copyToClipboard } from "../../lib/utils";
-import { downloadUrlToDevice } from "../../lib/file-download";
+import { downloadUrlToDevice, shouldUseIosImageShare } from "../../lib/file-download";
 import {
   ChatImageLightbox,
   ChatVideoLightbox,
@@ -65,10 +66,11 @@ interface ChatGalleryProps {
   onGenerateStoryboard?: () => void | Promise<void>;
   /** Show the latest Game Mode storyboard viewer. */
   onViewStoryboard?: () => void;
-  /** Generate a scene video from the latest illustration. */
-  onGenerateVideo?: () => void | Promise<void>;
+  /** Generate a scene video from the latest illustration, or a Conversation character's video message. */
+  onGenerateVideo?: (characterId?: string) => void | Promise<void>;
   /** Generate a scene video from a specific gallery illustration. */
-  onAnimateImage?: (image: ChatImage) => void | Promise<void>;
+  /** In Conversation, `characterId` is the character picked to send it. */
+  onAnimateImage?: (image: ChatImage, characterId?: string) => void | Promise<void>;
 }
 
 const EMPTY_SCENE_VIDEOS: GeneratedSceneVideo[] = [];
@@ -108,7 +110,7 @@ export function ChatGallery({
 }: ChatGalleryProps) {
   const { t: localizeUi } = useUiTranslation();
   const { data: images, isLoading } = useGalleryImages(chatId);
-  const sceneVideosEnabled = mode === "game" || mode === "roleplay";
+  const sceneVideosEnabled = mode === "game" || mode === "roleplay" || mode === "conversation";
   const sceneVideosQuery = useSceneVideos(chatId, sceneVideosEnabled);
   const sceneVideos = sceneVideosEnabled ? (sceneVideosQuery.data ?? EMPTY_SCENE_VIDEOS) : EMPTY_SCENE_VIDEOS;
   const upload = useUploadGalleryImage(chatId);
@@ -257,16 +259,37 @@ export function ChatGallery({
     unpinImage(id);
     setConfirmDeleteId(null);
     if (lightbox?.id === id) setLightbox(null);
-    remove.mutate(id, {
-      onSuccess: () => {
-        toast.success(localizeUi("ui.chat.chatgallery.imageDeleted"));
+    // The image's own chatId is the owner (a Game-mode gallery shows sibling
+    // sessions' images too); fall back to the open chat only if the row is
+    // somehow not in the list.
+    remove.mutate(
+      { imageId: id, chatId: image?.chatId ?? chatId },
+      {
+        onSuccess: () => {
+          toast.success(localizeUi("ui.chat.chatgallery.imageDeleted"));
+        },
+        onError: (error) => {
+          if (wasPinned && image) pinImage({ ...image, chatId });
+          toast.error(error instanceof Error ? error.message : localizeUi("ui.chat.chatgallery.failedToDeleteImage"));
+        },
       },
-      onError: (error) => {
-        if (wasPinned && image) pinImage({ ...image, chatId });
-        toast.error(error instanceof Error ? error.message : localizeUi("ui.chat.chatgallery.failedToDeleteImage"));
-      },
-    });
+    );
   };
+
+  const handleDownloadImage = useCallback(
+    async (image: ChatImage) => {
+      if (shouldUseIosImageShare()) {
+        setLightbox(image);
+        return;
+      }
+      try {
+        await downloadUrlToDevice(image.url, getChatImageDownloadName(image));
+      } catch {
+        toast.error(localizeUi("ui.chat.chatgallery.downloadFailed"));
+      }
+    },
+    [localizeUi],
+  );
 
   const handleBatchDownload = useCallback(async () => {
     if (selectedImages.length === 0 || batchOperationPendingRef.current) return;
@@ -331,7 +354,7 @@ export function ChatGallery({
         const wasPinned = useGalleryStore.getState().pinnedImages.some((item) => item.id === image.id);
         unpinImage(image.id);
         try {
-          await remove.mutateAsync(image.id);
+          await remove.mutateAsync({ imageId: image.id, chatId: image.chatId });
         } catch {
           failedDeletes += 1;
           if (wasPinned) pinImage({ ...image, chatId });
@@ -419,7 +442,8 @@ export function ChatGallery({
 
     setChatGeneratingVideo(chatId, true);
     try {
-      await onGenerateVideo();
+      // In Conversation the clip is a video message from the character picked for selfies.
+      await onGenerateVideo(selfieCharacters.length > 1 ? selectedSelfieCharacterId : selfieCharacters[0]?.id);
       await sceneVideosQuery.refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : localizeUi("ui.chat.chatgallery.videoGenerationFailed"));
@@ -450,7 +474,7 @@ export function ChatGallery({
 
     setChatGeneratingVideo(chatId, true);
     try {
-      await onAnimateImage(image);
+      await onAnimateImage(image, selfieCharacters.length > 1 ? selectedSelfieCharacterId : selfieCharacters[0]?.id);
       await sceneVideosQuery.refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : localizeUi("ui.chat.chatgallery.videoGenerationFailed"));
@@ -567,15 +591,33 @@ export function ChatGallery({
     }
   }, [activeTab, sceneVideosEnabled, videoLightbox]);
 
+  // Who sends a selfie or a video message: one picker, shown under Selfie, or under Video when selfies are off.
+  const renderCharacterPicker = () =>
+    selfieCharacters.length > 1 ? (
+      <select
+        value={selectedSelfieCharacterId}
+        onChange={(event) => setSelectedSelfieCharacterId(event.target.value)}
+        disabled={isGeneratingSelfie || isGeneratingVideo}
+        className="min-w-0 rounded-lg bg-[var(--secondary)] px-2 py-1.5 text-[0.6875rem] text-[var(--foreground)] outline-none ring-1 ring-[var(--border)] disabled:cursor-wait disabled:opacity-70"
+        aria-label={localizeUi("ui.chat.chatgallery.messageCharacter")}
+      >
+        {selfieCharacters.map((character) => (
+          <option key={character.id} value={character.id}>
+            {character.name}
+          </option>
+        ))}
+      </select>
+    ) : null;
+
   return (
     <>
-      <div className="flex flex-col gap-3 p-4">
+      <div className="flex flex-col gap-3">
         {(canIllustrate ||
           onGenerateSelfie ||
           onGenerateStoryboard ||
           (sceneVideosEnabled && onGenerateVideo) ||
           onGenerateBackground) && (
-          <div className={actionGridClass}>
+          <div className={cn("mari-gallery-generation-actions", actionGridClass)}>
             {canIllustrate && (
               <div ref={illustrateMenuRef} className="relative min-w-0">
                 <button
@@ -601,7 +643,7 @@ export function ChatGallery({
                       : localizeUi("ui.chat.chatgallery.illustrate")}
                   </span>
                   {illustrateAgents.length > 0 && !isIllustrating ? (
-                    <ChevronDown size="0.875rem" className="shrink-0" />
+                    <ChevronDown size="0.875rem" className="shrink-0 max-md:absolute max-md:right-1 max-md:top-1" />
                   ) : null}
                 </button>
                 {illustrateMenuOpen && (
@@ -657,21 +699,7 @@ export function ChatGallery({
                       : localizeUi("ui.chat.chatgallery.selfie")}
                   </span>
                 </button>
-                {selfieCharacters.length > 1 && (
-                  <select
-                    value={selectedSelfieCharacterId}
-                    onChange={(event) => setSelectedSelfieCharacterId(event.target.value)}
-                    disabled={isGeneratingSelfie}
-                    className="min-w-0 rounded-lg bg-[var(--secondary)] px-2 py-1.5 text-[0.6875rem] text-[var(--foreground)] outline-none ring-1 ring-[var(--border)] disabled:cursor-wait disabled:opacity-70"
-                    aria-label={localizeUi("ui.chat.chatgallery.selfieCharacter")}
-                  >
-                    {selfieCharacters.map((character) => (
-                      <option key={character.id} value={character.id}>
-                        {character.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                {renderCharacterPicker()}
               </div>
             )}
             {onGenerateStoryboard && (
@@ -695,24 +723,28 @@ export function ChatGallery({
               </button>
             )}
             {sceneVideosEnabled && onGenerateVideo && (
-              <button
-                type="button"
-                onClick={() => void handleGenerateVideo()}
-                disabled={isGeneratingVideo}
-                aria-busy={isGeneratingVideo}
-                className="flex min-w-0 items-center justify-center gap-2 rounded-xl bg-[var(--primary)]/15 px-3 py-3 text-xs font-medium text-[var(--primary)] transition-all hover:bg-[var(--primary)]/25 disabled:cursor-wait disabled:opacity-75"
-              >
-                {isGeneratingVideo ? (
-                  <Loader2 size="1rem" className="shrink-0 animate-spin" />
-                ) : (
-                  <Film size="1rem" className="shrink-0" />
-                )}
-                <span className="min-w-0 truncate">
-                  {isGeneratingVideo
-                    ? localizeUi("ui.chat.summarypopover.generating")
-                    : localizeUi("ui.chat.chatgallery.video")}
-                </span>
-              </button>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateVideo()}
+                  disabled={isGeneratingVideo}
+                  aria-busy={isGeneratingVideo}
+                  className="flex min-w-0 items-center justify-center gap-2 rounded-xl bg-[var(--primary)]/15 px-3 py-3 text-xs font-medium text-[var(--primary)] transition-all hover:bg-[var(--primary)]/25 disabled:cursor-wait disabled:opacity-75"
+                >
+                  {isGeneratingVideo ? (
+                    <Loader2 size="1rem" className="shrink-0 animate-spin" />
+                  ) : (
+                    <Film size="1rem" className="shrink-0" />
+                  )}
+                  <span className="min-w-0 truncate">
+                    {isGeneratingVideo
+                      ? localizeUi("ui.chat.summarypopover.generating")
+                      : localizeUi("ui.chat.chatgallery.video")}
+                  </span>
+                </button>
+                {/* With Selfie hidden (selfies off), the picker for who sends the video sits under Video instead. */}
+                {!onGenerateSelfie && mode === "conversation" && renderCharacterPicker()}
+              </div>
             )}
             {onGenerateBackground && (
               <button
@@ -737,7 +769,7 @@ export function ChatGallery({
           </div>
         )}
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 @md:flex-row @md:items-center">
           <div className="relative min-w-0 flex-1">
             <Search
               size="0.875rem"
@@ -749,7 +781,7 @@ export function ChatGallery({
               onChange={(event) => setAssetSearch(event.target.value)}
               placeholder={localizeUi("ui.chat.chatgallery.searchChatCharacterPersonaAndSpriteImages")}
               aria-label={localizeUi("ui.chat.chatgallery.searchGalleryImages")}
-              className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--secondary)] pl-9 pr-10 text-xs text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+              className="mari-chrome-field h-10 w-full !rounded-md pl-9 pr-10 text-xs"
             />
             {assetSearch && (
               <button
@@ -762,7 +794,7 @@ export function ChatGallery({
               </button>
             )}
           </div>
-          <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+          <div className="grid shrink-0 grid-cols-2 gap-2 @md:flex">
             <button
               type="button"
               disabled={!images?.length}
@@ -882,7 +914,7 @@ export function ChatGallery({
             )}
 
             {!assetsLoading && displayedAssets.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 @md:grid-cols-3">
                 {displayedAssets.map((asset) => {
                   const imageId = getChatGalleryImageId(asset, chatId);
                   const selected = imageId ? selectedImageIds.has(imageId) : false;
@@ -919,8 +951,9 @@ export function ChatGallery({
                           <Check size="0.9rem" />
                         </span>
                       ) : null}
-                      <img
+                      <ChatImagePreview
                         src={asset.url}
+                        mobileWidth={BACKGROUND_THUMBNAIL_WIDTH}
                         alt={asset.prompt || asset.name}
                         loading="lazy"
                         decoding="async"
@@ -956,7 +989,7 @@ export function ChatGallery({
             aria-selected={activeTab === "images"}
             onClick={() => setActiveTab("images")}
             className={cn(
-              "flex min-w-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+              "flex min-w-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors",
               activeTab === "images"
                 ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]",
@@ -978,7 +1011,7 @@ export function ChatGallery({
             }}
             disabled={!sceneVideosEnabled}
             className={cn(
-              "flex min-w-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+              "flex min-w-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors",
               !sceneVideosEnabled
                 ? "cursor-not-allowed text-[var(--muted-foreground)] opacity-50"
                 : activeTab === "videos"
@@ -1027,7 +1060,7 @@ export function ChatGallery({
 
             {/* Image grid */}
             {hasImages && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2">
                 {images!.map((img) => (
                   <div
                     key={img.id}
@@ -1062,8 +1095,9 @@ export function ChatGallery({
                           : localizeUi("ui.chat.chatgallery.openGalleryImage")
                       }
                     >
-                      <img
+                      <ChatImagePreview
                         src={img.url}
+                        mobileWidth={BACKGROUND_THUMBNAIL_WIDTH}
                         alt={img.prompt || "Gallery image"}
                         loading="lazy"
                         decoding="async"
@@ -1073,8 +1107,8 @@ export function ChatGallery({
                     {/* Overlay */}
                     {!selectingImages && (
                       <div className="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100">
-                        <div className="flex w-full items-center justify-between p-2">
-                          <div className="flex gap-1">
+                        <div className="mari-gallery-image-actions flex w-full items-center justify-between p-2">
+                          <div className="flex gap-1 max-md:contents">
                             <button
                               type="button"
                               onClick={() => handlePinImage(img)}
@@ -1084,15 +1118,15 @@ export function ChatGallery({
                             >
                               <Pin size="0.75rem" />
                             </button>
-                            <a
-                              href={img.url}
-                              download={getChatImageDownloadName(img)}
+                            <button
+                              type="button"
+                              onClick={() => void handleDownloadImage(img)}
                               aria-label={localizeUi("ui.chat.chatgallery.downloadGalleryImage")}
                               className="pointer-events-auto rounded-md bg-white/20 p-1.5 text-white transition-colors hover:bg-white/30"
                               title={localizeUi("ui.chat.chatgallery.downloadImage")}
                             >
                               <Download size="0.75rem" />
-                            </a>
+                            </button>
                             {sceneVideosEnabled && onAnimateImage && (
                               <button
                                 type="button"
@@ -1160,7 +1194,11 @@ export function ChatGallery({
                 <p className="text-xs">{localizeUi("ui.chat.chatgallery.noVideosYet")}</p>
                 <p className="text-[0.625rem] opacity-60">
                   {onGenerateVideo || onAnimateImage
-                    ? localizeUi("ui.chat.chatgallery.generateOrAnimateSceneVideosToFillThisTab")
+                    ? localizeUi(
+                        mode === "conversation"
+                          ? "ui.chat.chatgallery.sendOrAnimateVideoMessagesToFillThisTab"
+                          : "ui.chat.chatgallery.generateOrAnimateSceneVideosToFillThisTab",
+                      )
                     : localizeUi("ui.chat.chatgallery.generatedSceneVideosWillAppearHere")}
                 </p>
               </div>
@@ -1170,9 +1208,11 @@ export function ChatGallery({
               <section className="space-y-2">
                 <div className="flex items-center gap-2 text-[0.6875rem] font-medium uppercase text-[var(--muted-foreground)]">
                   <Film size="0.75rem" />
-                  {localizeUi("ui.chat.chatgallery.sceneVideos")}
+                  {localizeUi(
+                    mode === "conversation" ? "ui.chat.chatgallery.videoMessages" : "ui.chat.chatgallery.sceneVideos",
+                  )}
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 @sm:grid-cols-2">
                   {sceneVideos.map((video) => (
                     <div
                       key={video.id}
@@ -1276,7 +1316,9 @@ export function ChatGallery({
         )}
 
       {/* Lightbox */}
-      {lightbox && <ChatImageLightbox image={lightbox} onPin={handlePinImage} onClose={() => setLightbox(null)} />}
+      {lightbox && (
+        <ChatImageLightbox image={lightbox} regenerate={{}} onPin={handlePinImage} onClose={() => setLightbox(null)} />
+      )}
       {sceneVideosEnabled && videoLightbox && (
         <ChatVideoLightbox video={videoLightbox} onPin={handlePinVideo} onClose={() => setVideoLightbox(null)} />
       )}

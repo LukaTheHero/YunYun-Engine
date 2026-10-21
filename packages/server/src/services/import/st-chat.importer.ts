@@ -2,9 +2,26 @@
 // Importer: SillyTavern Chat (JSONL)
 // ──────────────────────────────────────────────
 import type { DB } from "../../db/connection.js";
+import { logger } from "../../lib/logger.js";
 import { createChatsStorage } from "../storage/chats.storage.js";
 import { createSpatialContextStorage } from "../storage/spatial-context.storage.js";
-import { SPATIAL_CONTEXT_LIMITS, type ChatMode } from "@marinara-engine/shared";
+import { createGameWorldSnapshotsStorage } from "../storage/game-world-snapshots.storage.js";
+import { saveGameWorldSnapshot } from "../game/game-world.service.js";
+import {
+  normalizeTextForMatch,
+  normalizeChatSummaryEntries,
+  compileChatSummaryEntries,
+  SPATIAL_CONTEXT_LIMITS,
+  type ChatMode,
+  readWorldSnapshot,
+  gameWorldFromSnapshot,
+  WORLD_GENERATOR_VERSION,
+  readWorldLedger,
+  worldFold,
+  worldLedgerCarry,
+  omitChatMetadataLocalDestinations,
+} from "@marinara-engine/shared";
+import { copyAdvancedMemoryRecords, remapAdvancedMemoryMetadata } from "../advanced-memory-transfer.js";
 import {
   latestTrustedTimestamp,
   normalizeTimestampOverrides,
@@ -27,7 +44,9 @@ interface STChatMessageExtra extends Record<string, unknown> {
 }
 
 interface STChatMessage {
+  marinara_message_id?: unknown;
   name?: string;
+  original_avatar?: unknown;
   is_user?: boolean;
   is_system?: boolean;
   role?: unknown;
@@ -43,6 +62,7 @@ interface STChatMessage {
 }
 
 interface ParsedSTChatMessageInput {
+  sourceMessageId?: string;
   role: "system" | "user" | "assistant" | "narrator";
   characterId: string | null;
   content: string;
@@ -74,6 +94,8 @@ export interface ImportSTChatOptions {
   groupId?: string | null;
   /** Persona to attach to the imported chat */
   personaId?: string | null;
+  /** Character card to use as the user identity */
+  personaCharacterId?: string | null;
   /** Connection to attach to the imported chat */
   connectionId?: string | null;
   /** Prompt preset to attach to the imported chat */
@@ -158,7 +180,12 @@ function normalizeImportedMode(value: unknown): ChatMode | null {
   }
 }
 
+function normalizeSpeakerKey(value: unknown): string {
+  return typeof value === "string" ? normalizeTextForMatch(value.replace(/\.(png|json)$/i, "")) : "";
+}
+
 const INTERNAL_EXTRA_KEYS = new Set([
+  "advancedMemoryReceipt",
   "cachedPrompt",
   "chatCompletionsReasoning",
   "chatSummaryFingerprint",
@@ -242,12 +269,15 @@ function sanitizeImportedMarinaraMetadata(
   metadata: Record<string, unknown>,
   localGameId: string,
 ): Record<string, unknown> {
-  const sanitized = { ...metadata };
+  // Outside addresses (Discord mirror, translator, haptics server) stay on the install that set them.
+  const sanitized = omitChatMetadataLocalDestinations(metadata);
 
   // These are source-chat pointers. Keeping them after import can make the new
   // branch/session operate on the exported campaign or an already-closed scene.
   delete sanitized.activeSceneChatId;
   delete sanitized.sceneOriginChatId;
+  delete sanitized.scenePackageOrigin;
+  delete sanitized.scenePackageData;
   delete sanitized.sceneStatus;
   delete sanitized.branchParentChatId;
   delete sanitized.branchParentMessageId;
@@ -315,6 +345,11 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
 
   const messageTimestamps: string[] = [];
   const parsedMsgInputs: ParsedSTChatMessageInput[] = [];
+  const normalizedSpeakerMap = new Map<string, string>();
+  for (const [speaker, characterId] of Object.entries(opts?.speakerMap ?? {})) {
+    const key = normalizeSpeakerKey(speaker);
+    if (key && !normalizedSpeakerMap.has(key)) normalizedSpeakerMap.set(key, characterId);
+  }
 
   for (let i = 1; i < lines.length; i++) {
     try {
@@ -366,9 +401,13 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
             : typeof stMsg.extra?.marinara_character_id === "string"
               ? stMsg.extra.marinara_character_id
               : null;
-        if (opts?.speakerMap && stMsg.name) {
+        if (opts?.speakerMap) {
           // Group chat: look up speaker
-          messageCharacterId = exportedCharacterId ?? opts.speakerMap[stMsg.name] ?? opts?.characterId ?? null;
+          const importedSpeakerId =
+            normalizedSpeakerMap.get(normalizeSpeakerKey(stMsg.original_avatar)) ??
+            normalizedSpeakerMap.get(normalizeSpeakerKey(stMsg.name)) ??
+            null;
+          messageCharacterId = exportedCharacterId ?? importedSpeakerId ?? opts?.characterId ?? null;
         } else {
           messageCharacterId = exportedCharacterId ?? opts?.characterId ?? null;
         }
@@ -377,6 +416,9 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
       const createdAt = parseTrustedTimestamp(stMsg.send_date);
 
       parsedMsgInputs.push({
+        ...(typeof stMsg.marinara_message_id === "string" && stMsg.marinara_message_id.trim()
+          ? { sourceMessageId: stMsg.marinara_message_id }
+          : {}),
         role,
         characterId: messageCharacterId,
         content,
@@ -391,7 +433,7 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
   }
 
   const msgInputs = normalizeTranscriptTimestamps(parsedMsgInputs, opts?.timestampOverrides).map(
-    ({ parsedCreatedAt, ...input }) => {
+    ({ parsedCreatedAt, sourceMessageId: _sourceMessageId, ...input }) => {
       messageTimestamps.push(input.createdAt);
       return input;
     },
@@ -411,6 +453,7 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
       characterIds,
       groupId: opts?.groupId ?? null,
       personaId: opts?.personaId ?? null,
+      personaCharacterId: opts?.personaCharacterId ?? null,
       promptPresetId: opts?.promptPresetId ?? null,
       connectionId: opts?.connectionId ?? null,
     },
@@ -427,6 +470,34 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
       opts?.groupId ?? chat.groupId ?? chat.id,
     );
     delete importedMetadata.spatialContextHistory;
+    delete importedMetadata.advancedMemoryTransfer;
+    delete importedMetadata.advancedMemoryState;
+    delete importedMetadata.gameWorldSnapshot;
+    // A game's world (worldgen W11): a world this Engine's generator made is made now from its recipe, as
+    // its edits are saved later; another generator's comes from the snapshot it came with, checked whole,
+    // kept before the metadata that names the world.
+    if (importedMetadata.gameWorld != null) {
+      const snapshots = createGameWorldSnapshotsStorage(db);
+      const sent = readWorldSnapshot(marinaraMetadata.gameWorldSnapshot);
+      const read =
+        sent.ok && sent.snapshot.generatorVersion === WORLD_GENERATOR_VERSION
+          ? ({ ok: false, issues: ["its recipe does not make a world"] } as const)
+          : sent;
+      if (read.ok) await snapshots.put(chat.id, read.snapshot);
+      const game = read.ok
+        ? gameWorldFromSnapshot(read.snapshot)
+        : await saveGameWorldSnapshot(db, chat.id, importedMetadata);
+      if (!game) {
+        logger.warn(
+          "Imported game chat %s has a world this Engine cannot read: %s",
+          chat.id,
+          read.ok ? "" : read.issues[0],
+        );
+      }
+      // The living world earlier sessions left, folded again from what they carried (W11).
+      const carried = worldLedgerCarry(importedMetadata.gameLedgerCarry);
+      if (game && carried?.tags) await snapshots.setFold(chat.id, worldFold(game, readWorldLedger([carried.tags])));
+    }
     await storage.patchMetadata(
       chat.id,
       {
@@ -439,6 +510,71 @@ export async function importSTChat(jsonlContent: string, db: DB, opts?: ImportST
   }
 
   const importedMessageIds = await storage.createMessagesBatch(chat.id, msgInputs, chatTimestamps);
+  const sourceIdCounts = new Map<string, number>();
+  for (const message of parsedMsgInputs)
+    if (message.sourceMessageId) {
+      sourceIdCounts.set(message.sourceMessageId, (sourceIdCounts.get(message.sourceMessageId) ?? 0) + 1);
+    }
+  const sourceToImportedMessageId = new Map(
+    parsedMsgInputs.flatMap((message, index) =>
+      message.sourceMessageId && sourceIdCounts.get(message.sourceMessageId) === 1 && importedMessageIds[index]
+        ? [[message.sourceMessageId, importedMessageIds[index]!] as const]
+        : [],
+    ),
+  );
+  await storage.remapRoleplayInterruptionTargets(chat.id, sourceToImportedMessageId);
+  if (importedMode === "roleplay" && marinaraMetadata.advancedMemory) {
+    const existing = await storage.getById(chat.id);
+    const metadata = existing?.metadata ? (JSON.parse(existing.metadata) as Record<string, unknown>) : {};
+    const remappedMetadata = remapAdvancedMemoryMetadata(metadata, sourceToImportedMessageId, characterIds);
+    const messageIndexes = new Map(importedMessageIds.map((id, index) => [id, index + 1]));
+    const entries = normalizeChatSummaryEntries(metadata.summaryEntries, {
+      legacySummary: typeof metadata.summary === "string" ? metadata.summary : null,
+    }).flatMap((entry) => {
+      if (!entry.messageIds?.length) return [entry];
+      if (!entry.messageIds.every((id) => sourceToImportedMessageId.has(id))) {
+        return entry.origin === "automated"
+          ? []
+          : [
+              {
+                ...entry,
+                enabled: false,
+                messageIds: undefined,
+                hiddenMessageIds: undefined,
+                rangeStartIndex: undefined,
+                rangeEndIndex: undefined,
+              },
+            ];
+      }
+      const ids = entry.messageIds.map((id) => sourceToImportedMessageId.get(id)!);
+      return [
+        {
+          ...entry,
+          messageIds: ids,
+          hiddenMessageIds: entry.hiddenMessageIds?.flatMap((id) => sourceToImportedMessageId.get(id) ?? []),
+          rangeStartIndex: Math.min(...ids.map((id) => messageIndexes.get(id)!)),
+          rangeEndIndex: Math.max(...ids.map((id) => messageIndexes.get(id)!)),
+        },
+      ];
+    });
+    remappedMetadata.summaryEntries = entries;
+    remappedMetadata.summary = compileChatSummaryEntries(entries);
+    const previousSummaryAnchor = metadata.lastAutomaticSummaryMessageId;
+    remappedMetadata.lastAutomaticSummaryMessageId =
+      typeof previousSummaryAnchor === "string" ? (sourceToImportedMessageId.get(previousSummaryAnchor) ?? null) : null;
+    await storage.patchMetadata(chat.id, remappedMetadata, { touchUpdatedAt: false });
+    await copyAdvancedMemoryRecords({
+      db,
+      chatId: chat.id,
+      records: marinaraMetadata.advancedMemoryTransfer,
+      sourceMessages: parsedMsgInputs.flatMap((message) =>
+        message.sourceMessageId ? [{ ...message, id: message.sourceMessageId }] : [],
+      ),
+      messageIds: sourceToImportedMessageId,
+      characterIds,
+      metadata: remappedMetadata,
+    });
+  }
   const spatialStorage = createSpatialContextStorage();
   for (const candidate of importedSpatialHistory) {
     if (!isRecord(candidate)) continue;

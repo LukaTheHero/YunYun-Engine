@@ -13,6 +13,15 @@
 //   Pasta-Devs/Marinara-Engine    upstream URLs + AGPL attribution (hyphen; must keep)
 //   custom_components/marinara_engine  Home Assistant domain (renaming breaks installs)
 //
+// Upstream characters: the fork ships none of upstream's characters. After a
+// merge, besides running this script, check by hand that the merge did not
+// bring back any of them: Professor Mari's appearance packs (only "basic"
+// ships, see src/lib/mari-work-animations.ts), the Dottore chat-widget style,
+// Professor Mari's persona lore in seed-mari.ts / workspace-agent.service.ts,
+// or new What's New announcements and their /releases/ media (the fork keeps
+// RELEASE_ANNOUNCEMENTS empty because upstream writes them as Mari and
+// illustrates them with its characters).
+//
 // Usage:  node scripts/yunyun-rebrand.mjs [--dry] [--list]
 // ──────────────────────────────────────────────
 import { execSync } from "node:child_process";
@@ -43,14 +52,118 @@ const RULES = [
   // the OLD paths — NoodlerBulkCreatePanel.tsx arrived in v2.4.1 doing exactly
   // that, pointing at an asset we had deleted. Remap them here so every future
   // merge self-heals instead of silently shipping a 404'd image.
-  [/\/sprites\/mari\/chibi-professor-mari\.png/g, "/sprites/yunyun/chibi-yunyun.png"],
-  [/\/sprites\/mari\/Mari_profile\.png/g, "/sprites/yunyun/yunyun-profile.png"],
+  // ── Deleted Marinara / Professor-Mari artwork ───────────────────────────
+  // The fork ships none of upstream's Marinara-branded art: everything under
+  // sprites/mari/ and the loose Professor-Mari / Marinara images were deleted,
+  // and every slot that used them now shows the one static chibi YunYun image.
+  // Upstream keeps adding files that point at the old paths, so collapse them
+  // here and every future merge self-heals instead of shipping a broken image.
+  // This matters more than a normal dead link: the SPA history fallback answers
+  // a missing asset with 200 text/html, not 404, so a stale path fails silently.
+  //
+  // These are written WITHOUT a leading slash so one rule covers both the
+  // served URL ("/sprites/mari/x.png") and the repository path that
+  // readFileSync/existsSync use ("packages/client/public/sprites/mari/x.png").
+  // Order matters: full paths collapse before bare basenames.
+
+  // The profile slot wants a portrait, so it keeps its own image, not the chibi.
+  [/sprites\/mari\/Mari_profile\.png/g, "sprites/yunyun/yunyun-profile.png"],
+  // v2.5.1 split her art into appearance-pack folders (sprites/mari/<pack>/...).
+  // The fork ships one pack, generated from its own art with the same file
+  // names and frame layout, at sprites/yunyun/basic/ — so every pack folder,
+  // Basic or one of upstream's costumes (Dottore, Golden, Safari, Raccoon),
+  // maps onto it. This must run before the catch-all below, which would turn
+  // "sprites/mari/basic/idle.webp" into "chibi-yunyun.png/idle.webp".
+  [/sprites\/mari\/(?!generated\/)[a-z][a-z0-9-]*\//g, "sprites/yunyun/basic/"],
+  // Everything else under sprites/mari/ — the six assistant states, the chibi,
+  // the pointing/waving tutorial sprites, the memory wheel and its prompt note.
+  [/sprites\/mari\/(?:generated\/)?[A-Za-z0-9_][A-Za-z0-9_.-]*/g, "sprites/yunyun/chibi-yunyun.png"],
+  // The directory is also interpolated, e.g. `sprites/mari/${image}` in a
+  // Playwright avatar helper, which the path rules above cannot match.
+  [/sprites\/mari\//g, "sprites/yunyun/"],
+  // Loose Marinara-branded images outside sprites/.
+  [/illustrations\/marinara-universal-preset\.webp/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/releases\/2\.4\.2\/professor-mari-memories\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/releases\/2\.5\.0\/chat-ui-mari\.jpg/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/images\/chat-widgets\/mari-primogem\.svg/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/assets\/imagegen\/home-v5-tabs\/professor-mari-(?:blink-source|idle-reference)\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/assets\/imagegen\/professor-mari-assistant-source\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  // Bare basenames, for the test helpers and CSS assertions that use the
+  // filename on its own with no directory in front of it.
+  [/\bMari_profile\.png/g, "yunyun-profile.png"],
+  [/\bMari_(?:wave|greet|thinking|explaining|point_up_left|point_middle_left|point_down_left|noodler_teaser_locked|noodler_teaser_unlocked)\.(?:png|webp)/g, "chibi-yunyun.png"],
+  // Appears bare in an imagegen prompt note. NB: must stay anchored to ".png" so
+  // it cannot touch the "marinara:chibi-professor-mari-toast-seen" localStorage
+  // key in ChibiProfessorMariEasterEgg.tsx — renaming that wipes user state.
+  [/\bchibi-professor-mari\.png/g, "chibi-yunyun.png"],
+  // The memory-wheel sprite is asserted as a regex literal in an e2e spec, where
+  // the dot arrives backslash-escaped, so accept both spellings.
+  [/\bprofessor-mari-memory-wheel-v2\\?\.png/g, "chibi-yunyun.png"],
+  [/\bmari-primogem\.svg/g, "chibi-yunyun.png"],
+  // Upstream's Dottore art (the chat-widget crest and the support GIF) is not
+  // shipped either.
+  [/images\/chat-widgets\/dottore-crest\.svg/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/sprites\/dottore\/[A-Za-z0-9_.-]+/g, "sprites/yunyun/chibi-yunyun.png"],
+  [/\bchat-ui-mari\.jpg/g, "chibi-yunyun.png"],
+  [/\bprofessor-mari-memories\.png/g, "chibi-yunyun.png"],
+
+  // Zero-width and soft-hyphen lookalikes of the assistant's name, used by the
+  // multiplayer identity-conflict guard to prove an impersonating persona is
+  // refused. The \uXXXX escapes sit inside the word, so rule 3's \b boundary
+  // cannot match them: the fixture's real persona name gets rebranded while the
+  // lookalikes keep spelling the old one, leaving them resembling nobody and the
+  // guard passing vacuously. Rewrite the lookalikes to match.
+  [/Ma(\\u[0-9A-Fa-f]{4})ri/g, "Yun$1Yun"],
+
+  // A literal \n / \r / \t escape inside a string makes the character before
+  // the name a word character, so rules 2 and 3 find no \b boundary and skip it
+  // — which silently desynchronised a regression's expected output from its
+  // already-rebranded input. The trailing \b is kept so this still cannot touch
+  // longer names that merely start with it, such as the character "Marisol".
+  [/(\\[nrt])Marinara\b(?!-)/g, "$1YunYun"],
+  [/(\\[nrt])Mari\b/g, "$1YunYun"],
   [/\/illustrations\/professor-mari-whats-new\.webp/g, "/illustrations/yunyun-whats-new.webp"],
   [/"\/logo\.png"/g, '"/yunyun-logo.png"'],
   [/"\/logo-splash\.gif"/g, '"/yunyun-logo-splash.gif"'],
   [/"\/favicon\.png"/g, '"/yunyun-favicon.png"'],
   [/"\/icon-192\.png"/g, '"/yunyun-icon-192.png"'],
   [/"\/icon-512\.png"/g, '"/yunyun-icon-512.png"'],
+  // The rules above are anchored to a quoted absolute URL, so they miss the
+  // branding files when they are referenced as a path on disk instead — which
+  // is how the Playwright fixtures load them, e.g.
+  // readFileSync(new URL("../packages/client/public/icon-512.png", ...)).
+  // Those reads throw at import time and take the whole spec file down with
+  // them, so match the public/ form too.
+  [/public\/logo\.png/g, "public/yunyun-logo.png"],
+  [/public\/logo-splash\.gif/g, "public/yunyun-logo-splash.gif"],
+  [/public\/favicon\.png/g, "public/yunyun-favicon.png"],
+  [/public\/icon-192\.png/g, "public/yunyun-icon-192.png"],
+  [/public\/icon-512\.png/g, "public/yunyun-icon-512.png"],
+  // Upstream's community links. These are Marinara's own Discord and donation
+  // page, so every merge that adds a new reference must be repointed at ours.
+  [/https:\/\/discord\.com\/invite\/KdAkTg94ME/g, "https://discord.gg/canalpa"],
+  [/https:\/\/ko-fi\.com\/marinara_spaghetti/g, "https://ko-fi.com/lukathehero"],
+
+  // Upstream's recurring example cast. Their prompts, docs, help text and test
+  // fixtures name these characters; the fork ships none of them, so every
+  // mention is renamed to a neutral stand-in of the same length, gender and
+  // opening letters (Do-, Mau-, P-), so fixed-width, token-count, sort-order
+  // and partial-name fixtures keep lining up. The rules have
+  // no word boundary on purpose: ids and camelCase identifiers ("dottoreId")
+  // must be renamed together with the display names they pair with.
+  // NB: this also renames upstream's "dottore" chat-widget preset id if a merge
+  // brings it back. The fork removed that style; drop it again by hand.
+  [/\bIl Dottore\b/g, "Dominic"],
+  [/\bil dottore\b/g, "dominic"],
+  [/Dottore/g, "Dominic"],
+  [/dottore/g, "dominic"],
+  [/DOTTORE/g, "DOMINIC"],
+  [/Maukie/g, "Maurus"],
+  [/maukie/g, "maurus"],
+  [/MAUKIE/g, "MAURUS"],
+  [/Pantalone/g, "Peregrine"],
+  [/pantalone/g, "peregrine"],
+  [/PANTALONE/g, "PEREGRINE"],
 ];
 
 // Phrases that must survive verbatim even though they contain the old name.

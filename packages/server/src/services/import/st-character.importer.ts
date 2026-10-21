@@ -1,3 +1,4 @@
+import { syncCharacterBookFromLorebook } from "../lorebook/character-book-sync.js";
 // ──────────────────────────────────────────────
 // Importer: SillyTavern Character (JSON / V2 Card / CharX)
 // ──────────────────────────────────────────────
@@ -8,7 +9,13 @@ import { createCharactersStorage } from "../storage/characters.storage.js";
 import { createLorebooksStorage } from "../storage/lorebooks.storage.js";
 import { createRegexScriptsStorage } from "../storage/regex-scripts.storage.js";
 import { importSTLorebook } from "./st-lorebook.importer.js";
-import { isPatternSafe } from "@marinara-engine/shared";
+import {
+  capImportedRulesetSheets,
+  containsDecisionStatements,
+  dropUnreadableOnboarding,
+  isPatternSafe,
+  ONBOARDING_MAX_QUESTIONS,
+} from "@marinara-engine/shared";
 import type {
   CharacterBookEntryPosition,
   CharacterBookEntryRole,
@@ -22,11 +29,27 @@ import { join } from "path";
 import { randomUUID } from "crypto";
 import { DATA_DIR } from "../../utils/data-dir.js";
 import { isAllowedImageBuffer } from "../../utils/security.js";
-import AdmZip from "adm-zip";
+import { openZipArchive, type ZipArchive } from "../../lib/zip-reader.js";
 import { normalizeTimestampOverrides, type TimestampOverrides } from "./import-timestamps.js";
+import { restoreSprites } from "./marinara.importer.js";
 
 const AVATAR_DIR = join(DATA_DIR, "avatars");
+/** The import routes' upload limit. A .charx reads its card and icon up to the same size, so raising
+ *  the limit raises both. */
+export const IMPORT_BODY_LIMIT_BYTES = 256 * 1024 * 1024;
 const IMPORT_METADATA_KEY = "importMetadata";
+
+/** Remove YunYun sprite binaries from card metadata before the normalized card is stored. */
+export function takeEmbeddedMarinaraSprites(raw: Record<string, unknown>): unknown {
+  const cardData = raw.data && typeof raw.data === "object" ? (raw.data as Record<string, unknown>) : raw;
+  if (!cardData.extensions || typeof cardData.extensions !== "object") return undefined;
+  const extensions = cardData.extensions as Record<string, unknown>;
+  if (!extensions.marinara || typeof extensions.marinara !== "object") return undefined;
+  const marinara = extensions.marinara as Record<string, unknown>;
+  const sprites = marinara.sprites;
+  delete marinara.sprites;
+  return sprites;
+}
 
 function ensureAvatarDir() {
   if (!existsSync(AVATAR_DIR)) {
@@ -118,7 +141,8 @@ function readBooleanFlag(value: unknown): boolean {
 
 function convertStRegexApplyMode(s: Record<string, unknown>): "prompt" | "display" | "both" {
   if (s.applyMode === "prompt" || s.applyMode === "display" || s.applyMode === "both") return s.applyMode;
-  const promptOnly = readBooleanFlag(s.promptOnly) || readBooleanFlag(s.prompt_only) || readBooleanFlag(s.onlyFormatPrompt);
+  const promptOnly =
+    readBooleanFlag(s.promptOnly) || readBooleanFlag(s.prompt_only) || readBooleanFlag(s.onlyFormatPrompt);
   const markdownOnly =
     readBooleanFlag(s.markdownOnly) || readBooleanFlag(s.markdown_only) || readBooleanFlag(s.onlyFormatDisplay);
   if (promptOnly && !markdownOnly) return "prompt";
@@ -187,6 +211,7 @@ export async function importSTCharacter(raw: Record<string, unknown>, db: DB, op
   const normalizedTimestamps = normalizeTimestampOverrides(options?.timestampOverrides);
   const shouldImportEmbeddedLorebook = options?.importEmbeddedLorebook ?? true;
   const tagImportMode = options?.tagImportMode ?? "all";
+  const embeddedMarinaraSprites = takeEmbeddedMarinaraSprites(raw);
 
   // Extract avatar data URL if present (from PNG import)
   const avatarDataUrl = raw._avatarDataUrl as string | null;
@@ -295,8 +320,7 @@ export async function importSTCharacter(raw: Record<string, unknown>, db: DB, op
           ...(data.extensions[IMPORT_METADATA_KEY] as Record<string, unknown>),
           embeddedLorebook: {
             ...(((data.extensions[IMPORT_METADATA_KEY] as Record<string, unknown>)?.embeddedLorebook as
-              | Record<string, unknown>
-              | undefined) ?? {}),
+              Record<string, unknown> | undefined) ?? {}),
             hasEmbeddedLorebook: true,
             lorebookId: result.lorebookId as string,
           },
@@ -306,6 +330,7 @@ export async function importSTCharacter(raw: Record<string, unknown>, db: DB, op
           updatedAt: normalizedTimestamps?.updatedAt ?? normalizedTimestamps?.createdAt ?? null,
           skipVersionSnapshot: true,
         });
+        await syncCharacterBookFromLorebook(db, result.lorebookId as string);
       } else if (hasEmbeddedLorebook) {
         throw new Error(
           typeof result?.error === "string"
@@ -347,6 +372,14 @@ export async function importSTCharacter(raw: Record<string, unknown>, db: DB, op
     }
   }
 
+  if (charId && embeddedMarinaraSprites !== undefined) {
+    try {
+      await restoreSprites(embeddedMarinaraSprites, charId);
+    } catch (err) {
+      logger.warn(err, "Skipped optional embedded sprite restore for %s", charId);
+    }
+  }
+
   return {
     success: true,
     characterId: charId,
@@ -382,47 +415,11 @@ export function inspectSTCharacter(raw: Record<string, unknown>): STCharacterImp
 }
 
 /**
- * Guard a parsed CharX zip against decompression-bomb abuse before any
- * `getData()` call materializes a decompressed entry into memory.
- *
- * adm-zip's `getData()` allocates the full uncompressed entry as a single
- * Buffer, and the 256 MB multipart cap (`app.ts`) bounds only the
- * *compressed* upload — DEFLATE reaches ~1000:1 on repetitive data, so a
- * few-MB `.charx` can expand to multiple GB and OOM the shared process.
- * Sizes are read off the central-directory headers (`entry.header.size`),
- * not the decompressed stream, so we reject before paying the memory cost.
- * Mirrors the `/marinara-package` cap in `import.routes.ts`. Throws on
- * violation; callers wrap this so the route surfaces a 4xx-style failure
- * instead of crashing.
- */
-function assertCharXWithinLimits(zip: AdmZip): void {
-  const MAX_CHARX_ENTRIES = 512;
-  const MAX_CHARX_ENTRY_BYTES = 64 * 1024 * 1024;
-  const MAX_CHARX_TOTAL_BYTES = 256 * 1024 * 1024;
-  const entries = zip.getEntries();
-  if (entries.length > MAX_CHARX_ENTRIES) {
-    throw new Error(".charx file has too many entries");
-  }
-  let total = 0;
-  for (const entry of entries) {
-    const size = entry.header.size ?? 0;
-    if (size > MAX_CHARX_ENTRY_BYTES) {
-      throw new Error(".charx file has an entry that is too large");
-    }
-    total += size;
-    if (total > MAX_CHARX_TOTAL_BYTES) {
-      throw new Error(".charx file decompresses to too much data");
-    }
-  }
-}
-
-/**
  * Import a CharX (.charx) file — RisuAI Character Card V3 zip format.
  * Extracts card.json and the main icon asset from the zip.
  */
 export async function importCharX(buf: Buffer, db: DB, options?: STCharacterImportOptions) {
-  const zip = new AdmZip(buf);
-  assertCharXWithinLimits(zip);
+  const zip = openZipArchive(buf);
 
   // Extract card.json from root of the zip
   const cardJson = readCharXCardJson(zip);
@@ -455,7 +452,7 @@ export async function importCharX(buf: Buffer, db: DB, options?: STCharacterImpo
       const entry = zip.getEntry(fallback);
       if (entry) {
         const ext = fallback.split(".").pop() ?? "png";
-        const data = entry.getData();
+        const data = entry.read(IMPORT_BODY_LIMIT_BYTES);
         const imageInfo = isAllowedImageBuffer(data, `.${ext}`);
         if (imageInfo) {
           avatarDataUrl = `data:${imageInfo.mimeType};base64,${data.toString("base64")}`;
@@ -470,13 +467,14 @@ export async function importCharX(buf: Buffer, db: DB, options?: STCharacterImpo
     cardJson._avatarDataUrl = avatarDataUrl;
   }
 
-  return importSTCharacter(cardJson as Record<string, unknown>, db, options);
+  const result = await importSTCharacter(cardJson as Record<string, unknown>, db, options);
+  // The importer reports decision statements (#6569); only the server opens a .charx.
+  return result.success && containsDecisionStatements(cardJson) ? { ...result, usesDecisions: true } : result;
 }
 
 export function inspectCharX(buf: Buffer): STCharacterImportPreview {
   try {
-    const zip = new AdmZip(buf);
-    assertCharXWithinLimits(zip);
+    const zip = openZipArchive(buf);
     const cardJson = readCharXCardJson(zip);
     if (!cardJson) {
       return {
@@ -497,10 +495,10 @@ export function inspectCharX(buf: Buffer): STCharacterImportPreview {
   }
 }
 
-function readCharXCardJson(zip: AdmZip): Record<string, unknown> | null {
+function readCharXCardJson(zip: ZipArchive): Record<string, unknown> | null {
   const cardEntry = zip.getEntry("card.json");
   if (!cardEntry) return null;
-  return JSON.parse(cardEntry.getData().toString("utf-8")) as Record<string, unknown>;
+  return JSON.parse(cardEntry.read(IMPORT_BODY_LIMIT_BYTES).toString("utf-8")) as Record<string, unknown>;
 }
 
 function normalizeCharacterData(raw: Record<string, unknown>): CharacterData {
@@ -625,6 +623,8 @@ const CHARACTER_BOOK_ENTRY_PASSTHROUGH_FIELDS = [
   "excludeRecursion",
   "delayUntilRecursion",
   "vectorized",
+  "decisionStatement",
+  "decisionMode",
 ];
 
 function buildCardSpecMetadata(raw: Record<string, unknown>) {
@@ -675,7 +675,7 @@ async function filterImportedTags(
 }
 
 /** Resolve an asset URI from a CharX zip to a data URL. */
-function resolveCharXAsset(zip: AdmZip, uri: string, ext?: string): string | null {
+function resolveCharXAsset(zip: ZipArchive, uri: string, ext?: string): string | null {
   // Handle embeded:// URIs (note: spec uses "embeded" not "embedded")
   let zipPath: string | null = null;
 
@@ -697,7 +697,7 @@ function resolveCharXAsset(zip: AdmZip, uri: string, ext?: string): string | nul
   const entry = zip.getEntry(zipPath);
   if (!entry) return null;
 
-  const data = entry.getData();
+  const data = entry.read(IMPORT_BODY_LIMIT_BYTES);
   const fileExt = ext ?? zipPath.split(".").pop() ?? "png";
   const imageInfo = isAllowedImageBuffer(data, `.${fileExt}`);
   if (!imageInfo) return null;
@@ -705,9 +705,29 @@ function resolveCharXAsset(zip: AdmZip, uri: string, ext?: string): string | nul
 }
 
 function normalizeV2(raw: Record<string, unknown>): CharacterData {
-  const rawExtensions = optionalRecord(raw.extensions);
+  // Ruleset sheets travel dormant under their key; only one the boundary would refuse is dropped.
+  // The raw key is taken out of the spread below, so a value that is not a sheet map leaves nothing.
+  const { rulesetSheets: rawRulesetSheets, ...extensionsWithOnboarding } = optionalRecord(raw.extensions);
+  const onboardingImport = dropUnreadableOnboarding(extensionsWithOnboarding);
+  const rawExtensions = onboardingImport.extensions;
+  if (onboardingImport.dropped)
+    logger.warn("[import] Dropped unreadable interactive onboarding from an imported character");
+  if (onboardingImport.truncated) {
+    logger.warn("[import] Kept the first %d onboarding questions of an imported character", ONBOARDING_MAX_QUESTIONS);
+  }
+  const importedSheets = capImportedRulesetSheets(rawRulesetSheets);
+  if (importedSheets.dropped.length > 0) {
+    logger.warn(
+      "[import] Dropped %d unusable ruleset sheet(s) from an imported character: %s",
+      importedSheets.dropped.length,
+      importedSheets.dropped.join(", "),
+    );
+  }
   return {
     name: String(raw.name ?? "Unknown"),
+    summary: String(raw.summary ?? "")
+      .trim()
+      .slice(0, 500),
     description: String(raw.description ?? ""),
     personality: String(raw.personality ?? ""),
     scenario: String(raw.scenario ?? ""),
@@ -734,6 +754,7 @@ function normalizeV2(raw: Record<string, unknown>): CharacterData {
       },
       backstory: String(rawExtensions.backstory ?? ""),
       appearance: String(rawExtensions.appearance ?? ""),
+      ...(importedSheets.sheets ? { rulesetSheets: importedSheets.sheets } : {}),
     },
     character_book: normalizeCharacterBook(raw.character_book),
     ...pickDefinedFields(raw, V3_CHARACTER_DATA_FIELDS),

@@ -6,7 +6,7 @@ import { z } from "zod";
 export const ttsSourceSchema = z.enum(["openai", "elevenlabs", "pockettts", "xai"]);
 export type TTSSource = z.infer<typeof ttsSourceSchema>;
 
-export const ttsAudioFormatSchema = z.enum(["mp3", "wav"]);
+export const ttsAudioFormatSchema = z.enum(["mp3", "wav", "pcm"]);
 export type TTSAudioFormat = z.infer<typeof ttsAudioFormatSchema>;
 
 export const ttsVoiceModeSchema = z.enum(["single", "per-character"]);
@@ -21,6 +21,19 @@ function normalizeDialoguePauseMs(value: number): number {
   return Math.min(TTS_DIALOGUE_PAUSE_MAX_SECONDS, Math.max(TTS_DIALOGUE_PAUSE_MIN_SECONDS, wholeSeconds)) * 1000;
 }
 
+/**
+ * How long one speech request may take, in milliseconds. The default is the fixed limit every
+ * request had before it could be changed; a local voice server on a laptop can need more (#7711).
+ */
+export const TTS_REQUEST_TIMEOUT_MS = { default: 60_000, min: 10_000, max: 3_600_000 } as const;
+
+/** A speech request's time limit: the saved one in whole seconds within bounds, otherwise the default. */
+export function resolveTtsRequestTimeoutMs(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return TTS_REQUEST_TIMEOUT_MS.default;
+  const { min, max } = TTS_REQUEST_TIMEOUT_MS;
+  return Math.min(max, Math.max(min, Math.round(value / 1000) * 1000));
+}
+
 export const ttsConversationCallAudioInputModeSchema = z.enum(["system", "auto", "transcribe", "local_whisper"]);
 export type TTSConversationCallAudioInputMode = z.infer<typeof ttsConversationCallAudioInputModeSchema>;
 
@@ -30,6 +43,38 @@ export const ttsVoiceAssignmentSchema = z.object({
   voice: z.string().default(""),
 });
 export type TTSVoiceAssignment = z.infer<typeof ttsVoiceAssignmentSchema>;
+
+/** Longest voice POST /api/tts/speak accepts; a longer saved voice could never be spoken. */
+export const TTS_VOICE_MAX_LENGTH = 200;
+
+/** Body of PUT /api/tts/config/voice-assignment: one character's voice; a blank voice removes its row. */
+export const ttsVoiceAssignmentInputSchema = z.object({
+  characterId: z.string().min(1).max(200),
+  // Card names have no length limit, so the name kept on the row has none either.
+  characterName: z.string(),
+  voice: z.string().max(TTS_VOICE_MAX_LENGTH),
+});
+export type TTSVoiceAssignmentInput = z.infer<typeof ttsVoiceAssignmentInputSchema>;
+
+/** Body of PUT /api/tts/config/voice-mode: one shared voice, or a voice per character. */
+export const ttsVoiceModeInputSchema = z.object({ voiceMode: ttsVoiceModeSchema });
+export type TTSVoiceModeInput = z.infer<typeof ttsVoiceModeInputSchema>;
+
+/**
+ * Give one character its own voice, or drop its rows when the voice is blank so
+ * it falls back to the default voice. Other characters' rows keep their order.
+ */
+export function setCharacterVoiceAssignment(
+  assignments: readonly TTSVoiceAssignment[] | undefined,
+  character: Pick<TTSVoiceAssignment, "characterId" | "characterName">,
+  voice: string,
+): TTSVoiceAssignment[] {
+  const rows = assignments ?? [];
+  const isOwnRow = (entry: TTSVoiceAssignment) => entry.characterId === character.characterId;
+  if (!voice.trim()) return rows.filter((entry) => !isOwnRow(entry));
+  if (!rows.some(isOwnRow)) return [...rows, { ...character, voice }];
+  return rows.map((entry) => (isOwnRow(entry) ? { ...entry, ...character, voice } : entry));
+}
 
 export const ELEVENLABS_TTS_LANGUAGE_OPTIONS = [
   { code: "", label: "Auto detect" },
@@ -139,6 +184,15 @@ const ttsConfigBaseSchema = z.object({
   autoplayGame: z.boolean().default(false),
   progressivePlayback: z.boolean().default(false),
   dialogueOnly: z.boolean().default(false),
+  skipTagContent: z.boolean().default(false),
+  skipCodeBlocks: z.boolean().default(true),
+  skipBracketedText: z.boolean().default(false),
+  /** Use a short auxiliary LLM call to separate Roleplay dialogue by speaker before autoplay. */
+  roleplaySpeakerExtractorEnabled: z.boolean().default(false),
+  /** Empty uses the connection marked as the default for agents. */
+  roleplaySpeakerExtractorConnectionId: z.string().default(""),
+  /** Ask the extractor to annotate dialogue with provider-supported emotion cues. */
+  roleplaySpeakerExtractorEmotionsEnabled: z.boolean().default(false),
   /** Stored in milliseconds for backward compatibility; the setting is configured in whole seconds. */
   dialoguePauseMs: z
     .number()
@@ -147,6 +201,8 @@ const ttsConfigBaseSchema = z.object({
     .default(TTS_DIALOGUE_PAUSE_DEFAULT_SECONDS * 1000)
     .transform(normalizeDialoguePauseMs),
   audioFormat: ttsAudioFormatSchema.default("mp3"),
+  /** How long a speech request from these settings may take. An audio connection has its own. */
+  requestTimeoutMs: z.number().default(TTS_REQUEST_TIMEOUT_MS.default).transform(resolveTtsRequestTimeoutMs),
   /** Global gate for Conversation-mode calls. Individual chats opt in separately. */
   callAudioEnabled: z.boolean().default(false),
   /** Deprecated: call transcription now uses the active conversation connection. */
@@ -198,12 +254,45 @@ export const ttsSourceProfilesSchema = z
   .default({});
 export type TTSSourceProfiles = z.infer<typeof ttsSourceProfilesSchema>;
 
+/**
+ * The card's voices and speech settings for one Audio connection (#7848). The connection keeps
+ * its own address, key and model, so a profile never holds them.
+ */
+export const ttsConnectionProfileSchema = ttsSourceProfileSchema.omit({
+  baseUrl: true,
+  apiKey: true,
+  model: true,
+  elevenLabsGameSoundEffects: true,
+  elevenLabsGameMusic: true,
+});
+export type TTSConnectionProfile = z.infer<typeof ttsConnectionProfileSchema>;
+
 export const ttsConfigSchema = ttsConfigBaseSchema.extend({
   /** Encrypted-at-rest provider fields retained independently for each TTS source. */
   sourceProfiles: ttsSourceProfilesSchema,
+  /**
+   * The Audio connection chosen as the card's Source (#7848). Empty uses the source settings above.
+   * While one is chosen, the top-level voice and speech fields belong to it, and the top-level
+   * address, key and model keep the last source's values untouched.
+   */
+  connectionId: z.string().default(""),
+  /** Voices and speech settings kept separately for each Audio connection, by connection ID. */
+  connectionProfiles: z.record(z.string(), ttsConnectionProfileSchema).default({}),
 });
 
 export type TTSConfig = z.infer<typeof ttsConfigSchema>;
+
+export function ttsConnectionProfileFromConfig(config: TTSConfig): TTSConnectionProfile {
+  const {
+    baseUrl: _baseUrl,
+    apiKey: _apiKey,
+    model: _model,
+    elevenLabsGameSoundEffects: _soundEffects,
+    elevenLabsGameMusic: _music,
+    ...profile
+  } = ttsSourceProfileFromConfig(config);
+  return profile;
+}
 
 export function ttsSourceProfileFromConfig(config: TTSConfig): TTSSourceProfile {
   return {
@@ -229,6 +318,27 @@ export function ttsSourceProfileFromConfig(config: TTSConfig): TTSSourceProfile 
 
 export const TTS_SETTINGS_KEY = "tts";
 export const TTS_API_KEY_MASK = "••••••";
+
+export const ttsRoleplaySpeakerSegmentSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("narration"),
+    text: z.string().trim().min(1).max(100_000),
+  }),
+  z.object({
+    kind: z.literal("dialogue"),
+    speaker: z.string().trim().min(1).max(120),
+    text: z.string().trim().min(1).max(100_000),
+    tone: z.string().trim().min(1).max(80).optional(),
+  }),
+]);
+export type TTSRoleplaySpeakerSegment = z.infer<typeof ttsRoleplaySpeakerSegmentSchema>;
+
+export const ttsRoleplaySpeakerExtractorResponseSchema = z.object({
+  // Up to 500 dialogue lines can produce one narration segment before, between,
+  // and after them: 500 dialogue + 501 narration segments.
+  segments: z.array(ttsRoleplaySpeakerSegmentSchema).max(1001),
+});
+export type TTSRoleplaySpeakerExtractorResponse = z.infer<typeof ttsRoleplaySpeakerExtractorResponseSchema>;
 
 /** Returned by GET /api/tts/voices */
 export interface TTSVoicesResponse {
@@ -256,3 +366,38 @@ export interface TTSModelsResponse {
   fromProvider: boolean;
   source: TTSSource;
 }
+
+// ── Speech to text ──────────────────────────────
+
+/** App-settings key for the speech-to-text server that Calls can use instead of Local Whisper. */
+export const SPEECH_TO_TEXT_SETTINGS_KEY = "speech-to-text";
+/** Sent when no model is set: the name the OpenAI transcription API and most compatible servers accept. */
+export const SPEECH_TO_TEXT_DEFAULT_MODEL = "whisper-1";
+
+/**
+ * An OpenAI-compatible speech-to-text server (POST `<baseUrl>/audio/transcriptions`), such as a
+ * self-hosted faster-whisper, Speaches, whisper.cpp or LocalAI server. While it is off or has no
+ * address, Calls keep using Local Whisper.
+ */
+export const speechToTextConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  baseUrl: z.string().trim().max(2_000).default(""),
+  /**
+   * Encrypted at rest. Responses carry TTS_API_KEY_MASK instead; sending the mask back keeps the saved key.
+   * A line break or NUL is refused: fetch would reject that header with the whole key in its error.
+   */
+  apiKey: z
+    .string()
+    .max(4_000)
+    .regex(/^[^\0\r\n]*$/u)
+    .default(""),
+  model: z.string().trim().max(200).default(""),
+  /** Optional language code such as "pl"; blank lets the server detect the language. */
+  language: z
+    .string()
+    .trim()
+    .max(16)
+    .regex(/^[A-Za-z-]*$/u)
+    .default(""),
+});
+export type SpeechToTextConfig = z.infer<typeof speechToTextConfigSchema>;

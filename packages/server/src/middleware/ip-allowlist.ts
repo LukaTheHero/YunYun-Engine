@@ -9,18 +9,22 @@
 //
 // When unset or empty, all IPs are allowed (no restriction).
 // Loopback addresses (127.0.0.1, ::1, ::ffff:127.0.0.1) are always allowed
-// so you can never lock yourself out of local access.
+// so you can never lock yourself out of local access. A reverse proxy or tunnel
+// on this machine also connects from loopback, so loopback requests carrying
+// forwarding headers count as the remote clients they relay.
 
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import {
+  getBasicAuthConfig,
   getDockerBypassMode,
   getIpAllowlist,
   getTailscaleBypassMode,
   getTrustedPrivateNetworksOverride,
   isDockerProxyAuthRequired,
   isDockerRuntime,
+  isLoopbackProxyAuthRequired,
 } from "../config/runtime-config.js";
 import { logger } from "../lib/logger.js";
 
@@ -134,7 +138,7 @@ function matchesCIDR(ipBytes: number[], cidr: CIDREntry): boolean {
 }
 
 // ── Loopback CIDRs (always allowed) ──
-const LOOPBACK_CIDRS: CIDREntry[] = [parseCIDR("127.0.0.1")!, parseCIDR("::1")!];
+const LOOPBACK_CIDRS: CIDREntry[] = [parseCIDR("127.0.0.0/8")!, parseCIDR("::1")!];
 
 // ── Specific interface CIDRs used by the Tailscale / Docker bypass ──
 // Tailscale assigns Tailnet peer IPs from the CGNAT block 100.64.0.0/10.
@@ -400,6 +404,25 @@ function getAllowlist() {
 // ── Reusable predicates (shared with basic-auth) ──
 
 /** True if the given IP string is a loopback address. */
+/**
+ * True when a base URL points at an inference server running on this machine
+ * or this LAN (llama.cpp, Ollama, vLLM, LM Studio). Such servers expose
+ * arbitrary model names that never match any provider catalog, so callers use
+ * this to decide when local-server-specific request shaping is safe.
+ */
+export function isLocalInferenceBaseUrl(baseUrl: string): boolean {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase().replace(/^\[|\]$|\.$/g, "");
+    if (hostname === "localhost" || isLoopbackIp(hostname)) return true;
+    if (hostname.endsWith(".local") || hostname.endsWith(".localhost")) return true;
+    if (hostname === "host.docker.internal" || hostname === "host.containers.internal") return true;
+    if (!hostname.includes(".") || hostname.endsWith(".internal")) return true;
+    return isNonRoutableNetworkIp(hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function isLoopbackIp(ip: string): boolean {
   const bytes = ipToBytes(ip);
   if (!bytes) return false;
@@ -407,6 +430,12 @@ export function isLoopbackIp(ip: string): boolean {
     if (matchesCIDR(bytes, lb)) return true;
   }
   return false;
+}
+
+/** True when the IP belongs to the built-in private/non-routable ranges, independent of auth configuration. */
+export function isNonRoutableNetworkIp(ip: string): boolean {
+  const bytes = ipToBytes(ip);
+  return Boolean(bytes && DEFAULT_PRIVATE_NETWORK_CIDRS.some((cidr) => matchesCIDR(bytes, cidr)));
 }
 
 /**
@@ -453,12 +482,18 @@ export function isDockerIp(ip: string): boolean {
   return matchesCIDR(bytes, DOCKER_CIDR);
 }
 
-const PROXY_FORWARDING_HEADERS = [
+/** Headers that reverse proxies and tunnels (nginx, Caddy, Traefik, cloudflared, Tailscale, ngrok) add. */
+export const PROXY_FORWARDING_HEADERS = [
   "forwarded",
   "x-forwarded-for",
   "x-real-ip",
   "x-forwarded-host",
   "x-forwarded-proto",
+  "cf-connecting-ip",
+  "true-client-ip",
+  "tailscale-user-login",
+  "tailscale-funnel-request",
+  "via",
 ] as const;
 
 function hasHeaderValue(value: string | string[] | undefined): boolean {
@@ -471,7 +506,32 @@ function hasProxyForwardingHeaders(request: Pick<FastifyRequest, "headers">): bo
   return PROXY_FORWARDING_HEADERS.some((header) => hasHeaderValue(request.headers[header]));
 }
 
-let bypassAnnounced = { tailscale: false, docker: false, dockerProxyForwarded: false };
+/**
+ * True when a loopback socket relays another client: a reverse proxy or tunnel
+ * on this machine connects from 127.0.0.1 but announces itself with forwarding
+ * headers. Such requests get the checks of a remote client, not loopback trust.
+ */
+export function isForwardedLoopbackRequest(request: Pick<FastifyRequest, "headers" | "ip">): boolean {
+  return isLoopbackIp(request.ip) && hasProxyForwardingHeaders(request) && isLoopbackProxyAuthRequired();
+}
+
+/** True when the request comes from this machine itself rather than through a local proxy. */
+export function isLoopbackRequest(request: Pick<FastifyRequest, "headers" | "ip">): boolean {
+  return isLoopbackIp(request.ip) && !isForwardedLoopbackRequest(request);
+}
+
+/**
+ * Docker Desktop, OrbStack and rootless Docker re-create published-port
+ * connections, so LAN clients reach the container from its gateway like the
+ * host's own browser. Automatic Docker trust can stand in for the no-password
+ * lockdown, but must not override a password or allowlist the operator set.
+ */
+function isAccessControlConfigured(): boolean {
+  const basicAuth = getBasicAuthConfig();
+  return Boolean(basicAuth.user && basicAuth.pass) || getAllowlist() !== null;
+}
+
+let bypassAnnounced = { tailscale: false, docker: false, dockerProxyForwarded: false, dockerAutoWithheld: false };
 
 /** Request-aware variant that can withhold Docker trust for proxy-forwarded traffic. */
 export function isTrustedInterfaceRequest(
@@ -503,13 +563,21 @@ export function isTrustedInterfaceRequest(
       dockerNetwork.containerInterfaceNames ?? dockerContainerInterfaceNames,
       parsedDockerCidrs,
     );
+  const dockerAutoWithheld = dockerMode === "auto" && dockerRuntimeMatch && isAccessControlConfigured();
+  if (dockerAutoWithheld && !bypassAnnounced.dockerAutoWithheld) {
+    logger.warn(
+      "[auth-bypass] Docker peer %s must pass Basic Auth/IP_ALLOWLIST: automatic Docker trust is off while either is configured, because Docker Desktop and OrbStack show LAN clients at the gateway address. Set BYPASS_AUTH_DOCKER=true only if every client of the published port is trusted.",
+      request.ip,
+    );
+    bypassAnnounced.dockerAutoWithheld = true;
+  }
   const dockerTrusted =
     dockerMode === "enabled"
       ? isDockerIp(request.ip) ||
         dockerRuntimeMatch ||
         (isDockerRuntime() &&
           isDockerCompatibilityNetworkIp(request.ip, dockerInterfaces, dockerGatewayIp, parsedDockerCidrs))
-      : dockerMode === "auto" && dockerRuntimeMatch;
+      : dockerMode === "auto" && dockerRuntimeMatch && !dockerAutoWithheld;
   const dockerProxyForwarded = dockerTrusted && hasProxyForwardingHeaders(request);
   if (dockerProxyForwarded && isDockerProxyAuthRequired()) return false;
   if (dockerProxyForwarded) {
@@ -565,9 +633,12 @@ export function ipAllowlistHook(request: FastifyRequest, reply: FastifyReply, do
     return;
   }
 
-  // Loopback is always allowed
-  for (const lb of LOOPBACK_CIDRS) {
-    if (matchesCIDR(bytes, lb)) return done();
+  // Loopback is always allowed, except a local proxy relaying another client:
+  // its loopback address says nothing about who that client is.
+  if (isLoopbackIp(ip)) {
+    if (isLoopbackRequest(request)) return done();
+    reply.status(403).send({ error: "Forbidden" });
+    return;
   }
 
   // Trusted direct Tailscale / Docker connections are treated like loopback —

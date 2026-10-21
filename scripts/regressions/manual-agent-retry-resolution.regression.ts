@@ -12,10 +12,27 @@ import {
 import { resolveAgentGenerationTools } from "../../packages/server/src/services/generation/tool-resolution-runtime.js";
 import type { SpotifyRuntimeAgent } from "../../packages/server/src/services/generation/spotify-agent-runtime.js";
 import {
+  resolveLorebookKeeperRetryAnchor,
   resolveRetryAgentContextPolicy,
   resolveRetryAgentPhaseToolInputs,
   validateSpotifyRetryPlayback,
 } from "../../packages/server/src/routes/generate/retry-agents-route.js";
+
+assert.deepEqual(
+  [
+    { id: "older-message", activeSwipeIndex: 1 },
+    { id: "newer-message", activeSwipeIndex: 3 },
+    { id: "null-message", activeSwipeIndex: null },
+    { id: "default-message" },
+  ].map(resolveLorebookKeeperRetryAnchor),
+  [
+    { messageId: "older-message", swipeIndex: 1 },
+    { messageId: "newer-message", swipeIndex: 3 },
+    { messageId: "null-message", swipeIndex: 0 },
+    { messageId: "default-message", swipeIndex: 0 },
+  ],
+  "Lorebook Keeper backfill results preserve each target message and swipe anchor",
+);
 
 const manifests = [
   {
@@ -60,6 +77,16 @@ const retryRouteSource = readFileSync(
   new URL("../../packages/server/src/routes/generate/retry-agents-route.ts", import.meta.url),
   "utf8",
 );
+assert.match(
+  retryRouteSource,
+  /`read-behind:\$\{entry\.resolved\.batchContextKey \?\? entry\.resolved\.id\}`/u,
+  "custom lorebook retries targeting the same historical message remain batchable",
+);
+assert.match(
+  retryRouteSource,
+  /messageId:\s*historicalTarget\?\.messageId[\s\S]*swipeIndex:\s*historicalTarget\?\.swipeIndex/u,
+  "custom lorebook retry events must identify their historical message and swipe",
+);
 const toolRuntimeSource = readFileSync(
   new URL("../../packages/server/src/services/generation/tool-resolution-runtime.ts", import.meta.url),
   "utf8",
@@ -84,14 +111,14 @@ const retryToolWiringStart = retryRouteSource.indexOf("const phaseToolInputs = r
 const retryToolWiringEnd = retryRouteSource.indexOf("const retryIllustratorPromptAgent", retryToolWiringStart);
 const retryToolWiringSource = retryRouteSource.slice(retryToolWiringStart, retryToolWiringEnd);
 assert.ok(retryToolWiringStart >= 0 && retryToolWiringEnd > retryToolWiringStart);
-assert.match(retryToolWiringSource, /selectedTargetMessage:\s*lastAssistant/);
+assert.match(retryToolWiringSource, /selectedTargetMessage:\s*rangeTarget \?\? lastAssistant/);
 assert.match(retryToolWiringSource, /await resolveAgentGenerationTools\(\{/);
 assert.match(retryToolWiringSource, /if \(activeMusicPlayerSource === null\)/);
 assert.match(retryToolWiringSource, /!spotifyToolNames\.has\(toolName\)/);
 assert.match(retryToolWiringSource, /gameSpotifyMusicEnabled:\s*activeMusicPlayerSource !== null/);
 assert.match(
   retryToolWiringSource,
-  /emitMetadataPatch:\s*\(patch\)\s*=>\s*sendSseEvent\(reply,\s*\{\s*type:\s*"metadata_patch",\s*data:\s*patch\s*\}\)/,
+  /emitMetadataPatch:\s*\(patch\)\s*=>\s*\{[\s\S]{0,120}assertRetrySetupActive\(\);[\s\S]{0,120}sendSseEvent\(reply,\s*\{\s*type:\s*"metadata_patch",\s*data:\s*patch\s*\}\);[\s\S]{0,40}\}/,
 );
 assert.match(retryToolWiringSource, /observeSpotifyPlaybackBeforePlay:\s*true/);
 
@@ -442,6 +469,74 @@ const callTool = async (agent: ResolvedAgent, name: string, args: Record<string,
     }),
   ) as Record<string, unknown>;
 };
+
+const idempotentWriter = makeAgent("idempotent-writer", "custom-idempotent-writer", {
+  enabledTools: ["save_lorebook_entry"],
+  writableLorebookId: "book-write",
+});
+let storedWriterEntry: Record<string, unknown> | null = null;
+let writerCreateCount = 0;
+let writerPersistenceCount = 0;
+await resolveAgentGenerationTools({
+  requestBody: {},
+  chatId: "retry-chat",
+  chatMetadata: { ...metadata, agentWriteApprovalRequired: false },
+  chats: {
+    getMessage: async () => null,
+    updateMessageContent: async () => ({}),
+    patchMetadata: async (_chatId, patcher) => ({ metadata: await patcher(metadata) }),
+  },
+  agentsStore: createSpotifyAgentsStore([]),
+  customToolsStore: { listEnabled: async () => [] },
+  lorebooksStore: {
+    listActiveEntries: async () => [],
+    getById: async () => ({ id: "book-write", name: "Writable" }),
+    listEntries: async () => (storedWriterEntry ? [storedWriterEntry] : []),
+    createEntry: async (entry) => {
+      writerPersistenceCount += 1;
+      writerCreateCount += 1;
+      storedWriterEntry = { ...entry, id: "entry-1" };
+      return storedWriterEntry;
+    },
+    updateEntry: async () => {
+      writerPersistenceCount += 1;
+      return storedWriterEntry;
+    },
+  },
+  resolvedAgents: [idempotentWriter],
+  enabledConfigs: [],
+  promptCharacterIds: [],
+  personaId: null,
+  activeLorebookIds: [],
+  excludedLorebookIds: [],
+  excludedSourceAgentIds: [],
+  gameState: null,
+  gameSpotifyMusicEnabled: false,
+  agentContext: historicalContext,
+  emitMetadataPatch: () => {},
+});
+const createWriterEntry = { name: "Timeline", content: "Turn seven", keys: ["timeline"], mode: "create" };
+assert.equal((await callTool(idempotentWriter, "save_lorebook_entry", createWriterEntry)).action, "created");
+assert.equal((await callTool(idempotentWriter, "save_lorebook_entry", createWriterEntry)).action, "exists");
+assert.equal(writerCreateCount, 1, "Retrying a create-mode lorebook write must not duplicate the entry");
+assert.equal(writerPersistenceCount, 1, "Retrying a create-mode lorebook write must persist only once");
+
+assert.match(
+  retryRouteSource,
+  /isAgentWriteApprovalEnvelope\(result\.data\)[\s\S]*onLorebookEffectStatus\?\.\(result\.agentId, "pending_approval"\)/u,
+  "Approval-required lorebook backfill must remain pending without advancing its cursor",
+);
+assert.match(
+  retryRouteSource,
+  /catch \(err\) \{[\s\S]*onLorebookEffectStatus\?\.\(result\.agentId, "failed"\)[\s\S]*Failed to apply lorebook update/u,
+  "Failed lorebook persistence must report failure without advancing its cursor",
+);
+assert.match(
+  retryRouteSource,
+  /customLorebookBackfillEffectStatus === "applied"[\s\S]*CUSTOM_LOREBOOK_BACKFILL_CURSOR_KEY/u,
+  "Custom lorebook backfill cursor advances only after durable application",
+);
+
 const rollResult = await callTool(composedAgent, "roll_dice", { notation: "1d2" });
 assert.equal(rollResult.notation, "1d2", "built-in collision handling must preserve the built-in implementation");
 assert.equal(typeof rollResult.total, "number");
@@ -598,7 +693,11 @@ assert.equal(
   "a tool-free YouTube Music DJ must not load custom or built-in tool definitions",
 );
 assert.equal(youtubeToolFreeRuntime.toolDefs, undefined);
-assert.equal(youtubeMusicDjWithoutTools.toolContext, undefined, "a tool-free YouTube Music DJ must not receive tool context");
+assert.equal(
+  youtubeMusicDjWithoutTools.toolContext,
+  undefined,
+  "a tool-free YouTube Music DJ must not receive tool context",
+);
 
 const disabledSpotifyAgent = makeAgent("spotify-disabled", "spotify", { enabledTools: [] });
 let disabledSpotifyCredentialReads = 0;
@@ -749,7 +848,11 @@ try {
   globalThis.fetch = originalFetch;
 }
 assert.deepEqual(unexpectedSpotifyRequests, [], "Spotify boundary requests must stay inside the expected fake API");
-assert.deepEqual(spotifyBoundaryViolations, [], "Spotify play requests must preserve the approved single-track payload");
+assert.deepEqual(
+  spotifyBoundaryViolations,
+  [],
+  "Spotify play requests must preserve the approved single-track payload",
+);
 assert.deepEqual(
   spotifyBoundaryEvents,
   [
@@ -820,5 +923,22 @@ const fallbackResult = await validateSpotifyRetryPlayback(
 assert.equal(fallbackResult.success, true);
 assert.equal((fallbackResult.data as Record<string, unknown>).deterministicFallbackApplied, true);
 assert.deepEqual(fallbackCalls, ["spotify_get_current_playback", "spotify_get_playlist_tracks", "spotify_play"]);
+
+// The metadata tool callback must not reattach a summary excluded from Roleplay agents.
+historicalContext.chatMode = "roleplay";
+await runtime.updateChatMetadataForTools({ ...metadata });
+assert.equal(historicalContext.chatSummary, null, "unset Roleplay preference excludes summaries after tool refresh");
+await runtime.updateChatMetadataForTools({ ...metadata, attachSummariesToAgents: false });
+assert.equal(historicalContext.chatSummary, null);
+await runtime.updateChatMetadataForTools({ ...metadata, summary: "Updated stored summary" });
+assert.equal(metadata.summary, "Updated stored summary", "tools can still save summaries");
+assert.equal(historicalContext.chatSummary, null, "a later metadata write cannot restore excluded context");
+await runtime.updateChatMetadataForTools({ ...metadata, attachSummariesToAgents: true });
+assert.equal(historicalContext.chatSummary, "Updated stored summary");
+for (const mode of ["conversation", "game"] as const) {
+  historicalContext.chatMode = mode;
+  await runtime.updateChatMetadataForTools({ ...metadata, attachSummariesToAgents: false });
+  assert.equal(historicalContext.chatSummary, "Updated stored summary", `${mode} behavior stays unchanged`);
+}
 
 console.info("Manual Agent retry settings/tool parity regression passed.");

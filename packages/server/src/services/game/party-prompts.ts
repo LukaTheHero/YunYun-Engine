@@ -4,6 +4,7 @@
 
 import type { PartyArc } from "@marinara-engine/shared";
 import type { CharacterSpriteInfo } from "./sprite.service.js";
+import { TTS_EMOTION_CUE_GUIDANCE } from "../tts-emotion-guidance.js";
 
 export interface PartyPromptContext {
   /** Character cards for each party member, optionally enriched with game-specific class/ability info. */
@@ -16,6 +17,7 @@ export interface PartyPromptContext {
   partyArcs?: PartyArc[];
   /** Available sprite expressions per character */
   characterSprites?: CharacterSpriteInfo[];
+  ttsEmotionIndicatorsEnabled?: boolean;
 }
 
 /** Build the system prompt for the Party Player agent. */
@@ -51,7 +53,7 @@ export function buildPartySystemPrompt(ctx: PartyPromptContext): string {
     `Dialogue types (the [expression] tag is MANDATORY for main, side, and whisper):`,
     `  [Name] [main] [expression]: "Spoken dialogue." — Primary dialogue. Shown in the VN dialogue box with the character's avatar and expression sprite.`,
     `  [Name] [side] [expression]: "Side remark." — Quick quips, overhearing, comedic interjections, or butt-in dialogue during someone else's main line. Appears as a floating box above the main dialogue.`,
-    `  [Name] [action] [expression]: Description of physical action or reaction. — Narrates what the character physically does. Always name the character ("Dottore adjusts his mask", NOT "adjusts his mask"). NO asterisks. Also use for brief non-verbal beats.`,
+    `  [Name] [action] [expression]: Description of physical action or reaction. — Narrates what the character physically does. Always name the character ("Dominic adjusts his mask", NOT "adjusts his mask"). NO asterisks. Also use for brief non-verbal beats.`,
     `  [Name] [thought] [expression]: Internal monologue... — Private thoughts the character has.`,
     `  [Name] [whisper:TargetName] [expression]: "Whispered text." — A quiet aside directed at a specific character.`,
     ``,
@@ -71,11 +73,11 @@ export function buildPartySystemPrompt(ctx: PartyPromptContext): string {
       : []),
     ``,
     `Example turn:`,
-    `[Dottore] [main] [smirk]: "I'm not stingy. Unlike some bankers in this party."`,
-    `[Pantalone] [side] [annoyed]: "I can hear you, you know?"`,
+    `[Dominic] [main] [smirk]: "I'm not stingy. Unlike some bankers in this party."`,
+    `[Peregrine] [side] [annoyed]: "I can hear you, you know?"`,
     `[Scaramouche] [action] [eye_roll]: Scaramouche rolls his eyes.`,
     `[Columbina] [whisper:${ctx.playerName}] [amused]: "They do this every time."`,
-    `[Dottore] [action] [neutral]: Dottore adjusts his mask and steps toward the artifact with clinical interest.`,
+    `[Dominic] [action] [neutral]: Dominic adjusts his mask and steps toward the artifact with clinical interest.`,
     ``,
     `Rules:`,
     `- Use [main] for key dialogue that advances the scene`,
@@ -87,6 +89,11 @@ export function buildPartySystemPrompt(ctx: PartyPromptContext): string {
     `- Not every character needs to speak every turn — only those who would naturally react`,
     `- In [action] lines, ALWAYS address the player as "you" when describing something done to/around the player (e.g. "He gestures vaguely at your entire being")`,
     `- Dialogue text in [main], [side], and [whisper] should be in quotes`,
+    ...(ctx.ttsEmotionIndicatorsEnabled
+      ? [
+          `- Spoken dialogue text only: ${TTS_EMOTION_CUE_GUIDANCE} Put vocal cues inside the quoted dialogue after the colon; keep the [Name] [type] [expression]: prefix unchanged.`,
+        ]
+      : []),
     `- NEVER generate dialogue lines for the player (${ctx.playerName}). You control only party members, not the player.`,
     `</party_dialogue_format>`,
   );

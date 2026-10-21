@@ -11,7 +11,11 @@
 // parseNarrationSegments segment-indexing logic just enough to do that.
 // ──────────────────────────────────────────────
 
-import { formatSkillCheckResultSummary, type SkillCheckResult } from "@marinara-engine/shared";
+import {
+  formatSkillCheckResultSummary,
+  stripGameBranchDelimiters,
+  type SkillCheckResult,
+} from "@marinara-engine/shared";
 
 /**
  * Strip GM command tags from message content.
@@ -20,7 +24,16 @@ import { formatSkillCheckResultSummary, type SkillCheckResult } from "@marinara-
  * are preserved as plain text because the roll result is canonical history.
  */
 export function stripGmCommandTags(content: string): string {
-  let text = stripSimpleGmTags(preserveResolvedSkillCheckResults(content));
+  // The one-request dice branch delimiters, which NOTHING below reaches. `readGmTagHead`
+  // requires the character after the name to be `:` or `]`, and `[on success]` has a
+  // space there, so the head read returns null and `REMOVABLE_GM_TAGS` is skipped before
+  // it is ever consulted; `[/branch]` is not a `[name:` or `[name]` head at all, and the
+  // dangling-closer sweep only clears lines that are ENTIRELY closers. Adding a name to
+  // the set below does not strip either one — only this literal pass does. The prose
+  // between the delimiters is kept: a block only reaches a stripper when the chance pass
+  // never ran for it, so what this is looking at is narration the player already read.
+  let text = stripGameBranchDelimiters(content);
+  text = stripSimpleGmTags(preserveResolvedSkillCheckResults(text));
   // Catch-all for unknown [tag: value] (but NOT [Name] or [Note:/Book:])
   text = stripUnknownGmTags(text);
   text = stripDanglingTagClosers(text);
@@ -50,6 +63,9 @@ const REMOVABLE_GM_TAGS = new Set([
   "dice",
   "choices",
   "map_update",
+  // `[branch: id]` is the one branch delimiter that IS an ordinary `[name:` head, so it is
+  // the one the walk below can reach. The other three are stripped above.
+  "branch",
 ]);
 const VALUELESS_GM_TAGS = new Set(["party-turn", "party-chat"]);
 const BALANCED_GM_TAGS = new Set(["choices", "map_update"]);
@@ -64,21 +80,13 @@ interface GmTagHead {
 function isAsciiWordCharacter(character: string | undefined): boolean {
   if (!character) return false;
   const code = character.charCodeAt(0);
-  return (
-    (code >= 48 && code <= 57) ||
-    (code >= 65 && code <= 90) ||
-    code === 95 ||
-    (code >= 97 && code <= 122)
-  );
+  return (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || code === 95 || (code >= 97 && code <= 122);
 }
 
 /** Parse only the name immediately after `[`, so malformed nested input stays linear. */
 function readGmTagHead(content: string, start: number, allowHyphen: boolean): GmTagHead | null {
   let cursor = start + 1;
-  while (
-    isAsciiWordCharacter(content[cursor]) ||
-    (allowHyphen && content[cursor] === "-")
-  ) {
+  while (isAsciiWordCharacter(content[cursor]) || (allowHyphen && content[cursor] === "-")) {
     cursor++;
   }
   if (cursor === start + 1 || (content[cursor] !== ":" && content[cursor] !== "]")) return null;
@@ -250,7 +258,8 @@ function parseResolvedSkillCheckBody(body: string): SkillCheckResult | null {
   const modeValue = values.get("mode")?.trim().toLowerCase();
   const rollMode: SkillCheckResult["rollMode"] =
     modeValue === "advantage" ? "advantage" : modeValue === "disadvantage" ? "disadvantage" : "normal";
-  const resolution: SkillCheckResult["resolution"] = values.get("resolution")?.trim().toLowerCase() === "successes" ? "successes" : "sum";
+  const resolution: SkillCheckResult["resolution"] =
+    values.get("resolution")?.trim().toLowerCase() === "successes" ? "successes" : "sum";
   const explicitUsedRoll = Number.parseInt(values.get("used") ?? "", 10);
   const inferredRollFromTotal = total - modifier;
   const usedRoll = Number.isFinite(explicitUsedRoll)
@@ -553,6 +562,45 @@ export function applySegmentEdits(
   return anyApplied ? output.join("\n\n") : content;
 }
 
+function collectSegmentOverlays(chatMeta: Record<string, unknown>) {
+  const editsByMessage = new Map<string, Record<number, SegmentEditValue>>();
+  const deletesByMessage = new Map<string, Set<number>>();
+  for (const [key, value] of Object.entries(chatMeta)) {
+    const isEdit = key.startsWith("segmentEdit:");
+    const isDelete = key.startsWith("segmentDelete:");
+    if (!isEdit && !isDelete) continue;
+    if (isDelete && value !== true && value !== "true") continue;
+    const parts = key.slice(isEdit ? "segmentEdit:".length : "segmentDelete:".length);
+    const lastColon = parts.lastIndexOf(":");
+    if (lastColon < 0) continue;
+    const messageId = parts.slice(0, lastColon);
+    const segmentIndex = Number.parseInt(parts.slice(lastColon + 1), 10);
+    if (Number.isNaN(segmentIndex)) continue;
+
+    if (isEdit) {
+      const edit = normalizeSegmentEditValue(value);
+      if (!edit) continue;
+      const edits = editsByMessage.get(messageId) ?? {};
+      edits[segmentIndex] = edit;
+      editsByMessage.set(messageId, edits);
+    } else {
+      const deleted = deletesByMessage.get(messageId) ?? new Set<number>();
+      deleted.add(segmentIndex);
+      deletesByMessage.set(messageId, deleted);
+    }
+  }
+  return { editsByMessage, deletesByMessage };
+}
+
+export function applyMessageSegmentEdits(
+  content: string,
+  chatMeta: Record<string, unknown>,
+  messageId: string,
+): string {
+  const { editsByMessage, deletesByMessage } = collectSegmentOverlays(chatMeta);
+  return applySegmentEdits(content, editsByMessage.get(messageId) ?? {}, deletesByMessage.get(messageId) ?? new Set());
+}
+
 /**
  * Collect segment edit overlays from chat metadata and apply them to the
  * corresponding messages.
@@ -566,41 +614,7 @@ export function applyAllSegmentEdits(
   chatMeta: Record<string, unknown>,
   allDbMessages: Array<{ id: string; role: string }>,
 ): void {
-  // Collect edits grouped by messageId
-  const editsByMessage = new Map<string, Record<number, SegmentEditValue>>();
-  const deletesByMessage = new Map<string, Set<number>>();
-  for (const [key, value] of Object.entries(chatMeta)) {
-    const isEdit = key.startsWith("segmentEdit:");
-    const isDelete = key.startsWith("segmentDelete:");
-    if (!isEdit && !isDelete) continue;
-    if (isDelete && value !== true && value !== "true") continue;
-    // Format: segment(Edit|Delete):messageId:segmentIndex
-    const parts = key.slice(isEdit ? "segmentEdit:".length : "segmentDelete:".length);
-    const lastColon = parts.lastIndexOf(":");
-    if (lastColon < 0) continue;
-    const messageId = parts.slice(0, lastColon);
-    const segIdx = parseInt(parts.slice(lastColon + 1), 10);
-    if (isNaN(segIdx)) continue;
-
-    if (isEdit) {
-      const edit = normalizeSegmentEditValue(value);
-      if (!edit) continue;
-      let edits = editsByMessage.get(messageId);
-      if (!edits) {
-        edits = {};
-        editsByMessage.set(messageId, edits);
-      }
-      edits[segIdx] = edit;
-      continue;
-    }
-
-    let deleted = deletesByMessage.get(messageId);
-    if (!deleted) {
-      deleted = new Set<number>();
-      deletesByMessage.set(messageId, deleted);
-    }
-    deleted.add(segIdx);
-  }
+  const { editsByMessage, deletesByMessage } = collectSegmentOverlays(chatMeta);
 
   if (editsByMessage.size === 0 && deletesByMessage.size === 0) return;
 

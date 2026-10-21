@@ -11,15 +11,16 @@ import { useTranslation as useUiTranslation } from "react-i18next";
 interface Props {
   open: boolean;
   onClose: () => void;
+  defaultName?: string;
 }
 
-export function CreateCharacterModal({ open, onClose }: Props) {
+export function CreateCharacterModal({ open, onClose, defaultName = "" }: Props) {
   const { t: localizeUi } = useUiTranslation();
   const createCharacter = useCreateCharacter();
   const uploadAvatar = useUploadAvatar();
   const openCharacterDetail = useUIStore((s) => s.openCharacterDetail);
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(defaultName);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,7 +87,12 @@ export function CreateCharacterModal({ open, onClose }: Props) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={localizeUi("ui.modals.createcharactermodal.createCharacter")} width="max-w-sm">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={localizeUi("ui.modals.createcharactermodal.createCharacter")}
+      width="max-w-sm"
+    >
       <div className="flex flex-col items-center gap-4">
         {/* Avatar picker */}
         <button
@@ -107,7 +113,9 @@ export function CreateCharacterModal({ open, onClose }: Props) {
 
         {/* Name */}
         <div className="w-full">
-          <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">{localizeUi("ui.modals.createcharactermodal.name")}</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--muted-foreground)]">
+            {localizeUi("ui.modals.createcharactermodal.name")}
+          </label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -128,7 +136,9 @@ export function CreateCharacterModal({ open, onClose }: Props) {
               reset();
             }}
             className="rounded-lg px-4 py-2 text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)]"
-          >{localizeUi("chat.delete.dialog.cancel")}</button>
+          >
+            {localizeUi("chat.delete.dialog.cancel")}
+          </button>
           <button
             onClick={handleCreate}
             disabled={!name.trim() || createCharacter.isPending}
@@ -138,7 +148,9 @@ export function CreateCharacterModal({ open, onClose }: Props) {
               <Loader2 size="0.75rem" className="animate-spin" />
             ) : (
               <Sparkles size="0.75rem" />
-            )}{localizeUi("ui.modals.createcharactermodal.create")}</button>
+            )}
+            {localizeUi("ui.modals.createcharactermodal.create")}
+          </button>
         </div>
       </div>
     </Modal>

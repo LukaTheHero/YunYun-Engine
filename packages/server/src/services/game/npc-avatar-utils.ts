@@ -45,13 +45,9 @@ export function nameLookupWithoutLeadingPrefix(normalizedName: string): string {
 function primaryAvatarLookupAliases(value: string): string[] {
   const normalized = normalizeAvatarLookupName(value);
   const withoutLeadingPrefix = nameLookupWithoutLeadingPrefix(normalized);
-  return Array.from(
-    new Set([
-      value.normalize("NFKC").trim().toLowerCase(),
-      normalized,
-      withoutLeadingPrefix,
-    ]),
-  ).filter(Boolean);
+  return Array.from(new Set([value.normalize("NFKC").trim().toLowerCase(), normalized, withoutLeadingPrefix])).filter(
+    Boolean,
+  );
 }
 
 function avatarLookupAliases(value: string): string[] {
@@ -178,6 +174,21 @@ export function sanitizeGameNpcAvatarUrls(npcs: GameNpc[]): GameNpc[] {
   let changed = false;
   const sanitized = npcs.map((npc) => {
     const { met: _met, ...withoutMet } = npc as GameNpc & { met?: unknown };
+    if (typeof withoutMet.avatarUrl === "string" && /^https?:\/\//i.test(withoutMet.avatarUrl)) {
+      try {
+        const url = new URL(withoutMet.avatarUrl);
+        if (
+          (url.hostname === "localhost" || url.hostname === "[::1]" || /^127\./.test(url.hostname)) &&
+          /^\/api\/avatars\/(?:npc|file)\//.test(url.pathname)
+        ) {
+          // Legacy local URLs must resolve on the device viewing this server, including over LAN.
+          withoutMet.avatarUrl = `${url.pathname}${url.search}${url.hash}`;
+          changed = true;
+        }
+      } catch {
+        // Leave an unparseable URL alone; it is not a known local avatar resource.
+      }
+    }
     const hasLegacyMet = "met" in npc;
     if (!isInvalidBuiltInMariNpcAvatar(withoutMet)) {
       if (hasLegacyMet) changed = true;

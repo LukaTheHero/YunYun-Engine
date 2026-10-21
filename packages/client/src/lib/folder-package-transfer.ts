@@ -1,4 +1,4 @@
-import { getFolderImportEntries, isJsonRecord, sanitizeFolderSegment } from "@marinara-engine/shared";
+import { getFolderImportEntries, isJsonRecord } from "@marinara-engine/shared";
 
 export type PackageTextFile = {
   path: string;
@@ -35,22 +35,14 @@ export function getPackagePathDirname(path: string) {
   return slashIndex >= 0 ? normalized.slice(0, slashIndex) : "";
 }
 
-export function reservePackageFolderSegment(value: string, fallback: string, usedSegments: Set<string>) {
-  const baseSegment = sanitizeFolderSegment(value, fallback);
-  let segment = baseSegment;
-  let suffix = 2;
-  while (usedSegments.has(segment.toLowerCase())) {
-    segment = `${baseSegment}-${suffix}`;
-    suffix++;
-  }
-  usedSegments.add(segment.toLowerCase());
-  return segment;
-}
+export { reservePackageFolderSegment } from "@marinara-engine/shared";
 
 export async function readTextFilesFromFileList(fileList: FileList | null): Promise<PackageTextFile[]> {
   const result: PackageTextFile[] = [];
   for (const file of Array.from(fileList ?? [])) {
-    const relativePath = normalizePackagePath((file as File & { webkitRelativePath?: string }).webkitRelativePath ?? "");
+    const relativePath = normalizePackagePath(
+      (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? "",
+    );
     const path = relativePath || normalizePackagePath(file.name);
     if (!path || !PACKAGE_TEXT_FILE_RE.test(path)) continue;
     result.push({ path, text: await file.text() });
@@ -99,9 +91,7 @@ export function collectFolderPackageEntries(
 
 export function resolvePackageTextPaths(resolveTextFile: (path: unknown) => string | null, value: unknown) {
   const paths = Array.isArray(value) ? value : [value];
-  const parts = paths
-    .map((path) => resolveTextFile(path))
-    .filter((text): text is string => typeof text === "string");
+  const parts = paths.map((path) => resolveTextFile(path)).filter((text): text is string => typeof text === "string");
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
 

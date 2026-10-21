@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState, type ChangeEvent } from "react";
+import { useTranslation as useUiTranslation } from "react-i18next";
+import { toast } from "sonner";
 import type {
   CharacterStat,
   CustomTrackerField,
-  InventoryItem,
   PlayerStats,
   PresentCharacter,
   QuestProgress,
@@ -10,15 +11,14 @@ import type {
 } from "@marinara-engine/shared";
 import {
   characterTrackerLockPrefix,
-  inventoryItemTrackerLockPrefix,
   normalizeTrackerHiddenFields,
   removeTrackerCharacterLocks,
-  removeTrackerFieldLockPrefix,
   removeTrackerQuestLocks,
   renameTrackerFieldLockPrefix,
 } from "@marinara-engine/shared";
 import { api } from "../../../lib/api-client";
 import { useGameStateStore } from "../../../stores/game-state.store";
+import { useUIStore } from "../../../stores/ui.store";
 import type { GameStatePatchField } from "../../../hooks/use-game-state-patcher";
 import { getCharacterFeatureKey, resolveCharacterTargetIndex } from "../lib/character-tracker-data";
 import { useTrackerFieldLockUpdater } from "./use-tracker-field-lock-updater";
@@ -63,11 +63,7 @@ function findUniqueNamedIndex<T extends { name?: string }>(items: T[], item: T |
   return matches.length === 1 ? matches[0]!.index : -1;
 }
 
-function resolveIndexedMutationTarget<T extends { name?: string }>(
-  liveItems: T[],
-  renderedItems: T[],
-  index: number,
-) {
+function resolveIndexedMutationTarget<T extends { name?: string }>(liveItems: T[], renderedItems: T[], index: number) {
   const renderedItem = renderedItems[index];
   const namedIndex = findUniqueNamedIndex(liveItems, renderedItem);
   const targetIndex = namedIndex >= 0 ? namedIndex : index;
@@ -83,7 +79,9 @@ function reconcileListUpdate<T extends { name?: string }>(liveItems: T[], render
   }
 
   if (updatedItems.length === renderedItems.length - 1) {
-    const removedIndex = renderedItems.findIndex((renderedItem, index) => !shallowRecordEqual(renderedItem, updatedItems[index]));
+    const removedIndex = renderedItems.findIndex(
+      (renderedItem, index) => !shallowRecordEqual(renderedItem, updatedItems[index]),
+    );
     const fallbackIndex = removedIndex >= 0 ? removedIndex : renderedItems.length - 1;
     const { targetIndex } = resolveIndexedMutationTarget(liveItems, renderedItems, fallbackIndex);
     if (targetIndex < 0) return liveItems;
@@ -91,7 +89,9 @@ function reconcileListUpdate<T extends { name?: string }>(liveItems: T[], render
   }
 
   if (updatedItems.length === renderedItems.length) {
-    const changedIndex = updatedItems.findIndex((updatedItem, index) => !shallowRecordEqual(updatedItem, renderedItems[index]));
+    const changedIndex = updatedItems.findIndex(
+      (updatedItem, index) => !shallowRecordEqual(updatedItem, renderedItems[index]),
+    );
     if (changedIndex < 0) return liveItems;
     const { renderedItem, targetIndex } = resolveIndexedMutationTarget(liveItems, renderedItems, changedIndex);
     if (targetIndex < 0) return updatedItems;
@@ -110,7 +110,6 @@ function reconcileListUpdate<T extends { name?: string }>(liveItems: T[], render
 export function useTrackerMutations({
   activeChatId,
   customFields,
-  inventory,
   personaStats,
   presentCharacters,
   quests,
@@ -120,7 +119,6 @@ export function useTrackerMutations({
 }: {
   activeChatId: string | null;
   customFields: CustomTrackerField[];
-  inventory: InventoryItem[];
   personaStats: CharacterStat[];
   presentCharacters: PresentCharacter[];
   quests: QuestProgress[];
@@ -128,6 +126,7 @@ export function useTrackerMutations({
   patchPlayerStats: (field: keyof PlayerStats, value: unknown) => void;
   removeFeaturedCharacterCard: (key: string) => void;
 }) {
+  const { t: localizeUi } = useUiTranslation();
   const [avatarUpload, setAvatarUpload] = useState<{ characterId: string; index: number } | null>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const avatarUploadSerialRef = useRef(0);
@@ -154,16 +153,12 @@ export function useTrackerMutations({
     [presentCharacters, readCurrentGameState],
   );
   const readPlayerStats = useCallback(() => readCurrentGameState()?.playerStats ?? null, [readCurrentGameState]);
-  const readInventory = useCallback(() => readPlayerStats()?.inventory ?? inventory, [inventory, readPlayerStats]);
   const readQuests = useCallback(() => readPlayerStats()?.activeQuests ?? quests, [quests, readPlayerStats]);
   const readPersonaStats = useCallback(
     () => readCurrentGameState()?.personaStats ?? personaStats,
     [personaStats, readCurrentGameState],
   );
-  const readCustomFields = useCallback(
-    () => readPlayerStats()?.customTrackerFields ?? [],
-    [readPlayerStats],
-  );
+  const readCustomFields = useCallback(() => readPlayerStats()?.customTrackerFields ?? [], [readPlayerStats]);
 
   const openAvatarUpload = useCallback(
     (index: number) => {
@@ -173,6 +168,20 @@ export function useTrackerMutations({
       avatarFileInputRef.current?.click();
     },
     [presentCharacters, readPresentCharacters],
+  );
+
+  /** Point the character at a saved portrait, unless a newer upload or generation took over. */
+  const saveAvatarPath = useCallback(
+    (characterId: string, fallbackIndex: number, token: number, avatarPath: string) => {
+      if (avatarUploadTokenByCharacterRef.current.get(characterId) !== token) return;
+      const latestCharacters = readPresentCharacters();
+      const targetIndex = resolveCharacterTargetIndex(latestCharacters, characterId, fallbackIndex);
+      if (targetIndex < 0) return;
+      const nextCharacters = [...latestCharacters];
+      nextCharacters[targetIndex] = { ...latestCharacters[targetIndex]!, avatarPath };
+      patchField("presentCharacters", nextCharacters);
+    },
+    [patchField, readPresentCharacters],
   );
 
   const handleAvatarUpload = useCallback(
@@ -203,15 +212,7 @@ export function useTrackerMutations({
             name: character.name,
             avatar: dataUrl,
           });
-          if (avatarUploadTokenByCharacterRef.current.get(characterId) !== uploadToken) return;
-
-          const latestCharacters = readPresentCharacters();
-          const targetIndex = resolveCharacterTargetIndex(latestCharacters, characterId, fallbackIndex);
-          if (targetIndex < 0) return;
-
-          const nextCharacters = [...latestCharacters];
-          nextCharacters[targetIndex] = { ...latestCharacters[targetIndex]!, avatarPath: response.avatarPath };
-          patchField("presentCharacters", nextCharacters);
+          saveAvatarPath(characterId, fallbackIndex, uploadToken, response.avatarPath);
         } catch {
           // Match the original HUD widget behavior: failed avatar uploads leave tracker data unchanged.
         } finally {
@@ -227,7 +228,42 @@ export function useTrackerMutations({
       };
       reader.readAsDataURL(file);
     },
-    [activeChatId, patchField, readPresentCharacters],
+    [activeChatId, readPresentCharacters, saveAvatarPath],
+  );
+
+  /** A new tracker portrait from the look, and the outfit when asked; the old one stays if this fails. */
+  const generateAvatar = useCallback(
+    async (index: number, includeOutfit: boolean) => {
+      const characterId = presentCharacters[index]?.characterId ?? readPresentCharacters()[index]?.characterId;
+      if (!activeChatId || !characterId) return;
+      const currentCharacters = readPresentCharacters();
+      const character = currentCharacters[resolveCharacterTargetIndex(currentCharacters, characterId, index)];
+      if (!character) return;
+
+      const token = avatarUploadSerialRef.current + 1;
+      avatarUploadSerialRef.current = token;
+      avatarUploadTokenByCharacterRef.current.set(characterId, token);
+      try {
+        const response = await api.post<{ avatarPath: string }>(`/avatars/npc/${activeChatId}/generate`, {
+          name: character.name,
+          // Tracker fields are raw model output; send only text.
+          appearance: typeof character.appearance === "string" ? character.appearance : null,
+          outfit: typeof character.outfit === "string" ? character.outfit : null,
+          includeOutfit,
+          debugMode: useUIStore.getState().debugMode,
+        });
+        saveAvatarPath(characterId, index, token, response.avatarPath);
+      } catch (error) {
+        toast.error(localizeUi("ui.trackerPanel.featuredcharacterportrait.newPortraitFailed"), {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      } finally {
+        if (avatarUploadTokenByCharacterRef.current.get(characterId) === token) {
+          avatarUploadTokenByCharacterRef.current.delete(characterId);
+        }
+      }
+    },
+    [activeChatId, localizeUi, presentCharacters, readPresentCharacters, saveAvatarPath],
   );
 
   const handleAvatarFileInputChange = useCallback(
@@ -324,44 +360,6 @@ export function useTrackerMutations({
     ]);
   }, [patchField, readPresentCharacters]);
 
-  const updateInventory = useCallback(
-    (items: InventoryItem[]) => patchPlayerStats("inventory", items),
-    [patchPlayerStats],
-  );
-
-  const updateInventoryItem = useCallback(
-    (index: number, item: InventoryItem) => {
-      const liveInventory = readInventory();
-      const { renderedItem, targetIndex } = resolveIndexedMutationTarget(liveInventory, inventory, index);
-      if (targetIndex < 0) return;
-      const next = [...liveInventory];
-      next[targetIndex] = mergeChangedRecord(
-        liveInventory[targetIndex]! as InventoryItem & Record<string, unknown>,
-        renderedItem as (InventoryItem & Record<string, unknown>) | undefined,
-        item as InventoryItem & Record<string, unknown>,
-      ) as InventoryItem;
-      updateInventory(next);
-    },
-    [inventory, readInventory, updateInventory],
-  );
-
-  const removeInventoryItem = useCallback(
-    (index: number) => {
-      const liveInventory = readInventory();
-      const { targetIndex } = resolveIndexedMutationTarget(liveInventory, inventory, index);
-      if (targetIndex < 0) return;
-      updateInventory(liveInventory.filter((_, itemIndex) => itemIndex !== targetIndex));
-      updateFieldLocks((locks) =>
-        removeTrackerFieldLockPrefix(locks, inventoryItemTrackerLockPrefix(liveInventory[targetIndex]!, targetIndex)),
-      );
-    },
-    [inventory, readInventory, updateFieldLocks, updateInventory],
-  );
-
-  const addInventoryItem = useCallback(() => {
-    updateInventory([...readInventory(), { name: "New Item", description: "", quantity: 1, location: "on_person" }]);
-  }, [readInventory, updateInventory]);
-
   const updateQuests = useCallback(
     (nextQuests: QuestProgress[]) => patchPlayerStats("activeQuests", nextQuests),
     [patchPlayerStats],
@@ -419,7 +417,8 @@ export function useTrackerMutations({
   const savePersonaStatus = useCallback((status: string) => patchPlayerStats("status", status), [patchPlayerStats]);
 
   const updatePersonaStats = useCallback(
-    (stats: CharacterStat[]) => patchField("personaStats", reconcileListUpdate(readPersonaStats(), personaStats, stats)),
+    (stats: CharacterStat[]) =>
+      patchField("personaStats", reconcileListUpdate(readPersonaStats(), personaStats, stats)),
     [patchField, personaStats, readPersonaStats],
   );
 
@@ -438,19 +437,17 @@ export function useTrackerMutations({
 
   return {
     addCharacter,
-    addInventoryItem,
     addPersonaStat,
     addQuest,
     avatarFileInputRef,
+    generateAvatar,
     handleAvatarFileInputChange,
     openAvatarUpload,
     removeCharacter,
-    removeInventoryItem,
     removeQuest,
     savePersonaStatus,
     updateCharacter,
     updateCustomFields,
-    updateInventoryItem,
     updatePersonaStats,
     updateQuest,
   };

@@ -11,7 +11,58 @@ Many problems clear up with two quick steps.
 
 If you are asking the team for help, turn on **Debug mode** first so the server logs the prompt and response. See Getting more help at the end of this guide.
 
+## Multiplayer connection or turn problems
+
+- **Controls unavailable:** confirm `MULTIPLAYER_ENABLED=true` is in the correct Engine's `.env`, restart that Engine, then enable Settings separately. A saved toggle cannot override a missing/invalid environment flag. The Android native wrapper deliberately cannot join.
+- **Host unavailable:** use a separate reachable HTTPS room port, a valid certificate chain/hostname and the matching invitation fingerprint. Do not disable TLS validation, add `null` to trusted origins, expose the normal Engine API or open a host-supplied client to work around an error.
+- **Awaiting approval:** the host must approve the request in Players. No transcript is available before approval. Ask for a fresh invitation if it expired or was revoked.
+- **Disconnected:** keep the guest's own Engine running. The client reconnects to the same pinned host while the explicit session is alive; unsent drafts stay in the current view. Restart ends credentials and needs a fresh join; to keep the same persona name afterwards, ask the host to remove your old seat first. Stop/Leave remain available when the network fails.
+- **Game waiting:** inspect Players. Disconnected participants are not automatically passed. The host can explicitly Pass/Kick or Pause. Submitting one of two required actions must not run the GM.
+- **Interrupted generation:** do not repeatedly resubmit the round. The host should inspect committed narration/state and explicitly resume forward, or stop the room. Multiplayer does not silently replay an ambiguous model request or apply its world effects twice.
+- **Restricted command or missing media:** the initial room protocol intentionally carries only text. Use the [compatibility matrix](development/multiplayer.md#command-and-feature-compatibility); do not install a peer-provided file or extension as a workaround.
+
+When reporting a connection error, include mode, platform, the visible error and whether approval succeeded. Do not post invitations, room passwords, session tokens, private transcripts or provider credentials.
+
 ## Install and launch problems
+
+### Termux: JavaScript heap out of memory while building the client
+
+If Vite stops with `Reached heap limit` or `JavaScript heap out of memory`, the client build ran out of Node.js heap. This is different from a missing native Rollup binary. Update and rerun `start-termux.sh`: client builds, including in-app updates, now run with their own 1536 MiB heap, capped at half of known device RAM but never below the 1280 MiB the build needs. The RAM cap is rounded down in 128 MiB steps. The running server keeps its smaller profile-based limit. An explicit heap limit in `NODE_OPTIONS` takes precedence for both processes, so check for a previously configured 1024 MiB override: the client no longer builds in 1024 MiB.
+
+Close other apps before retrying. Phones with less than about 3 GB of RAM can still run out of memory or be stopped by Android; keep the complete launcher output when reporting that case. Do not delete your chats or profile to repair a build failure.
+
+### Desktop: JavaScript heap out of memory while type-checking the client
+
+If the client build stops with `JavaScript heap out of memory` and then says `The client type-check needs about 2.5 GiB of Node.js heap`, the heap limit set in your `NODE_OPTIONS` is too small. The build keeps a limit you set instead of raising it. If `NODE_OPTIONS` contains `--max-old-space-size-percentage`, raise that percentage; it overrides `--max-old-space-size`. If using `--max-old-space-size` alone, raise it to 2560 or more. Or remove those options so the build picks its own limit. Then run the launcher again. Your chats and settings are not touched.
+
+### Termux: missing multiplayer guest asset
+
+If startup still reports a missing `packages/client/dist/multiplayer/guest.js` after rebuilding, update Engine and rerun `./start-termux.sh`. The launcher now runs the complete low-memory client build, including the guest assets checked at startup. You do not need to enable multiplayer to repair this build error.
+
+### Termux: server stops when you open Engine, or Sharp cannot load
+
+Sharp is the image library Engine uses for thumbnails and sprites. On Android it runs through a WebAssembly fallback. Updating in place from 2.4.6 could leave part of that fallback uninstalled, and the server then stopped the first time a browser opened Engine.
+
+Update Engine and let the launcher reinstall dependencies. The update installs the missing part, and Engine keeps it through later updates. If the server keeps stopping when you open Engine before you can update, repair the install by hand in Termux:
+
+```bash
+cd ~/Marinara-Engine
+rm -f node_modules/.modules.yaml
+SHARP_IGNORE_GLOBAL_LIBVIPS=1 pnpm --config.trustPolicy=off --config.confirmModulesPurge=false install --frozen-lockfile --prefer-offline
+./start-termux.sh
+```
+
+This clears pnpm's outdated install record and reinstalls the dependencies. Your chats and settings are not touched.
+
+If Sharp still cannot load, Engine now keeps running with image processing off: thumbnails it has already made still show, new ones show the full-size image instead, and sprite generation and the built-in background removal are unavailable. Do not replace Sharp with an unrelated version. Keep the complete error output when you report the problem.
+
+### Blank page or JavaScript served as HTML after an update
+
+An error such as "Failed to load module script" with a `text/html` MIME type can mean the browser requested a JavaScript file that is missing from the installed build. The previous-session shutdown warning does not identify this problem, and deleting a writer lease or your data will not repair the assets.
+
+Stop the running server, then run `start.bat`, `start.sh` or `start-termux.sh` again. The launcher checks Vite's build inventory, including lazy JavaScript chunks, and rebuilds incomplete client assets before starting. A build made before this check was added is rebuilt once to create its inventory. If rebuilding fails, keep the terminal error for support. For a manual install, run `pnpm build` from the repository root before starting again.
+
+If the launcher check passes but the page is still blank, hard-refresh or try a private browser window. Report the failing asset's full URL, HTTP status, Content-Type and first response line, together with the launcher output. Missing assets now return HTTP 404 instead of the app's HTML page.
 
 ### Windows: EPERM or corepack signature error when installing pnpm
 
@@ -62,6 +113,10 @@ rm -rf node_modules .pnpm .pnpm-store
 
 Then start YunYun again with `./start.sh`. If you install by hand, run `pnpm install` after removing those folders.
 
+### Install says "Ignored build scripts: @google/genai"
+
+This notice is harmless: that package's install script does nothing, and YunYun does not need it. Do not run `pnpm approve-builds`, because it changes a file YunYun tracks, and every later update then has to set that change aside. Current versions no longer show the notice. If an install that already showed it keeps showing it after you update, delete the file `node_modules/.modules.yaml` in your YunYun folder, then run the launcher again. Your chats and settings are not touched.
+
 ### ERR_PNPM_TRUST_DOWNGRADE during install
 
 This is almost always a half-finished install. First rerun the launcher so it can repair the workspace. If you install by hand, run this single command from the YunYun folder:
@@ -87,6 +142,8 @@ If an installed map or call does not appear, close YunYun Engine completely and 
 
 If an older installation cannot complete its first package migration, do not delete the `data/capability-packages` folder or your chat data. YunYun leaves the migration incomplete and retries on the next startup. Existing chat selections and settings remain stored while the catalog is unreachable.
 
+If `data/capability-runtime-snapshots` or `data/capability-packages/versions` has grown large, you do not need to clean it by hand. YunYun deletes the old copies when it starts and keeps only the current and previous version of each agent.
+
 Package downloads are rejected when their checksum, declared file list, Engine version range, or archive paths do not match the official catalog. Update YunYun Engine first, refresh the catalog, and retry. Do not manually extract an artifact into the data directory.
 
 Agent updates are never applied at startup. When a newer compatible version is available, YunYun asks whether to apply it. Choose **No** to keep the installed version; the **Update** button remains available in **Agents → Download Agents**. A failed update also leaves the installed version registered, and a newly updated server runtime that fails its startup self-check rolls back to the previous version.
@@ -98,7 +155,8 @@ If you cannot access YunYun from a phone, tablet, or another computer on your ne
 - Bind the server to a reachable address. The server listens on `127.0.0.1` (loopback, your own machine only) by default. The shell launchers set `HOST=0.0.0.0` for you. If you started with `pnpm start` by hand, set `HOST=0.0.0.0` in your `.env` file first.
 - Confirm both devices are on the same Wi-Fi network.
 - Confirm no firewall blocks the port. The default port is `7860`, or whatever you set as `PORT`.
-- Set up access control. For ordinary network or public clients, set `BASIC_AUTH_USER` and `BASIC_AUTH_PASS` in `.env`. Loopback stays passwordless. Direct traffic over Tailscale and the same-host Docker bridge or detected container gateway is trusted by default; proxy-forwarded Docker traffic requires normal authorization unless you explicitly set `REQUIRE_AUTH_FOR_DOCKER_PROXY=false`.
+- Set up access control. For ordinary network or public clients, set `BASIC_AUTH_USER` and `BASIC_AUTH_PASS` in `.env`. Loopback stays passwordless, but visitors forwarded by a reverse proxy or tunnel on the same machine need the login. Direct Tailscale traffic is trusted by default. Same-host Docker bridge or gateway traffic is trusted only until you set Basic Auth or `IP_ALLOWLIST`; proxy-forwarded Docker traffic requires normal authorization unless you explicitly set `REQUIRE_AUTH_FOR_DOCKER_PROXY=false`.
+- If the device shows **Too many wrong passwords**, wait 15 minutes, then sign in with the correct Basic Auth password. Restarting the server also lets it try again.
 - For privileged actions from that device (backups, data clearing, updates), set `ADMIN_SECRET` in the server `.env`. Then paste the same value into **Settings** > **Advanced** > **Admin Access** on that device and click **Save**.
 - If you use a public or reverse-proxy domain and see **Untrusted request host**, add its exact hostname to `TRUSTED_HOSTS` in `.env`. Direct IP addresses used by phones, LAN computers, and Tailscale peers remain accepted automatically.
 
@@ -128,9 +186,11 @@ Generation errors appear as a toast at the bottom of the screen. If a connection
 - **No API connection configured for this chat**: the chat has no connection selected. Open the **Connections** panel, create one, then pick it for the chat. See [Connecting to an AI Provider](connections/connecting-to-a-provider.md). An API key is a secret code from a provider that lets YunYun use their models.
 - The model does not accept a parameter: the toast tells you which one. Open **Chat Settings** > **Advanced Parameters** and find that parameter. Turn off the switch next to its name (the tooltip reads "This parameter is sent to the model").
 - The model says a parameter is required: do the same, but turn the switch next to that parameter on.
+- **This model's chat template needs user and assistant messages to take turns**: some local models, such as Mistral-based models served by llama.cpp, only accept messages that alternate between you and the AI. YunYun already merges back-to-back messages for these models and tries once more. If you still see this, open **Chat Settings** > **Advanced Parameters** and set **Post-Processing Messages** to **Single User Message**, or serve the model with a less strict chat template.
 - **The AI returned an empty response. Try sending your message again.**: send your message again. If it keeps happening, try a different model or connection.
 - **A generation is already in progress for this chat**: one reply is still streaming. Wait for it to finish or click the Stop button, then try again.
 - **No connections are marked for the random pool**: you turned on random connection routing but marked no connections for the pool. Add at least one connection to the pool, or turn random routing off.
+- Every message fails with a network error, and your computer reaches the internet only through a proxy (for example v2rayN without TUN mode): tell YunYun about the proxy. See [Outbound HTTP proxy](CONFIGURATION.md#outbound-http-proxy).
 
 ## Local Model problems
 
@@ -161,25 +221,36 @@ For full setup, see [Local Model Setup](connections/local-model.md).
 1. Open **Chat Settings** > **Memory Recall** and confirm **Enable Memory Recall** is on.
 2. Open **Access memories for this chat**. In the **Memories for This Chat** window, look at each chunk's status.
 3. A status of **Waiting for vector** means the memory is still being processed. Wait, then chat again.
-4. A status of **Embedding unavailable** means no embedding source is working. Configure an embedding connection, or let the built-in local model load. See [Local Model Setup](connections/local-model.md).
+4. A status of **Embedding unavailable** means no embedding source is working. Configure an embedding connection, or let the built-in local model load. See [Local Model Setup](connections/local-model.md). To use one embedding source for every chat, pick it under **Embeddings** in the **Defaults** section of the **Connections** panel.
 
 A memory needs at least 5 new messages before it is created. Recall also only shows memories that closely match your new message, so it can return nothing even when memories exist.
+
+### Advanced Memory says scenes need attention
+
+A steady dot on the **Chat Settings** button, or a notice that Advanced Memory found problems, means some scene memories are unclear, out of date or missing.
+
+1. Open **Chat Settings** > **Memory Recall**, or press **Fix** in the notice.
+2. Press **Fix**. It repairs every scene it can with the Helper model and never changes summaries you edited.
+3. Select each scene number under **need your review** to open it in **Access memories for this chat**, then check its text and characters and press **Save correction**.
+
+If Fix stops with an error, check the Helper model's connection, then press **Resume processing** or **Fix** again. See [Fixing memory problems](agents/memory.md#fixing-memory-problems).
 
 ### Summaries are not generating
 
 Chat summaries need a working text connection to write them.
 
-- In Roleplay mode, open the **Chat Summary** popover and confirm a connection is set. Use **Backfill Summary** to catch up an older chat.
+- In Roleplay mode, open **Chat Settings** > **Chat Summary** and confirm a connection is set. Use **Backfill Summary** to catch up an older chat.
 - In Conversation mode, open **Automatic Summarization** and use **Backfill** to retry days that failed.
 - If your chat requires agent write approval, an AI summary waits for your review before it takes effect.
 - A summary that keeps failing (for example, a bad API key) is retried on a delay. Fix the connection, then use **Backfill**.
 
 ## Card Browser problems
 
-The **Card Browser** lets you search public character sites and import characters. Open it from the **Card Browser** icon in the top bar, then click **Download Cards**.
+The **Card Browser** lets you search public character sites and import characters. Open it with the **Download** button at the top of the **Characters** or **Personas** panel.
 
 - If JannyAI search or a character page fails with a Cloudflare block, YunYun shows a message. It asks you to visit the JannyAI site once in the same browser to clear the challenge, then retry.
-- If your CharacterTavern or Pygmalion login stops working after you restart the server, that is expected. Those logins live only in server memory and clear on restart. Open the login window and paste your cookie or token again.
+- If your Pygmalion login stops working after you restart the server, that is expected. That login lives only in server memory and clears on restart. Open the login window and paste your token again.
+- If CharacterTavern shows a notice instead of search results, that is expected. Its rebuilt website no longer offers the connection YunYun used. Download the card from character-tavern.com and import the file instead.
 
 ## Media generation problems
 
@@ -202,12 +273,13 @@ Then restart YunYun and click **Reapply Cleanup** in the sprite generation windo
 Game Mode Storyboards turn a completed GM narration into keyframe images and optional clips. Roleplay Storyboards combine completed exchanges and display the result inline after the assistant response.
 
 - Confirm **Storyboard** is installed from **Agents** > **Download Agents**, then turn on **Enable Agents** and **Enable Storyboards** for the chat.
-- For a manual scene video, generate or upload a **Gallery** image first, then use its **Video** or **Animate** action. The **Gallery** splits **Images** and **Videos** into tabs, so check the **Videos** tab.
+- For a manual scene video, open **Chat Settings** > **Gallery**, generate or upload an image, then use its **Video** or **Animate** action. The **Gallery** splits **Images** and **Videos** into tabs, so check the **Videos** tab.
 - For automatic Game Mode Storyboards, open **Chat Settings** > **Agents** > **Storyboards** and confirm **Automatic Storyboard Illustrations** is on. Turn on **Automatic Storyboard Animations** too if you also want clips.
-- In Roleplay, add the **Storyboard** Agent to the chat. Choose **Still images** or **Animations**, set **Messages per episode**, and select the Storyboard image connection. **Manual only** runs from **Create storyboard** in the Gallery instead.
+- In Roleplay, add the **Storyboard** Agent to the chat. Choose **Still images** or **Animations**, set **Messages per episode**, and select the Storyboard image connection. **Manual only** runs from **Create storyboard** in the **Gallery** section of **Chat Settings** instead.
 - Keyframe images need an image connection. Clips also need a video connection.
 - If a custom prompt works better with all characters combined, turn off **Use NovelAI Character Prompts**.
 - Slow providers can hit a timeout. Raise `IMAGE_GEN_TIMEOUT_MS` or `VIDEO_GEN_TIMEOUT_MS` in `.env`, then restart YunYun. The server only reads these values at startup.
+- By default, an image provider response larger than 30 MiB fails with `Outbound response exceeded 31457280 bytes`. Local ComfyUI output files that embed the workflow and reference images as metadata can reach this size. Raise `IMAGE_GEN_MAX_RESPONSE_BYTES` in `.env` and restart YunYun, or turn off metadata in ComfyUI.
 
 See the [Storyboard Agent Guide](game/storyboard.md) for both workflows and [Game Mode: Getting Started](game/getting-started.md) for Game setup.
 
@@ -222,7 +294,8 @@ If starting a game fails because the model returned broken JSON, YunYun opens th
 ## Voice, calls, and TTS
 
 - If characters do not speak during a call, Text to Speech is not set up. Open **Connections** > **Text to Speech**, enable it, choose a source, enter your key, pick a voice, and save. A character with no voice appears as text only.
-- If the microphone is not working, you may need the local speech model. Install **Calls** from **Agents > Download Agents**, then open **Connections** > **Local Model**, expand the card, find **Local Speech Model**, choose a Whisper model, and click **Download Whisper**. Firefox in particular needs this because it lacks browser speech recognition. Uninstalling Calls deletes its Whisper models to reclaim disk space.
+- If speech stops with **No audio after 60 s**, your voice server is slower than YunYun waits. A local server on a laptop often is. Raise **Request timeout (seconds)** in **Connections** > **Text to Speech**, or in the audio connection the message names. See [Request timeout](media/tts-setup.md#request-timeout).
+- If the microphone is not working, you may need the local speech model. Install **Calls** from **Agents > Download Agents**, then open **Connections** > **Local Model**, expand the card, find **Local Speech Model**, choose a Whisper model, and click **Download Whisper**. Firefox in particular needs this because it lacks browser speech recognition. Uninstalling Calls deletes its Whisper models to reclaim disk space. You can also use your own speech-to-text server from the **Speech to Text** card in **Connections**; see [Use your own speech-to-text server](conversation/calls.md#use-your-own-speech-to-text-server).
 - On a Lite build, the message **Local Whisper is disabled in Lite mode** means that small build cannot run the local speech model. Use a full YunYun install instead.
 
 ### Music DJ Spotify login fails on a remote or network install
@@ -237,6 +310,18 @@ The Music DJ agent's Spotify mode uses OAuth. OAuth is a login handoff where Spo
 The cleanest long-term fix is to put the server behind HTTPS. Last checked against YunYun Engine 2.2.0. Spotify tightened these rules in February 2025.
 
 ## Storage and data
+
+### Restart Server does not return
+
+Start YunYun using `start.bat`, `start-local.bat`, `start.sh`, `start-termux.sh`, or `pnpm start`. These keep the server attached to its launcher and wait for the old process to exit before starting its replacement. In-app restart closes lingering connections after four seconds and forces exit after eight seconds if shutdown is still stuck; a forced shutdown can interrupt pending writes and is recorded as forced in diagnostics. Direct `node` runs and development watchers are not automatically replaced: stop and restart them from their terminal. Docker continues to use its container restart policy. On Windows, press Ctrl+C in the launcher console and wait for **Shutdown complete** before closing it. Closing or force-killing the terminal can interrupt pending saves.
+
+Do not launch another server against the same data directory while the old one is still running. If an older build left a process behind, stop that process first; do not remove a live server's writer lease.
+
+### Startup says another process may be using the data directory
+
+YunYun allows only one running server to write to a local data directory. If startup reports **Another YunYun Engine process ... may be using** the directory, close the other YunYun process and start again.
+
+After a crash or a moved Docker data volume, startup can instead report **The storage writer lease ... is incomplete or invalid** or identify a process that no longer exists on this host. First verify that every YunYun process and container using that data directory is stopped. Then remove only the `.writer-lease` directory named in the error and restart YunYun. Do not remove the surrounding `storage` directory or any table files. On Linux, Android, and container hosts whose data directory lives on a local disk, YunYun reclaims a lease left by a crashed or force-killed process on its own, including after a reboot; the manual step remains the fallback for network or shared storage. Windows does the same when the data directory is on one of the computer's own drives. On Windows, the manual step remains the fallback for a network drive, a shared folder, a removable drive such as a USB stick, or a computer renamed after the crash.
 
 ### Data seems missing after an update
 
@@ -272,7 +357,13 @@ Docker and Podman keep data in the `marinara-data` volume, so run the command in
 
 ### Backup or Export returns 403
 
-Loopback sessions can make backups without an admin secret. From another device, a network address, or Docker, backups and profile exports need more. Set `ADMIN_SECRET` on the server and save the same value in **Settings** > **Advanced** > **Admin Access**. If you want loopback to require the secret too, set `MARINARA_REQUIRE_ADMIN_SECRET_ON_LOOPBACK=true`.
+Loopback sessions can make backups without an admin secret. By default, requests from another device, a network address, Docker, or a reverse proxy or tunnel on the same computer need more for backups and profile exports. Set `ADMIN_SECRET` on the server and save the same value in **Settings** > **Advanced** > **Admin Access**. If you want loopback to require the secret too, set `MARINARA_REQUIRE_ADMIN_SECRET_ON_LOOPBACK=true`. If `REQUIRE_AUTH_FOR_LOOPBACK_PROXY=false`, forwarded visitors use the local bypass too; keep that safeguard on for a public proxy or tunnel.
+
+### Import says the file is not a readable ZIP archive
+
+YunYun reads `.charx` cards, `.marinara` packages, Agent packages and custom Agent repositories as ZIP archives. It refuses an archive that is damaged or whose contents do not match its own file list, and shows **The file is not a readable ZIP archive** (or **Could not read .marinara package** for a `.marinara` package). A partial download is the usual cause, so download the file again. If you made the archive yourself, create it again with a standard tool such as your system's compress option, `zip`, or 7-Zip. Zero padding or a line break added after the archive during a transfer is fine.
+
+**Package contains too many files** means an Agent package or custom repository holds more than 8,192 files. **.marinara package has too many entries** means a `.marinara` package holds more than 8 files. These limits are not new. Remove the extra files and try again.
 
 ## Android and Docker
 
@@ -285,15 +376,19 @@ The Android app is a small shell around Termux. Termux is a Linux terminal app f
 3. If Android asks to run commands in Termux, grant it.
 4. Wait for the launcher to finish and start the server, then return to the app.
 
+The normal APK path never asks you to paste a YunYun secret. The app generates its private localhost credential, provisions it in Termux, and signs in automatically. Android's app-install and Termux permission dialogs are still required system prompts. Do not add `null`, `http://null`, or the APK's secret to `CSRF_TRUSTED_ORIGINS`; none is a valid or necessary Android setup step.
+
 Also confirm the app and Termux use the same port. The default is `7860`. If you built the app with a different port, set the matching `PORT` in the Termux `.env` too.
 
 ### Android localhost opens the login page or returns 401/503
 
-APK-managed Termux installs protect localhost with a private per-install secret. The Android app authenticates automatically. In another browser on the same phone, open `/android-login` and paste the value shown by this Termux command:
+APK-managed Termux installs protect localhost with a private per-install secret. The Android app authenticates automatically and should not display this login page during setup. If the login page appears inside the YunYun Engine app, install the [latest APK](https://github.com/Pasta-Devs/Marinara-Engine/releases/latest/download/marinara-engine-android.apk), tap **Install / Start YunYun** again, and return to the app when Termux finishes.
 
-```bash
-cat ~/.marinara-engine/android-secret
-```
+An error naming origin `null` means an older APK/server pair let Android's opaque WebView origin reach the general CSRF gate before the private handshake. Editing `.env` cannot fix that: literal `null` is deliberately ignored, and trusting an opaque origin globally would weaken every unsafe API route. Update the APK and Engine instead; current Android login routes verify their own one-time proof or per-install secret while `null` remains rejected everywhere else.
+
+To open a browser on the same phone, select **Open in browser** on the Android launcher and tap **Retry connection**. A current APK and Engine authenticate it automatically; no secret entry is needed. Reopen through this action after a server restart or an expired session. From inside the app, return to the launcher through **Settings > General > App Behavior > Open Android launcher (app or browser)**.
+
+Older APKs can still use `/android-login` with the value from `cat ~/.marinara-engine/android-secret`. A browser link expires after one minute and works once; an expired link should be opened again through the launcher, not reused from history.
 
 The local `mari` CLI reads the same file automatically. A 401 means the pasted secret or an authentication challenge was rejected; reload `/android-login` and paste the current value. A 503 means the server received a malformed configured secret. Restart through `./start-termux.sh`; if the launcher reports that its secret file is invalid or empty, return to the Android app and tap **Install / Start YunYun** so the APK provisions it again. Do not put this secret in screenshots or issue reports.
 
@@ -307,11 +402,23 @@ Exit status 134 usually means Android ran out of memory during a build step. Upd
 
 If it still stops, close other Android apps, reopen Termux, and run the command again.
 
+### Termux closes or restarts while YunYun is running
+
+The launcher requests an Android wake lock while the server runs and saves each server session under `~/.marinara-engine/logs/`. After an unexpected restart, include the newest `server-*.log` file in the report. If the file ends without a YunYun or Node error, Android or the phone vendor most likely terminated Termux outside the server process.
+
+Allow Termux to run in the background and remove battery optimization for it in Android settings. The `termux-wake-lock` and `termux-wake-unlock` commands ship with every standard Termux install (the core `termux-tools` package) — no add-on is required. These settings cannot prevent every vendor-specific process kill, but they remove the common idle-suspension cause while the persistent log preserves evidence from application-level failures.
+
+### YunYun stops responding until Termux is brought to the foreground
+
+If chats hang at "Opening chat..." and the app then reports **Server unreachable**, the Support Diagnostics copy shows **Unreachable (request timed out)** for the server fields, and everything recovers the instant you open Termux — the host process is **frozen**, not crashed. Android's cached-app freezer (and vendor equivalents, which are especially aggressive on some phones) suspends the whole Termux process: the phone still accepts the connection, but the frozen server never answers it. A wake lock alone does not exempt a process from freezing, and the session log shows a timestamp gap over the frozen window rather than an error.
+
+To reduce it: exempt Termux from battery optimization and allow background activity in Android settings, lock Termux in the recents screen if your phone supports it, and keep the Termux notification visible. If the freezes continue, the reliable workaround is keeping Termux foregrounded (or the screen on) while YunYun is in active use.
+
 ### Android update runs out of storage while installing dependencies
 
 The built YunYun app is not several gigabytes, and Noodle does not download its own AI models. A large temporary footprint during an update usually comes from pnpm's dependency store and virtual store, especially after several releases or an interrupted forced reinstall.
 
-The current launcher prunes packages left over from older releases and avoids rebuilding the dependency store more than once for the same update. If an older launcher already filled the device, update the launcher and reclaim its unreferenced cache before trying again:
+The current launcher prunes packages left over from older releases and avoids rebuilding the dependency store more than once for the same update. In-app updates from **Settings** > **Advanced** > **Updates** now install only the Android packages too, instead of copies for every other platform. If an older launcher already filled the device, update the launcher and reclaim its unreferenced cache before trying again:
 
 ```bash
 cd Marinara-Engine
@@ -406,7 +513,7 @@ Before sharing debug output, remove API keys, access tokens, admin secrets, priv
 Then reach the community:
 
 - Read the open issues at https://github.com/Pasta-Devs/Marinara-Engine/issues
-- Join the Discord for community help at https://discord.com/invite/KdAkTg94ME
+- Join the Discord for community help at https://discord.gg/canalpa
 - File a bug report at https://github.com/Pasta-Devs/Marinara-Engine/issues with your details above.
 
 ## Related guides
@@ -419,3 +526,7 @@ Then reach the community:
 - [Local Model Setup](connections/local-model.md)
 - [Game Mode: Getting Started](game/getting-started.md)
 - [Settings Overview](settings/settings-overview.md)
+
+### Android Chrome does not offer PWA installation behind Basic Auth
+
+Use an HTTPS address, sign in, and reload after updating YunYun. The app requests its manifest with credentials so Basic Auth can remain enabled. If installation is still unavailable, check that your proxy serves `/manifest.json` as JSON rather than a login page or an error.

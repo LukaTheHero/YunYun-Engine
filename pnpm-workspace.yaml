@@ -18,6 +18,14 @@ trustPolicy: off
 confirmModulesPurge: false
 blockExoticSubdeps: true
 
+patchedDependencies:
+  # Let an explicit speech-clock opening override held vowels; voice and idle without it stay native.
+  # The painted mouth opens across the whole lip line (rig halfLen), not its middle half, for every vowel.
+  mesh-avatar@0.1.1: patches/mesh-avatar@0.1.1.patch
+  onnxruntime-node@1.30.0: patches/onnxruntime-node@1.30.0.patch
+  # Upstream READY-handshake fix (pinojs/thread-stream#246, #251). Drop once a release after 4.2.0 ships it.
+  thread-stream@4.2.0: patches/thread-stream@4.2.0.patch
+
 # Native/build dependencies permitted to run install scripts.
 onlyBuiltDependencies:
   - esbuild
@@ -25,11 +33,8 @@ onlyBuiltDependencies:
   - onnxruntime-node
   - protobufjs
 
-# Dependency version pins applied across the workspace.
-overrides:
-  onnxruntime-common: "1.24.3"
-  onnxruntime-node: "1.24.3"
-  onnxruntime-web: "1.24.3"
-  protobufjs: "7.5.5"
-  brace-expansion: "5.0.9"
-  "@anthropic-ai/sdk": "0.93.0"
+# Dependencies whose install scripts are known no-ops. Listing them keeps pnpm from asking every
+# installer, launcher and updater run to "approve-builds", which would edit this tracked file.
+ignoredBuiltDependencies:
+  - "@google/genai"
+

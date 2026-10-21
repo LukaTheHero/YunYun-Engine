@@ -7,6 +7,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { logger, logDebugOverride } from "../lib/logger.js";
 import { z } from "zod";
 import { sidecarModelService } from "../services/sidecar/sidecar-model.service.js";
+import { validateLocalGgufPath } from "../services/sidecar/sidecar-model-files.js";
 import { sidecarSpeechService } from "../services/sidecar/sidecar-speech.service.js";
 import { mlxRuntimeService } from "../services/sidecar/mlx-runtime.service.js";
 import { sidecarRuntimeService } from "../services/sidecar/sidecar-runtime.service.js";
@@ -35,6 +36,7 @@ import {
   sceneAnalysisRequestSchema,
   scoreAmbient,
   scoreMusic,
+  musicAreaSlug,
   type GameActiveState,
   type SidecarDownloadProgress,
   type SidecarQuantization,
@@ -42,6 +44,7 @@ import {
 } from "@marinara-engine/shared";
 import { isSidecarRuntimeInstallEnabled } from "../config/runtime-config.js";
 import { isAdminAuthorized, requirePrivilegedAccess } from "../middleware/privileged-gate.js";
+import { registerSequentialGameTasks } from "../services/game/sequential-tasks.js";
 
 const quantizationSchema = z.enum(["q8_0", "q4_k_m"]);
 const speechModelIdSchema = z.enum(
@@ -88,6 +91,8 @@ async function requireConversationCallsForSpeech(reply: FastifyReply): Promise<b
 }
 
 export const sidecarRoutes: FastifyPluginAsync = async (app) => {
+  let modelSwitchInProgress = false;
+  registerSequentialGameTasks(app, ["/analyze-scene"]);
   app.get("/status", async () => {
     void sidecarProcessService
       .syncForCurrentConfig({ suppressKnownFailure: true, allowRuntimeInstall: false })
@@ -99,6 +104,7 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
     return {
       ...status,
       inferenceReady: sidecarProcessService.isReady(),
+      gpuMemory: sidecarProcessService.getGpuMemory(),
       startupError: sidecarProcessService.getStartupError(),
       failedRuntimeVariant: sidecarProcessService.getFailedRuntimeVariant(),
     };
@@ -111,6 +117,7 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
 
   const configSchema = z.object({
     useForTrackers: z.boolean().optional(),
+    useAsAgentsDefault: z.boolean().optional(),
     useForGameScene: z.boolean().optional(),
     contextSize: z.number().int().min(512).optional(),
     maxTokens: z.number().int().min(64).optional(),
@@ -119,6 +126,7 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
     topK: z.number().int().min(0).max(500).optional(),
     maxParallelJobs: z.number().int().min(1).max(16).optional(),
     gpuLayers: z.number().int().min(-1).max(1024).optional(),
+    kvCacheType: z.enum(["f16", "q8_0", "q4_0"]).optional(),
     enableNativeToolCalls: z.boolean().optional(),
     embeddingPooling: z.enum(SIDECAR_EMBEDDING_POOLING_TYPES).optional(),
     embeddingBatchSize: z.number().int().min(128).max(32768).optional(),
@@ -238,6 +246,11 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
   });
 
   async function handleDownloadSse(reply: FastifyReply, task: () => Promise<void>): Promise<void> {
+    if (modelSwitchInProgress) {
+      reply.status(409).send({ error: "Wait for the current model switch or download to finish" });
+      return;
+    }
+    modelSwitchInProgress = true;
     reply.hijack();
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
@@ -292,6 +305,7 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
         error: error instanceof Error ? error.message : "Download failed",
       });
     } finally {
+      modelSwitchInProgress = false;
       sidecarModelService.removeProgressListener(listener);
       completed = true;
       if (!reply.raw.destroyed && !reply.raw.writableEnded) {
@@ -379,7 +393,9 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
   }>("/download", async (req, reply) => {
     if (!requirePrivilegedAccess(req, reply, { feature: "Sidecar model download" })) return;
     if (isInferenceBusy()) {
-      return reply.status(409).send({ error: "Cannot download or switch sidecar models while inference is in progress" });
+      return reply
+        .status(409)
+        .send({ error: "Cannot download or switch sidecar models while inference is in progress" });
     }
     const { quantization } = z.object({ quantization: quantizationSchema }).parse(req.body);
     await handleDownloadSse(reply, async () => {
@@ -394,7 +410,9 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
   }>("/download/custom", async (req, reply) => {
     if (!requirePrivilegedAccess(req, reply, { feature: "Sidecar custom model download" })) return;
     if (isInferenceBusy()) {
-      return reply.status(409).send({ error: "Cannot download or switch sidecar models while inference is in progress" });
+      return reply
+        .status(409)
+        .send({ error: "Cannot download or switch sidecar models while inference is in progress" });
     }
     const body = z
       .object({
@@ -410,6 +428,37 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.post("/model/local", async (req, reply) => {
+    if (!requirePrivilegedAccess(req, reply, { feature: "Local GGUF selection" })) return;
+    if (
+      modelSwitchInProgress ||
+      isInferenceBusy() ||
+      sidecarModelService.getStatus().status.startsWith("downloading")
+    ) {
+      return reply.status(409).send({ error: "Wait for the current inference or download before switching models" });
+    }
+    const { path } = z.object({ path: z.string().trim().min(1).max(4096) }).parse(req.body);
+    let selected: string;
+    try {
+      selected = validateLocalGgufPath(path);
+    } catch (error) {
+      return reply.status(400).send({ error: error instanceof Error ? error.message : "Cannot read this GGUF file" });
+    }
+    modelSwitchInProgress = true;
+    try {
+      await sidecarProcessService.stop();
+      sidecarModelService.selectLocalModel(selected);
+    } catch (error) {
+      return reply.status(400).send({ error: error instanceof Error ? error.message : "Cannot select this GGUF file" });
+    } finally {
+      modelSwitchInProgress = false;
+      void sidecarProcessService.syncForCurrentConfig({ allowRuntimeInstall: false }).catch((error) => {
+        logger.error(error, "[sidecar] Failed to synchronize local GGUF selection");
+      });
+    }
+    return sidecarModelService.getStatus();
+  });
+
   app.post("/download/cancel", async (req, reply) => {
     if (!requirePrivilegedAccess(req, reply, { feature: "Sidecar download cancel" })) return;
     sidecarModelService.cancelDownload();
@@ -421,12 +470,19 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/model", async (_req, reply) => {
     if (!requirePrivilegedAccess(_req, reply, { feature: "Sidecar model deletion" })) return;
-    if (isInferenceBusy()) {
-      return reply.status(409).send({ error: "Cannot delete the sidecar model while inference is in progress" });
+    if (modelSwitchInProgress || isInferenceBusy()) {
+      return reply
+        .status(409)
+        .send({ error: "Cannot delete the sidecar model while inference or a model switch is in progress" });
     }
 
-    await sidecarProcessService.stop();
-    await sidecarModelService.deleteModel();
+    modelSwitchInProgress = true;
+    try {
+      await sidecarProcessService.stop();
+      await sidecarModelService.deleteModel();
+    } finally {
+      modelSwitchInProgress = false;
+    }
     return { ok: true };
   });
 
@@ -481,7 +537,11 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
         debugLog("[debug/game/scene-analysis:sidecar] user prompt:\n%s", userPrompt);
       }
 
-      const raw = await analyzeScene(systemPrompt, userPrompt, createResponseAbortSignal(reply, "Sidecar scene analysis"));
+      const raw = await analyzeScene(
+        systemPrompt,
+        userPrompt,
+        createResponseAbortSignal(reply, "Sidecar scene analysis"),
+      );
       if (debugLogsEnabled) {
         debugLog("[debug/game/scene-analysis:sidecar] parsed model response:\n%s", JSON.stringify(raw, null, 2));
       }
@@ -516,16 +576,22 @@ export const sidecarRoutes: FastifyPluginAsync = async (app) => {
 
       if (body.context.useSpotifyMusic) {
         result.music = null;
-      } else if (!body.context.generateMusic) {
+      } else {
+        // Scoring runs even with music generation enabled (#5161): generated
+        // context tracks are ordinary scoreable library entries now, and the
+        // analyzer no longer writes free-text music prompts.
         const scoredMusic = scoreMusic({
           state: (body.context.currentState as GameActiveState) ?? "exploration",
           weather: result.weather ?? body.context.currentWeather ?? null,
           timeOfDay: result.timeOfDay ?? body.context.currentTimeOfDay ?? null,
           musicGenre: result.musicGenre,
           musicIntensity: result.musicIntensity,
+          locationSlug: musicAreaSlug(body.context.currentLocation),
+          enemyTier: body.context.enemyTier,
           currentMusic: body.context.currentMusic ?? null,
           recentMusic: body.context.recentMusic ?? null,
           availableMusic: musicTags,
+          family: body.context.artFamily,
         });
         result.music = scoredMusic ?? null;
       }

@@ -4,6 +4,30 @@
 # ──────────────────────────────────────────────
 set -e
 
+MARINARA_TERMUX_LOG_DIR="$HOME/.marinara-engine/logs"
+MARINARA_TERMUX_LOG_FILE=""
+MARINARA_TERMUX_LOG_TEE_PID=""
+if mkdir -p "$MARINARA_TERMUX_LOG_DIR"; then
+    if chmod 700 "$MARINARA_TERMUX_LOG_DIR" 2>/dev/null; then
+        find "$MARINARA_TERMUX_LOG_DIR" -type f -name 'server-*.log' -mtime +14 -delete 2>/dev/null || true
+        MARINARA_TERMUX_LOG_FILE="$MARINARA_TERMUX_LOG_DIR/server-$(date '+%Y%m%d-%H%M%S')-$$.log"
+        if command -v tee >/dev/null 2>&1 && touch "$MARINARA_TERMUX_LOG_FILE" && chmod 600 "$MARINARA_TERMUX_LOG_FILE" 2>/dev/null; then
+            exec 3>&1 4>&2
+            exec > >(tee -a "$MARINARA_TERMUX_LOG_FILE") 2>&1
+            MARINARA_TERMUX_LOG_TEE_PID=$!
+            echo "  [OK] Persistent launcher/server log: $MARINARA_TERMUX_LOG_FILE"
+        else
+            echo "  [WARN] Could not create a restrictively permissioned Termux session log." >&2
+            rm -f "$MARINARA_TERMUX_LOG_FILE"
+            MARINARA_TERMUX_LOG_FILE=""
+        fi
+    else
+        echo "  [WARN] Could not restrict permissions on $MARINARA_TERMUX_LOG_DIR; this session will not have a persistent log." >&2
+    fi
+else
+    echo "  [WARN] Could not create $MARINARA_TERMUX_LOG_DIR; this session will not have a persistent log." >&2
+fi
+
 echo ""
 echo "  ╔══════════════════════════════════════════╗"
 echo "  ║   YunYun Engine  —  Termux Launcher    ║"
@@ -12,6 +36,9 @@ echo ""
 
 # Navigate to script directory
 cd "$(dirname "$0")"
+
+# Public update checks must never pause for GitHub credentials.
+export GIT_TERMINAL_PROMPT=0
 
 # APK-managed installs provision a per-install secret in Termux-private
 # storage. The server uses it to keep unrelated Android apps from inheriting
@@ -69,35 +96,6 @@ for pkg_name in git; do
     fi
 done
 
-# ── Fix platform detection for native binaries ──
-# Node.js 24+ on Termux reports process.platform = "android", but Termux uses
-# the Linux kernel and Linux ARM64 native binaries work perfectly. Tell pnpm to
-# install both android AND linux optional dependencies so build tools like
-# rollup, lightningcss, and tailwindcss oxide resolve correctly.
-# Run early so the auto-update's pnpm install also benefits.
-NODE_PLAT=$(node -e "process.stdout.write(process.platform)" 2>/dev/null || echo "")
-if [ "$NODE_PLAT" = "android" ]; then
-    NPMRC_MARKER="# termux-supported-architectures"
-    if ! grep -q "$NPMRC_MARKER" .npmrc 2>/dev/null; then
-        NODE_ARCH=$(node -e "process.stdout.write(process.arch)" 2>/dev/null || echo "")
-        echo "  [OK] Detected Android/Termux (${NODE_ARCH:-unknown}) — enabling Linux binaries"
-        {
-            echo "$NPMRC_MARKER"
-            echo "supportedArchitectures.os[]=current"
-            echo "supportedArchitectures.os[]=linux"
-            echo "supportedArchitectures.cpu[]=current"
-            [ -n "$NODE_ARCH" ] && echo "supportedArchitectures.cpu[]=$NODE_ARCH"
-        } >> .npmrc
-        # Force pnpm to re-resolve optional deps on next install
-        TERMUX_FORCE_INSTALL=1
-    fi
-    # Ensure wasm32 is supported (required for sharp fallback on some Android devices)
-    if ! grep -q "supportedArchitectures.cpu\[\]=wasm32" .npmrc 2>/dev/null; then
-        echo "supportedArchitectures.cpu[]=wasm32" >> .npmrc
-        TERMUX_FORCE_INSTALL=1
-    fi
-fi
-
 # ── Check Node.js ──
 if ! command -v node &> /dev/null || ! node -v &> /dev/null; then
     echo "  [..] Node.js not found or broken — installing via pkg..."
@@ -136,7 +134,7 @@ fi
 
 # Large profiles can exceed Node's conservative mobile heap limit while the
 # file-backed store serializes them. Keep an explicit operator limit, otherwise
-# give Termux enough headroom for installation and normal server operation.
+# choose a bounded default from the profile size and available device memory.
 has_explicit_node_heap_limit() {
     local node_options_value="${NODE_OPTIONS:-}"
     NODE_OPTIONS= NODE_OPTIONS_VALUE="$node_options_value" node <<'NODE_OPTIONS_PARSER'
@@ -177,11 +175,39 @@ process.exit(hasHeapLimit ? 0 : 1);
 NODE_OPTIONS_PARSER
 }
 
-if ! has_explicit_node_heap_limit; then
-    NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--max-old-space-size=2048"
-    export NODE_OPTIONS
-    echo "  [OK] Node.js heap limit raised for large profiles"
-fi
+resolve_default_node_heap_mb() {
+    local profile_storage_kib="${1:-0}"
+    local device_memory_kib="${2:-0}"
+    case "$profile_storage_kib" in *[!0-9]*|"") profile_storage_kib=0 ;; esac
+    case "$device_memory_kib" in *[!0-9]*|"") device_memory_kib=0 ;; esac
+
+    # Budget about twice the on-disk structured profile plus 512 MiB of
+    # headroom, in stable 128 MiB steps: the file-backed store keeps every
+    # row in memory, and V8 objects plus flush serialization run well above
+    # the JSON byte size. Media lives outside storage.
+    local heap_mb=$(( ((profile_storage_kib + 1023) / 1024) * 2 + 512 ))
+    heap_mb=$(( (heap_mb + 127) / 128 * 128 ))
+    [ "$heap_mb" -lt 1024 ] && heap_mb=1024
+
+    if [ "$device_memory_kib" -gt 0 ]; then
+        # Cap at about one quarter of physical RAM so Android keeps room for
+        # the Termux process, but never below the safe 1 GiB baseline.
+        local device_cap_mb=$(( device_memory_kib / 1024 / 4 / 128 * 128 ))
+        [ "$device_cap_mb" -lt 1024 ] && device_cap_mb=1024
+        [ "$heap_mb" -gt "$device_cap_mb" ] && heap_mb="$device_cap_mb"
+    elif [ "$heap_mb" -gt 1536 ]; then
+        # Unknown device memory: keep the conservative bounded default.
+        heap_mb=1536
+    fi
+    printf '%s' "$heap_mb"
+}
+
+build_termux_client() (
+    # Vite needs more heap than the running server. The client's build script
+    # sets it for the build only (packages/client/scripts/build-heap.mjs), so the
+    # in-app updater gets it too; an explicit NODE_OPTIONS heap still wins.
+    MARINARA_LOW_MEMORY_BUILD=1 run_pnpm --filter @marinara-engine/client build
+)
 
 load_launcher_setting() {
     local setting_name="$1"
@@ -195,10 +221,30 @@ load_launcher_setting() {
 # Read only settings used by this launcher. The server loads every other .env
 # value itself. Node parses these as inert dotenv data; no shell code is sourced.
 if [ -f .env ]; then
-    for setting_name in AUTO_UPDATE_ENABLED PORT HOST SSL_CERT SSL_KEY AUTO_OPEN_BROWSER; do
+    for setting_name in AUTO_UPDATE_ENABLED PORT HOST SSL_CERT SSL_KEY AUTO_OPEN_BROWSER DATA_DIR MARINARA_MAX_RESIDENT_CHATS; do
         load_launcher_setting "$setting_name"
     done
 fi
+
+if ! has_explicit_node_heap_limit; then
+    MARINARA_TERMUX_DATA_DIR="${DATA_DIR:-./data}"
+    case "$MARINARA_TERMUX_DATA_DIR" in
+        /*) MARINARA_TERMUX_STORAGE_DIR="$MARINARA_TERMUX_DATA_DIR/storage" ;;
+        *) MARINARA_TERMUX_STORAGE_DIR="$PWD/packages/server/$MARINARA_TERMUX_DATA_DIR/storage" ;;
+    esac
+    MARINARA_TERMUX_PROFILE_STORAGE_KIB=$(du -sk "$MARINARA_TERMUX_STORAGE_DIR" 2>/dev/null | awk '{print $1}' || true)
+    MARINARA_TERMUX_DEVICE_MEMORY_KIB=$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo 2>/dev/null || true)
+    MARINARA_TERMUX_HEAP_MB=$(resolve_default_node_heap_mb "$MARINARA_TERMUX_PROFILE_STORAGE_KIB" "$MARINARA_TERMUX_DEVICE_MEMORY_KIB")
+    NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--max-old-space-size=${MARINARA_TERMUX_HEAP_MB}"
+    export NODE_OPTIONS
+    echo "  [OK] Node.js heap limit set to ${MARINARA_TERMUX_HEAP_MB} MiB for this profile and device"
+else
+    # Tells the client build (and the in-app updater's) to keep the user's heap.
+    export MARINARA_EXPLICIT_NODE_HEAP=1
+fi
+
+# Resident chat cap (#5592): evict clean LRU chats from memory past this. 0 = off.
+export MARINARA_MAX_RESIDENT_CHATS="${MARINARA_MAX_RESIDENT_CHATS:-8}"
 
 AUTO_UPDATE_ENABLED_NORMALIZED=$(printf '%s' "${AUTO_UPDATE_ENABLED:-true}" | tr '[:upper:]' '[:lower:]' | tr -d '\r ')
 case "$AUTO_UPDATE_ENABLED_NORMALIZED" in
@@ -235,6 +281,8 @@ prune_pnpm_store() {
 install_workspace_dependencies() {
     # Avoid --force here. On constrained Android devices it recreates the entire
     # virtual store and may download optional binaries for platforms we cannot run.
+    # pnpm's default target (android/<arch>) is the right one: the native build
+    # tools ship Android builds, and nothing loads Linux binaries on Android.
     # Termux provides a global libvips but no Android NDK; Sharp must use its
     # supported WebAssembly fallback rather than attempting a native source build.
     SHARP_IGNORE_GLOBAL_LIBVIPS=1 run_pnpm install --frozen-lockfile --prefer-offline
@@ -506,9 +554,9 @@ if [ -f "packages/shared/dist/constants/defaults.js" ]; then
 fi
 
 # ── Install dependencies ──
-if [ ! -d "node_modules" ] || [ "$TERMUX_FORCE_INSTALL" = "1" ] || ! node scripts/check-workspace-install.mjs >/dev/null 2>&1; then
+if [ ! -d "node_modules" ] || ! node scripts/check-workspace-install.mjs >/dev/null 2>&1; then
     echo ""
-    echo "  [..] Installing dependencies${TERMUX_FORCE_INSTALL:+ (refreshing for platform fix)}..."
+    echo "  [..] Installing dependencies..."
     echo "       This may take several minutes on mobile."
     echo ""
     prune_pnpm_store
@@ -524,17 +572,17 @@ if [ ! -f "packages/server/dist/index.js" ]; then
     echo "  [..] Building server..."
     run_pnpm --filter @marinara-engine/server build
 fi
-if [ ! -f "packages/client/dist/index.html" ]; then
-    echo "  [..] Building client..."
+if ! node scripts/check-client-build.mjs; then
+    echo "  [..] Rebuilding incomplete client assets..."
     # Skip tsc type-check on Termux — it OOMs on low-memory devices.
     # Skip PWA service worker — terser minifier OOMs on low-memory devices.
     # Vite doesn't need tsc output (tsconfig has noEmit: true).
-    if ! SKIP_PWA=1 run_pnpm --filter @marinara-engine/client exec vite build 2>&1; then
-        echo "  [WARN] Vite build failed — native binaries may not match Node.js $(node -v)."
-        echo "  [..] Ensuring WASM fallback for rollup is installed and retrying..."
+    if ! build_termux_client 2>&1; then
+        echo "  [WARN] Vite build failed. Checking build dependencies before one retry..."
         run_pnpm install --frozen-lockfile --prefer-offline --filter @marinara-engine/client 2>/dev/null || true
-        SKIP_PWA=1 run_pnpm --filter @marinara-engine/client exec vite build
+        build_termux_client
     fi
+    node scripts/check-client-build.mjs
 fi
 
 export NODE_ENV=production
@@ -607,14 +655,57 @@ trap release_termux_wake_lock EXIT
 if command -v termux-wake-lock &> /dev/null && command -v termux-wake-unlock &> /dev/null; then
     if termux-wake-lock >/dev/null 2>&1; then
         TERMUX_WAKE_LOCK_ACQUIRED=1
+        export MARINARA_WAKE_LOCK_STATUS=acquired
         echo "  [OK] Android wake lock acquired for background reliability"
     else
+        export MARINARA_WAKE_LOCK_STATUS=failed
         echo "  [WARN] Could not acquire an Android wake lock; background execution may pause."
     fi
 else
+    export MARINARA_WAKE_LOCK_STATUS=unavailable
     echo "  [WARN] Termux wake-lock commands are unavailable; background execution may pause."
+fi
+
+# A missing wake lock is the #1 background-reliability signal (#5656): repeat
+# it prominently right before the server starts so it cannot scroll away
+# unnoticed, and tell the user what to do about it.
+if [ "$MARINARA_WAKE_LOCK_STATUS" != "acquired" ]; then
+    echo ""
+    echo "  ============================================================"
+    echo "  [WARN] NO ANDROID WAKE LOCK ($MARINARA_WAKE_LOCK_STATUS)."
+    echo "         Android may FREEZE the server whenever Termux is in"
+    echo "         the background: the app will hang until you bring"
+    echo "         Termux back to the foreground."
+    if [ "$MARINARA_WAKE_LOCK_STATUS" = "unavailable" ]; then
+        echo "         termux-wake-lock ships with the core termux-tools"
+        echo "         package: run 'pkg install termux-tools' and restart."
+    fi
+    echo "         Also set Termux's battery usage to Unrestricted in"
+    echo "         Android settings."
+    echo "  ============================================================"
+    echo ""
 fi
 
 # Start server
 cd packages/server
-node dist/index.js
+# Preserve Node's real exit status. The launcher's session-wide tee has already
+# made update, build, and server output durable for the next support report.
+set +e
+node ../../scripts/run-server.mjs dist/index.js
+MARINARA_SERVER_STATUS=$?
+set -e
+if [ "$MARINARA_SERVER_STATUS" -ne 0 ]; then
+    echo "  [ERROR] YunYun Engine server exited with status $MARINARA_SERVER_STATUS." >&2
+fi
+if [ -n "$MARINARA_TERMUX_LOG_TEE_PID" ]; then
+    # Close the pipe before waiting so tee sees EOF and flushes the final lines.
+    exec 1>&3 2>&4 3>&- 4>&-
+    set +e
+    wait "$MARINARA_TERMUX_LOG_TEE_PID"
+    MARINARA_TERMUX_LOG_TEE_STATUS=$?
+    set -e
+    if [ "$MARINARA_TERMUX_LOG_TEE_STATUS" -ne 0 ]; then
+        echo "  [WARN] Persistent Termux logging failed with status $MARINARA_TERMUX_LOG_TEE_STATUS." >&2
+    fi
+fi
+exit "$MARINARA_SERVER_STATUS"

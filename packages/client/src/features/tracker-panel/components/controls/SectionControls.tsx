@@ -3,6 +3,9 @@ import { ChevronDown, Plus } from "lucide-react";
 import { cn } from "../../../../lib/utils";
 import { TRACKER_TEXT_MICRO } from "../../lib/tracker-panel.constants";
 
+export const TRACKER_SECTION_SHELL_CLASS =
+  "relative z-10 overflow-hidden border-b border-[var(--border)] bg-[var(--tracker-panel-section-background,color-mix(in_srgb,var(--card)_5%,transparent))] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_5%,transparent)]";
+
 export function AddRowButton({
   children,
   onClick,
@@ -60,11 +63,12 @@ export function SectionIconButton({
       aria-pressed={pressed}
       className={cn(
         "flex h-6 min-h-6 w-6 min-w-6 shrink-0 items-center justify-center rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
-        tone === "feature"
-          ? pressed
-            ? "bg-[var(--foreground)]/10 text-[var(--foreground)] ring-1 ring-[var(--foreground)]/18 hover:bg-[var(--foreground)]/14"
-            : "text-[var(--muted-foreground)]/45 hover:bg-[var(--secondary)]/65 hover:text-[var(--foreground)]/86"
-          : "text-[var(--muted-foreground)]/62 hover:bg-[var(--secondary)]/65 hover:text-[var(--foreground)]",
+        // A switched-on mode (lock, add, delete) looks pressed whatever its tone (#7689).
+        pressed
+          ? "bg-[var(--foreground)]/10 text-[var(--foreground)] ring-1 ring-[var(--foreground)]/18 hover:bg-[var(--foreground)]/14"
+          : tone === "feature"
+            ? "text-[var(--muted-foreground)]/45 hover:bg-[var(--secondary)]/65 hover:text-[var(--foreground)]/86"
+            : "text-[var(--muted-foreground)]/62 hover:bg-[var(--secondary)]/65 hover:text-[var(--foreground)]",
         className,
       )}
     >
@@ -169,9 +173,14 @@ export function SectionHeader({
   );
 }
 
-export function EmptySection({ children }: { children: ReactNode }) {
+export function EmptySection({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="rounded-sm border border-dashed border-[color-mix(in_srgb,var(--tracker-inline-rule,var(--border))_38%,transparent)] px-1 py-1 text-center text-[0.6875rem] text-[color-mix(in_srgb,var(--tracker-inline-muted,var(--muted-foreground))_66%,transparent)]">
+    <div
+      className={cn(
+        "rounded-sm border border-dashed border-[color-mix(in_srgb,var(--tracker-inline-rule,var(--border))_38%,transparent)] px-1 py-1 text-center text-[0.6875rem] text-[color-mix(in_srgb,var(--tracker-inline-muted,var(--muted-foreground))_66%,transparent)]",
+        className,
+      )}
+    >
       {children}
     </div>
   );

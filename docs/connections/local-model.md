@@ -12,6 +12,7 @@ The Local Model is deliberately small. It is meant for background helper work, n
 - Scene effects in Game Mode, such as backgrounds, music, and weather.
 - Lorebook embeddings for semantic search.
 - Microphone transcription in Conversation calls, through a separate speech model.
+- Answering activation questions and decision statements, if you pick it as your Decision model. See [Decision Models](decision-models.md).
 
 The setup window calls it the **Local AI Model**. The connection dropdowns call it **Local Model (sidecar)**. These are the same feature.
 
@@ -180,6 +181,8 @@ To remove only the selected model, click the trash button titled **Delete Local 
 
 Your recorded audio never leaves your machine. Only the transcribed text is sent to your chosen chat connection. To use it in a call, set the call audio input mode to the Local Whisper option. See [Conversation Audio and Video Calls](../conversation/calls.md).
 
+If you turn on the **Speech to Text** card in Connections, that call mode sends your speech to the server you entered there instead of Local Whisper. See [Use your own speech-to-text server](../conversation/calls.md#use-your-own-speech-to-text-server).
+
 ## Troubleshooting
 
 **"Sidecar runtime install is disabled."** Installing or reinstalling the runtime is a protected action. Windows one-click installs turn it on for you. On macOS, Linux, and Docker, you have two options. Set `SIDECAR_RUNTIME_INSTALL_ENABLED=true` in the server `.env` file, for example:
@@ -203,6 +206,7 @@ For more help, see [Troubleshooting YunYun Engine](../TROUBLESHOOTING.md).
 ## Related guides
 
 - [Connecting to an AI Provider](connecting-to-a-provider.md)
+- [Decision Models](decision-models.md)
 - [Connecting a Local or Self-Hosted Model](local-self-hosted.md)
 - [Memory Recall and Chat Summaries](../agents/memory.md)
 - [Conversation Audio and Video Calls](../conversation/calls.md)

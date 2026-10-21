@@ -1,4 +1,5 @@
 import { compactQuestProgressForContext, formatCustomTrackerFieldForPrompt } from "@marinara-engine/shared";
+import { formatBeholderStateForPrompt, normalizeBeholderState } from "../agents/beholder-state.js";
 import { wrapContent } from "../prompt/format-engine.js";
 
 type WrapFormat = "xml" | "markdown" | "none";
@@ -20,6 +21,16 @@ type GameStateSnapshotLike = {
   personaStats?: unknown;
   playerStats?: unknown;
 };
+
+export const COMMITTED_TRACKER_AGENT_TYPES = new Set([
+  "world-state",
+  "character-tracker",
+  "persona-stats",
+  "quest",
+  "custom-tracker",
+  "inventory-tracker",
+  "beholder",
+]);
 
 export const MAX_WORLD_CUSTOM_FIELDS_IN_COMMITTED_CONTEXT = 64;
 
@@ -104,10 +115,7 @@ function formatCharacterLine(character: any): string | null {
   if (character.thoughts) details.push(`thoughts: ${character.thoughts}`);
   if (character.customFields && typeof character.customFields === "object" && !Array.isArray(character.customFields)) {
     for (const [fieldName, fieldValue] of Object.entries(character.customFields)) {
-      const line = formatNamedValueLine(
-        { name: fieldName, value: fieldValue },
-        CHARACTER_RESERVED_CUSTOM_FIELD_NAMES,
-      );
+      const line = formatNamedValueLine({ name: fieldName, value: fieldValue }, CHARACTER_RESERVED_CUSTOM_FIELD_NAMES);
       if (line) details.push(line);
     }
   }
@@ -136,33 +144,40 @@ function formatQuestLine(quest: any): string | null {
   return `- ${name}${objectives ? "\n" + objectives : ""}`;
 }
 
-function formatInventoryLine(item: any): string | null {
+function formatInventoryTrackerLine(item: any): string | null {
   const name = asText(item?.name);
   if (!name) return null;
-  const quantity = finiteNumberText(item?.quantity);
-  const description = asText(item?.description);
-  return `- ${name}${quantity && Number(quantity) > 1 ? ` x${quantity}` : ""}${description ? ` — ${description}` : ""}`;
+  const quantity = finiteNumberText(item?.qty);
+  const details = [
+    formatNamedValueLine({ name: "description", value: item?.description }),
+    formatNamedValueLine({ name: "location", value: item?.location }),
+  ].filter(isNonEmptyLine);
+  return `- ${name}${quantity && Number(quantity) > 1 ? ` x${quantity}` : ""}${details.length ? ` (${details.join("; ")})` : ""}`;
 }
 
 export function buildCommittedTrackerContextBlock(args: {
   chatEnableAgents: boolean;
   activeAgentIds: string[];
   latestGameState: GameStateSnapshotLike | null | undefined;
+  beholderState?: unknown;
   chatMetadata: Record<string, unknown>;
   wrapFormat: WrapFormat;
+  excludeAgentIds?: ReadonlySet<string>;
 }): string | null {
   if (!args.chatEnableAgents || args.activeAgentIds.length === 0) return null;
 
   const active = new Set(args.activeAgentIds);
+  if (!args.activeAgentIds.some((id) => COMMITTED_TRACKER_AGENT_TYPES.has(id))) return null;
+  for (const id of args.excludeAgentIds ?? []) active.delete(id);
   const hasWorldState = active.has("world-state");
   const hasCharTracker = active.has("character-tracker");
   const hasPersonaStats = active.has("persona-stats");
   const hasQuest = active.has("quest");
   const hasCustomTracker = active.has("custom-tracker");
-  if (!hasWorldState && !hasCharTracker && !hasPersonaStats && !hasQuest && !hasCustomTracker) return null;
+  const hasInventoryTracker = active.has("inventory-tracker");
+  const hasBeholder = active.has("beholder");
 
-  const snap = args.latestGameState ?? undefined;
-  if (!snap) return null;
+  const snap = args.latestGameState ?? {};
 
   const trackerParts: string[] = [];
 
@@ -219,11 +234,6 @@ export function buildCommittedTrackerContextBlock(args: {
         }
       }
 
-      if (hasPersonaStats && Array.isArray(stats.inventory) && stats.inventory.length > 0) {
-        const invLines = (stats.inventory as unknown[]).map(formatInventoryLine).filter(isNonEmptyLine);
-        if (invLines.length > 0) trackerParts.push(wrapContent(invLines.join("\n"), "Inventory", args.wrapFormat));
-      }
-
       if (hasPersonaStats && Array.isArray(stats.stats) && stats.stats.length > 0) {
         const statLines = (stats.stats as unknown[]).map(formatStatLine).filter(isNonEmptyLine);
         if (statLines.length > 0) trackerParts.push(wrapContent(statLines.join("\n"), "Stats", args.wrapFormat));
@@ -233,6 +243,29 @@ export function buildCommittedTrackerContextBlock(args: {
         const customLines = stats.customTrackerFields.map(formatCustomTrackerFieldForPrompt);
         trackerParts.push(wrapContent(customLines.join("\n"), "Custom Tracker", args.wrapFormat));
       }
+
+      if (hasInventoryTracker) {
+        const inventoryGroups = [
+          ["Currencies", stats.inventoryTrackerCurrencies],
+          ["Equipped", stats.inventoryTrackerEquipped],
+          ["Inventory", stats.inventoryTrackerInventory],
+        ] as const;
+        const groupBlocks = inventoryGroups.flatMap(([label, rows]) => {
+          if (!Array.isArray(rows) || rows.length === 0) return [];
+          const lines = rows.map(formatInventoryTrackerLine).filter(isNonEmptyLine);
+          return lines.length > 0 ? [`${label}:\n${lines.join("\n")}`] : [];
+        });
+        if (groupBlocks.length > 0) {
+          trackerParts.push(wrapContent(groupBlocks.join("\n"), "Inventory Tracker", args.wrapFormat));
+        }
+      }
+    }
+  }
+
+  if (hasBeholder) {
+    const beholderState = normalizeBeholderState(args.beholderState);
+    if (beholderState && beholderState.characters.length > 0) {
+      trackerParts.push(wrapContent(formatBeholderStateForPrompt(beholderState), "Physical State", args.wrapFormat));
     }
   }
 
@@ -251,7 +284,7 @@ export function buildCommittedTrackerContextBlock(args: {
   if (trackerParts.length === 0) return null;
 
   return args.wrapFormat === "none"
-    ? trackerParts.join("\n\n")
+    ? `Context:\n${trackerParts.join("\n\n")}`
     : args.wrapFormat === "xml"
       ? `<context>\n${trackerParts.map((part) => "    " + part.replace(/\n/g, "\n    ")).join("\n")}\n</context>`
       : `# Context\n*(Established state as of the last message. Do not re-describe — advance from here.)*\n${trackerParts.join("\n")}`;
@@ -262,17 +295,34 @@ export function injectCommittedTrackerContext(args: {
   chatEnableAgents: boolean;
   activeAgentIds: string[];
   latestGameState: GameStateSnapshotLike | null | undefined;
+  beholderState?: unknown;
   chatMetadata: Record<string, unknown>;
   wrapFormat: WrapFormat;
+  /** Return true only when an enabled preset section consumed this saved state. */
+  placeSection?(agentType: string, content: string): boolean;
   dedupeLastMessageWrappers(messages: PromptMessage[]): void;
   findTrackerContextInsertIndex(messages: PromptMessage[]): number;
 }): void {
+  const placedAgentIds = new Set<string>();
+  if (args.placeSection && args.chatEnableAgents) {
+    for (const agentType of new Set(args.activeAgentIds)) {
+      const sectionContent = buildCommittedTrackerContextBlock({
+        ...args,
+        activeAgentIds: [agentType],
+        // Player notes belong to the shared context, never to an individual tracker.
+        chatMetadata: {},
+      });
+      if (sectionContent && args.placeSection(agentType, sectionContent)) placedAgentIds.add(agentType);
+    }
+  }
   const contextBlock = buildCommittedTrackerContextBlock({
     chatEnableAgents: args.chatEnableAgents,
     activeAgentIds: args.activeAgentIds,
     latestGameState: args.latestGameState,
+    beholderState: args.beholderState,
     chatMetadata: args.chatMetadata,
     wrapFormat: args.wrapFormat,
+    excludeAgentIds: placedAgentIds,
   });
 
   if (!contextBlock) return;

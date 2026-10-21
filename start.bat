@@ -51,6 +51,35 @@ if !NODE_MAJOR! LSS 24 (
     exit /b 1
 )
 
+:: Resolve the browser URL before update/install work so repeat shortcut launches
+:: can reopen a healthy server immediately.
+set NODE_ENV=production
+if not defined PORT set PORT=7860
+if not defined HOST set HOST=0.0.0.0
+if not defined SIDECAR_RUNTIME_INSTALL_ENABLED set SIDECAR_RUNTIME_INSTALL_ENABLED=true
+
+set PROTOCOL=http
+if defined SSL_CERT if defined SSL_KEY set PROTOCOL=https
+set "BROWSER_HOST=%HOST%"
+if "%BROWSER_HOST%"=="" set "BROWSER_HOST=127.0.0.1"
+if "%BROWSER_HOST%"=="0.0.0.0" set "BROWSER_HOST=127.0.0.1"
+if "%BROWSER_HOST%"=="::" set "BROWSER_HOST=127.0.0.1"
+
+set "AUTO_OPEN_BROWSER_ENABLED=1"
+if defined AUTO_OPEN_BROWSER (
+    if /I "%AUTO_OPEN_BROWSER%"=="0" set "AUTO_OPEN_BROWSER_ENABLED="
+    if /I "%AUTO_OPEN_BROWSER%"=="false" set "AUTO_OPEN_BROWSER_ENABLED="
+    if /I "%AUTO_OPEN_BROWSER%"=="no" set "AUTO_OPEN_BROWSER_ENABLED="
+    if /I "%AUTO_OPEN_BROWSER%"=="off" set "AUTO_OPEN_BROWSER_ENABLED="
+)
+
+call :check_launch_port
+if errorlevel 2 goto :existing_server
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
 :: Resolve the exact repo-pinned pnpm before any install path uses it.
 call :resolve_pnpm_runner
 if errorlevel 1 (
@@ -59,6 +88,10 @@ if errorlevel 1 (
 )
 
 goto :after_restore_helper
+
+:check_launch_port
+node scripts\check-port-available.mjs
+exit /b !errorlevel!
 
 :restore_stashed_changes
 if not "!STASHED!"=="1" goto :eof
@@ -104,7 +137,10 @@ if defined AUTO_UPDATE_DISABLED (
     node scripts\check-launcher-update.mjs
     goto :skip_update
 )
-if not exist ".git" goto :skip_update
+if not exist ".git" (
+    echo  [OK] Not a Git checkout; automatic updates and commit-based stale-build checks are unavailable. Version checks will still run.
+    goto :skip_update
+)
 echo  [..] Checking for updates...
 for /f "tokens=*" %%i in ('git rev-parse HEAD 2^>nul') do set "OLD_HEAD=%%i"
 set "CURRENT_BRANCH="
@@ -323,7 +359,8 @@ if errorlevel 1 echo  [WARN] Optional background remover install failed; built-i
 :: Build if needed
 if not exist "packages\shared\dist\constants\defaults.js" set "BUILD_REQUIRED=1"
 if not exist "packages\server\dist\index.js" set "BUILD_REQUIRED=1"
-if not exist "packages\client\dist\index.html" set "BUILD_REQUIRED=1"
+node scripts\check-client-build.mjs
+if errorlevel 1 set "BUILD_REQUIRED=1"
 if "!BUILD_REQUIRED!"=="1" (
     echo  [..] Cleaning stale build artifacts...
     call :run_pnpm clean:stale-client
@@ -341,34 +378,34 @@ if "!BUILD_REQUIRED!"=="1" (
     if errorlevel 1 echo  [ERROR] Failed to build server or client package. & pause & exit /b 1
 )
 
+node scripts\check-client-build.mjs
+if errorlevel 1 (
+    echo  [ERROR] Client assets are still incomplete after building. Startup stopped.
+    pause
+    exit /b 1
+)
+
 :: Database migrations are handled automatically at server startup by runMigrations()
 
-:: Set defaults only if not already set
-set NODE_ENV=production
-if not defined PORT set PORT=7860
-if not defined HOST set HOST=0.0.0.0
-if not defined SIDECAR_RUNTIME_INSTALL_ENABLED set SIDECAR_RUNTIME_INSTALL_ENABLED=true
-
-set PROTOCOL=http
-if defined SSL_CERT if defined SSL_KEY set PROTOCOL=https
-set "BROWSER_HOST=%HOST%"
-if "%BROWSER_HOST%"=="" set "BROWSER_HOST=127.0.0.1"
-if "%BROWSER_HOST%"=="0.0.0.0" set "BROWSER_HOST=127.0.0.1"
-if "%BROWSER_HOST%"=="::" set "BROWSER_HOST=127.0.0.1"
-
-set "AUTO_OPEN_BROWSER_ENABLED=1"
-if defined AUTO_OPEN_BROWSER (
-    if /I "%AUTO_OPEN_BROWSER%"=="0" set "AUTO_OPEN_BROWSER_ENABLED="
-    if /I "%AUTO_OPEN_BROWSER%"=="false" set "AUTO_OPEN_BROWSER_ENABLED="
-    if /I "%AUTO_OPEN_BROWSER%"=="no" set "AUTO_OPEN_BROWSER_ENABLED="
-    if /I "%AUTO_OPEN_BROWSER%"=="off" set "AUTO_OPEN_BROWSER_ENABLED="
-)
-
-node scripts\check-port-available.mjs
+call :check_launch_port
+if errorlevel 2 goto :existing_server
 if errorlevel 1 (
     pause
-    goto :eof
+    exit /b 1
 )
+
+goto :start_server
+
+:existing_server
+if defined AUTO_OPEN_BROWSER_ENABLED (
+    echo  [OK] Reopening the running YunYun Engine instance...
+    start "" "%PROTOCOL%://%BROWSER_HOST%:%PORT%" || explorer "%PROTOCOL%://%BROWSER_HOST%:%PORT%"
+) else (
+    echo  [OK] YunYun Engine is already running. Auto-open is disabled ^(AUTO_OPEN_BROWSER=%AUTO_OPEN_BROWSER%^)
+)
+exit /b 0
+
+:start_server
 
 echo.
 echo  ==========================================
@@ -387,7 +424,7 @@ if defined AUTO_OPEN_BROWSER_ENABLED (
 
 :: Start server
 cd packages\server
-node dist/index.js
+node ../../scripts/run-server.mjs dist/index.js
 if errorlevel 1 (
     echo.
     echo  [ERROR] Server exited unexpectedly. See the error above.

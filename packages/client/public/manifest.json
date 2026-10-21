@@ -2,11 +2,11 @@
   "name": "YunYun Engine",
   "short_name": "YunYun",
   "description": "AI Chat & Roleplay Frontend — Conversation, Roleplay, Game",
-  "version": "2.4.2",
+  "version": "2.5.1",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#0a0a0f",
+  "background_color": "#0f0f13",
+  "theme_color": "#0f0f13",
   "icons": [
     {
       "src": "/yunyun-favicon.png",

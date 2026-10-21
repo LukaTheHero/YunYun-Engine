@@ -25,8 +25,7 @@ import { SIDECAR_DEFAULT_CONFIG } from "@marinara-engine/shared";
 import { api } from "../lib/api-client.js";
 import { consumeSidecarDownloadStream } from "../lib/sidecar-download-stream.js";
 
-export const GEMMA_RESTART_MESSAGE =
-  "Gemma downloaded. Completely restart YunYun Engine before using the local model.";
+export const GEMMA_RESTART_MESSAGE = "Gemma downloaded. Completely restart YunYun Engine before using the local model.";
 
 interface SidecarTestMessageResult {
   success: boolean;
@@ -59,6 +58,7 @@ interface SidecarState {
   runtime: SidecarRuntimeInfo;
   inferenceReady: boolean;
   modelSize: number | null;
+  gpuMemory: SidecarStatusResponse["gpuMemory"];
   logPath: string | null;
   startupError: string | null;
   failedRuntimeVariant: string | null;
@@ -106,6 +106,7 @@ interface SidecarState {
       Pick<
         SidecarConfig,
         | "useForTrackers"
+        | "useAsAgentsDefault"
         | "useForGameScene"
         | "contextSize"
         | "maxTokens"
@@ -114,6 +115,7 @@ interface SidecarState {
         | "topK"
         | "maxParallelJobs"
         | "gpuLayers"
+        | "kvCacheType"
         | "enableNativeToolCalls"
         | "embeddingPooling"
         | "embeddingBatchSize"
@@ -326,6 +328,7 @@ export const useSidecarStore = create<SidecarState>((set, get) => ({
   runtime: { installed: false, build: null, variant: null, backend: null },
   inferenceReady: false,
   modelSize: null,
+  gpuMemory: null,
   logPath: null,
   startupError: null,
   failedRuntimeVariant: null,
@@ -363,6 +366,7 @@ export const useSidecarStore = create<SidecarState>((set, get) => ({
         runtime: response.runtime,
         inferenceReady: response.inferenceReady,
         modelSize: response.modelSize,
+        gpuMemory: response.gpuMemory ?? null,
         logPath: response.logPath,
         startupError: response.startupError ?? null,
         failedRuntimeVariant: response.failedRuntimeVariant ?? null,
@@ -549,6 +553,7 @@ export const useSidecarStore = create<SidecarState>((set, get) => ({
       modelDisplayName: null,
       inferenceReady: false,
       modelSize: null,
+      gpuMemory: null,
       startupError: null,
       failedRuntimeVariant: null,
       runtimeDiagnostics: null,

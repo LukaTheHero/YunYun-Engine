@@ -10,6 +10,7 @@ import {
   resolveSpriteNativeTransparency,
   resolveSpriteSheetCanvas,
 } from "../../packages/server/src/routes/sprites.routes.js";
+import type { ImageGenerationDefaultsProfile } from "../../packages/shared/src/types/image-generation-defaults.js";
 
 // Resolve the optional native dependency from the server package where it is
 // declared instead of from this root-level regression script.
@@ -44,24 +45,18 @@ assert.equal(resolveSpriteNativeTransparency("gpt-image-1.5", true), true);
 assert.equal(resolveSpriteNativeTransparency("sdxl", true), true);
 assert.equal(resolveSpriteNativeTransparency("gpt-image-2", false), false);
 
-assert.deepEqual(
-  resolveSpriteSheetCanvas({ cols: 1, rows: 1, spriteType: "full-body", model: "gpt-image-2" }),
-  {
-    sheetWidth: 1024,
-    sheetHeight: 1536,
-    cellWidth: 1024,
-    cellHeight: 1536,
-  },
-);
-assert.deepEqual(
-  resolveSpriteSheetCanvas({ cols: 1, rows: 1, spriteType: "full-body", model: "sdxl" }),
-  {
-    sheetWidth: 1024,
-    sheetHeight: 1536,
-    cellWidth: 1024,
-    cellHeight: 1536,
-  },
-);
+assert.deepEqual(resolveSpriteSheetCanvas({ cols: 1, rows: 1, spriteType: "full-body", model: "gpt-image-2" }), {
+  sheetWidth: 1024,
+  sheetHeight: 1536,
+  cellWidth: 1024,
+  cellHeight: 1536,
+});
+assert.deepEqual(resolveSpriteSheetCanvas({ cols: 1, rows: 1, spriteType: "full-body", model: "sdxl" }), {
+  sheetWidth: 1024,
+  sheetHeight: 1536,
+  cellWidth: 1024,
+  cellHeight: 1536,
+});
 
 const fullBodyReferenceContract = buildFullBodyReferenceContract([
   { kind: "neutral-full-body" },
@@ -209,3 +204,142 @@ assert.equal(pixelAt(transparentOutput.data, width, 0, 0).alpha, 0);
 assert.equal(pixelAt(transparentOutput.data, width, 20, 20).blue, 220);
 
 console.info("Sprite background regression passed.");
+
+// ── styleProfileId threading (#5095) ─────────────────────────────────────────
+// The sprite compiler must honor an explicit per-request style profile, keep
+// byte-identical output when the field is absent, and degrade unknown ids the
+// same way the gallery path does (findImageStyleProfile falls back gracefully).
+{
+  const { compileSpritePrompt } = await import("../../packages/server/src/routes/sprites.routes.js");
+  const { normalizeImageStyleProfileSettings, findImageStyleProfile } =
+    await import("../../packages/shared/src/constants/image-style-profiles.js");
+  const settings = normalizeImageStyleProfileSettings(null);
+  const nonDefault = settings.profiles.find((profile) => profile.id !== settings.defaultProfileId);
+  assert.ok(nonDefault, "built-in profiles must include a non-default profile for this regression");
+
+  const base = { appearance: "a test subject", styleProfiles: settings };
+  const omitted = compileSpritePrompt("sprite of the subject", base);
+  const explicitDefault = compileSpritePrompt("sprite of the subject", {
+    ...base,
+    styleProfileId: settings.defaultProfileId,
+  });
+  assert.deepEqual(explicitDefault, omitted, "explicitly passing the default profile must equal omitting the field");
+
+  const overridden = compileSpritePrompt("sprite of the subject", { ...base, styleProfileId: nonDefault.id });
+  assert.notDeepEqual(overridden, omitted, "an explicit non-default profile must change the compiled prompt");
+
+  const unknown = compileSpritePrompt("sprite of the subject", { ...base, styleProfileId: "no-such-profile" });
+  const fallbackProfile = findImageStyleProfile(settings, "no-such-profile");
+  const fallbackDirect = compileSpritePrompt("sprite of the subject", { ...base, styleProfileId: fallbackProfile.id });
+  assert.deepEqual(unknown, fallbackDirect, "unknown ids must degrade exactly like findImageStyleProfile");
+
+  const blank = compileSpritePrompt("sprite of the subject", { ...base, styleProfileId: "   " });
+  assert.deepEqual(blank, omitted, "a blank styleProfileId must behave like an omitted one");
+
+  // Connection-scoped default: imageDefaults.styleProfileId is the middle link of
+  // the compiler's `explicit ?? connection default ?? user default` chain, which the
+  // `base` object (no imageDefaults) never exercises. A styleProfileId-only defaults
+  // object is prompt/negative-prefix-neutral (the prefixes come from the per-service
+  // sub-objects, left unset here), so its only effect on the compiled prompt is which
+  // profile the chain resolves to.
+  const connectionDefault: ImageGenerationDefaultsProfile = {
+    version: 1,
+    service: "automatic1111",
+    seed: 0,
+    styleProfileId: nonDefault.id,
+  };
+  const viaConnectionDefault = compileSpritePrompt("sprite of the subject", {
+    ...base,
+    imageDefaults: connectionDefault,
+  });
+  assert.deepEqual(
+    viaConnectionDefault,
+    overridden,
+    "omitting styleProfileId must fall back to the connection's imageDefaults.styleProfileId",
+  );
+  assert.notDeepEqual(
+    viaConnectionDefault,
+    omitted,
+    "the connection default must move the compiled prompt off the user's default profile",
+  );
+
+  const explicitOverridesConnectionDefault = compileSpritePrompt("sprite of the subject", {
+    ...base,
+    imageDefaults: connectionDefault,
+    styleProfileId: settings.defaultProfileId,
+  });
+  assert.deepEqual(
+    explicitOverridesConnectionDefault,
+    omitted,
+    "an explicit styleProfileId must override the connection's imageDefaults.styleProfileId",
+  );
+  console.log("sprite styleProfileId threading regression passed");
+}
+
+// ── Talking-head faces ───────────────────────────────────────────────────────
+// Faces made for a 2D avatar must start with open eyes and a closed mouth, or its blink and talk pictures
+// change nothing; the rule is added after compiling, so the tag compiler can't drop it.
+{
+  const { withTalkingHeadFaceContract } = await import("../../packages/server/src/routes/sprites.routes.js");
+  const compiled = { prompt: "happy, portrait", negativePrompt: "blurry" };
+  assert.deepEqual(
+    withTalkingHeadFaceContract(compiled, { talkingHeadFaces: false }),
+    compiled,
+    "other sprites are drawn as before",
+  );
+  const faces = withTalkingHeadFaceContract(compiled, { talkingHeadFaces: true });
+  assert.ok(faces.prompt.startsWith("happy, portrait\n\n"), "the compiled prompt stays first");
+  assert.match(faces.prompt, /both eyes are fully open/u);
+  assert.match(faces.prompt, /lips are closed/u);
+  assert.match(faces.prompt, /happy face smiles with open eyes and closed lips/u);
+  assert.match(faces.prompt, /angry face glares under lowered brows with its lips pressed shut/u);
+  assert.match(faces.prompt, /surprised face has wide-open eyes and raised brows with a closed mouth/u);
+  assert.match(faces.negativePrompt, /^blurry, closed eyes, .*open mouth/u);
+  assert.doesNotMatch(faces.prompt, /Draw each face like this/u, "no faces asked for, no looks");
+}
+
+// ── Talking-head face looks ──────────────────────────────────────────────────
+// Each of the 29 faces gets a look that keeps the eyes open and the lips closed, and a prompt describes only the
+// faces it asks for.
+{
+  const { TALKING_HEAD_FACE_LOOKS, withTalkingHeadFaceContract } =
+    await import("../../packages/server/src/routes/sprites.routes.js");
+  const { AVATAR_EMOTIONS, AVATAR_EXTRA_FEELINGS } = await import("../../packages/shared/src/types/avatars.js");
+  const faces = [...AVATAR_EMOTIONS, ...AVATAR_EXTRA_FEELINGS];
+  assert.equal(faces.length, 29);
+  assert.deepEqual(Object.keys(TALKING_HEAD_FACE_LOOKS).sort(), [...faces].sort(), "every face has a look");
+  for (const [face, look] of Object.entries(TALKING_HEAD_FACE_LOOKS)) {
+    assert.doesNotMatch(look, /open mouth|teeth|closed eyes|wink|laugh/iu, `${face} keeps open eyes and closed lips`);
+  }
+
+  const compiled = { prompt: "portrait", negativePrompt: "" };
+  const sheet = withTalkingHeadFaceContract(compiled, {
+    talkingHeadFaces: true,
+    expressions: ["neutral", "pride", "realization", "my_custom_face"],
+  });
+  assert.ok(sheet.prompt.includes("visible teeth. Separate blinking and talking pictures are made from these faces"));
+  const looksLine = sheet.prompt.split("\n").find((line) => line.startsWith("Draw each face like this: "));
+  assert.ok(looksLine, "a sheet's faces get their looks");
+  assert.equal(
+    looksLine,
+    `Draw each face like this: neutral: ${TALKING_HEAD_FACE_LOOKS.neutral}; pride: ${TALKING_HEAD_FACE_LOOKS.pride}; realization: ${TALKING_HEAD_FACE_LOOKS.realization}.`,
+    "only the faces asked for, in order; a custom label gets no look",
+  );
+  assert.doesNotMatch(sheet.prompt, /happy: |grief: /u, "faces not asked for get no look");
+
+  const oneFace = withTalkingHeadFaceContract(
+    compiled,
+    { talkingHeadFaces: true, expressions: ["neutral", "pride", "grief"] },
+    ["grief"],
+  );
+  assert.match(
+    oneFace.prompt,
+    new RegExp(`Draw each face like this: grief: ${TALKING_HEAD_FACE_LOOKS.grief}\\.$`, "u"),
+  );
+  assert.doesNotMatch(oneFace.prompt, /neutral: |pride: /u, "a one-face picture describes only its own face");
+  assert.equal(
+    withTalkingHeadFaceContract(compiled, { talkingHeadFaces: false, expressions: ["neutral"] }),
+    compiled,
+    "other sprites get no looks",
+  );
+}

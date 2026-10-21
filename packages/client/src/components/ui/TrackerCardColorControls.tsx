@@ -18,6 +18,7 @@ import {
   type TrackerCardPaintOpacity,
 } from "../../lib/tracker-card-colors";
 import { ColorPicker } from "./ColorPicker";
+import { SETTINGS_BUTTON_CLASS } from "../panels/settings/SettingControls";
 import { useTranslation as useUiTranslation } from "react-i18next";
 
 export type TrackerCardColorEntityLabel = "Character" | "Persona";
@@ -185,7 +186,12 @@ function ChannelToggle({
         checked && "bg-[var(--primary)]/22 ring-[var(--primary)]/40",
         disabled && "cursor-not-allowed opacity-55",
       )}
-      title={localizeUi("ui.ui.modal.value1Value2", { value1: checked ?localizeUi("ui.panels.extensionsettings.disable") :localizeUi("ui.presets.sectionstab.enable"), value2: label })}
+      title={localizeUi("ui.ui.modal.value1Value2", {
+        value1: checked
+          ? localizeUi("ui.panels.extensionsettings.disable")
+          : localizeUi("ui.presets.sectionstab.enable"),
+        value2: label,
+      })}
     >
       <input
         type="checkbox"
@@ -264,10 +270,16 @@ export function TrackerCardColorControls({
         type="button"
         onClick={() => setCollapsed((open) => !open)}
         aria-expanded={!collapsed}
-        title={collapsed ?localizeUi("ui.ui.trackercardcolorcontrols.expandTrackerCardColors") :localizeUi("ui.ui.trackercardcolorcontrols.collapseTrackerCardColors")}
+        title={
+          collapsed
+            ? localizeUi("ui.ui.trackercardcolorcontrols.expandTrackerCardColors")
+            : localizeUi("ui.ui.trackercardcolorcontrols.collapseTrackerCardColors")
+        }
         className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-[var(--accent)]/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--primary)]/60"
       >
-        <h4 className="min-w-0 truncate text-xs font-semibold text-[var(--foreground)]">{entityLabel} {localizeUi("ui.characters.characterlibraryview.card")}</h4>
+        <h4 className="min-w-0 truncate text-xs font-semibold text-[var(--foreground)]">
+          {entityLabel} {localizeUi("ui.characters.characterlibraryview.card")}
+        </h4>
         <div className="flex shrink-0 items-center gap-1.5" aria-hidden="true">
           <span
             className={cn("h-4 w-4 rounded ring-1 ring-[var(--border)]", !paintEnabled.displayEnabled && "opacity-35")}
@@ -290,7 +302,8 @@ export function TrackerCardColorControls({
           />
         </div>
         <p className="col-span-2 text-[0.625rem] text-[var(--muted-foreground)]">
-          {modeLabel}, {portraitStageBackgroundLabel.toLowerCase()} {localizeUi("ui.ui.trackercardcolorcontrols.stageFinishMGC")} {finishSummary}.
+          {modeLabel}, {portraitStageBackgroundLabel.toLowerCase()}{" "}
+          {localizeUi("ui.ui.trackercardcolorcontrols.stageFinishMGC")} {finishSummary}.
         </p>
       </button>
 
@@ -298,8 +311,10 @@ export function TrackerCardColorControls({
         <div className="mt-2 space-y-2">
           <div className="grid gap-1.5 rounded-lg bg-[var(--secondary)]/65 p-1.5 ring-1 ring-[var(--border)]/40">
             <div className="grid min-w-0 gap-1">
-              <span className="px-0.5 text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">{localizeUi("ui.noodle.wizard.source")}</span>
-              <div className="grid grid-cols-3 gap-0.5 rounded-md bg-[var(--background)]/35 p-0.5">
+              <span className="px-0.5 text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">
+                {localizeUi("ui.noodle.wizard.source")}
+              </span>
+              <div className="flex flex-wrap gap-1">
                 {MODE_OPTIONS.map((option) => {
                   const Icon = option.icon;
                   const selected = option.mode === mode;
@@ -309,14 +324,10 @@ export function TrackerCardColorControls({
                       type="button"
                       onClick={() => updateMode(option.mode)}
                       disabled={disabled}
-                      className={cn(
-                        "flex min-h-6 min-w-0 items-center justify-center gap-1 rounded-sm px-1 text-[0.5625rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55",
-                        selected
-                          ? "bg-[var(--primary)]/12 text-[var(--primary)] ring-1 ring-[var(--primary)]/24"
-                          : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]/45 hover:text-[var(--foreground)]",
-                      )}
+                      aria-pressed={selected}
+                      className={cn(SETTINGS_BUTTON_CLASS, "flex-auto")}
                     >
-                      {selected ? <Check size="0.625rem" /> : <Icon size="0.625rem" />}
+                      {selected ? <Check size="0.75rem" /> : <Icon size="0.75rem" />}
                       <span className="truncate">{option.label}</span>
                     </button>
                   );
@@ -325,8 +336,10 @@ export function TrackerCardColorControls({
             </div>
 
             <div className="grid min-w-0 gap-1">
-              <span className="px-0.5 text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">{localizeUi("ui.ui.trackercardcolorcontrols.stage")}</span>
-              <div className="grid grid-cols-4 gap-0.5 rounded-md bg-[var(--background)]/35 p-0.5">
+              <span className="px-0.5 text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">
+                {localizeUi("ui.ui.trackercardcolorcontrols.stage")}
+              </span>
+              <div className="flex flex-wrap gap-1">
                 {PORTRAIT_STAGE_BACKGROUND_OPTIONS.map((option) => {
                   const Icon = option.icon;
                   const selected = option.value === portraitStageBackground;
@@ -338,14 +351,10 @@ export function TrackerCardColorControls({
                       title={option.title}
                       onClick={() => updatePortraitStageBackground(option.value)}
                       disabled={disabled}
-                      className={cn(
-                        "flex min-h-6 min-w-0 items-center justify-center gap-1 rounded-sm px-1 text-[0.5625rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55",
-                        selected
-                          ? "bg-[var(--primary)]/12 text-[var(--primary)] ring-1 ring-[var(--primary)]/24"
-                          : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]/45 hover:text-[var(--foreground)]",
-                      )}
+                      aria-pressed={selected}
+                      className={cn(SETTINGS_BUTTON_CLASS, "flex-auto")}
                     >
-                      {selected ? <Check size="0.625rem" /> : <Icon size="0.625rem" />}
+                      {selected ? <Check size="0.75rem" /> : <Icon size="0.75rem" />}
                       <span className="truncate">{option.label}</span>
                     </button>
                   );
@@ -356,8 +365,10 @@ export function TrackerCardColorControls({
 
           <div className="grid gap-1.5 rounded-lg bg-[var(--secondary)]/65 p-1.5 ring-1 ring-[var(--border)]/40">
             <div className="grid min-w-0 gap-1">
-              <span className="px-0.5 text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">{localizeUi("ui.ui.trackercardcolorcontrols.finish")}</span>
-              <div className="grid grid-cols-3 gap-0.5 rounded-md bg-[var(--background)]/35 p-0.5">
+              <span className="px-0.5 text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">
+                {localizeUi("ui.ui.trackercardcolorcontrols.finish")}
+              </span>
+              <div className="flex flex-wrap gap-1">
                 {FINISH_PRESETS.map((preset) => {
                   const selected =
                     finish.materialBrightness === preset.finish.materialBrightness &&
@@ -371,12 +382,8 @@ export function TrackerCardColorControls({
                       title={preset.title}
                       onClick={() => updateFinishPreset(preset.finish)}
                       disabled={disabled}
-                      className={cn(
-                        "min-h-6 rounded-sm px-1 text-[0.5625rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-55",
-                        selected
-                          ? "bg-[var(--primary)]/12 text-[var(--primary)] ring-1 ring-[var(--primary)]/24"
-                          : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]/45 hover:text-[var(--foreground)]",
-                      )}
+                      aria-pressed={selected}
+                      className={cn(SETTINGS_BUTTON_CLASS, "flex-auto")}
                     >
                       {preset.label}
                     </button>
@@ -399,7 +406,10 @@ export function TrackerCardColorControls({
                     </span>
                     <input
                       type="range"
-                      aria-label={localizeUi("ui.ui.customemojitagbutton.value1Value2", { value1: option.label, value2: option.title })}
+                      aria-label={localizeUi("ui.ui.customemojitagbutton.value1Value2", {
+                        value1: option.label,
+                        value2: option.title,
+                      })}
                       title={option.title}
                       min={0}
                       max={100}
@@ -420,7 +430,9 @@ export function TrackerCardColorControls({
           {mode === "chat" && (
             <div className="grid gap-1.5 rounded-lg bg-[var(--secondary)]/55 p-1.5 ring-1 ring-[var(--border)]/35">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">{localizeUi("ui.ui.trackercardcolorcontrols.sourceStrength")}</span>
+                <span className="text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">
+                  {localizeUi("ui.ui.trackercardcolorcontrols.sourceStrength")}
+                </span>
                 <span className="font-mono text-[0.5625rem] tabular-nums text-[var(--muted-foreground)]">
                   {paintOpacitySummary}
                 </span>
@@ -435,7 +447,11 @@ export function TrackerCardColorControls({
                     <div
                       key={option.key}
                       className="grid min-w-0 grid-cols-[minmax(5rem,auto)_minmax(0,1fr)_2.1rem] items-center gap-1 rounded-md bg-[var(--background)]/18 px-1 py-0.5"
-                      title={channelEnabled ? option.title :localizeUi("ui.ui.trackercardcolorcontrols.value1ChannelIsOff", { value1: option.label })}
+                      title={
+                        channelEnabled
+                          ? option.title
+                          : localizeUi("ui.ui.trackercardcolorcontrols.value1ChannelIsOff", { value1: option.label })
+                      }
                     >
                       <span className="flex min-w-0 items-center gap-1.5">
                         <span className="min-w-0 truncate text-[0.5625rem] text-[var(--muted-foreground)]">
@@ -450,7 +466,10 @@ export function TrackerCardColorControls({
                       </span>
                       <input
                         type="range"
-                        aria-label={localizeUi("ui.ui.customemojitagbutton.value1Value2", { value1: option.label, value2: option.title })}
+                        aria-label={localizeUi("ui.ui.customemojitagbutton.value1Value2", {
+                          value1: option.label,
+                          value2: option.title,
+                        })}
                         title={option.title}
                         min={0}
                         max={100}
@@ -472,7 +491,9 @@ export function TrackerCardColorControls({
           {mode === "custom" && (
             <div className="rounded-lg bg-[var(--secondary)]/55 p-1.5 ring-1 ring-[var(--border)]/35">
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">{localizeUi("ui.ui.trackercardcolorcontrols.customPaint")}</span>
+                <span className="text-[0.5625rem] font-semibold uppercase text-[var(--muted-foreground)]">
+                  {localizeUi("ui.ui.trackercardcolorcontrols.customPaint")}
+                </span>
                 <span className="font-mono text-[0.5625rem] tabular-nums text-[var(--muted-foreground)]">
                   {paintOpacitySummary}
                 </span>
@@ -511,14 +532,19 @@ export function TrackerCardColorControls({
                       />
                       <label className="grid min-w-0 gap-1">
                         <span className="flex min-w-0 items-center justify-between gap-2 text-[0.5625rem] text-[var(--muted-foreground)]">
-                          <span className="min-w-0 truncate">{option.label} {localizeUi("ui.ui.trackercardcolorcontrols.strength")}</span>
+                          <span className="min-w-0 truncate">
+                            {option.label} {localizeUi("ui.ui.trackercardcolorcontrols.strength")}
+                          </span>
                           <span className="shrink-0 font-mono tabular-nums">
                             {getChannelValueLabel(channelEnabled, hasCustomPaint, value)}
                           </span>
                         </span>
                         <input
                           type="range"
-                          aria-label={localizeUi("ui.ui.customemojitagbutton.value1Value2", { value1: option.label, value2: option.title })}
+                          aria-label={localizeUi("ui.ui.customemojitagbutton.value1Value2", {
+                            value1: option.label,
+                            value2: option.title,
+                          })}
                           title={option.title}
                           min={0}
                           max={100}

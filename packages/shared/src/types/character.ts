@@ -1,6 +1,8 @@
 // ──────────────────────────────────────────────
 // Character Card V2 Types (compatible with ST / Chub)
 // ──────────────────────────────────────────────
+import type { ChoiceDisplayMode, ChoiceOption, ChoiceOptionSort } from "./prompt.js";
+
 /** Full Character Card V2 envelope. */
 export interface CharacterCardV2 {
   spec: "chara_card_v2";
@@ -11,6 +13,8 @@ export interface CharacterCardV2 {
 /** Core character data (V2 spec). */
 export interface CharacterData {
   name: string;
+  /** Short metadata synopsis for library previews. Not sent to the model. */
+  summary?: string;
   description: string;
   personality: string;
   scenario: string;
@@ -38,18 +42,41 @@ export interface CharacterExtensions {
   backstory: string;
   /** YunYun Engine extension: physical appearance description */
   appearance: string;
+  /** YunYun Engine: use `imageAppearance` instead of `appearance` in image prompts. */
+  imageAppearanceEnabled?: boolean;
+  /** YunYun Engine: appearance text used for image prompts when the override is enabled. */
+  imageAppearance?: string;
   /** YunYun Engine: Name display color/gradient (CSS value, e.g. "linear-gradient(90deg, #ff6b6b, #ffd93d)" or "#ff6b6b") */
   nameColor?: string;
   /** YunYun Engine: Dialogue highlight color — text in quotation marks is bold + colored with this */
   dialogueColor?: string;
   /** YunYun Engine: Chat bubble / dialogue box background color */
   boxColor?: string;
+  /** YunYun Engine: Alternative names/nicknames that should be colored with this
+   *  character's nameColor when they appear in chat prose. The character's primary
+   *  `name` is always a trigger; these are additional aliases (e.g. "Kate", "Kitty"). */
+  nameAliases?: string[];
   /** YunYun Engine: RPG stats toggle + custom attributes */
   rpgStats?: RPGStatsConfig;
+  /** YunYun Engine: starting builds for Game Mode rulesets, keyed by ruleset id. A game copies
+   *  the one it needs; a sheet for a ruleset that is not installed is kept dormant. */
+  rulesetSheets?: Record<string, unknown>;
   /** YunYun Engine: per-character Tracker fields copied into each new Roleplay chat. */
   trackerCustomFieldDefaults?: CharacterTrackerCustomFieldDefault[];
   /** YunYun Engine: Conversation-mode availability status */
   conversationStatus?: import("./chat.js").ConversationPresenceStatus;
+  /** YunYun Engine (Conversation mode ONLY): manual presence override. Like the
+   *  schedule, it belongs to the character and applies in every Conversation chat;
+   *  `null` means no override. Chats cache a resolved copy in
+   *  `chats.metadata.conversationStatusOverrides`. */
+  conversationStatusOverride?: import("./chat.js").ConversationStatusOverride | null;
+  /** YunYun Engine (Conversation mode ONLY): the character's weekly schedule. The
+   *  character owns it; every conversation chat caches a resolved copy in
+   *  `chats.metadata.characterSchedules`. Per-chat opt-out lives on the chat as
+   *  `conversationSchedulesEnabled`. */
+  conversationSchedule?: import("../utils/conversation-presence.js").WeekSchedule;
+  /** Renew the weekly Conversation schedule when its week ends. Defaults on when a schedule exists. */
+  conversationScheduleAutoRenew?: boolean;
   /** YunYun Engine: pronunciation override used when sending this character's name to TTS. */
   phoneticName?: string;
   /** YunYun Engine (Conversation mode ONLY): display name shown as the sender label
@@ -67,13 +94,60 @@ export interface CharacterExtensions {
   convoBehavior?: ConvoBehaviorConfig;
   /** YunYun Engine: character-specific direction for Conversation selfie image prompts. */
   conversationImageInstructions?: string;
-  /** YunYun Engine: also apply conversationImageInstructions to this character's Noodle images. */
+  /** Retain prior card revisions and automatically advance character_version on edits. */
+  versioningEnabled?: boolean;
+  /**
+   * Also apply conversationImageInstructions to this character's Noodle images. Noodle owns the
+   * control; Slurp reads it as the default until the character has its own Slurp choice.
+   */
   applyConversationImageInstructionsToNoodle?: boolean;
   /** YunYun Engine: gallery image selected as this character's optional visual reference sheet. */
   characterSheetImageId?: string | null;
   /** YunYun Engine: prefer the selected character sheet over the avatar for image references. */
   useCharacterSheetAsReference?: boolean;
+  /** YunYun Engine: interactive onboarding ("skeleton persona") carried by the card. */
+  onboarding?: CharacterOnboarding;
   [key: string]: unknown;
+}
+
+/**
+ * Interactive onboarding: a skeleton persona the card ships. The five persona
+ * Card fields are prose that may use `{{variable}}` and `{{#if}}`; `variables`
+ * are the questions the player answers once when a chat starts, and the resolved
+ * text becomes a real persona. Absent or `enabled: false` means nothing is parsed.
+ */
+export interface CharacterOnboarding {
+  enabled: boolean;
+  description: string;
+  personality: string;
+  backstory: string;
+  appearance: string;
+  scenario: string;
+  variables: CharacterOnboardingVariable[];
+  /**
+   * Questions for the card's own fields. The answers are saved as chat variables,
+   * so a `{{name}}` in the card resolves per chat and the card itself never changes.
+   */
+  cardVariables: CharacterOnboardingVariable[];
+}
+
+/**
+ * One onboarding question, shaped like a preset variable. No options = free
+ * text; options = a choice whose first option is the default; options plus
+ * `allowCustom` = a choice that also accepts the player's own answer. A variable
+ * named `player` supplies the created persona's name.
+ */
+export interface CharacterOnboardingVariable {
+  id: string;
+  variableName: string;
+  question: string;
+  /** `description` is optional help text shown to the player under the option label. */
+  options: Array<ChoiceOption & { description?: string }>;
+  allowCustom: boolean;
+  multiSelect: boolean;
+  separator: string;
+  displayMode: ChoiceDisplayMode;
+  optionSort: ChoiceOptionSort;
 }
 
 /** Where a Convo-mode behavior directive is inserted into the conversation prompt. */
@@ -137,18 +211,7 @@ export interface CharacterBook {
 }
 
 export type CharacterBookEntryPosition =
-  | "before_char"
-  | "after_char"
-  | "at_depth"
-  | "depth"
-  | 0
-  | 1
-  | 2
-  | 3
-  | 4
-  | 5
-  | 6
-  | 7;
+  "before_char" | "after_char" | "at_depth" | "depth" | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type CharacterBookEntryRole = "system" | "user" | "assistant" | 0 | 1 | 2;
 
 /** A single entry in a character book. */
@@ -209,6 +272,7 @@ export interface PersonaCardSnapshot {
   name: string;
   creator: string;
   personaVersion: string;
+  versioningEnabled: string;
   creatorNotes: string;
   phoneticName?: string;
   description: string;
@@ -216,6 +280,10 @@ export interface PersonaCardSnapshot {
   scenario: string;
   backstory: string;
   appearance: string;
+  /** YunYun Engine: image-prompt override flag, stored as a string like its siblings. */
+  imageAppearanceEnabled?: string;
+  /** YunYun Engine: appearance text used for image prompts while the override is on. */
+  imageAppearance?: string;
   characterSheetImageId: string;
   useCharacterSheetAsReference: string;
   avatarCrop: string;

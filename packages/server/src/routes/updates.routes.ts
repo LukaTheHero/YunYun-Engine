@@ -13,13 +13,22 @@ import {
   getMonorepoRoot,
   isDockerRuntime,
   isUpdatesApplyEnabled,
+  isUpdatesApplyHardDisabled,
   isUpdatesRemoteApplyAllowed,
 } from "../config/runtime-config.js";
 import { getBuildBranch, getBuildCommit, getBuildLabel } from "../config/build-info.js";
 import { getFileStorageDir } from "../config/runtime-config.js";
 import { requirePrivilegedAccess } from "../middleware/privileged-gate.js";
-import { isLoopbackIp } from "../middleware/ip-allowlist.js";
-import { isGitUpdateApplyAllowed } from "../services/updates/update-apply-policy.js";
+import { isLoopbackRequest } from "../middleware/ip-allowlist.js";
+import { UPDATE_CHANNEL_RATE_LIMIT } from "../middleware/rate-limit.js";
+import { noteSessionExitKind } from "../lib/session-postmortem.js";
+import { armShutdownDeadline } from "../lib/shutdown-deadline.js";
+import {
+  isChannelCheckoutBranch,
+  isGitUpdateApplyAllowed,
+  isUpdateChannelSwitch,
+  resolveDockerChannelImageTags,
+} from "../services/updates/update-apply-policy.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -59,7 +68,17 @@ const DEFAULT_PNPM_DESCRIPTOR =
   "10.34.5+sha512.a4ee05f2f73658255bd6a89859c065a45c28a57daefae2c893a168ee2b73168c37b91e83e57ea67654ad03f03031746430e8bce38e362e042605fb8abc80192e";
 const DEFAULT_PNPM_VERSION = DEFAULT_PNPM_DESCRIPTOR.slice(0, DEFAULT_PNPM_DESCRIPTOR.indexOf("+"));
 const PNPM_NONINTERACTIVE_ARGS = ["--config.trustPolicy=off", "--config.confirmModulesPurge=false"];
-const PNPM_UPDATE_INSTALL_ARGS = ["install", "--force", "--frozen-lockfile"];
+/**
+ * The dependency install every update runs. `--force` skips pnpm's platform
+ * filter, so on Termux it fetched every platform's optional binaries (about
+ * 1.7 GB, #7214). Android installs the way start-termux.sh does; since #7179 a
+ * plain frozen install also repairs the stale pnpm state `--force` used to heal.
+ */
+export function getUpdateInstallStep(platform: ServerPlatform): { env: Record<string, string>; args: string[] } {
+  return platform === "android-termux"
+    ? { env: { SHARP_IGNORE_GLOBAL_LIBVIPS: "1" }, args: ["install", "--frozen-lockfile", "--prefer-offline"] }
+    : { env: {}, args: ["install", "--force", "--frozen-lockfile"] };
+}
 // A forced reinstall is verbose; the execFile default (1 MiB) can abort an
 // otherwise healthy install with a maxBuffer error.
 const PNPM_OUTPUT_MAX_BUFFER = 32 * 1024 * 1024;
@@ -72,8 +91,7 @@ function updateStepTimeout(baseMs: number): number {
 }
 const MANUAL_PNPM_COMMAND = `corepack pnpm@${DEFAULT_PNPM_DESCRIPTOR}`;
 const DOCKER_IMAGE = "ghcr.io/pasta-devs/marinara-engine";
-const MANUAL_GIT_UPDATE_COMMAND =
-  `git fetch origin +refs/heads/main:refs/remotes/origin/main && (git merge --ff-only origin/main || git checkout --detach origin/main) && ${MANUAL_PNPM_COMMAND} --config.trustPolicy=off --config.confirmModulesPurge=false install --force --frozen-lockfile && ${MANUAL_PNPM_COMMAND} --filter @marinara-engine/shared build && ${MANUAL_PNPM_COMMAND} --filter @marinara-engine/server --filter @marinara-engine/client --parallel run build && ${MANUAL_PNPM_COMMAND} start`;
+const MANUAL_GIT_UPDATE_COMMAND = `git fetch origin +refs/heads/main:refs/remotes/origin/main && (git merge --ff-only origin/main || git checkout --detach origin/main) && ${MANUAL_PNPM_COMMAND} --config.trustPolicy=off --config.confirmModulesPurge=false install --force --frozen-lockfile && ${MANUAL_PNPM_COMMAND} --filter @marinara-engine/shared build && ${MANUAL_PNPM_COMMAND} --filter @marinara-engine/server --filter @marinara-engine/client --parallel run build && ${MANUAL_PNPM_COMMAND} start`;
 const DOCKER_UPDATE_COMMAND = "docker compose pull && docker compose up -d";
 const ANDROID_APK_NOTICE =
   "> [!IMPORTANT]\n" +
@@ -99,6 +117,8 @@ type ServerPlatform = "windows" | "macos" | "linux" | "android-termux" | "unknow
 type ClientPlatform = "ios" | "android" | "desktop" | "unknown";
 type ApplyUnavailableReason =
   | "disabled"
+  | "hard-disabled"
+  | "dev-branch"
   | "unsupported-install"
   | "container-install"
   | "storage-format-incompatible"
@@ -191,14 +211,28 @@ async function getUpdateChannelForCheckout(root: string, branch: string | null |
 // be in range of a clean.
 const STALE_SOURCE_CLEAN_PATHS = ["packages/shared/src", "packages/server/src", "packages/client/src"];
 
-function getManualGitApplyCommand(
+/**
+ * The first step of every manual recipe: get the user's terminal into the
+ * checkout. Many testers do not know where their install lives (#5645); the
+ * server does - it runs from it. `/d` lets cmd cross drive letters.
+ */
+function getChangeDirectoryCommand(platform: ServerPlatform, repoRoot: string) {
+  return platform === "windows" ? `cd /d "${repoRoot}"` : `cd "${repoRoot}"`;
+}
+
+export function getManualGitApplyCommand(
   channel = UPDATE_CHANNELS.stable,
   platform: ServerPlatform = "unknown",
   pnpmCommand = MANUAL_PNPM_COMMAND,
+  repoRoot: string | null = getMonorepoRoot(),
 ) {
+  // The alternation is parenthesized so its '||' can only capture the
+  // show-ref probe: without the outer group, a failed leading cd or fetch
+  // would fall through into `git checkout -b` (and everything after it)
+  // executed in whatever directory the user happened to be standing in.
   const checkoutCommand =
     channel.id === "staging"
-      ? `git show-ref --verify --quiet refs/heads/${channel.branch} && (git checkout ${channel.branch} && git merge --ff-only ${channel.targetRef}) || git checkout -b ${channel.branch} ${channel.targetRef}`
+      ? `(git show-ref --verify --quiet refs/heads/${channel.branch} && (git checkout ${channel.branch} && git merge --ff-only ${channel.targetRef}) || git checkout -b ${channel.branch} ${channel.targetRef})`
       : `(git merge --ff-only ${channel.targetRef} || git checkout --detach ${channel.targetRef})`;
   // Same scoped cleanup cleanStaleSourceFiles performs, so a manual apply (the
   // only path available when UPDATES_APPLY_ENABLED is false) cannot build with
@@ -208,7 +242,12 @@ function getManualGitApplyCommand(
     platform === "android-termux"
       ? `${pnpmCommand} --filter @marinara-engine/shared build && ${pnpmCommand} --filter @marinara-engine/server build && ${pnpmCommand} --filter @marinara-engine/client build`
       : `${pnpmCommand} --filter @marinara-engine/shared build && ${pnpmCommand} --filter @marinara-engine/server --filter @marinara-engine/client --parallel run build`;
-  return `git fetch ${UPDATE_REMOTE} ${channel.fetchRef} && ${checkoutCommand} && ${cleanCommand} && ${pnpmCommand} --config.trustPolicy=off --config.confirmModulesPurge=false ${PNPM_UPDATE_INSTALL_ARGS.join(" ")} && ${buildCommand}`;
+  const install = getUpdateInstallStep(platform);
+  const installEnv = Object.entries(install.env)
+    .map(([name, value]) => `${name}=${value} `)
+    .join("");
+  const applyCommand = `git fetch ${UPDATE_REMOTE} ${channel.fetchRef} && ${checkoutCommand} && ${cleanCommand} && ${installEnv}${pnpmCommand} --config.trustPolicy=off --config.confirmModulesPurge=false ${install.args.join(" ")} && ${buildCommand}`;
+  return repoRoot ? `${getChangeDirectoryCommand(platform, repoRoot)} && ${applyCommand}` : applyCommand;
 }
 
 function getManualUpdateCommand(installType: InstallType, platform: ServerPlatform, channel = UPDATE_CHANNELS.stable) {
@@ -216,20 +255,35 @@ function getManualUpdateCommand(installType: InstallType, platform: ServerPlatfo
   if (installType === "git" && channel.id === "staging") {
     return getManualGitApplyCommand(channel, platform);
   }
-  if (installType === "git") return getGitLauncherCommand(platform);
+  if (installType === "git") {
+    const launcher = getGitLauncherCommand(platform);
+    const repoRoot = getMonorepoRoot();
+    return repoRoot ? `${getChangeDirectoryCommand(platform, repoRoot)} && ${launcher}` : launcher;
+  }
   return null;
 }
 
-function getManualUpdateHint(installType: InstallType, platform: ServerPlatform, channel = UPDATE_CHANNELS.stable) {
+export function getManualUpdateHint(
+  installType: InstallType,
+  platform: ServerPlatform,
+  channel = UPDATE_CHANNELS.stable,
+) {
   if (installType === "docker") {
-    return "Pull the published container image and restart the container. Versioned tags are published from vX.Y.Z release tags.";
+    if (channel.id === "staging") {
+      return `Set the Compose image to ${DOCKER_IMAGE}:staging, then pull it and restart the container. Use a separate data volume for staging.`;
+    }
+    return `Set the Compose image to the stable tag shown below (or ${DOCKER_IMAGE}:latest), then pull it and restart the container.`;
   }
+  const windowsShellNote = (gitBashExtra = "") =>
+    platform === "windows"
+      ? ` Run it in Command Prompt (cmd) or Git Bash - the default Windows PowerShell rejects '&&' chains (Git Bash users: replace \`cd /d\` with \`cd\`${gitBashExtra}).`
+      : "";
   if (installType === "git" && channel.id === "staging") {
-    return "Staging is a tester branch. Make a profile backup first, then apply from the browser or run the command below from the repo checkout.";
+    return `Staging is a tester branch. Make a profile backup first, then apply from the browser or paste the complete command below - it starts by changing into the install folder.${windowsShellNote()}`;
   }
   if (installType === "git") {
     const launcher = getGitLauncherCommand(platform);
-    return `Relaunch YunYun with ${launcher} to let the platform launcher fetch the current checkout's update branch, install dependencies, rebuild, and start the new version.`;
+    return `Relaunch YunYun with ${launcher} to let the platform launcher fetch the current checkout's update branch, install dependencies, rebuild, and start the new version. The command below changes into the install folder first.${windowsShellNote(" and run \`./start.bat\` - bash does not resolve a bare batch file from the current folder")}`;
   }
   return "Download the release asset or update the host install manually, then restart YunYun.";
 }
@@ -354,7 +408,11 @@ async function checkTargetStorageFormat(
   return { compatible: targetFormat >= onDiskFormat, verified: true, onDiskFormat, targetFormat };
 }
 
-async function checkoutOrCreateUpdateBranch(root: string, channel: UpdateChannelInfo, targetHead: string): Promise<void> {
+async function checkoutOrCreateUpdateBranch(
+  root: string,
+  channel: UpdateChannelInfo,
+  targetHead: string,
+): Promise<void> {
   const branchRef = `refs/heads/${channel.branch}`;
   const branchExists = await gitCommandSucceeds(root, ["show-ref", "--verify", "--quiet", branchRef]);
   if (branchExists) {
@@ -401,7 +459,9 @@ async function createUpdateStash(root: string): Promise<UpdateStash | null> {
     return { oid, marker };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Git created update stash marker ${marker}, but its immutable recovery commit could not be found: ${message}`);
+    throw new Error(
+      `Git created update stash marker ${marker}, but its immutable recovery commit could not be found: ${message}`,
+    );
   }
 }
 
@@ -658,7 +718,7 @@ function describePnpmFailure(err: unknown, args: string[], timeout: number): Err
   return new Error(parts.join(" "));
 }
 
-async function runPinnedPnpm(root: string, args: string[], baseTimeout: number) {
+async function runPinnedPnpm(root: string, args: string[], baseTimeout: number, env: Record<string, string> = {}) {
   const runner = await resolvePinnedPnpmRunner(root);
   const timeout = updateStepTimeout(baseTimeout);
   const invocation = commandInvocation(runner.command, [...runner.prefixArgs, ...PNPM_NONINTERACTIVE_ARGS, ...args]);
@@ -667,6 +727,7 @@ async function runPinnedPnpm(root: string, args: string[], baseTimeout: number) 
       cwd: root,
       timeout,
       maxBuffer: PNPM_OUTPUT_MAX_BUFFER,
+      env: { ...process.env, ...env },
     });
   } catch (err) {
     throw describePnpmFailure(err, args, timeout);
@@ -761,14 +822,12 @@ function serializeUpdateChannels() {
   }));
 }
 
-function buildReleasePayload(release: NonNullable<typeof cachedRelease>) {
+function buildReleasePayload(release: NonNullable<typeof cachedRelease>, channel = UPDATE_CHANNELS.stable) {
   const releaseTag = `v${release.latestVersion}`;
   return {
     ...release,
     releaseTag,
-    dockerImage: DOCKER_IMAGE,
-    dockerImageTag: `${DOCKER_IMAGE}:${release.latestVersion}`,
-    dockerLiteImageTag: `${DOCKER_IMAGE}:${release.latestVersion}-lite`,
+    ...resolveDockerChannelImageTags(DOCKER_IMAGE, release.latestVersion, channel.id),
   };
 }
 
@@ -777,6 +836,7 @@ function getApplyAvailability(
   platform: ServerPlatform,
   channel = UPDATE_CHANNELS.stable,
   localChannelSwitchRequested = false,
+  currentBranch: string | null = null,
 ) {
   const enabled = isUpdatesApplyEnabled();
   if (installType === "docker") {
@@ -797,11 +857,29 @@ function getApplyAvailability(
       manualUpdateHint: getManualUpdateHint(installType, platform, channel),
     };
   }
-  if (!isGitUpdateApplyAllowed({ updatesApplyEnabled: enabled, localChannelSwitchRequested })) {
+  const hardDisabled = isUpdatesApplyHardDisabled();
+  // Same precedence as the apply route (hard-disabled beats dev-branch), so
+  // the preview never explains a different refusal than an apply would return.
+  if (hardDisabled || !isChannelCheckoutBranch(currentBranch)) {
+    return {
+      applyAvailable: false,
+      updatesApplyEnabled: enabled,
+      applyUnavailableReason: (hardDisabled ? "hard-disabled" : "dev-branch") as ApplyUnavailableReason,
+      manualUpdateCommand: getManualUpdateCommand(installType, platform, channel),
+      manualUpdateHint: getManualUpdateHint(installType, platform, channel),
+    };
+  }
+  if (
+    !isGitUpdateApplyAllowed({
+      updatesApplyEnabled: enabled,
+      localChannelSwitchRequested,
+      updatesApplyHardDisabled: hardDisabled,
+    })
+  ) {
     return {
       applyAvailable: false,
       updatesApplyEnabled: false,
-      applyUnavailableReason: "disabled" as ApplyUnavailableReason,
+      applyUnavailableReason: (hardDisabled ? "hard-disabled" : "disabled") as ApplyUnavailableReason,
       manualUpdateCommand: getManualUpdateCommand(installType, platform, channel),
       manualUpdateHint: getManualUpdateHint(installType, platform, channel),
     };
@@ -817,6 +895,14 @@ function getApplyAvailability(
 }
 
 export async function updatesRoutes(app: FastifyInstance) {
+  // Local-only metadata stays available before (or after a failed) GitHub update check.
+  app.get("/channel", { config: { rateLimit: UPDATE_CHANNEL_RATE_LIMIT } }, async () => {
+    const root = getMonorepoRoot();
+    const currentBranch = isGitInstall() ? await getCurrentBranch(root).catch(() => null) : getBuildBranch();
+    const channel = await getUpdateChannelForCheckout(root, currentBranch);
+    return { channel: channel.id, currentBranch, channels: serializeUpdateChannels() };
+  });
+
   // ── Check for updates ──
   // GET /api/updates/check
   // Fetches the newest stable Git tag from GitHub, then hydrates it
@@ -838,12 +924,13 @@ export async function updatesRoutes(app: FastifyInstance) {
       (req.query as { channel?: unknown } | undefined)?.channel,
       currentBranch,
     );
-    const channelSwitch = gitInstall && currentChannel.id !== channel.id;
+    const channelSwitch = isUpdateChannelSwitch(installType, currentChannel.id, channel.id);
     const applyAvailability = getApplyAvailability(
       installType,
       serverPlatform,
       channel,
-      channelSwitch && isLoopbackIp(req.ip),
+      channelSwitch && isLoopbackRequest(req),
+      gitInstall ? currentBranch : null,
     );
 
     // Check commits behind for git installs
@@ -858,81 +945,63 @@ export async function updatesRoutes(app: FastifyInstance) {
       }
     }
 
-    // Return cached release info if fresh
-    if (cachedRelease && now - cacheTimestamp < CACHE_TTL_MS) {
-      const versionUpdate = isNewerVersion(APP_VERSION, cachedRelease.latestVersion);
-      return {
-        currentVersion: APP_VERSION,
-        currentCommit,
-        currentBuild,
-        channel: channel.id,
-        channelLabel: channel.label,
-        currentBranch,
-        channels: serializeUpdateChannels(),
-        ...buildReleasePayload(cachedRelease),
-        updateAvailable:
-          channelSwitch || (channel.id === "stable" && versionUpdate) || (commitsBehind != null && commitsBehind > 0),
-        versionUpdate: channel.id === "stable" ? versionUpdate : false,
-        commitsBehind: commitsBehind ?? 0,
-        installType,
-        serverPlatform,
-        clientPlatform,
-        ...applyAvailability,
-        targetRef: channel.targetRef,
-        targetCommit: gitInstall ? await resolveGitRef(root, channel.targetRef) : null,
-      };
-    }
+    let release = cachedRelease && now - cacheTimestamp < CACHE_TTL_MS ? cachedRelease : null;
 
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
+    if (!release) {
       try {
-        cachedRelease = await resolveLatestReleaseFromGitHub(controller.signal);
-      } finally {
-        clearTimeout(timeout);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10_000);
+        try {
+          release = await resolveLatestReleaseFromGitHub(controller.signal);
+        } finally {
+          clearTimeout(timeout);
+        }
+        cachedRelease = release;
+        cacheTimestamp = now;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return reply.status(502).send({
+          error: `Failed to check for updates: ${message}`,
+          currentVersion: APP_VERSION,
+          currentCommit,
+          currentBuild,
+          channel: channel.id,
+          channelLabel: channel.label,
+          currentBranch,
+          channels: serializeUpdateChannels(),
+          updateAvailable: channelSwitch || (commitsBehind != null && commitsBehind > 0),
+          channelSwitch,
+          commitsBehind: commitsBehind ?? 0,
+          installType,
+          serverPlatform,
+          clientPlatform,
+          ...applyAvailability,
+        });
       }
-      cacheTimestamp = now;
-
-      const versionUpdate = isNewerVersion(APP_VERSION, cachedRelease.latestVersion);
-      return {
-        currentVersion: APP_VERSION,
-        currentCommit,
-        currentBuild,
-        channel: channel.id,
-        channelLabel: channel.label,
-        currentBranch,
-        channels: serializeUpdateChannels(),
-        ...buildReleasePayload(cachedRelease),
-        updateAvailable:
-          channelSwitch || (channel.id === "stable" && versionUpdate) || (commitsBehind != null && commitsBehind > 0),
-        versionUpdate: channel.id === "stable" ? versionUpdate : false,
-        commitsBehind: commitsBehind ?? 0,
-        installType,
-        serverPlatform,
-        clientPlatform,
-        ...applyAvailability,
-        targetRef: channel.targetRef,
-        targetCommit: gitInstall ? await resolveGitRef(root, channel.targetRef) : null,
-      };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(502).send({
-        error: `Failed to check for updates: ${message}`,
-        currentVersion: APP_VERSION,
-        currentCommit,
-        currentBuild,
-        channel: channel.id,
-        channelLabel: channel.label,
-        currentBranch,
-        channels: serializeUpdateChannels(),
-        updateAvailable: channelSwitch || (commitsBehind != null && commitsBehind > 0),
-        commitsBehind: commitsBehind ?? 0,
-        installType,
-        serverPlatform,
-        clientPlatform,
-        ...applyAvailability,
-      });
     }
+
+    const versionUpdate = isNewerVersion(APP_VERSION, release.latestVersion);
+    return {
+      currentVersion: APP_VERSION,
+      currentCommit,
+      currentBuild,
+      channel: channel.id,
+      channelLabel: channel.label,
+      currentBranch,
+      channels: serializeUpdateChannels(),
+      ...buildReleasePayload(release, channel),
+      updateAvailable:
+        channelSwitch || (channel.id === "stable" && versionUpdate) || (commitsBehind != null && commitsBehind > 0),
+      channelSwitch,
+      versionUpdate: channel.id === "stable" ? versionUpdate : false,
+      commitsBehind: commitsBehind ?? 0,
+      installType,
+      serverPlatform,
+      clientPlatform,
+      ...applyAvailability,
+      targetRef: channel.targetRef,
+      targetCommit: gitInstall ? await resolveGitRef(root, channel.targetRef) : null,
+    };
   });
 
   // ── Apply update (git installs only) ──
@@ -985,11 +1054,31 @@ export async function updatesRoutes(app: FastifyInstance) {
       currentBranch = await getCurrentBranch(root);
       const currentChannel = await getUpdateChannelForCheckout(root, currentBranch);
       channel = await resolveUpdateChannel(root, req.body?.channel, currentBranch);
-      const localChannelSwitchRequested = currentChannel.id !== channel.id && isLoopbackIp(req.ip);
+      const localChannelSwitchRequested = currentChannel.id !== channel.id && isLoopbackRequest(req);
+      const applyHardDisabled = isUpdatesApplyHardDisabled();
+      const devBranchCheckout = !isChannelCheckoutBranch(currentBranch);
+      if (applyHardDisabled || devBranchCheckout) {
+        // Hard refusals (#5646): a dev/e2e-launched server, or a checkout
+        // sitting on a development branch, must never stash/checkout/rebuild
+        // the repo it runs from - not even for a loopback channel switch.
+        const reason: ApplyUnavailableReason = applyHardDisabled ? "hard-disabled" : "dev-branch";
+        return reply.status(403).send({
+          error: "Update apply is blocked for this server instance",
+          message: applyHardDisabled
+            ? "This server was started with UPDATES_APPLY_DISABLED (the dev and e2e launchers set it so a browser tab cannot rewrite a development checkout). Update the checkout manually if you really intend to - and commit or stash local work first, because the manual recipe deletes untracked files under packages/*/src."
+            : `This checkout is on development branch "${currentBranch}", not a release channel branch, so applying updates from the browser is blocked to protect work in progress. Update the checkout manually if you really intend to - and commit or stash local work first, because the manual recipe deletes untracked files under packages/*/src.`,
+          installType: "git",
+          serverPlatform,
+          applyUnavailableReason: reason,
+          manualUpdateCommand: getManualUpdateCommand("git", serverPlatform, channel),
+          manualUpdateHint: getManualUpdateHint("git", serverPlatform, channel),
+        });
+      }
       if (
         !isGitUpdateApplyAllowed({
           updatesApplyEnabled: isUpdatesApplyEnabled(),
           localChannelSwitchRequested,
+          updatesApplyHardDisabled: applyHardDisabled,
         })
       ) {
         return reply.status(403).send({
@@ -1144,7 +1233,8 @@ export async function updatesRoutes(app: FastifyInstance) {
 
       // Step 2: pnpm install. Channel switches (stable <-> staging) force a
       // near-full dependency reinstall, so this step gets a generous budget.
-      await runPinnedPnpm(root, PNPM_UPDATE_INSTALL_ARGS, 300_000);
+      const installStep = getUpdateInstallStep(serverPlatform);
+      await runPinnedPnpm(root, installStep.args, 300_000, installStep.env);
 
       // Step 3: Rebuild all packages
       await runPinnedBuild(root);
@@ -1166,6 +1256,13 @@ export async function updatesRoutes(app: FastifyInstance) {
             // app.close() runs Fastify onClose -> closeDB() -> fileStore.close()
             // -> flush(true), plus stops the sidecar. A bare process.exit(0)
             // bypasses onClose/beforeExit and silently drops debounced writes.
+            // #5506 diagnostics: name this ending so the next startup reports
+            // an update restart instead of an external kill.
+            noteSessionExitKind("restart");
+            // #5838: the update relaunch relies on an external launcher
+            // either way, so a close stuck on open connections or a hung
+            // flush must not leave the old process running forever.
+            armShutdownDeadline(app, "update restart");
             await app.close();
             logger.info("[Update] Shutting down after update...");
             process.exit(0);

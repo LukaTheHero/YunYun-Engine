@@ -1,15 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { basename, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const LOCALES_DIR = join(ROOT, "packages", "client", "src", "localization", "locales");
 const DEFAULT_LOCALE = "en";
 const KEY_PATTERN = /^[a-z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)*(?:\.[a-z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)*)*$/u;
-const INTENTIONALLY_EMPTY_TRANSLATION_KEYS = new Set([
-  "ui.lorebooks.lorebookeditor.es",
-  "ui.noodle.stageprofileview.s",
-]);
 
 function canonicalizeLocale(value) {
   try {
@@ -46,13 +42,6 @@ function extractTokens(value, context) {
   }
   richTextTags.sort();
   return { interpolation, richTextTags };
-}
-
-function sameTokens(left, right) {
-  return (
-    left.interpolation.join("\u0000") === right.interpolation.join("\u0000") &&
-    left.richTextTags.join("\u0000") === right.richTextTags.join("\u0000")
-  );
 }
 
 async function readLocale(filename) {
@@ -95,9 +84,7 @@ async function readLocale(filename) {
     if (!KEY_PATTERN.test(key)) {
       throw new Error(`${filename}: ${key} is not a semantic localization key`);
     }
-    const intentionallyEmpty =
-      value === "" && code !== DEFAULT_LOCALE && INTENTIONALLY_EMPTY_TRANSLATION_KEYS.has(key);
-    if (typeof value !== "string" || (!value.trim() && !intentionallyEmpty)) {
+    if (typeof value !== "string" || !value.trim()) {
       throw new Error(`${filename}: ${key} must contain non-empty text`);
     }
   }
@@ -105,39 +92,79 @@ async function readLocale(filename) {
   return { code, filename, messages };
 }
 
-async function main() {
-  const filenames = (await readdir(LOCALES_DIR))
-    .filter((filename) => filename.endsWith(".json"))
-    .sort((left, right) => left.localeCompare(right, "en"));
-  const locales = await Promise.all(filenames.map(readLocale));
-  const canonical = locales.find((locale) => locale.code === DEFAULT_LOCALE);
-  if (!canonical) {
-    throw new Error(`Missing canonical ${DEFAULT_LOCALE}.json locale`);
+// A literal key the client renders but English lacks shows up as the raw key text.
+async function findMissingUsedKeys(keys) {
+  const known = new Set(keys.map((key) => key.replace(/_(?:zero|one|two|few|many|other)$/u, "")));
+  const clientSource = join(ROOT, "packages", "client", "src");
+  const missing = [];
+  for (const entry of await readdir(clientSource, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !/\.tsx?$/u.test(entry.name)) continue;
+    const file = join(entry.parentPath, entry.name);
+    // Skip comment lines, which show example keys.
+    const source = (await readFile(file, "utf8")).replace(/^\s*(?:\*|\/\/).*$/gmu, "");
+    for (const [, key] of source.matchAll(/(?<![\w.$])(?:t|localizeUi)\(\s*["'`]([a-z]\w*(?:\.\w+)+)["'`]/gu)) {
+      if (!known.has(key)) missing.push(`${relative(ROOT, file)}: ${key}`);
+    }
   }
+  return missing;
+}
 
+// Every searchable settings control names its label and description in English, and the keys must resolve to
+// that same text, so the search registry cannot drift from what the Settings panel shows.
+async function findRegistryKeyProblems(messages) {
+  const source = await readFile(join(ROOT, "packages", "client", "src", "lib", "settings-registry.ts"), "utf8");
+  const controls = source.slice(source.indexOf("export const SETTINGS_SEARCHABLE_CONTROLS"));
+  // Prettier leaves a string single-quoted when it contains double quotes.
+  const string = String.raw`("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')`;
+  // One pass over the single-quoted body: keep escape sequences, unescape \', and escape bare double quotes.
+  const parse = (literal) =>
+    literal.startsWith("'")
+      ? JSON.parse(
+          `"${literal.slice(1, -1).replace(/\\(.)|"/gsu, (match, escaped) => (escaped === undefined ? '\\"' : escaped === "'" ? "'" : match))}"`,
+        )
+      : JSON.parse(literal);
+  const entry = new RegExp(
+    String.raw`\n    id: ([^\n]+),\n    sectionId: [^\n]+,\n    labelKey: ${string},\n    label:\s*${string},\n    description:\s*${string},\n    descriptionKey: ${string},`,
+    "gu",
+  );
+  const problems = [];
+  let found = 0;
+  for (const [, id, labelKey, label, description, descriptionKey] of controls.matchAll(entry)) {
+    found += 1;
+    for (const [field, key, english] of [
+      ["labelKey", parse(labelKey), parse(label)],
+      ["descriptionKey", parse(descriptionKey), parse(description)],
+    ]) {
+      if (messages[key] === undefined) problems.push(`${id}: ${field} ${key} is not in en.json`);
+      else if (messages[key] !== english)
+        problems.push(`${id}: ${field} ${key} no longer matches the registry English`);
+    }
+  }
+  const total = [...controls.matchAll(/\n    id: /gu)].length;
+  if (found !== total) problems.push(`${total - found} settings-registry control(s) lack labelKey/descriptionKey`);
+  return problems;
+}
+
+async function main() {
+  // Community packs and their coverage/token validator live on docs-i18n/ui.
+  const canonical = await readLocale(`${DEFAULT_LOCALE}.json`);
   const canonicalKeys = Object.keys(canonical.messages);
   if (canonicalKeys.length === 0) {
     throw new Error(`${canonical.filename}: canonical locale cannot be empty`);
   }
 
-  for (const locale of locales) {
-    const localeKeys = Object.keys(locale.messages);
-    const unknown = localeKeys.filter((key) => !(key in canonical.messages));
-    if (unknown.length > 0) {
-      throw new Error(`${locale.filename}: unknown keys: ${unknown.join(", ")}`);
-    }
-
-    for (const key of localeKeys) {
-      const expected = extractTokens(canonical.messages[key], `${canonical.filename}: ${key}`);
-      const actual = extractTokens(locale.messages[key], `${locale.filename}: ${key}`);
-      if (!sameTokens(expected, actual)) {
-        throw new Error(`${locale.filename}: ${key} must preserve English interpolation and rich-text tokens`);
-      }
-    }
-
-    const coverage = Math.round((localeKeys.length / canonicalKeys.length) * 100);
-    console.info(`[localization] ${locale.code}: ${localeKeys.length}/${canonicalKeys.length} keys (${coverage}%)`);
+  for (const key of canonicalKeys) extractTokens(canonical.messages[key], `${canonical.filename}: ${key}`);
+  const missing = await findMissingUsedKeys(canonicalKeys);
+  if (missing.length > 0) {
+    throw new Error(`keys used in the client are missing from ${canonical.filename}:\n${missing.join("\n")}`);
   }
+  const registryProblems = await findRegistryKeyProblems(canonical.messages);
+  if (registryProblems.length > 0) {
+    throw new Error(
+      `settings-registry.ts keys are out of sync with ${canonical.filename}:\n${registryProblems.join("\n")}`,
+    );
+  }
+  console.info(`[localization] en: ${canonicalKeys.length} canonical keys`);
 }
 
 main().catch((error) => {

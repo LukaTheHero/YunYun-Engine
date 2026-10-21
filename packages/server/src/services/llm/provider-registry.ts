@@ -10,6 +10,7 @@ import { GoogleProvider } from "./providers/google.provider.js";
 import type { BaseLLMProvider } from "./base-provider.js";
 import { withConnectionDefaultParameters } from "./connection-default-provider.js";
 import { withConnectionAdmissionProvider } from "../generation/connection-admission.js";
+import { withRateLimitAwareProvider } from "./rate-limit-aware-provider.js";
 
 export function normalizeCohereOpenAIBaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.replace(/\/+$/, "");
@@ -63,12 +64,16 @@ export function createLLMProvider(
 
   let resolved: BaseLLMProvider;
   switch (provider) {
+    case "decision":
+      throw new Error("Decision connections cannot generate chat or agent output.");
     case "openai":
     case "openrouter":
     case "nanogpt":
     case "xai":
     case "mistral":
     case "arli":
+    case "zai":
+    case "deepseek":
       resolved = new OpenAIProvider(
         baseUrl,
         apiKey,
@@ -138,7 +143,13 @@ export function createLLMProvider(
       );
       break;
     case "google":
-      resolved = new GoogleProvider(baseUrl, apiKey, normalizedMaxContext, openrouterProvider, normalizedMaxTokensOverride);
+      resolved = new GoogleProvider(
+        baseUrl,
+        apiKey,
+        normalizedMaxContext,
+        openrouterProvider,
+        normalizedMaxTokensOverride,
+      );
       break;
     case "google_vertex":
       resolved = new GoogleProvider(
@@ -164,5 +175,8 @@ export function createLLMProvider(
       break;
   }
   const configured = withConnectionDefaultParameters(resolved, defaultParameters);
-  return connectionId ? withConnectionAdmissionProvider(configured, connectionId) : configured;
+  if (!connectionId) return configured;
+  // Pace + pause/resume outside the admission (concurrency) gate so a proxy 429 retries the same
+  // connection before any fallback decision, and the per-connection throttle applies to everyone.
+  return withRateLimitAwareProvider(withConnectionAdmissionProvider(configured, connectionId), connectionId);
 }

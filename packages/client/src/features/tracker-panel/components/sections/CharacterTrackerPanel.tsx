@@ -12,7 +12,7 @@ import type { StatIconLookup } from "../../hooks/use-stat-icons";
 import { getCharacterFeatureKey } from "../../lib/character-tracker-data";
 import { getSpriteExpressionForCharacter } from "../../lib/sprite-expressions";
 import type { TrackerProfileColors } from "../../lib/tracker-profile-style";
-import { AddRowButton, EmptySection, SectionHeader } from "../controls/SectionControls";
+import { AddRowButton, EmptySection, SectionHeader, TRACKER_SECTION_SHELL_CLASS } from "../controls/SectionControls";
 import { CharacterTrackerCard } from "../character-card/CharacterTrackerCard";
 import { FeaturedCharacterTrackerCard } from "../character-card/FeaturedCharacterTrackerCard";
 import { useTranslation as useUiTranslation } from "react-i18next";
@@ -42,6 +42,7 @@ export function CharacterTrackerPanel({
   onAddCharacter,
   onToggleFeatured,
   onUploadAvatar,
+  onGeneratePortrait,
   deleteMode,
   addMode,
   action,
@@ -67,6 +68,7 @@ export function CharacterTrackerPanel({
   onAddCharacter: () => void;
   onToggleFeatured: (key: string) => void;
   onUploadAvatar: (index: number) => void;
+  onGeneratePortrait?: (index: number, includeOutfit: boolean) => Promise<void>;
   deleteMode: boolean;
   addMode: boolean;
   action?: ReactNode;
@@ -150,6 +152,9 @@ export function CharacterTrackerPanel({
           addMode={addMode}
           onToggleFeatured={() => onToggleFeatured(entry.cardKey)}
           onUploadAvatar={() => onUploadAvatar(entry.index)}
+          onGeneratePortrait={
+            onGeneratePortrait ? (includeOutfit) => onGeneratePortrait(entry.index, includeOutfit) : undefined
+          }
         />
       </div>
     );
@@ -175,7 +180,7 @@ export function CharacterTrackerPanel({
 
   return (
     <section
-      className="group/characters relative z-10 border-b border-[var(--border)] bg-[var(--tracker-panel-section-background,color-mix(in_srgb,var(--card)_5%,transparent))] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_5%,transparent)]"
+      className={cn(TRACKER_SECTION_SHELL_CLASS, "group/characters")}
       aria-label={localizeUi("navigation.topbar.characters")}
     >
       <SectionHeader
@@ -183,7 +188,13 @@ export function CharacterTrackerPanel({
         title={localizeUi("ui.trackerPanel.charactertrackerpanel.presentCharacters")}
         action={action}
         addAction={
-          addMode ? <AddRowButton title={localizeUi("ui.trackerPanel.charactertrackerpanel.addCharacter")} onClick={onAddCharacter} className="rounded-sm" /> : undefined
+          addMode ? (
+            <AddRowButton
+              title={localizeUi("ui.trackerPanel.charactertrackerpanel.addCharacter")}
+              onClick={onAddCharacter}
+              className="rounded-sm"
+            />
+          ) : undefined
         }
         collapsed={collapsed}
         onToggle={onToggleCollapsed}

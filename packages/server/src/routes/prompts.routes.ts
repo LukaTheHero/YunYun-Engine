@@ -15,21 +15,26 @@ import {
   updateChoiceBlockSchema,
   createFolderEntry,
   isStockMarinaraUniversalPreset,
+  normalizeAdvancedMemorySettings,
   type LorebookEntryTimingState,
 } from "@marinara-engine/shared";
 import type { ExportEnvelope } from "@marinara-engine/shared";
 import { createPromptsStorage } from "../services/storage/prompts.storage.js";
-import { assemblePrompt, type AssemblerInput } from "../services/prompt/index.js";
+import { assemblePrompt, normalizeChatMacroVariables, type AssemblerInput } from "../services/prompt/index.js";
+import { parsePresetParameters } from "../services/prompt/assembler.js";
+import { resolveReasoningMacroValue } from "../services/generation/provider-generation-runtime.js";
 import { cardPromptText } from "../services/prompt/card-text.js";
 import { resolveLorebookScopeExclusions } from "../services/lorebook/game-lorebook-scope.js";
 import { createChatsStorage } from "../services/storage/chats.storage.js";
+import { createConnectionsStorage } from "../services/storage/connections.storage.js";
 import { createCharactersStorage } from "../services/storage/characters.storage.js";
+import { resolveChatUserIdentity } from "../services/chat-user-identity.js";
 import { normalizeTimestampOverrides } from "../services/import/import-timestamps.js";
 import AdmZip from "adm-zip";
-import { resolveActivePersonaCandidate } from "./generate/generate-route-utils.js";
 import { DATA_DIR } from "../utils/data-dir.js";
 import { assertInsideDir, extensionFromImageMime, isAllowedImageBuffer } from "../utils/security.js";
 import { logger } from "../lib/logger.js";
+import { forwardPromptPreview } from "./generate/prompt-preview.js";
 
 const PROMPT_IMAGES_DIR = join(DATA_DIR, "prompts", "images");
 const PROMPT_IMAGE_URL_PREFIX = "/api/prompts/images/file/";
@@ -273,6 +278,7 @@ export async function promptsRoutes(app: FastifyInstance) {
     }
 
     const zip = new AdmZip();
+    const usedSegments = new Set<string>();
     let exportedCount = 0;
     for (const id of ids) {
       const result = await buildPresetExportEnvelope(storage, id);
@@ -283,6 +289,7 @@ export async function promptsRoutes(app: FastifyInstance) {
         itemKind: "marinara.preset",
         config: result.envelope,
         fallbackName: `preset-${exportedCount + 1}`,
+        usedSegments,
       });
       zip.addFile(entry.path, Buffer.from(JSON.stringify(entry.manifest, null, 2), "utf-8"));
       exportedCount++;
@@ -363,15 +370,18 @@ export async function promptsRoutes(app: FastifyInstance) {
     return storage.createSection(input);
   });
 
-  app.patch<{ Params: { presetId: string; sectionId: string } }>("/:presetId/sections/:sectionId", async (req, reply) => {
-    const section = await storage.getSection(req.params.sectionId);
-    if (!section || section.presetId !== req.params.presetId) {
-      return reply.status(404).send({ error: "Prompt section not found" });
-    }
-    if (await rejectStockPresetMutation(storage, section.presetId, reply)) return;
-    const input = updatePromptSectionSchema.parse(req.body);
-    return storage.updateSection(section.id, input);
-  });
+  app.patch<{ Params: { presetId: string; sectionId: string } }>(
+    "/:presetId/sections/:sectionId",
+    async (req, reply) => {
+      const section = await storage.getSection(req.params.sectionId);
+      if (!section || section.presetId !== req.params.presetId) {
+        return reply.status(404).send({ error: "Prompt section not found" });
+      }
+      if (await rejectStockPresetMutation(storage, section.presetId, reply)) return;
+      const input = updatePromptSectionSchema.parse(req.body);
+      return storage.updateSection(section.id, input);
+    },
+  );
 
   app.delete<{ Params: { presetId: string; sectionId: string } }>(
     "/:presetId/sections/:sectionId",
@@ -414,15 +424,18 @@ export async function promptsRoutes(app: FastifyInstance) {
     return storage.createChoiceBlock(input);
   });
 
-  app.patch<{ Params: { presetId: string; variableId: string } }>("/:presetId/variables/:variableId", async (req, reply) => {
-    const variable = await storage.getChoiceBlock(req.params.variableId);
-    if (!variable || variable.presetId !== req.params.presetId) {
-      return reply.status(404).send({ error: "Preset variable not found" });
-    }
-    if (await rejectStockPresetMutation(storage, variable.presetId, reply)) return;
-    const input = updateChoiceBlockSchema.parse(req.body);
-    return storage.updateChoiceBlock(variable.id, input);
-  });
+  app.patch<{ Params: { presetId: string; variableId: string } }>(
+    "/:presetId/variables/:variableId",
+    async (req, reply) => {
+      const variable = await storage.getChoiceBlock(req.params.variableId);
+      if (!variable || variable.presetId !== req.params.presetId) {
+        return reply.status(404).send({ error: "Preset variable not found" });
+      }
+      if (await rejectStockPresetMutation(storage, variable.presetId, reply)) return;
+      const input = updateChoiceBlockSchema.parse(req.body);
+      return storage.updateChoiceBlock(variable.id, input);
+    },
+  );
 
   app.delete<{ Params: { presetId: string; variableId: string } }>(
     "/:presetId/variables/:variableId",
@@ -462,6 +475,7 @@ export async function promptsRoutes(app: FastifyInstance) {
     if (!chat) return reply.status(404).send({ error: "Chat not found" });
 
     const characterIds: string[] = JSON.parse(chat.characterIds as string);
+    let lorebookCharacterIds = characterIds;
     const chatMessages = await chats.listMessages(chatId);
     let chatMeta: Record<string, unknown> = {};
     try {
@@ -471,6 +485,17 @@ export async function promptsRoutes(app: FastifyInstance) {
           : ((chat.metadata as Record<string, unknown>) ?? {});
     } catch {
       chatMeta = {};
+    }
+    if (chat.mode === "roleplay" && normalizeAdvancedMemorySettings(chatMeta.advancedMemory).enabled) {
+      const preview = await forwardPromptPreview(app, req, { chatId, presetId: preset.id, presetChoices: choices });
+      if (preview.statusCode >= 400) return reply.status(preview.statusCode).send(preview.body);
+      const messages = preview.body.prompt?.messages ?? [];
+      return {
+        messages,
+        parameters: preview.body.parameters ?? {},
+        messageCount: messages.length,
+        advancedMemory: preview.body.prompt?.advancedMemory,
+      };
     }
     const lorebookScopeExclusions = resolveLorebookScopeExclusions(chat.mode, chatMeta);
     const mappedMessages = chatMessages.map((m: any) => ({
@@ -485,10 +510,17 @@ export async function promptsRoutes(app: FastifyInstance) {
     let personaDescription = "";
     let personaFields: { personality?: string; scenario?: string; backstory?: string; appearance?: string } = {};
     // Get active persona
-    const allPersonas = await charStorage.listPersonas();
-    const activePersona = resolveActivePersonaCandidate(allPersonas, chat.personaId, chat.mode);
+    const activePersona = await resolveChatUserIdentity(charStorage, chat);
     if (activePersona) {
-      personaId = activePersona.id as string;
+      // A character-backed identity must stay in character scope so lorebook
+      // and macro processing does not treat it as a persona record. [PR #5583]
+      if (activePersona.source === "character") {
+        if (!lorebookCharacterIds.includes(activePersona.id)) {
+          lorebookCharacterIds = [...lorebookCharacterIds, activePersona.id];
+        }
+      } else {
+        personaId = activePersona.id;
+      }
       personaName = activePersona.name;
       personaDescription = cardPromptText(activePersona.description);
       personaFields = {
@@ -505,15 +537,32 @@ export async function promptsRoutes(app: FastifyInstance) {
       storage.listChoiceBlocksForPreset(req.params.id),
     ]);
 
+    const connections = createConnectionsStorage(app.db);
+    const connection = chat.connectionId
+      ? await connections.getById(chat.connectionId)
+      : await connections.getDefault();
     const assemblerInput: AssemblerInput = {
       db: app.db,
+      model: connection?.model,
+      reasoning: connection
+        ? resolveReasoningMacroValue({
+            connection,
+            chatMode: chat.mode,
+            isSceneChat: chatMeta.sceneStatus === "active",
+            chatParameters: chatMeta.chatParameters,
+            baseReasoningEffort: parsePresetParameters(preset.parameters).reasoningEffort ?? null,
+          })
+        : undefined,
       preset: preset as any,
       sections: sections as any,
       groups: groups as any,
       choiceBlocks: choiceBlocks as any,
       chatChoices: choices ?? {},
+      // Chat variables win over built-in macros of the same name, as in generation.
+      localVariables: normalizeChatMacroVariables(chatMeta.macroVariables),
       chatId,
       characterIds,
+      lorebookCharacterIds,
       personaId,
       personaName,
       personaDescription,

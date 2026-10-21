@@ -14,6 +14,7 @@ import { showConfirmDialog } from "../../lib/app-dialogs";
 import { useLocalizedUiText } from "../../localization/use-localized-ui-text";
 import { useTranslation as useUiTranslation } from "react-i18next";
 import { ChatModeIcon } from "../chat/ChatModeIcon";
+import { normalizeAvatarCrop, type AvatarCrop } from "@marinara-engine/shared";
 
 type CharacterRow = { id: string; data: string; avatarPath: string | null; createdAt: string; updatedAt: string };
 
@@ -44,7 +45,14 @@ export function BotBrowserPanel() {
   const parsed = useMemo(() => {
     if (!characters) return [];
     return (characters as CharacterRow[]).reduce<
-      { id: string; name: string; avatarPath: string | null; createdAt: string; updatedAt: string }[]
+      {
+        id: string;
+        name: string;
+        avatarPath: string | null;
+        avatarCrop?: AvatarCrop;
+        createdAt: string;
+        updatedAt: string;
+      }[]
     >((acc, c) => {
       const d = JSON.parse(c.data);
       if (d.extensions?.botBrowserSource) {
@@ -52,6 +60,7 @@ export function BotBrowserPanel() {
           id: c.id,
           name: d.name ?? "Unnamed",
           avatarPath: c.avatarPath,
+          avatarCrop: normalizeAvatarCrop(d.extensions?.avatarCrop) ?? undefined,
           createdAt: c.createdAt,
           updatedAt: c.updatedAt,
         });
@@ -94,9 +103,11 @@ export function BotBrowserPanel() {
   const handleDeleteCharacter = useCallback(
     async (character: { id: string; name: string }) => {
       const confirmed = await showConfirmDialog({
-        title:localizeUi("ui.panels.botbrowserpanel.deleteImportedCharacter"),
-        message:localizeUi("ui.panels.botbrowserpanel.deleteValue1FromYourImportedCharactersThisCannotBe", { value1: character.name }),
-        confirmLabel:localizeUi("lorebook.editor.batch.delete"),
+        title: localizeUi("ui.panels.botbrowserpanel.deleteImportedCharacter"),
+        message: localizeUi("ui.panels.botbrowserpanel.deleteValue1FromYourImportedCharactersThisCannotBe", {
+          value1: character.name,
+        }),
+        confirmLabel: localizeUi("lorebook.editor.batch.delete"),
         tone: "destructive",
       });
       if (!confirmed) return;
@@ -107,7 +118,9 @@ export function BotBrowserPanel() {
         if (characterDetailId === character.id) closeCharacterDetail();
         toast.success(localizeUi("ui.panels.botbrowserpanel.deletedValue1", { value1: character.name }));
       } catch (error) {
-        toast.error(error instanceof Error ? error.message :localizeUi("ui.panels.botbrowserpanel.failedToDeleteCharacter"));
+        toast.error(
+          error instanceof Error ? error.message : localizeUi("ui.panels.botbrowserpanel.failedToDeleteCharacter"),
+        );
       } finally {
         setDeletingCharacterId(null);
       }
@@ -125,7 +138,9 @@ export function BotBrowserPanel() {
           botBrowserOpen && "mari-chrome-control--selected",
         )}
       >
-        <Bot size="0.875rem" />{localizeUi("ui.panels.botbrowserpanel.downloadCards")}</button>
+        <Bot size="0.875rem" />
+        {localizeUi("ui.panels.botbrowserpanel.downloadCards")}
+      </button>
 
       {/* Search + Sort */}
       <div className="flex gap-1.5">
@@ -164,10 +179,14 @@ export function BotBrowserPanel() {
 
       {/* Character list */}
       {isLoading ? (
-        <div className="mari-chrome-text-muted py-4 text-center text-xs">{localizeUi("ui.characters.characterlibraryview.loading")}</div>
+        <div className="mari-chrome-text-muted py-4 text-center text-xs">
+          {localizeUi("ui.characters.characterlibraryview.loading")}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="mari-chrome-text-muted py-4 text-center text-xs">
-          {search ?localizeUi("ui.panels.botbrowserpanel.noMatches") :localizeUi("ui.panels.botbrowserpanel.noImportedCharactersYet")}
+          {search
+            ? localizeUi("ui.panels.botbrowserpanel.noMatches")
+            : localizeUi("ui.panels.botbrowserpanel.noImportedCharactersYet")}
         </div>
       ) : (
         <div className="flex flex-col gap-0.5">
@@ -200,7 +219,7 @@ export function BotBrowserPanel() {
                       alt={char.name}
                       loading="lazy"
                       className="h-full w-full object-cover"
-                      style={getAvatarCropStyle()}
+                      style={getAvatarCropStyle(char.avatarCrop)}
                     />
                   ) : (
                     <User size="0.875rem" />

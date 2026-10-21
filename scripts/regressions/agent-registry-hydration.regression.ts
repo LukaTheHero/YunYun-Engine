@@ -5,8 +5,12 @@ import {
   type BuiltInAgentManifest,
   type InstalledCapabilityPackage,
 } from "../../packages/shared/dist/index.js";
-import { buildRoleplayAgentSettingsOrder } from "../../packages/client/src/lib/agent-settings-order.js";
 import {
+  buildRoleplayAgentSettingsOrder,
+  hasStandaloneRoleplayAgentSettings,
+} from "../../packages/client/src/lib/agent-settings-order.js";
+import {
+  isCapabilityPackageAvailable,
   isCapabilityPackageAvailableUntilRestart,
   selectHomeBrowserPackages,
   selectVisibleTrackerCapabilityAgents,
@@ -120,6 +124,12 @@ const activeSettingsOrder = ["writer", "tracker", "misc"].flatMap((category) =>
     .map((agent) => agent.id),
 );
 assert.deepEqual(activeSettingsOrder, menuOrder, "Roleplay quick links and active settings must share one order");
+assert.equal(hasStandaloneRoleplayAgentSettings("memory-nag"), true);
+assert.equal(hasStandaloneRoleplayAgentSettings("hierarchical-maps"), true);
+assert.equal(hasStandaloneRoleplayAgentSettings("beholder"), true);
+assert.equal(hasStandaloneRoleplayAgentSettings("storyboard"), true);
+assert.equal(hasStandaloneRoleplayAgentSettings("long-term-memory"), true);
+assert.equal(hasStandaloneRoleplayAgentSettings("late-tracker"), false);
 
 // Connections can mount before this query resolves. It must use the React Query
 // result, rather than reading the mutable shared registry that is already hydrated.
@@ -156,15 +166,47 @@ const pendingNoodleUpdate = {
   status: "restart-required",
   readiness: "pending",
   previousVersion: "1.0.8",
+  previousManifest: {
+    entrypoints: { client: "client.js" },
+    contributions: {
+      slots: ["home-browser-tab"],
+      homeBrowserTab: { label: "Previous Noodle", ariaLabel: "Open previous Noodle" },
+    },
+  },
 } as unknown as InstalledCapabilityPackage;
 assert.equal(isCapabilityPackageAvailableUntilRestart(pendingNoodleUpdate), true);
+// Package filters and toggles (Lorebook generation pills, chat settings) stay while an update
+// waits for restart, and a first install that has never loaded stays hidden.
+for (const id of ["noodle", "slurp2"]) {
+  assert.equal(
+    isCapabilityPackageAvailable([{ ...pendingNoodleUpdate, id }], id),
+    true,
+    `${id} must stay available while its update waits for restart`,
+  );
+  assert.equal(
+    isCapabilityPackageAvailable(
+      [{ ...pendingNoodleUpdate, id, previousVersion: undefined, previousManifest: undefined }],
+      id,
+    ),
+    false,
+    `a first install of ${id} waiting for restart must not count as available`,
+  );
+  assert.equal(isCapabilityPackageAvailable([{ ...pendingNoodleUpdate, id, status: "active" }], id), true);
+  assert.equal(isCapabilityPackageAvailable([{ ...pendingNoodleUpdate, id, status: "error" }], id), false);
+}
 assert.deepEqual(
-  selectHomeBrowserPackages([pendingNoodleUpdate]).map((item) => item.id),
-  ["noodle"],
-  "A Noodle update waiting for restart must keep the already-loaded Home tab visible",
+  selectHomeBrowserPackages([pendingNoodleUpdate]).map((item) => [
+    item.id,
+    item.version,
+    item.manifest.contributions?.homeBrowserTab?.label,
+  ]),
+  [["noodle", "1.0.8", "Previous Noodle"]],
+  "A Noodle update waiting for restart must keep the already-loaded Home tab and its manifest visible",
 );
 assert.deepEqual(
-  selectHomeBrowserPackages([{ ...pendingNoodleUpdate, previousVersion: undefined }]).map((item) => item.id),
+  selectHomeBrowserPackages([{ ...pendingNoodleUpdate, previousVersion: undefined, previousManifest: undefined }]).map(
+    (item) => item.id,
+  ),
   [],
   "A first install waiting for restart must not expose a client module that has never loaded",
 );
@@ -184,7 +226,7 @@ assert.match(
 );
 assert.match(
   sidecarCardSource,
-  /const trackerAgents = useMemo\(\s*\(\) => selectVisibleTrackerCapabilityAgents\(capabilityAgents\),\s*\[capabilityAgents\],\s*\);/u,
+  /const trackerAgents = useMemo\(\s*\(\) => selectVisibleTrackerCapabilityAgents\(capabilityAgents\),\s*\[capabilityAgents\],?\s*\);/u,
   "Connections must recompute visible trackers when capability-agent query data changes",
 );
 assert.match(
@@ -196,6 +238,15 @@ assert.match(
 const capabilityPackageRoutesSource = await readFile(
   new URL("../../packages/server/src/routes/capability-packages.routes.ts", import.meta.url),
   "utf8",
+);
+const capabilityPackageManagerSource = await readFile(
+  new URL("../../packages/server/src/services/capability-packages/package-manager.service.ts", import.meta.url),
+  "utf8",
+);
+assert.match(
+  capabilityPackageManagerSource,
+  /const servable = await resolveServableInstalledPackage\(installed\);[\s\S]*?readInstalledAgentDefinitions\(servable\)/u,
+  "The capability-agent registry must retain the previous agent definitions while an update waits for restart",
 );
 assert.match(
   capabilityPackageRoutesSource,

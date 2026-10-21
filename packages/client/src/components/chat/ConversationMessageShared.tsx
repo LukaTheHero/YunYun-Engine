@@ -11,15 +11,22 @@ import {
   type QuoteFormat,
 } from "@marinara-engine/shared";
 import { cn } from "../../lib/utils";
+import { useBackdropDismiss } from "../../hooks/use-backdrop-dismiss";
 import type { ReactionSegmentTarget } from "../../lib/reactions";
 import { applyInlineMarkdown, renderMarkdownBlocks } from "../../lib/markdown";
+import { RemoteImageGate } from "../../lib/remote-image-placeholder";
 import { resolveSelfCardAssets, type ChatGalleryIndex } from "../../lib/card-asset-links";
 import { renderInlineWithCustomEmojis } from "../../lib/custom-emoji-render";
 import { renderWithStickerBlocks } from "../../lib/sticker-render";
 import { applyTextareaQuoteFormat } from "../../lib/textarea-quotes";
 import { ImagePromptPanel } from "./ImagePromptPanel";
+import { ChatImagePreview } from "./ChatImagePreview";
+import { ChatVideoAttachment, isAttachmentHiddenByImageText, isVideoAttachment } from "./ChatVideoAttachment";
+import { MessageActionButton } from "./MessageActionButton";
 import { SwipeJumpControl } from "./SwipeJumpControl";
-import { AnimatedDiceRoll, isDiceRollResult, shouldAnimateDiceRollMessage } from "../dice/AnimatedDiceRoll";
+import { useUIStore } from "../../stores/ui.store";
+import { AnimatedDiceRoll, shouldAnimateDiceRollMessage } from "../dice/AnimatedDiceRoll";
+import { isDiceRollResult } from "../../lib/dice-roll-result";
 import type { CharacterMap } from "./chat-area.types";
 import { useTranslation as useUiTranslation } from "react-i18next";
 
@@ -60,9 +67,24 @@ export interface MessageData {
   createdAt: string;
 }
 
-export function DiceMessageContent({ diceRollResult, createdAt }: { diceRollResult: unknown; createdAt?: string | null }) {
+export function DiceMessageContent({
+  diceRollResult,
+  createdAt,
+}: {
+  diceRollResult: unknown;
+  createdAt?: string | null;
+}) {
   if (!isDiceRollResult(diceRollResult)) return null;
   return <AnimatedDiceRoll {...diceRollResult} mode="chat" animate={shouldAnimateDiceRollMessage(createdAt)} />;
+}
+
+/**
+ * A `/roll` message is nothing but its roll, so the card stands in for the text. An
+ * assistant turn that called the dice tool mid-narration has prose of its own, and the
+ * card sits alongside it instead of swallowing the message.
+ */
+export function diceRollReplacesMessageContent(role: string, diceRollResult: unknown): boolean {
+  return isDiceRollResult(diceRollResult) && role !== "assistant";
 }
 
 /** Everything the layout sub-components (Bubble, Line, Grouped) need, pre-resolved by the shell. */
@@ -147,7 +169,8 @@ export interface MessageRenderContext {
   onCopy: () => void;
   onTranslate: () => void;
   onStartEdit: () => void;
-  onImageOpen: (url: string, prompt?: string | null) => void;
+  /** `galleryId` is set for generated images saved to the chat gallery, which can be regenerated (#7767). */
+  onImageOpen: (url: string, prompt?: string | null, galleryId?: string | null) => void;
   /** Open the Convo about-me profile popout, anchored to the clicked avatar (undefined when unresolvable). */
   onOpenAboutMe?: (anchor: DOMRect) => void;
   onRemoveAttachment: (index: number) => void;
@@ -169,6 +192,8 @@ export interface MessageRenderContext {
   onPickSegmentReaction?: (target: ReactionSegmentTarget, emoji: string, imageUrl: string | null) => void;
   /** Toggle the user's membership in an existing reaction entry (segment-aware chip click). */
   onToggleReactionEntry: (reaction: MessageReaction) => void;
+  /** Remove character membership from an existing reaction entry. */
+  onRemoveCharacterReaction: (reaction: MessageReaction) => void;
   // style
   messageTextStyle: CSSProperties;
   // bubble-specific (ignored by Line/Grouped)
@@ -340,8 +365,16 @@ export function HiddenFromAIConversationButton({
           "inline-flex items-center gap-1 rounded px-1 py-0.5 text-[0.625rem] font-medium text-[var(--marinara-chat-chrome-highlight-text)] transition-colors hover:bg-[var(--marinara-chat-chrome-highlight-bg-hover)] hover:text-[var(--marinara-chat-chrome-button-text-hover)]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--marinara-chat-chrome-focus-ring)]",
         )}
-        aria-label={isHiddenExpanded ?localizeUi("ui.chat.hiddenfromaiconversationbutton.collapseHiddenFromAiMessage") :localizeUi("ui.chat.hiddenfromaimessagesummary.expandHiddenFromAiMessage")}
-        title={isHiddenExpanded ?localizeUi("ui.chat.hiddenfromaiconversationbutton.collapseHiddenFromAiMessage") :localizeUi("ui.chat.hiddenfromaimessagesummary.expandHiddenFromAiMessage")}
+        aria-label={
+          isHiddenExpanded
+            ? localizeUi("ui.chat.hiddenfromaiconversationbutton.collapseHiddenFromAiMessage")
+            : localizeUi("ui.chat.hiddenfromaimessagesummary.expandHiddenFromAiMessage")
+        }
+        title={
+          isHiddenExpanded
+            ? localizeUi("ui.chat.hiddenfromaiconversationbutton.collapseHiddenFromAiMessage")
+            : localizeUi("ui.chat.hiddenfromaimessagesummary.expandHiddenFromAiMessage")
+        }
       >
         <ChevronRight size="0.7rem" className={cn("shrink-0 transition-transform", isHiddenExpanded && "rotate-90")} />
         <EyeOff size="0.7rem" className="shrink-0" />
@@ -365,7 +398,9 @@ export function HiddenFromAIConversationSummary({ onExpand }: { onExpand: () => 
     >
       <EyeOff size="0.8rem" className="shrink-0" />
       <span className="min-w-0 flex-1 truncate">{localizeUi("ui.chat.conversationmessagegrouped.hiddenFromAi")}</span>
-      <span className="shrink-0 text-[0.625rem] opacity-70">{localizeUi("ui.chat.hiddenfromaimessagesummary.show")}</span>
+      <span className="shrink-0 text-[0.625rem] opacity-70">
+        {localizeUi("ui.chat.hiddenfromaimessagesummary.show")}
+      </span>
     </button>
   );
 }
@@ -397,17 +432,24 @@ export function MessageContent({
   if (IMAGE_URL_RE.test(resolved.trim())) {
     const url = resolved.trim();
     return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onImageOpen(url);
-        }}
-        className="block cursor-zoom-in rounded-lg text-left"
-        title={localizeUi("ui.noodle.noodlepostcard.openImage")}
-      >
-        <img src={url} alt={localizeUi("ui.chat.messagecontent.gif")} className="max-h-48 max-w-full sm:max-w-xs rounded-lg" loading="lazy" />
-      </button>
+      <RemoteImageGate src={url}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onImageOpen(url);
+          }}
+          className="block cursor-zoom-in rounded-lg text-left"
+          title={localizeUi("ui.noodle.noodlepostcard.openImage")}
+        >
+          <img
+            src={url}
+            alt={localizeUi("ui.chat.messagecontent.gif")}
+            className="max-h-48 max-w-full sm:max-w-xs rounded-lg"
+            loading="lazy"
+          />
+        </button>
+      </RemoteImageGate>
     );
   }
   const compacted = resolved.replace(/\n{3,}/g, "\n\n");
@@ -443,21 +485,15 @@ export function MsgAction({
   buttonRef?: RefObject<HTMLButtonElement | null>;
 }) {
   return (
-    <button
-      ref={buttonRef}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
+    <MessageActionButton
+      buttonRef={buttonRef}
+      icon={icon}
+      onClick={onClick}
       title={title}
+      className={className}
       tabIndex={tabIndex}
-      className={cn(
-        "rounded p-1 text-foreground/70 transition-colors hover:bg-foreground/20 hover:text-foreground",
-        className,
-      )}
-    >
-      {icon}
-    </button>
+      stopPropagation
+    />
   );
 }
 
@@ -484,6 +520,7 @@ export function ConversationMessageEditForm({
     <div className="space-y-2">
       <textarea
         ref={editRef}
+        data-chat-message-editor="true"
         value={editValue}
         onChange={(e) => {
           const nextValue = applyTextareaQuoteFormat(e.currentTarget, quoteFormat, e.nativeEvent as InputEvent);
@@ -503,9 +540,13 @@ export function ConversationMessageEditForm({
         }}
       />
       <div className="flex items-center gap-2 text-[0.6875rem] text-[var(--muted-foreground)]">
-        <button onClick={onCancel} className="text-foreground/70 hover:underline hover:text-foreground">{localizeUi("ui.chat.conversationmessageeditform.cancel")}</button>
+        <button onClick={onCancel} className="text-foreground/70 hover:underline hover:text-foreground">
+          {localizeUi("ui.chat.conversationmessageeditform.cancel")}
+        </button>
         <span>·</span>
-        <button onClick={onSave} className="text-foreground/70 hover:underline hover:text-foreground">{localizeUi("ui.chat.conversationmessageeditform.save")}</button>
+        <button onClick={onSave} className="text-foreground/70 hover:underline hover:text-foreground">
+          {localizeUi("ui.chat.conversationmessageeditform.save")}
+        </button>
       </div>
     </div>
   );
@@ -518,28 +559,46 @@ export function ConversationMessageAttachments({
   onImageOpen,
   onRemove,
 }: {
-  attachments: Array<{ type: string; url?: string; data?: string; filename?: string; name?: string; prompt?: string }>;
+  attachments: Array<{
+    type: string;
+    url?: string;
+    data?: string;
+    filename?: string;
+    name?: string;
+    prompt?: string;
+    videoId?: string;
+    galleryId?: string;
+  }>;
   renderedContent: string;
-  onImageOpen: (url: string, prompt?: string | null) => void;
+  /** `galleryId` is set for generated images saved to the chat gallery, which can be regenerated (#7767). */
+  onImageOpen: (url: string, prompt?: string | null, galleryId?: string | null) => void;
   onRemove: (i: number) => void;
 }) {
   const { t: localizeUi } = useUiTranslation();
-  if (!attachments.length || IMAGE_URL_RE.test(renderedContent.trim())) return null;
+  const textIsImageUrl = IMAGE_URL_RE.test(renderedContent.trim());
+  if (!attachments.some((att) => !isAttachmentHiddenByImageText(att, textIsImageUrl))) return null;
   return (
-    <div className="mt-1.5 flex flex-col items-center gap-2">
+    <div className="mt-1.5 flex flex-col items-start gap-2">
       {attachments.map((att, i) =>
-        att.type === "image" || att.type?.startsWith("image/") ? (
+        isAttachmentHiddenByImageText(att, textIsImageUrl) ? null : isVideoAttachment(att) && att.url ? (
+          <ChatVideoAttachment
+            key={att.videoId ?? att.url}
+            src={att.url}
+            prompt={att.prompt}
+            onRemove={() => onRemove(i)}
+          />
+        ) : att.type === "image" || att.type?.startsWith("image/") ? (
           <div key={i} className="group/att relative inline-block">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onImageOpen(att.url || att.data || "", att.prompt);
+                onImageOpen(att.url || att.data || "", att.prompt, att.galleryId);
               }}
               className="block cursor-zoom-in rounded-lg text-left"
               title={localizeUi("ui.noodle.noodlepostcard.openImage")}
             >
-              <img
+              <ChatImagePreview
                 src={att.url || att.data}
                 alt={att.filename || att.name || "image"}
                 className="max-h-[70vh] max-w-full rounded-lg object-contain sm:max-h-[32rem]"
@@ -596,45 +655,40 @@ export function ConversationMessageTranslation({
   return (
     <div className="mt-1.5 border-t border-[var(--border)] pt-1.5">
       {isTranslating ? (
-        <span className="text-[0.75rem] italic text-[var(--muted-foreground)]">{localizeUi("ui.chat.chatmessage.translating")}</span>
+        <span className="text-[0.75rem] italic text-[var(--muted-foreground)]">
+          {localizeUi("ui.chat.chatmessage.translating")}
+        </span>
       ) : (
-        <div className="translation-text whitespace-pre-wrap">
-          {translatedText}
-        </div>
+        <div className="translation-text whitespace-pre-wrap">{translatedText}</div>
       )}
     </div>
   );
 }
 
 /** Compact swipe control — consistent style for all Conversation layouts. */
-export function ConversationMessageSwipes({
-  messageId,
-  activeSwipeIndex,
-  swipeCount,
-  onSetActiveSwipe,
-  onCreateNextSwipe,
-  className,
-}: {
-  messageId: string;
-  activeSwipeIndex: number;
-  swipeCount: number;
-  onSetActiveSwipe: (index: number) => void;
-  onCreateNextSwipe?: () => void;
-  className?: string;
-}) {
+export function ConversationMessageSwipes({ ctx }: { ctx: MessageRenderContext }) {
+  const alwaysShow = useUIStore((state) => state.alwaysDisplayConversationSwipeMenu);
+  const {
+    message,
+    isUser,
+    hideActions,
+    isHiddenCollapsed,
+    hasSwipes,
+    swipeCount,
+    onSetActiveSwipe,
+    canRegenerate,
+    onRegenerate,
+  } = ctx;
+  if (hideActions || isHiddenCollapsed || (!hasSwipes && !(canRegenerate && onRegenerate))) return null;
   return (
     <SwipeJumpControl
-      messageId={messageId}
-      activeSwipeIndex={activeSwipeIndex}
+      alwaysShow={alwaysShow && !isUser}
+      messageId={message.id}
+      activeSwipeIndex={message.activeSwipeIndex}
       swipeCount={swipeCount}
-      onSetActiveSwipe={onSetActiveSwipe}
-      onCreateNextSwipe={onCreateNextSwipe}
-      className={cn(
-        "inline-flex items-center gap-0.5 rounded-md border border-[var(--border)] bg-[var(--secondary)] px-1.5 py-0.5 text-[0.625rem] text-[var(--muted-foreground)]",
-        className,
-      )}
-      buttonClassName="rounded-sm p-0.5 transition-colors hover:bg-[var(--accent)] disabled:opacity-30"
-      inputClassName="h-[1.25rem] w-[2rem] border-none bg-transparent text-center text-[0.625rem] outline-none"
+      onSetActiveSwipe={(idx) => onSetActiveSwipe?.(message.id, idx)}
+      onCreateNextSwipe={canRegenerate && onRegenerate ? () => onRegenerate(message.id) : undefined}
+      className={ctx.isBubbleStyle && isUser ? "justify-end" : undefined}
     />
   );
 }
@@ -650,10 +704,11 @@ export function ConversationMessageLightbox({
   onClose: () => void;
 }) {
   const { t: localizeUi } = useUiTranslation();
+  const backdropDismiss = useBackdropDismiss(onClose);
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm max-md:pt-[env(safe-area-inset-top)]"
-      onClick={onClose}
+      {...backdropDismiss}
     >
       <div
         className="flex max-h-[90vh] w-[min(90vw,64rem)] max-w-[90vw] flex-col items-center gap-2"

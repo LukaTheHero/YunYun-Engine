@@ -39,6 +39,8 @@ You can also guide a reply while you regenerate it. This reuses whatever text yo
 
 When the setting is on and you have text in the box, the **Regenerate** button changes its tooltip to **Regenerate (guided)**. The AI makes a new version of the reply using your typed text as the direction.
 
+Your direction stays in the message box afterwards, so you can adjust it and regenerate again; to clear it instead, turn off **Keep guidance after regenerating** in **Settings** > **General** > **Input & Editing**.
+
 ### Reading Stored guidance
 
 When a reply was made with a direction, YunYun saves that direction so you can see it later. A **Stored guidance** action (a scroll icon) appears on the message.
@@ -89,7 +91,7 @@ The section has these controls:
 - **Preset**: use a specific prompt preset for impersonate replies only. A preset is a saved bundle of prompt settings. See [Presets](../prompts/presets.md). The default is **Use chat default**. Presets apply in Roleplay only.
 - **Connection**: route impersonate replies to a specific connection, such as a cheaper or faster model. A connection is a saved link to an AI provider. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md). The default is **Use chat default**. You can also choose **Random**.
 - **Skip agents**: when on, YunYun skips the agent pipeline (trackers, lorebook routers, and similar helpers) during impersonate. This keeps impersonate fast and stops it from changing world state. It is off by default. See [Agents](../agents/agents-overview.md).
-- **Use CYOA as direction**: when on, clicking a CYOA option uses it as the impersonate direction instead of posting it as a normal message. CYOA means choose your own adventure, a set of clickable choices some chats show after a reply. This setting is off by default.
+- **Use CYOA as direction**: when on, clicking a CYOA option uses it as the impersonate direction instead of posting it as a normal message. CYOA means choose your own adventure, a set of clickable choices some chats show after a reply. This setting is off by default. If **Add CYOA choices to the message box instead of sending them** is on in **Settings** > **General** > **Input & Editing**, clicking a choice only adds its text to your message box, and this setting has no effect.
 
 ### Setting a custom impersonate prompt
 
@@ -124,7 +126,7 @@ You choose which actions show from settings.
 
 The three actions are:
 
-- **Post only**: add your typed message to the chat without triggering an AI reply.
+- **Post only**: add your typed message to the chat without triggering an AI reply. You can also run this with the `/send <message>` slash command.
 - **Guide reply**: send your typed text as a `/guided` direction instead of a normal message.
 - **Impersonate**: generate a reply as your persona, using your typed text as the direction. This action is hidden in Conversation chats, because Impersonate does not work there.
 

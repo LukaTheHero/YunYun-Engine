@@ -11,6 +11,7 @@ interface ImageUploadDropzoneProps {
   pendingLabel?: string;
   dragLabel?: string;
   className?: string;
+  labelClassName?: string;
   accept?: string;
   multiple?: boolean;
   disabled?: boolean;
@@ -41,6 +42,7 @@ export function ImageUploadDropzone({
   pendingLabel = "Uploading...",
   dragLabel = "Drop images to upload",
   className,
+  labelClassName,
   accept = "image/*",
   multiple = true,
   disabled = false,
@@ -57,13 +59,19 @@ export function ImageUploadDropzone({
     const supportedFiles = getSupportedFiles(files, fileKind);
     if (supportedFiles.length === 0) {
       if (files && files.length > 0) {
-        toast.error(fileKind === "image" ?localizeUi("ui.ui.imageuploaddropzone.dropImageFilesToUpload") :localizeUi("ui.ui.imageuploaddropzone.dropVideoFilesToUpload"));
+        toast.error(
+          fileKind === "image"
+            ? localizeUi("ui.ui.imageuploaddropzone.dropImageFilesToUpload")
+            : localizeUi("ui.ui.imageuploaddropzone.dropVideoFilesToUpload"),
+        );
       }
       return;
     }
     if (files && supportedFiles.length < files.length) {
       toast.warning(
-        fileKind === "image" ?localizeUi("ui.ui.imageuploaddropzone.onlyImageFilesCanBeUploadedHere") :localizeUi("ui.ui.imageuploaddropzone.onlyVideoFilesCanBeUploadedHere"),
+        fileKind === "image"
+          ? localizeUi("ui.ui.imageuploaddropzone.onlyImageFilesCanBeUploadedHere")
+          : localizeUi("ui.ui.imageuploaddropzone.onlyVideoFilesCanBeUploadedHere"),
       );
     }
     onFilesSelected(supportedFiles);
@@ -138,7 +146,7 @@ export function ImageUploadDropzone({
         )}
       >
         {icon}
-        {isDragging ? dragLabel : pending ? pendingLabel : label}
+        <span className={labelClassName}>{isDragging ? dragLabel : pending ? pendingLabel : label}</span>
       </button>
       <input
         ref={inputRef}

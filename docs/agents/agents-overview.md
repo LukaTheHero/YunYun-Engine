@@ -8,7 +8,7 @@ Agents are small AI helpers that run automatically around your main chat reply. 
 
 Agents are turned on per chat, not per character. There is no agent toggle on a character card. Two chats with the same character can run completely different agents. You choose which agents run in each chat's settings.
 
-Fresh YunYun Engine installations start without optional agents. This keeps the base app and Termux installation smaller. The official v2.3.0+ catalog contains 32 one-click packages: 6 Writer Agents, 8 Tracker Agents, and 18 Misc Agents, including Long-Term Memory, Maps, Calls, and all six Conversation games. Their source, manifests, downloadable artifacts, and repository-level catalog are public in [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents). For the complete per-agent guide, see [Downloadable Agents Reference](built-in-agents.md). To make your own, see [Creating Custom Agents](custom-agents.md).
+Fresh YunYun Engine installations start without optional agents. This keeps the base app and Termux installation smaller. **Download Agents** groups the official one-click packages into **Apps**, **Writer Agents**, **Tracker Agents**, and **Misc Agents**. The catalog includes Long-Term Memory, World Maps, Calls, Inventory Tracker, and all six Conversation games. Their source, manifests, downloadable artifacts, and repository-level catalog are public in [Pasta-Devs/Marinara-Agents](https://github.com/Pasta-Devs/Marinara-Agents). For the complete per-agent guide, see [Downloadable Agents Reference](built-in-agents.md). To make your own, see [Creating Custom Agents](custom-agents.md).
 
 ## The three phases
 
@@ -22,22 +22,31 @@ Every agent runs at one of three points around your reply. This point is called 
 
 Open the **Agents** panel from the right-side panel tabs (the Sparkles icon). Here you browse, create, and organize agents. This is your library. It is not the on or off switch for a single chat.
 
-Click **Download Agents** at the top to open the full-screen official catalog. It works on desktop and mobile. Select an item to read its description, supported feature type, download size, permissions, version compatibility, and documentation. Click **Install** to add it; the same screen offers immediate manual updates and **Uninstall** for packages you already have. YunYun also checks every installed official package at server startup and upgrades it to the newest compatible catalog version before its runtime activates. Packages continue working at their current version when the host server is offline or an update cannot be verified.
+Click **Download Agents** at the top to open the full-screen official catalog. It works on desktop and mobile. Select an item to read its description, supported feature type, download size, permissions, version compatibility, and documentation. Click **Install** to add it; the same screen offers immediate manual updates and **Uninstall** for packages you already have. When the package publishes release notes, a **Version history** section lists what each version changed.
 
 The in-app catalog is backed by the public [Marinara-Agents repository](https://github.com/Pasta-Devs/Marinara-Agents). You can inspect every package and artifact there, but normal users should install through **Download Agents** so YunYun can validate compatibility, permissions, hashes, archive contents, and restart requirements.
 
-The catalog includes first-party chat agents, World Maps, Conversation audio/video calls, and every optional Conversation game. Installed agents are grouped into **Writer Agents**, **Tracker Agents**, and **Misc Agents**, plus a **Custom Agents** section for ones you make. Uninstalling a catalog package removes its code and settings from the Engine while preserving chat messages and history. Deleting a custom agent removes it for good.
+The catalog includes first-party chat agents, World Maps, Conversation audio/video calls, and every optional Conversation game. Installed agents are grouped into **Apps**, **Writer Agents**, **Tracker Agents**, and **Misc Agents**, plus a **Custom Agents** section for ones you make. **Apps** are packages with their own Home tab, like Noodle and Slurp, that you use on their own instead of adding to a chat. A package marked **Rules** is not an agent: it adds a Game Mode ruleset, such as 5e (SRD 5.1), which you pick under **Rules** when you create a new game (see [Choosing rules](../game/getting-started.md#choosing-rules)). It has nothing to switch on in a chat. The 5e package is in preview, so today only an Engine on the `staging` branch lists it. Uninstalling a catalog package removes its code and settings from the Engine while preserving chat messages and history. Deleting a custom agent removes it for good.
 
 When upgrading from an Engine version that bundled these features, YunYun downloads the matching packages once and preserves existing chat selections, agent settings, stored runtime data, and history. If that migration cannot reach the catalog, it retries at the next startup instead of discarding anything.
 
-Automatic startup updates never install an unselected package. Desktop, Docker, and Android/Termux installations update the packages stored by their local server. iOS, iPadOS, and other browser clients use the packages installed and updated by the YunYun server they connect to.
+### Updating packages
+
+YunYun asks before it updates a package. When a newer compatible version of a package you installed is available, an **Agent updates available** window appears. It lists each update with its new version and whether it needs a restart. When the package publishes release notes, **What changed** shows them. If the update skips versions, **What changed** lists the notes of every version since yours, newest first, and shows how many there are. A long note is cut short; select **More** to read all of it. A dot marks a change you will notice; updates without one are routine fixes.
+
+- Click **Update all** to install every listed update. Restart YunYun Engine if it asks you to.
+- Click **Not now** to keep your current versions. YunYun does not ask again about a version you skipped.
+
+You can still update any package later from **Download Agents**. Installed packages keep working at their current version until you update them, even when the catalog cannot be reached.
+
+Updates only apply to packages you already installed. Desktop, Docker, and Android/Termux installations keep their packages on their local server. iOS, iPadOS, and other browser clients use the packages installed on the YunYun server they connect to.
 
 ## Enabling agents for a chat
 
 You turn agents on inside each chat, in the **Chat Settings** drawer.
 
 1. Open the chat you want.
-2. Open **Chat Settings** (the gear).
+2. Open **Chat Settings**.
 3. Find the **Agents** section.
 4. Turn on **Enable Agents**. This is the master switch. When it is off, no agent runs for this chat.
 5. Add the agents you want from the lists below the switch, or remove ones you do not want.
@@ -46,15 +55,20 @@ You should see the agents you added listed as active, each with a small remove b
 
 The **Agents** section has a few more controls:
 
-- **Review Agent Outputs**: when on, lorebook, summary, and character card changes wait for your approval before they save. When off, lorebook and summary changes can save on their own, but character card edits still ask you first. See [Agent Approvals and the Agent Suite](approvals-and-agent-suite.md).
-- **Manual Trackers** (Roleplay chats only): when on, tracker agents do not run after every reply. You trigger them by hand from a button in the HUD. HUD means heads-up display, the on-screen status overlay in Roleplay.
+- **Agent Menus** (Roleplay chats only): sits right under **Enable Agents**. Click an agent's name to jump to its settings.
+- **Trackers Control** (Roleplay chats only): a card that starts closed. Click it to open these settings:
+  - **Attach chat summaries**: off by default, including in existing chats without a saved choice. Turn it on to include saved chat summaries in agent requests, including post-processing and manual retries. This does not remove summaries from the main reply or stop summary generation. Agents explicitly granted full main-prompt access can still read summaries inside that prompt.
+  - **Attach Lorebooks to Trackers**: when on, tracker agents also get the lorebook entries used for the main reply. It shows once the chat has a tracker agent.
+  - **Review Agent Outputs**: described in its own item after this list.
+  - **Individual tracker schedule**: turn a tracker on to stop it from running after every reply. You then run it by hand from a button in the HUD. HUD means heads-up display, the on-screen status overlay in Roleplay. It shows once the chat has a tracker agent.
+- **Review Agent Outputs**: when on, lorebook, summary, and character card changes wait for your approval before they save. When off, lorebook and summary changes can save on their own, but character card edits still ask you first. See [Agent Approvals and the Agent Suite](approvals-and-agent-suite.md). In Roleplay chats, it is inside **Trackers Control**.
 - **Agent Suite**: opens a viewer where you can read and edit everything the agents have stored for this chat.
 
 ### The cost warning
 
 Agents cost extra tokens and extra model calls. Each agent adds its own instructions, and often its own model call. YunYun groups agents that share the same connection into one call when it can. Above the agent list, a readout estimates the load for your current setup. It shows about how many tokens of agent instructions you added and about how many extra calls happen per turn.
 
-This readout turns amber with a warning icon when the load gets heavy. The real cost per turn is higher than the number shown. Your chat history and character details are sent with each call. If you see the warning, remove agents you do not need, or move some to a cheaper or local connection.
+Tap the help icon beside the readout to open its explanation on desktop or mobile. This readout turns amber with a warning icon when the load gets heavy. The real cost per turn is higher than the number shown. Your chat history and character details are sent with each call. The recent-message limit only controls chat messages; agent instructions, character details, and attached summaries are additional context. If you see the warning, remove agents you do not need, or move some to a cheaper or local connection. A **Reasoning Effort** saved on a connection also applies to the agents that use it, so a high level makes each of their calls slower and costlier. See [Parameters for agents](../prompts/generation-parameters.md#parameters-for-agents).
 
 ## Which agents each mode starts with
 
@@ -71,7 +85,7 @@ You can add or remove compatible agents at any time.
 Some agents change something you can see right away. Others work quietly. Here is how to check.
 
 - Tracker agents write into the HUD and the tracker panels. If the time, location, mood, or stats updated, a tracker agent ran.
-- A floating status overlay shows short thinking messages from agents while they work, so you can watch them run in real time.
+- **Agent activity** in **Chat Settings** lists short notes from the agents. While they work, its icon turns into a spinner, and a dot appears on it when an agent fails. See [Agent activity](../roleplay/getting-started.md#agent-activity).
 - The **Prose Guardian** and **Continuity Checker** agents change the reply text itself. A cleaned-up or corrected reply is a sign they ran.
 - For a full trace, turn on **Debug mode** in **Settings**, then **Advanced**, then **Message Tools**. It logs the prompt and response for each agent to the server console. It also shows an **Agent Debug** overlay with per-agent calls, tokens, and timing.
 
@@ -80,6 +94,7 @@ Did an agent you expected not run? Check that **Enable Agents** is on. Check tha
 ## Related guides
 
 - [Downloadable Agents Reference](built-in-agents.md)
+- [2D and 3D Avatars](avatars.md)
 - [Official YunYun Agents repository](https://github.com/Pasta-Devs/Marinara-Agents)
 - [Creating Custom Agents](custom-agents.md)
 - [Agent Approvals and the Agent Suite](approvals-and-agent-suite.md)

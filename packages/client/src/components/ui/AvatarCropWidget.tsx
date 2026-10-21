@@ -40,8 +40,16 @@ export interface AvatarCropWidgetProps {
 }
 
 const MIN_CROP_PX = 24;
-const MAX_DISPLAY_W = 360;
-const MAX_DISPLAY_H = 360;
+/** Drawn size of a corner handle. */
+const HANDLE_VISUAL_PX = 16;
+/** Touch target around it — the usual 44px mobile minimum. */
+const HANDLE_TOUCH_PX = 44;
+/** Clear space around the image, so a crop that reaches the image edge (the
+ *  default for square images) still shows its whole frame and corner handles. */
+const STAGE_GUTTER_PX = 12;
+// The image gives up the gutter, so the widget keeps its 360px footprint.
+const MAX_DISPLAY_W = 360 - 2 * STAGE_GUTTER_PX;
+const MAX_DISPLAY_H = 360 - 2 * STAGE_GUTTER_PX;
 
 export function AvatarCropWidget({ src, alt, crop, onChange, onRemove, removing = false }: AvatarCropWidgetProps) {
   const { t: localizeUi } = useUiTranslation();
@@ -219,7 +227,8 @@ export function AvatarCropWidget({ src, alt, crop, onChange, onRemove, removing 
     <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--secondary)] p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--muted-foreground)]">
-          <Crop size="0.75rem" /> {localizeUi("ui.ui.avatarcropwidget.avatarCrop")}</span>
+          <Crop size="0.75rem" /> {localizeUi("ui.ui.avatarcropwidget.avatarCrop")}
+        </span>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -227,14 +236,16 @@ export function AvatarCropWidget({ src, alt, crop, onChange, onRemove, removing 
             className="mari-editor-action mari-editor-action--compact inline-flex gap-1 rounded-lg px-2 py-1 text-[0.625rem]"
             title={localizeUi("ui.ui.avatarcropwidget.openFullImage")}
           >
-            <Maximize2 size="0.625rem" /> {localizeUi("ui.ui.avatarcropwidget.fullImage")}</button>
+            <Maximize2 size="0.625rem" /> {localizeUi("ui.ui.avatarcropwidget.fullImage")}
+          </button>
           <button
             type="button"
             onClick={reset}
             className="mari-editor-action mari-editor-action--compact inline-flex gap-1 rounded-lg px-2 py-1 text-[0.625rem]"
             title={localizeUi("ui.ui.avatarcropwidget.resetToCenteredMaxSquareCrop")}
           >
-            <RotateCcw size="0.625rem" /> {localizeUi("ui.characters.charactercliptrimmodal.reset")}</button>
+            <RotateCcw size="0.625rem" /> {localizeUi("ui.characters.charactercliptrimmodal.reset")}
+          </button>
           {onRemove && (
             <button
               type="button"
@@ -243,87 +254,114 @@ export function AvatarCropWidget({ src, alt, crop, onChange, onRemove, removing 
               className="mari-editor-action mari-editor-action--compact mari-editor-action--danger inline-flex gap-1 rounded-lg px-2 py-1 text-[0.625rem]"
               title={localizeUi("ui.ui.avatarcropwidget.removeAvatar")}
             >
-              <Trash2 size="0.625rem" /> {removing ?localizeUi("ui.ui.avatarcropwidget.removing") :localizeUi("settings.notifications.customSound.actions.remove")}
+              <Trash2 size="0.625rem" />{" "}
+              {removing
+                ? localizeUi("ui.ui.avatarcropwidget.removing")
+                : localizeUi("settings.notifications.customSound.actions.remove")}
             </button>
           )}
         </div>
       </div>
-      <p className="text-[0.625rem] text-[var(--muted-foreground)]">{localizeUi("ui.ui.avatarcropwidget.dragTheSquareToPanTheCornersToResize")}</p>
+      <p className="text-[0.625rem] text-[var(--muted-foreground)]">
+        {localizeUi("ui.ui.avatarcropwidget.dragTheSquareToPanTheCornersToResize")}
+      </p>
 
       <div className="flex gap-4 max-md:flex-col max-md:items-center">
-        {/* Crop canvas — sized to fit the displayed image exactly so overlay
-            coords are also image coords. */}
-        <div
-          className="relative overflow-hidden rounded-lg bg-black/40 select-none"
-          style={{
-            width: imgRect?.w ?? MAX_DISPLAY_W,
-            height: imgRect?.h ?? MAX_DISPLAY_H,
-          }}
-        >
-          {/* key={src} forces remount when the source changes (e.g. switching
-              between personas/characters in the editor). Without this, only the
-              `src` attribute updates on the existing element, and if the new
-              image is already in browser cache the `load` event never fires for
-              React's onLoad listener — so `handleImgLoad` doesn't run and the
-              crop overlay never initializes. */}
-          <img
-            key={src}
-            ref={imgRef}
-            src={src}
-            alt={alt}
-            onLoad={handleImgLoad}
-            draggable={false}
-            className="block h-full w-full"
-            style={{ objectFit: "fill" }}
-          />
-          {cropPx && imgRect && (
-            <div
-              className="absolute touch-none"
-              style={{
-                left: cropPx.x,
-                top: cropPx.y,
-                width: cropPx.size,
-                height: cropPx.size,
-                boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
-                outline: "2px solid white",
-                cursor: "move",
-              }}
-              onPointerDown={(e) => onPointerDown(e, "pan")}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-            >
-              <CornerHandle
-                pos="tl"
-                onPointerDown={(e) => onPointerDown(e, "tl")}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
+        {/* Crop stage — a gutter around the image so the frame and corner
+            handles are never clipped at the image edge (#7323). Only the image
+            and its dimming are clipped; the inner box is sized to the displayed
+            image exactly, so overlay coords are also image coords. On phones the
+            stage fills the editor's width, so it trims the touch targets sideways
+            at the gutter instead of letting them scroll the editor sideways. */}
+        <div className="select-none max-md:overflow-x-clip" style={{ padding: STAGE_GUTTER_PX }}>
+          <div
+            className="relative"
+            style={{
+              width: imgRect?.w ?? MAX_DISPLAY_W,
+              height: imgRect?.h ?? MAX_DISPLAY_H,
+            }}
+          >
+            <div className="absolute inset-0 overflow-hidden rounded-lg bg-black/40">
+              {/* key={src} forces remount when the source changes (e.g. switching
+                  between personas/characters in the editor). Without this, only the
+                  `src` attribute updates on the existing element, and if the new
+                  image is already in browser cache the `load` event never fires for
+                  React's onLoad listener — so `handleImgLoad` doesn't run and the
+                  crop overlay never initializes. */}
+              <img
+                key={src}
+                ref={imgRef}
+                src={src}
+                alt={alt}
+                onLoad={handleImgLoad}
+                draggable={false}
+                className="block h-full w-full"
+                style={{ objectFit: "fill" }}
               />
-              <CornerHandle
-                pos="tr"
-                onPointerDown={(e) => onPointerDown(e, "tr")}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-              />
-              <CornerHandle
-                pos="bl"
-                onPointerDown={(e) => onPointerDown(e, "bl")}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-              />
-              <CornerHandle
-                pos="br"
-                onPointerDown={(e) => onPointerDown(e, "br")}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-              />
+              {cropPx && imgRect && (
+                <div
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: cropPx.x,
+                    top: cropPx.y,
+                    width: cropPx.size,
+                    height: cropPx.size,
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
+                  }}
+                />
+              )}
             </div>
-          )}
+            {cropPx && imgRect && (
+              <div
+                data-avatar-crop-frame=""
+                className="absolute touch-none"
+                style={{
+                  left: cropPx.x,
+                  top: cropPx.y,
+                  width: cropPx.size,
+                  height: cropPx.size,
+                  outline: "2px solid white",
+                  cursor: "move",
+                }}
+                onPointerDown={(e) => onPointerDown(e, "pan")}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+              >
+                <CornerHandle
+                  pos="tl"
+                  onPointerDown={(e) => onPointerDown(e, "tl")}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                />
+                <CornerHandle
+                  pos="tr"
+                  onPointerDown={(e) => onPointerDown(e, "tr")}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                />
+                <CornerHandle
+                  pos="bl"
+                  onPointerDown={(e) => onPointerDown(e, "bl")}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                />
+                <CornerHandle
+                  pos="br"
+                  onPointerDown={(e) => onPointerDown(e, "br")}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Live preview — circle avatar at typical sidebar size */}
         <div className="flex shrink-0 flex-col items-center gap-2">
-          <span className="text-[0.625rem] text-[var(--muted-foreground)]">{localizeUi("settings.notifications.customSound.actions.preview")}</span>
+          <span className="text-[0.625rem] text-[var(--muted-foreground)]">
+            {localizeUi("settings.notifications.customSound.actions.preview")}
+          </span>
           <div className="relative h-24 w-24 overflow-hidden rounded-full bg-black/20 ring-2 ring-[var(--border)]">
             <img src={src} alt={alt} className="h-full w-full object-cover" style={getAvatarCropStyle(previewCrop)} />
           </div>
@@ -359,24 +397,41 @@ function CornerHandle({
   onPointerMove: (e: React.PointerEvent) => void;
   onPointerUp: () => void;
 }) {
-  const base: React.CSSProperties = {
-    position: "absolute",
-    width: 14,
-    height: 14,
-    background: "white",
-    border: "1px solid black",
-    borderRadius: 2,
-  };
+  // The visible square stays small, but a 16px target is roughly 4mm on a phone
+  // and misses far more often than it hits. Wrap it in a 44px transparent target
+  // (the standard mobile minimum) that reaches mostly *outward* from the crop
+  // corner: it intrudes only `HANDLE_VISUAL_PX / 2` into the crop box, so the
+  // four corners cannot swallow the pan area even at `MIN_CROP_PX`. The crop
+  // stage does not clip it, so it stays whole at the image edge too (on phones
+  // the stage trims its sideways reach to the gutter; the drawn square fits).
+  const inset = HANDLE_TOUCH_PX - HANDLE_VISUAL_PX / 2;
   const cursorByPos = { tl: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize", br: "nwse-resize" } as const;
-  const positionByPos: Record<typeof pos, React.CSSProperties> = {
-    tl: { top: -8, left: -8 },
-    tr: { top: -8, right: -8 },
-    bl: { bottom: -8, left: -8 },
-    br: { bottom: -8, right: -8 },
+  const targetByPos: Record<typeof pos, React.CSSProperties> = {
+    tl: { top: -inset, left: -inset },
+    tr: { top: -inset, right: -inset },
+    bl: { bottom: -inset, left: -inset },
+    br: { bottom: -inset, right: -inset },
+  };
+  // Pin the visible square to the target's crop-facing corner, so it lands where
+  // it has always been drawn.
+  const squareByPos: Record<typeof pos, React.CSSProperties> = {
+    tl: { bottom: 0, right: 0 },
+    tr: { bottom: 0, left: 0 },
+    bl: { top: 0, right: 0 },
+    br: { top: 0, left: 0 },
   };
   return (
     <div
-      style={{ ...base, ...positionByPos[pos], cursor: cursorByPos[pos] }}
+      style={{
+        position: "absolute",
+        width: HANDLE_TOUCH_PX,
+        height: HANDLE_TOUCH_PX,
+        // Without this the WebView can claim the gesture as a scroll before the
+        // pointer capture in `onPointerDown` takes effect.
+        touchAction: "none",
+        ...targetByPos[pos],
+        cursor: cursorByPos[pos],
+      }}
       onPointerDown={(e) => {
         e.stopPropagation();
         onPointerDown(e);
@@ -384,7 +439,20 @@ function CornerHandle({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-    />
+    >
+      <div
+        data-avatar-crop-handle={pos}
+        style={{
+          position: "absolute",
+          width: HANDLE_VISUAL_PX,
+          height: HANDLE_VISUAL_PX,
+          background: "white",
+          border: "1px solid black",
+          borderRadius: 2,
+          ...squareByPos[pos],
+        }}
+      />
+    </div>
   );
 }
 

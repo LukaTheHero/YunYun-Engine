@@ -24,9 +24,11 @@
 // codebase, and stays correct as new *ConnectionId settings are added
 // without requiring this file to be updated in lockstep.
 
+import { DEFAULT_EMBEDDING_CONNECTION_SETTINGS_KEY } from "@marinara-engine/shared";
 import { eq } from "../../db/file-query.js";
 import type { DB } from "../../db/connection.js";
 import { apiConnections, chats, agentConfigs } from "../../db/schema/index.js";
+import { createAppSettingsStorage } from "./app-settings.storage.js";
 import { now } from "../../utils/id-generator.js";
 
 const CLEANUP_BATCH_SIZE = 250;
@@ -41,10 +43,7 @@ type ConnectionReferenceCleanupResult = {
  * Returns rewritten serialized JSON only when an object contains a matching
  * `*ConnectionId` reference. Malformed and non-object roots are left alone.
  */
-function serializeNullifiedConnectionIdReferences(
-  raw: unknown,
-  deletedConnectionId: string,
-): string | undefined {
+function serializeNullifiedConnectionIdReferences(raw: unknown, deletedConnectionId: string): string | undefined {
   if (typeof raw !== "string" && (!raw || typeof raw !== "object" || Array.isArray(raw))) {
     return undefined;
   }
@@ -71,7 +70,7 @@ function serializeNullifiedConnectionIdReferences(
 /**
  * Clears every stored reference to `deletedConnectionId`: the direct
  * `connectionId` columns on chats and agent configs, `embeddingConnectionId`
- * on other connections, and any `*ConnectionId` key inside chat metadata or
+ * on other connections, the app-wide default embedding connection, and any `*ConnectionId` key inside chat metadata or
  * agent settings (however deeply nested). Call this once the connection
  * itself has been removed (or is about to be); it is a no-op if nothing
  * references the id.
@@ -95,13 +94,13 @@ export async function sweepDanglingConnectionReferences(
     result.connectionsUpdated = danglingEmbeddingRefs.length;
   }
 
+  const appSettings = createAppSettingsStorage(db);
+  if ((await appSettings.get(DEFAULT_EMBEDDING_CONNECTION_SETTINGS_KEY)) === deletedConnectionId) {
+    await appSettings.remove(DEFAULT_EMBEDDING_CONNECTION_SETTINGS_KEY);
+  }
+
   for (let offset = 0; ; offset += CLEANUP_BATCH_SIZE) {
-    const chatRows = await db
-      .select()
-      .from(chats)
-      .orderBy(chats.id)
-      .limit(CLEANUP_BATCH_SIZE)
-      .offset(offset);
+    const chatRows = await db.select().from(chats).orderBy(chats.id).limit(CLEANUP_BATCH_SIZE).offset(offset);
     for (const chat of chatRows) {
       const metadata = serializeNullifiedConnectionIdReferences(chat.metadata, deletedConnectionId);
       const directMatch = chat.connectionId === deletedConnectionId;

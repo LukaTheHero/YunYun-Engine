@@ -1,6 +1,6 @@
 # Game Mode: Sessions and Saves
 
-This guide explains how YunYun Engine tracks your Game Mode progress across play sessions. It covers ending and starting a session and reading past sessions in the **Session History** panel. It also covers the **Show Spoilers** view and how the game saves your data.
+This guide explains how YunYun Engine tracks your Game Mode progress across play sessions. It covers ending and starting a session and reading past sessions in **Session History**. It also covers the **Show Spoilers** view, fixing the game's data by hand, and how the game saves your data.
 
 ## What a session is
 
@@ -8,23 +8,23 @@ Game Mode splits your adventure into numbered sessions. A session is one continu
 
 Your first session is **Session 1**. Ending it and starting again creates **Session 2**, and so on.
 
-## Opening the Session panel
+## Opening Session
 
-The **Session** panel is where you end sessions, start new ones, and read your history.
+**Session** is where you end sessions, start new ones, and read your history.
 
 1. Start or open a Game Mode chat so the game surface is showing.
-2. In the top toolbar, click the **Session** button (the feather icon).
-3. The panel opens. The header shows **Session** with the current number and status.
-4. The panel has two tabs: **Session History** and **Journal**. Stay on **Session History** for session controls and setup sharing.
+2. Click or tap the **Session** button (the feather icon). It starts near the top right of the chat. You can drag it to another spot (see [Control windows and their buttons](../chats/chat-settings.md#control-windows-and-their-buttons)).
+3. **Session** opens as a window on a computer or a full-width panel on a phone. Its first line shows **Session** with the current number and status.
+4. It has two tabs: **Session History** and **Journal**. Stay on **Session History** for session controls and setup sharing.
 
-The panel header also has a **Game tutorial** button that reopens the guided tour.
+If you used **Put back in Chat Settings** to move this window, open the **Session** section in Chat Settings instead.
 
 ## Sharing the setup that created a game
 
 Game Mode keeps an immutable snapshot of the setup used to create each new campaign. This lets you play first, decide that the combination works well, and share it afterward without manually recording every field before starting.
 
 1. Open the Game Mode campaign you want to share.
-2. Click the **Session** button (the feather icon) in the top toolbar.
+2. Open **Session** (the feather icon button).
 3. Stay on **Session History**, then expand **Initial Game Setup**.
 4. Review the saved adventure, cast, model, prompt, effective generation parameters, visual, storyboard, and world-tool settings.
 5. Click **Copy setup** to put the text on your clipboard, or **Download .txt** to save a shareable text file.
@@ -37,7 +37,7 @@ Campaigns created before setup snapshots were added cannot recover preferences t
 
 End a session when you want to wrap up the current chapter and let the GM summarize it.
 
-1. Open the **Session** panel and stay on the **Session History** tab.
+1. Open **Session** and stay on the **Session History** tab.
 2. At the top you see the current session, labeled **Session N (Current)**.
 3. In that row, click the **End Session** button (the small square icon next to **Show Spoilers**).
 4. A dialog titled **End Session** opens and asks you to confirm.
@@ -51,9 +51,11 @@ After you confirm, the engine generates a summary. Wait on this screen until it 
 
 Once the current session is concluded, the same button changes to **New Session**.
 
-1. Open the **Session** panel and go to the **Session History** tab.
+1. Open **Session** and go to the **Session History** tab.
 2. In the current session row, click the **New Session** button (the play icon).
 3. The GM resumes the story. It uses the last session's summary and any next-session note you wrote when you ended it.
+
+In a game with a generated world, the world goes on from where the last session left it: the days that passed, the party's deeds and standing, the places and groups the story added, and where the party went all carry into the new session.
 
 ## Reading past sessions
 
@@ -102,9 +104,9 @@ A **Regenerate Lorebook** button appears only on your latest concluded session, 
 
 **Show Spoilers** reveals the GM's hidden notes for the current session. These are normally kept secret from you during play. Reading them can spoil plot twists.
 
-1. Open the **Session** panel and go to the **Session History** tab.
+1. Open **Session** and go to the **Session History** tab.
 2. In the current session row, click **Show Spoilers** (the eye icon).
-3. The panel reveals the GM's private state.
+3. The GM's private state appears.
 
 The spoiler view can show these sections:
 
@@ -118,11 +120,41 @@ To hide the notes again, click the same button. It now reads **Hide Spoilers**.
 
 You can also edit these secrets, which acts like a game-master cheat panel. Click **Edit Spoilers**, change the text, then click **Save Spoilers**. Some fields are shown as JSON, a structured text format. Only edit JSON fields if you understand the format, since bad JSON will not save.
 
+## Editing game data by hand
+
+When the Game Master gets something wrong, such as an NPC's reputation or a quest that stays open, you can fix the game's saved data yourself.
+
+1. Open **Game controls** and choose **Edit game data**. On a phone, **Game controls** is in the three-dot **Chat tools** menu.
+2. The **Game Data** window opens. A warning at the top reads: "Hand edits can break a game. Every change is checked before it saves, and names can't change here."
+3. Pick a section from the list, or from the row of chips on a phone. You can also type in the search box to find a value in every section at once.
+4. Change values in **Fields**, or switch to **JSON** to edit the raw data.
+5. Click **Review changes** to see exactly what changes, then click **Save changes**.
+
+You can change **Party Cards**, **Party Sheet**, **NPCs**, **Journal**, **Player Notes**, **Inventory**, **Story**, **Session Summaries**, **World Edits**, **Story Script** and **HUD Widgets**. A section shows only when the game has that data, so a game without a world has no **World Edits**. The other sections, such as **World**, **Maps & Position**, **Time, Weather & Morale**, **Combat** and **Settings**, are marked **Read-only**. You can read and search them, but the game keeps them itself. Prompt, image, music and dice preferences are changed in **Chat Settings**.
+
+Every change is checked before it saves:
+
+- Names can't change, because cards, NPCs, the party and bags find each other by name. Party members can't be added or removed here.
+- An NPC's reputation runs from -100 to 100.
+- In **Inventory**, you can change an item's quantity, nickname and carrier, and whether it is worn, attuned or switched on. Leave a stack out to remove it, or add one without an id to add an item.
+- In **Session Summaries**, only the text of a session can change.
+- **World Edits** holds your hand edits over the world, such as renamed places or added people. The world itself is never changed.
+
+When a change can't be saved, the editor says why, and that section keeps your draft so you can fix it. If the game changed the same data while you were editing, the save is refused so it does not undo the game's change. **Reload** shows the game's version and discards your drafts.
+
+Before each save, the game tries to take a checkpoint, marked **Before a State Editor save** in **Checkpoints**. If an edit goes wrong, load that checkpoint to undo it (see below).
+
+The window works like the Roleplay State Editor. See [The State Editor](../roleplay/hud-and-trackers.md#the-state-editor).
+
 ## How your game saves
 
 Game Mode saves your progress automatically. You do not need to press a save button. Your world, party, map, inventory, in-game time, and session summaries are all kept for you as you play.
 
-The app also records automatic checkpoints behind the scenes. It captures a checkpoint at session start, at session end, and when combat begins or ends. There is currently no in-app screen to browse or restore these checkpoints. So do not rely on loading an old checkpoint to undo a turn.
+The app also records automatic checkpoints behind the scenes. It captures a checkpoint at session start, at session end, when combat begins or ends, when you reach a new place, and at automatic intervals. The [Game data editor](#editing-game-data-by-hand) also tries to take one before every save, though a game too new to have its first turn saved has nothing to checkpoint yet. Open **Game controls → Checkpoints** to see them, newest first. **Load** takes the game back to that moment: the tracker, the map, the **World Edits** from the Game data editor and the story after it are restored, and a system message marks where the game was set back. The party's cards and sheets, the NPCs, the journal, your notes, the inventory, the session summaries, the GM's story plans, the HUD widgets and the time, weather and morale go back to that moment too. Your settings stay as they are. **Delete** removes one for good.
+
+Automatic checkpoints are kept to the five newest of each kind, so older ones are cleaned up as you play.
+
+To undo a single bad turn, use **Retry turn** in **Game controls** or a swipe instead. Loading a checkpoint also restores the story to that moment.
 
 To keep your own copy of your data, use the app's backup tools. See [Backup and Restore](../data/backup-and-restore.md).
 

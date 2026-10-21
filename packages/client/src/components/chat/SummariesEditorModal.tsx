@@ -4,13 +4,22 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X, Plus, Trash2, CalendarClock, ChevronRight, ChevronsDownUp, ChevronsUpDown, RefreshCw } from "lucide-react";
 import { cn } from "../../lib/utils";
-import type { Chat, ChatMetadata, DaySummaryEntry, WeekSummaryEntry } from "@marinara-engine/shared";
+import { useBackdropDismiss } from "../../hooks/use-backdrop-dismiss";
+import { isBrowserExtensionUi } from "../../lib/chat-floating-ui-events";
+import {
+  estimateTextTokens,
+  type Chat,
+  type ChatMetadata,
+  type DaySummaryEntry,
+  type WeekSummaryEntry,
+} from "@marinara-engine/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { chatKeys, useBackfillConversationSummaries, useUpdateChatSummaries } from "../../hooks/use-chats";
 import { useTranslation as useUiTranslation } from "react-i18next";
+import { useDialogFocusScope } from "../../hooks/use-dialog-focus-scope";
 
 function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  return estimateTextTokens(text);
 }
 
 function fmtTokens(n: number): string {
@@ -113,6 +122,7 @@ function computeDelta(
 
 export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorModalProps) {
   const { t: localizeUi } = useUiTranslation();
+  const backdropDismiss = useBackdropDismiss(onClose);
   const metadata = useMemo(
     () => (typeof chat.metadata === "string" ? JSON.parse(chat.metadata) : (chat.metadata ?? {})),
     [chat.metadata],
@@ -125,6 +135,19 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [backfillNotice, setBackfillNotice] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useDialogFocusScope(open, dialogRef);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Escape in a browser extension's card (Grammarly's) closes that card, not this editor and its drafts.
+      if (event.key === "Escape" && !isBrowserExtensionUi(event.target)) onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, open]);
 
   // Reinitialize drafts whenever the modal opens, refetching the chat first so
   // auto-summaries written during a prior generation show up without a page refresh.
@@ -274,9 +297,13 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
     <div
       data-chat-floating-panel
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm max-md:pt-[env(safe-area-inset-top)]"
-      onClick={onClose}
+      {...backdropDismiss}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="summaries-editor-title"
         className="mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-[var(--border)] bg-[var(--background)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -284,9 +311,17 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
         <div className="shrink-0 flex items-center justify-between border-b border-[var(--border)] px-5 py-3">
           <div className="flex items-center gap-2">
             <CalendarClock size="1rem" className="text-[var(--muted-foreground)]" />
-            <h3 className="text-sm font-bold">{localizeUi("ui.chat.chatsettingsdrawer.automaticSummarization")}</h3>
+            <h3 id="summaries-editor-title" className="text-sm font-bold">
+              {localizeUi("ui.chat.chatsettingsdrawer.automaticSummarization")}
+            </h3>
             <span className="text-[0.625rem] text-[var(--muted-foreground)]">
-              {entries.length} {entries.length === 1 ?localizeUi("ui.lorebooks.lorebookeditor.entry") :localizeUi("ui.lorebooks.lorebookeditor.entries_c2e311d")} {localizeUi("ui.chat.peekpromptmodal.middot")}{fmtTokens(totalTokens)} {localizeUi("ui.chat.collapsibleblock.token")}{totalTokens !== 1 ?localizeUi("ui.noodle.stageprofileview.s") : ""}
+              {entries.length}{" "}
+              {entries.length === 1
+                ? localizeUi("ui.lorebooks.lorebookeditor.entry")
+                : localizeUi("ui.lorebooks.lorebookeditor.entries_c2e311d")}{" "}
+              {localizeUi("ui.chat.peekpromptmodal.middot")}
+              {fmtTokens(totalTokens)} {localizeUi("ui.chat.collapsibleblock.token")}
+              {totalTokens !== 1 ? localizeUi("ui.noodle.stageprofileview.s") : ""}
             </span>
           </div>
           <button
@@ -299,22 +334,34 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
 
         {/* Body */}
         <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3">
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--secondary)]/30 px-3 py-2 text-[0.6875rem] text-[var(--muted-foreground)]">{localizeUi("ui.chat.summarieseditormodal.daysFromTheCurrentWeekAreAutomaticallyConsolidatedInto")}</div>
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--secondary)]/30 px-3 py-2 text-[0.6875rem] text-[var(--muted-foreground)]">
+            {localizeUi("ui.chat.summarieseditormodal.daysFromTheCurrentWeekAreAutomaticallyConsolidatedInto")}
+          </div>
 
           <div className="rounded-lg border border-[var(--border)] bg-[var(--secondary)]/20 px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[0.75rem] font-medium text-[var(--foreground)]">{localizeUi("ui.chat.summarieseditormodal.missingSummaries")}</p>
-                <p className="text-[0.625rem] leading-snug text-[var(--muted-foreground)]">{localizeUi("ui.chat.summarieseditormodal.retryPastDaysThatFailedOrNeverReceivedAn")}</p>
+                <p className="text-[0.75rem] font-medium text-[var(--foreground)]">
+                  {localizeUi("ui.chat.summarieseditormodal.missingSummaries")}
+                </p>
+                <p className="text-[0.625rem] leading-snug text-[var(--muted-foreground)]">
+                  {localizeUi("ui.chat.summarieseditormodal.retryPastDaysThatFailedOrNeverReceivedAn")}
+                </p>
               </div>
               <button
                 onClick={handleBackfill}
                 disabled={isDirty || backfillSummaries.isPending}
-                title={isDirty ?localizeUi("ui.chat.summarieseditormodal.saveYourEditsBeforeBackfilling") :localizeUi("ui.chat.summarieseditormodal.generateMissingSummaries")}
+                title={
+                  isDirty
+                    ? localizeUi("ui.chat.summarieseditormodal.saveYourEditsBeforeBackfilling")
+                    : localizeUi("ui.chat.summarieseditormodal.generateMissingSummaries")
+                }
                 className="flex items-center gap-1.5 rounded-md bg-[var(--secondary)] px-2.5 py-1.5 text-[0.6875rem] font-medium text-[var(--foreground)] ring-1 ring-[var(--border)] transition-colors hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw size="0.75rem" className={cn(backfillSummaries.isPending && "animate-spin")} />
-                {backfillSummaries.isPending ?localizeUi("settings.notifications.customSound.status.loading") :localizeUi("ui.chat.summarieseditormodal.backfill")}
+                {backfillSummaries.isPending
+                  ? localizeUi("settings.notifications.customSound.status.loading")
+                  : localizeUi("ui.chat.summarieseditormodal.backfill")}
               </button>
             </div>
             {(backfillNotice || backfillSummaries.isError) && (
@@ -324,25 +371,39 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
                   backfillSummaries.isError ? "text-[var(--destructive)]" : "text-[var(--muted-foreground)]",
                 )}
               >
-                {backfillSummaries.isError ?localizeUi("ui.chat.summarieseditormodal.backfillFailedCheckTheServerLogForDetails") : backfillNotice}
+                {backfillSummaries.isError
+                  ? localizeUi("ui.chat.summarieseditormodal.backfillFailedCheckTheServerLogForDetails")
+                  : backfillNotice}
               </p>
             )}
           </div>
 
           {entries.length === 0 && (
-            <div className="rounded-lg border border-dashed border-[var(--border)] px-4 py-8 text-center text-[0.75rem] text-[var(--muted-foreground)]">{localizeUi("ui.chat.summarieseditormodal.noSummariesYetComeBackAfterYourFirstDay")}</div>
+            <div className="rounded-lg border border-dashed border-[var(--border)] px-4 py-8 text-center text-[0.75rem] text-[var(--muted-foreground)]">
+              {localizeUi("ui.chat.summarieseditormodal.noSummariesYetComeBackAfterYourFirstDay")}
+            </div>
           )}
 
           {entries.length > 0 && (
             <div className="flex items-center justify-end">
               <button
                 onClick={toggleAll}
-                title={allExpanded ?localizeUi("ui.chat.summarieseditormodal.collapseAll") :localizeUi("ui.chat.summarieseditormodal.expandAll")}
-                aria-label={allExpanded ?localizeUi("ui.chat.summarieseditormodal.collapseAll") :localizeUi("ui.chat.summarieseditormodal.expandAll")}
+                title={
+                  allExpanded
+                    ? localizeUi("ui.chat.summarieseditormodal.collapseAll")
+                    : localizeUi("ui.chat.summarieseditormodal.expandAll")
+                }
+                aria-label={
+                  allExpanded
+                    ? localizeUi("ui.chat.summarieseditormodal.collapseAll")
+                    : localizeUi("ui.chat.summarieseditormodal.expandAll")
+                }
                 className="flex items-center gap-1 rounded-md px-2 py-1 text-[0.6875rem] font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
               >
                 {allExpanded ? <ChevronsDownUp size="0.85rem" /> : <ChevronsUpDown size="0.85rem" />}
-                {allExpanded ?localizeUi("ui.chat.summarieseditormodal.collapseAll") :localizeUi("ui.chat.summarieseditormodal.expandAll")}
+                {allExpanded
+                  ? localizeUi("ui.chat.summarieseditormodal.collapseAll")
+                  : localizeUi("ui.chat.summarieseditormodal.expandAll")}
               </button>
             </div>
           )}
@@ -379,7 +440,8 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
                     {entry.kind}
                   </span>
                   <span className="ml-auto shrink-0 text-[0.625rem] text-[var(--muted-foreground)]">
-                    ~{fmtTokens(entryTokens)} {localizeUi("ui.chat.collapsibleblock.token")}{entryTokens !== 1 ?localizeUi("ui.noodle.stageprofileview.s") : ""}
+                    ~{fmtTokens(entryTokens)} {localizeUi("ui.chat.collapsibleblock.token")}
+                    {entryTokens !== 1 ? localizeUi("ui.noodle.stageprofileview.s") : ""}
                   </span>
                 </button>
 
@@ -387,7 +449,9 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
                   <div className="space-y-2 border-t border-[var(--border)] px-3 py-2">
                     {/* Summary textarea */}
                     <div className="space-y-1">
-                      <label className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">{localizeUi("ui.chat.summarieseditormodal.summary")}</label>
+                      <label className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">
+                        {localizeUi("ui.chat.summarieseditormodal.summary")}
+                      </label>
                       <AutoSizingTextarea
                         value={current.summary}
                         onChange={(next) => updateEntry(entry.kind, entry.key, { ...current, summary: next })}
@@ -397,9 +461,13 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
 
                     {/* Key details rows */}
                     <div className="space-y-1">
-                      <label className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">{localizeUi("ui.chat.summarieseditormodal.keyDetails")}</label>
+                      <label className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">
+                        {localizeUi("ui.chat.summarieseditormodal.keyDetails")}
+                      </label>
                       {current.keyDetails.length === 0 && (
-                        <p className="text-[0.6875rem] italic text-[var(--muted-foreground)]">{localizeUi("ui.chat.summarieseditormodal.noKeyDetails")}</p>
+                        <p className="text-[0.6875rem] italic text-[var(--muted-foreground)]">
+                          {localizeUi("ui.chat.summarieseditormodal.noKeyDetails")}
+                        </p>
                       )}
                       <div className="space-y-1.5">
                         {current.keyDetails.map((detail, i) => (
@@ -432,7 +500,9 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
                         }
                         className="mt-1 flex items-center gap-1 rounded-md px-2 py-1 text-[0.6875rem] text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
                       >
-                        <Plus size="0.75rem" />{localizeUi("ui.chat.summarieseditormodal.addKeyDetail")}</button>
+                        <Plus size="0.75rem" />
+                        {localizeUi("ui.chat.summarieseditormodal.addKeyDetail")}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -444,20 +514,24 @@ export function SummariesEditorModal({ chat, open, onClose }: SummariesEditorMod
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-between gap-2 border-t border-[var(--border)] px-5 py-3">
           <div className="text-[0.6875rem] text-[var(--destructive)]">
-            {updateSummaries.isError ?localizeUi("ui.chat.summarieseditormodal.saveFailedTryAgain") : ""}
+            {updateSummaries.isError ? localizeUi("ui.chat.summarieseditormodal.saveFailedTryAgain") : ""}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
               disabled={updateSummaries.isPending}
               className="rounded-lg px-3 py-1.5 text-[0.75rem] font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] disabled:opacity-50"
-            >{localizeUi("chat.delete.dialog.cancel")}</button>
+            >
+              {localizeUi("chat.delete.dialog.cancel")}
+            </button>
             <button
               onClick={handleSave}
               disabled={!isDirty || updateSummaries.isPending}
               className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-[0.75rem] font-medium text-[var(--primary-foreground)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {updateSummaries.isPending ?localizeUi("chat.settings.inlineEditor.saving") :localizeUi("ui.noodle.noodlehome.save")}
+              {updateSummaries.isPending
+                ? localizeUi("chat.settings.inlineEditor.saving")
+                : localizeUi("ui.noodle.noodlehome.save")}
             </button>
           </div>
         </div>

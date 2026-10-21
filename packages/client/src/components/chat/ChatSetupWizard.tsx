@@ -24,9 +24,11 @@ import {
   RotateCcw,
   Dices,
   FolderOpen,
+  Folder,
+  UserPlus,
 } from "lucide-react";
 import { cn, getAvatarCropStyle } from "../../lib/utils";
-import { useConnections } from "../../hooks/use-connections";
+import { useConnections, useModelParameterCapabilities } from "../../hooks/use-connections";
 import { usePresets, usePresetFull, useDefaultPreset } from "../../hooks/use-presets";
 import { useCharacterGroups, useCharacters, usePersonas } from "../../hooks/use-characters";
 import { useLorebooks } from "../../hooks/use-lorebooks";
@@ -38,13 +40,27 @@ import { useUIStore } from "../../stores/ui.store";
 import { useChatStore } from "../../stores/chat.store";
 import { useSidecarStore } from "../../stores/sidecar.store";
 import { api } from "../../lib/api-client";
-import { appendLocalSidecarConnectionOption } from "../../lib/connection-filters";
+import { appendLocalSidecarConnectionOption, filterLanguageGenerationConnections } from "../../lib/connection-filters";
 import { resolveConversationSelfieSetup } from "../../lib/conversation-selfie-setup";
+import {
+  captureChatWizardDefaults,
+  readChatMetadata,
+  wizardDefaultsMetadataPatch,
+  type ChatWizardDefaults,
+} from "../../lib/chat-wizard-defaults";
 import { getAgentRunIntervalMeta } from "../../lib/agent-cadence";
 import { characterMatchesSearch, getCharacterTitle, parseCharacterDisplayData } from "../../lib/character-display";
+import { buildCharacterIdentityGroups } from "../../lib/character-identity-groups";
 import { addSilentGreetingSwipes } from "../../lib/message-swipes";
 import { ChoiceSelectionModal } from "../presets/ChoiceSelectionModal";
+import { CharacterOnboardingModal, type OnboardingCardTarget } from "../characters/CharacterOnboardingModal";
+import { ActiveChatBackgroundPicker } from "../panels/settings/BackgroundPicker";
 import {
+  type CardOnboarding,
+  hasOnboardingContent,
+  canBuildPersona,
+  getRelevantCardVariables,
+  readCardOnboarding,
   CONVERSATION_COMMAND_AGENT_IDS,
   CONVERSATION_COMMAND_KEYS,
   DEFAULT_CONVERSATION_PROMPT,
@@ -61,6 +77,7 @@ import {
   isRetiredBuiltInAgentId,
   mergeBuiltInAgentSettings,
   normalizeAgentPhaseForType,
+  normalizeIllustratorRunInterval,
   type AgentPhase,
   type Chat,
   type ChatMode,
@@ -98,7 +115,9 @@ import {
   type AgentAddSpriteSubject,
 } from "./AgentAddSetupFields";
 import { ConversationTimeZoneSelect } from "./ConversationTimeZoneSelect";
+import { AdvancedMemorySettings } from "./AdvancedMemorySettings";
 import { useTranslation as useUiTranslation } from "react-i18next";
+import { MultiplayerPrepareButton } from "../../features/multiplayer/MultiplayerPrepareButton";
 
 // ─── Step definitions ─────────────────────────
 
@@ -202,6 +221,11 @@ interface ChatSetupWizardProps {
   onFinish: () => void;
 }
 
+interface WizardWithDefaultsProps extends ChatSetupWizardProps {
+  defaultsApplied: boolean;
+  defaultsAction: (metadata: Record<string, unknown>) => React.ReactNode;
+}
+
 type ConnectionSetupOption = {
   id: string;
   name: string;
@@ -247,7 +271,7 @@ type AgentAddPreview = {
 
 const WIZARD_PANEL_CLASS = cn(
   NEUTRAL_PANEL_SHELL,
-  "mari-chat-setup-wizard pointer-events-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden sm:max-h-[min(90dvh,44rem)]",
+  "mari-chat-setup-wizard pointer-events-auto flex max-h-full w-full max-w-lg flex-col overflow-hidden sm:max-h-[min(100%,44rem)]",
 );
 
 const WIZARD_FIELD_LABEL = "text-[0.6875rem] font-medium uppercase tracking-wider text-[var(--muted-foreground)]";
@@ -380,18 +404,6 @@ function WizardSelect({
   );
 }
 
-function readChatMetadata(chat: Chat): Record<string, unknown> {
-  const raw = (chat as unknown as { metadata?: string | Record<string, unknown> }).metadata;
-  if (typeof raw === "string") {
-    try {
-      return JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      return {};
-    }
-  }
-  return raw ?? {};
-}
-
 function readChatActiveAgentIds(chat: Chat): string[] {
   const metadata = readChatMetadata(chat);
   const activeIds = metadata.activeAgentIds;
@@ -415,9 +427,9 @@ function isConversationCommandToggleEnabled(
   return toggles[command] !== false;
 }
 
-function normalizePositiveInteger(value: unknown, fallback: number, max: number): number {
+function normalizePositiveInteger(value: unknown, fallback: number, max: number, min = 1): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
-  return Math.max(1, Math.min(max, Math.trunc(value)));
+  return Math.max(min, Math.min(max, Math.trunc(value)));
 }
 
 function normalizeAgentMaxTokens(value: unknown): number {
@@ -469,7 +481,7 @@ function SetupWizardShell({
 }) {
   const { t: localizeUi } = useUiTranslation();
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center p-3 pointer-events-none max-md:pt-[max(0.75rem,env(safe-area-inset-top))] max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
+    <div className="absolute inset-0 z-50 flex items-center justify-center p-3 pointer-events-none max-md:pt-[max(0.75rem,env(safe-area-inset-top))] max-md:pb-[max(0.75rem,var(--mari-safe-area-inset-bottom,env(safe-area-inset-bottom)))] sm:p-4">
       <AnimatePresence mode="wait">
         <motion.div
           key={animationKey}
@@ -608,17 +620,42 @@ function PersonaAvatar({ persona }: { persona: Persona | null }) {
 
 function PersonaPicker({
   personas,
+  characters = [],
+  characterGroups = [],
+  showCharacterIdentities = false,
   value,
+  characterValue = null,
   onChange,
+  onCharacterChange,
+  templates = [],
+  templateValue = null,
+  onTemplateChange,
   searchable = true,
 }: {
   personas: Persona[];
+  /** Characters whose onboarding builds a new persona; picking one asks its questions on Next. */
+  templates?: Array<{ id: string; data: string | Record<string, unknown>; avatarPath?: string | null }>;
+  templateValue?: string | null;
+  onTemplateChange?: (characterId: string) => void;
+  characters?: Array<{
+    id: string;
+    data: string | Record<string, unknown>;
+    avatarPath?: string | null;
+    comment?: string | null;
+  }>;
+  characterGroups?: CharacterGroup[];
+  showCharacterIdentities?: boolean;
   value: string | null;
+  characterValue?: string | null;
   onChange: (personaId: string | null) => void;
+  onCharacterChange?: (characterId: string | null) => void;
   searchable?: boolean;
 }) {
   const { t: localizeUi } = useUiTranslation();
   const selectedId = value ?? "";
+  const selectedCharacterId = characterValue ?? "";
+  const [showCharacters, setShowCharacters] = useState(false);
+  const [expandedCharacterGroups, setExpandedCharacterGroups] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const filteredPersonas = useMemo(() => {
     if (!search.trim()) return personas;
@@ -628,16 +665,61 @@ function PersonaPicker({
       return persona.name.toLowerCase().includes(query) || title.includes(query);
     });
   }, [personas, search]);
+  const characterGroupsWithMembers = useMemo(
+    () => buildCharacterIdentityGroups(characters, characterGroups, localizeUi("ui.chat.personapicker.ungrouped")),
+    [characterGroups, characters, localizeUi],
+  );
+
+  const noneSelected = !selectedId && !selectedCharacterId && !templateValue;
 
   return (
     <div className="overflow-hidden rounded-lg bg-[var(--secondary)]/50 ring-1 ring-[var(--border)]">
+      {templates.map((character) => {
+        const isSelected = templateValue === character.id;
+        const characterData = parseCharacterDisplayData(character);
+        return (
+          <button
+            key={`template-${character.id}`}
+            type="button"
+            onClick={() => onTemplateChange?.(character.id)}
+            aria-pressed={isSelected}
+            className={cn(
+              "flex w-full items-center gap-2.5 border-b border-[var(--border)] px-3 py-2 text-left transition-all hover:bg-[var(--accent)]",
+              isSelected && "bg-[var(--primary)]/10 ring-1 ring-inset ring-[var(--primary)]/25",
+            )}
+          >
+            {character.avatarPath ? (
+              <CroppedAvatarImage
+                src={character.avatarPath}
+                alt=""
+                className="h-7 w-7 rounded-full"
+                crop={characterData.avatarCrop ?? null}
+              />
+            ) : (
+              <PersonaAvatar persona={null} />
+            )}
+            <div className="min-w-0 flex-1">
+              <span className="flex items-center gap-1 truncate text-xs font-medium">
+                <UserPlus size="0.75rem" className="shrink-0 text-[var(--primary)]" />
+                {localizeUi("ui.characters.onboarding.modalTitle")}
+              </span>
+              <span className="block truncate text-[0.625rem] text-[var(--muted-foreground)]">
+                {localizeUi("ui.characters.onboarding.templateSource", { value1: characterData.name })}
+              </span>
+            </div>
+            {isSelected && <Check size="0.75rem" className="shrink-0 text-[var(--primary)]" />}
+          </button>
+        );
+      })}
       <button
         type="button"
-        onClick={() => onChange(null)}
-        aria-pressed={!selectedId}
+        onClick={() => {
+          onChange(null);
+        }}
+        aria-pressed={noneSelected}
         className={cn(
           "flex w-full items-center gap-2.5 px-3 py-2 text-left transition-all hover:bg-[var(--accent)]",
-          !selectedId && "bg-[var(--primary)]/10 ring-1 ring-inset ring-[var(--primary)]/25",
+          noneSelected && "bg-[var(--primary)]/10 ring-1 ring-inset ring-[var(--primary)]/25",
         )}
       >
         <PersonaAvatar persona={null} />
@@ -647,22 +729,23 @@ function PersonaPicker({
             {localizeUi("ui.chat.personapicker.stayAnonymous")}
           </span>
         </div>
-        {!selectedId && <Check size="0.75rem" className="shrink-0 text-[var(--primary)]" />}
+        {noneSelected && <Check size="0.75rem" className="shrink-0 text-[var(--primary)]" />}
       </button>
 
       {personas.length > 0 && <div className="border-t border-[var(--border)]" />}
 
-      {searchable && personas.length > 0 && (
-        <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
-          <Search size="0.75rem" className="text-[var(--muted-foreground)]" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={localizeUi("ui.chat.chatsettingsdrawer.searchPersonas")}
-            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--muted-foreground)]"
-          />
-        </div>
-      )}
+      {searchable &&
+        (personas.length > 0 || (characters.length > 0 && (showCharacterIdentities || !!selectedCharacterId))) && (
+          <div className="flex items-center gap-2 border-b border-[var(--border)] px-3 py-2">
+            <Search size="0.75rem" className="text-[var(--muted-foreground)]" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={localizeUi("ui.chat.chatsettingsdrawer.searchPersonas")}
+              className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--muted-foreground)]"
+            />
+          </div>
+        )}
 
       <div className="max-h-40 overflow-y-auto">
         {filteredPersonas.map((persona) => {
@@ -672,7 +755,9 @@ function PersonaPicker({
             <button
               key={persona.id}
               type="button"
-              onClick={() => onChange(persona.id)}
+              onClick={() => {
+                onChange(persona.id);
+              }}
               aria-pressed={isSelected}
               className={cn(
                 "flex w-full items-center gap-2.5 px-3 py-2 text-left transition-all hover:bg-[var(--accent)]",
@@ -698,6 +783,95 @@ function PersonaPicker({
               : localizeUi("ui.chat.personapicker.noMatchingPersonas")}
           </p>
         )}
+        {characters.length > 0 && (showCharacterIdentities || !!selectedCharacterId) && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowCharacters((value) => !value)}
+              aria-expanded={showCharacters}
+              className="flex w-full items-center gap-2 border-t border-[var(--border)] px-3 py-2 text-left text-[0.625rem] font-semibold uppercase text-[var(--muted-foreground)] hover:bg-[var(--accent)]"
+            >
+              {showCharacters ? <FolderOpen size="0.75rem" /> : <Folder size="0.75rem" />}
+              <span className="flex-1">{localizeUi("ui.chat.personapicker.playAsCharacter")}</span>
+              {showCharacters ? <ChevronDown size="0.75rem" /> : <ChevronRight size="0.75rem" />}
+            </button>
+            {showCharacters &&
+              characterGroupsWithMembers.map((group) => {
+                const expanded = expandedCharacterGroups.has(group.id);
+                const visibleMembers = group.members.filter(
+                  (character) =>
+                    character.id === selectedCharacterId ||
+                    (showCharacterIdentities && characterMatchesSearch(parseCharacterDisplayData(character), search)),
+                );
+                if (visibleMembers.length === 0) return null;
+                return (
+                  <div key={group.id}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedCharacterGroups((current) => {
+                          const next = new Set(current);
+                          if (next.has(group.id)) next.delete(group.id);
+                          else next.add(group.id);
+                          return next;
+                        })
+                      }
+                      aria-expanded={expanded}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-[var(--accent)]"
+                    >
+                      {group.avatarPath ? (
+                        <img src={group.avatarPath} alt="" className="h-4 w-4 shrink-0 rounded object-cover" />
+                      ) : expanded ? (
+                        <FolderOpen size="0.75rem" />
+                      ) : (
+                        <Folder size="0.75rem" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">{group.name}</span>
+                      <span className="text-[0.625rem] text-[var(--muted-foreground)]">{visibleMembers.length}</span>
+                      {expanded ? <ChevronDown size="0.75rem" /> : <ChevronRight size="0.75rem" />}
+                    </button>
+                    {expanded &&
+                      visibleMembers.map((character) => {
+                        const isSelected = selectedCharacterId === character.id;
+                        const characterData = parseCharacterDisplayData(character);
+                        const name = characterData.name;
+                        return (
+                          <button
+                            key={`character-${character.id}`}
+                            type="button"
+                            onClick={() => onCharacterChange?.(character.id)}
+                            aria-pressed={isSelected}
+                            className={cn(
+                              "flex w-full items-center gap-2.5 py-2 pl-8 pr-3 text-left transition-all hover:bg-[var(--accent)]",
+                              isSelected && "bg-[var(--primary)]/10 ring-1 ring-inset ring-[var(--primary)]/25",
+                            )}
+                          >
+                            {character.avatarPath ? (
+                              <CroppedAvatarImage
+                                src={character.avatarPath}
+                                alt=""
+                                className="h-7 w-7 rounded-full"
+                                crop={characterData.avatarCrop ?? null}
+                              />
+                            ) : (
+                              <PersonaAvatar persona={null} />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-medium">{name}</span>
+                              <span className="block truncate text-[0.625rem] text-[var(--muted-foreground)]">
+                                {getCharacterTitle(characterData) ||
+                                  localizeUi("ui.chat.personapicker.characterSource")}
+                              </span>
+                            </div>
+                            {isSelected && <Check size="0.75rem" className="shrink-0 text-[var(--primary)]" />}
+                          </button>
+                        );
+                      })}
+                  </div>
+                );
+              })}
+          </>
+        )}
       </div>
     </div>
   );
@@ -706,25 +880,27 @@ function PersonaPicker({
 function SetupGenerationParametersPanel({
   enabled,
   value,
-  showOpenRouterServiceTier,
+  connection,
   onEnabledChange,
   onChange,
 }: {
   enabled: boolean;
   value: EditableGenerationParameters;
-  showOpenRouterServiceTier: boolean;
+  /** The selected connection; its provider and model decide which settings are offered. */
+  connection: { id?: string | null; provider?: string | null; model?: string | null; baseUrl?: unknown } | null;
   onEnabledChange: (enabled: boolean) => void;
   onChange: (next: EditableGenerationParameters) => void;
 }) {
   const { t: localizeUi } = useUiTranslation();
+  const modelCapabilities = useModelParameterCapabilities(enabled ? connection : null);
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3">
       <button
         type="button"
         onClick={() => onEnabledChange(!enabled)}
-        className="flex w-full items-center justify-between gap-3 text-left"
+        className="flex min-w-0 w-full items-center justify-between gap-3 text-left"
       >
-        <div>
+        <div className="min-w-0 flex-1">
           <span className="block text-xs font-medium text-[var(--foreground)]">
             {localizeUi("ui.chat.setupgenerationparameterspanel.customizeParameters")}
           </span>
@@ -734,7 +910,7 @@ function SetupGenerationParametersPanel({
         </div>
         <div
           className={cn(
-            "h-5 w-9 rounded-full p-0.5 transition-colors",
+            "h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors",
             enabled ? "bg-[var(--primary)]" : "bg-[var(--muted-foreground)]/50",
           )}
         >
@@ -745,7 +921,10 @@ function SetupGenerationParametersPanel({
         <div className="mt-3 border-t border-[var(--border)] pt-3">
           <GenerationParametersFields
             value={value}
-            showOpenRouterServiceTier={showOpenRouterServiceTier}
+            provider={connection?.provider ?? null}
+            model={connection?.model ?? null}
+            baseUrl={typeof connection?.baseUrl === "string" ? connection.baseUrl : null}
+            modelCapabilities={modelCapabilities}
             onChange={onChange}
           />
         </div>
@@ -756,25 +935,138 @@ function SetupGenerationParametersPanel({
 
 export function ChatSetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
   const chatMode = (chat as unknown as { mode?: string }).mode ?? "roleplay";
-
-  if (chatMode === "conversation") {
-    return <ConversationQuickSetup chat={chat} onFinish={onFinish} />;
-  }
-
   // Game mode has its own wizard in GameSurface — skip the roleplay wizard
-  if (chatMode === "game") {
-    return null;
-  }
+  if (chatMode === "game") return null;
+  return <SavedChatSetupWizard key={chat.id} chat={chat} onFinish={onFinish} />;
+}
 
-  return <RoleplaySetupWizard chat={chat} onFinish={onFinish} />;
+function SavedChatSetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
+  const { t } = useUiTranslation();
+  const mode = chat.mode === "conversation" ? "conversation" : "roleplay";
+  const [initial] = useState(() => captureChatWizardDefaults(chat));
+  const saved = useUIStore((state) => state.chatWizardDefaults[mode]);
+  const settingsSyncReady = useUIStore((state) => state.settingsSyncReady);
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const pendingApply = useRef<Promise<unknown> | null>(null);
+  const initialApplyDone = useRef(false);
+  const updateChat = useUpdateChat();
+  const updateMeta = useUpdateChatMetadata();
+  const queryClient = useQueryClient();
+  const apply = useCallback(
+    async (defaults: ChatWizardDefaults, reset = false) => {
+      const { metadata, connectionId, promptPresetId, personaId, personaCharacterId, characterIds } = defaults;
+      // Older saved templates still contain a name. Apply only reusable setup fields.
+      await updateChat.mutateAsync({
+        id: chat.id,
+        connectionId,
+        promptPresetId,
+        personaId,
+        personaCharacterId,
+        characterIds,
+      });
+      const latest = queryClient.getQueryData<Chat>(chatKeys.detail(chat.id)) ?? chat;
+      await updateMeta.mutateAsync({
+        id: chat.id,
+        ...(reset ? wizardDefaultsMetadataPatch(captureChatWizardDefaults(latest), defaults) : metadata),
+      });
+    },
+    [chat, queryClient, updateChat, updateMeta],
+  );
+
+  useEffect(() => {
+    if (!settingsSyncReady || initialApplyDone.current) return;
+    if (!saved) {
+      initialApplyDone.current = true;
+      setReady(true);
+      return;
+    }
+    let active = true;
+    pendingApply.current ??= apply({
+      ...saved,
+      // A card launch is an explicit participant choice, ahead of saved defaults.
+      characterIds: initial.characterIds.length ? initial.characterIds : saved.characterIds,
+    });
+    void pendingApply.current
+      .then(() => {
+        if (!active) return;
+        initialApplyDone.current = true;
+        setDefaultsApplied(true);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        initialApplyDone.current = true;
+        toast.error(t("chat.wizard.defaults.failed"));
+        setDefaultsApplied(false);
+        setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [apply, initial.characterIds, saved, settingsSyncReady, t]);
+
+  const defaultsAction = (metadata: Record<string, unknown>) => (
+    <button
+      type="button"
+      className={WIZARD_GHOST_BUTTON_CLASS}
+      onClick={async () => {
+        if (defaultsApplied) {
+          setReady(false);
+          try {
+            await apply(initial, true);
+            useUIStore.getState().setChatWizardDefaults(mode, null);
+            setDefaultsApplied(false);
+            setRevision((value) => value + 1);
+          } catch {
+            toast.error(t("chat.wizard.defaults.failed"));
+          } finally {
+            setReady(true);
+          }
+        } else {
+          const latest = queryClient.getQueryData<Chat>(chatKeys.detail(chat.id)) ?? chat;
+          useUIStore.getState().setChatWizardDefaults(mode, captureChatWizardDefaults(latest, metadata));
+          setDefaultsApplied(true);
+          toast.success(t("chat.wizard.defaults.saved"));
+        }
+      }}
+    >
+      {t(defaultsApplied ? "chat.wizard.defaults.reset" : "chat.wizard.defaults.save")}
+    </button>
+  );
+
+  if (!ready)
+    return (
+      <>
+        <WizardBackdrop onClose={onFinish} />
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center p-3">
+          <div
+            role="status"
+            className={cn(NEUTRAL_PANEL_SHELL, "flex items-center gap-2 p-4 text-sm text-[var(--foreground)]")}
+          >
+            <Loader2 size="1rem" className="animate-spin" aria-hidden="true" />
+            {t("navigation.common.loading")}
+          </div>
+        </div>
+      </>
+    );
+  const currentChat = queryClient.getQueryData<Chat>(chatKeys.detail(chat.id)) ?? chat;
+  const props = { chat: currentChat, onFinish, defaultsApplied, defaultsAction };
+  return mode === "conversation" ? (
+    <ConversationQuickSetup key={revision} {...props} />
+  ) : (
+    <RoleplaySetupWizard key={revision} {...props} />
+  );
 }
 
 // ──────────────────────────────────────────────
 // Conversation Quick Setup — Discord-style "New DM" picker
 // ──────────────────────────────────────────────
 
-function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
+function ConversationQuickSetup({ chat, onFinish, defaultsApplied, defaultsAction }: WizardWithDefaultsProps) {
   const { t: localizeUi } = useUiTranslation();
+  const showCharacterIdentities = useUIStore((state) => state.showCharactersInPersonaPickers);
   const [step, setStep] = useState(0);
   const currentStep = CONVERSATION_STEPS[step]!;
   const isLast = step === CONVERSATION_STEPS.length - 1;
@@ -794,11 +1086,19 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
   const openRightPanel = useUIStore((s) => s.openRightPanel);
   const openAgentCatalog = useUIStore((s) => s.openAgentCatalog);
   const [scheduleState, setScheduleState] = useState<"idle" | "generating" | "done">("idle");
-  const [autonomousEnabled, setAutonomousEnabled] = useState(true);
-  const [generateSchedule, setGenerateSchedule] = useState(false);
-  const [promptPresetTouched, setPromptPresetTouched] = useState(false);
-  const [customConversationPromptEnabled, setCustomConversationPromptEnabled] = useState(false);
-  const [conversationSystemPromptDraft, setConversationSystemPromptDraft] = useState(DEFAULT_CONVERSATION_PROMPT);
+  const [autonomousEnabled, setAutonomousEnabled] = useState(() => readChatMetadata(chat).autonomousMessages !== false);
+  const [generateSchedule, setGenerateSchedule] = useState(
+    () => readChatMetadata(chat).conversationSchedulesEnabled === true,
+  );
+  const [promptPresetTouched, setPromptPresetTouched] = useState(defaultsApplied);
+  const [customConversationPromptEnabled, setCustomConversationPromptEnabled] = useState(
+    () => !!readChatMetadata(chat).customSystemPrompt,
+  );
+  const [conversationSystemPromptDraft, setConversationSystemPromptDraft] = useState(() =>
+    typeof readChatMetadata(chat).customSystemPrompt === "string"
+      ? (readChatMetadata(chat).customSystemPrompt as string)
+      : DEFAULT_CONVERSATION_PROMPT,
+  );
   const defaultPromptPresetAppliedRef = useRef<string | null>(null);
   const selectedConnectionChatIdRef = useRef(chat.id);
   const latestChatConnectionIdRef = useRef(chat.connectionId);
@@ -841,7 +1141,7 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
 
   // Track whether the user has manually edited the chat name.
   // If not, auto-rename to match the selected character name(s).
-  const [userEditedName, setUserEditedName] = useState(false);
+  const [userEditedName, setUserEditedName] = useState(defaultsApplied);
 
   const characters = useMemo(
     () =>
@@ -897,7 +1197,7 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
     return readChatMetadata(chat);
   }, [chat]);
   const [commandsEnabled, setCommandsEnabled] = useState(
-    () => metadata.conversationSetupComplete === true && metadata.characterCommands !== false,
+    () => (defaultsApplied || metadata.conversationSetupComplete === true) && metadata.characterCommands !== false,
   );
   const [conversationCommandToggles, setConversationCommandToggles] = useState<
     Partial<Record<ConversationCommandKey, boolean>>
@@ -916,8 +1216,13 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
     [connectionOptions, selectedConnectionId],
   );
   const parameterDefaults = useMemo(
-    () => getEditableGenerationParameters(CHAT_PARAMETER_DEFAULTS, selectedConnection?.defaultParameters),
-    [selectedConnection?.defaultParameters],
+    () =>
+      getEditableGenerationParameters(
+        CHAT_PARAMETER_DEFAULTS,
+        selectedConnection?.defaultParameters,
+        selectedConnection?.provider,
+      ),
+    [selectedConnection?.defaultParameters, selectedConnection?.provider],
   );
   const [customizeParameters, setCustomizeParameters] = useState(
     () => !!parseEditableGenerationParameters(metadata.chatParameters),
@@ -1122,7 +1427,13 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
 
   const setPersona = useCallback(
     (personaId: string | null) => {
-      updateChat.mutate({ id: chat.id, personaId });
+      updateChat.mutate({ id: chat.id, personaId, personaCharacterId: null });
+    },
+    [chat.id, updateChat],
+  );
+  const setPersonaCharacter = useCallback(
+    (personaCharacterId: string | null) => {
+      updateChat.mutate({ id: chat.id, personaId: null, personaCharacterId });
     },
     [chat.id, updateChat],
   );
@@ -1148,7 +1459,7 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
   }, []);
 
   const handleStartChatting = useCallback(async () => {
-    if (!hasConnection || !hasCharacters) return;
+    if (metadata.multiplayerSetup !== true && (!hasConnection || !hasCharacters)) return;
     const trimmedConversationSystemPrompt = conversationSystemPromptDraft.trim();
     const baseConversationPromptText = baseConversationPrompt.trim();
     const customSystemPrompt =
@@ -1171,7 +1482,7 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
     await updateMeta.mutateAsync({
       id: chat.id,
       autonomousMessages: autonomousEnabled,
-      conversationSchedulesEnabled: autonomousEnabled && generateSchedule,
+      conversationSchedulesEnabled: generateSchedule,
       characterCommands: hasConversationCommands && commandsEnabled,
       conversationCommandToggles: selfieSetup.conversationCommandToggles,
       conversationSetupComplete: true,
@@ -1179,7 +1490,7 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
       customSystemPrompt,
       ...(selfieSetup.imageGenConnectionId ? { imageGenConnectionId: selfieSetup.imageGenConnectionId } : {}),
     });
-    if (autonomousEnabled && generateSchedule) {
+    if (autonomousEnabled && generateSchedule && metadata.multiplayerSetup !== true) {
       setScheduleState("generating");
       try {
         const scheduleGenerationPreferences = useUIStore.getState().scheduleGenerationPreferences;
@@ -1221,10 +1532,12 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
     availableConversationCommandIds,
     connectionOptions,
     metadata.imageGenConnectionId,
+    metadata.multiplayerSetup,
   ]);
 
   const renderConnectionStep = () => (
     <div className="space-y-4">
+      <MultiplayerPrepareButton chatId={chat.id} prepared={metadata.multiplayerSetup === true} />
       <div className="space-y-1.5">
         <label className={WIZARD_FIELD_LABEL}>{localizeUi("ui.characters.metadatatab.name")}</label>
         <input
@@ -1270,7 +1583,7 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
         <SetupGenerationParametersPanel
           enabled={customizeParameters}
           value={generationParameters}
-          showOpenRouterServiceTier={selectedConnection?.provider === "openrouter"}
+          connection={selectedConnection}
           onEnabledChange={setCustomizeParameters}
           onChange={setGenerationParameters}
         />
@@ -1376,7 +1689,16 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
     <div className="space-y-4">
       <div className="space-y-1.5">
         <label className={WIZARD_FIELD_LABEL}>{localizeUi("ui.chat.conversationquicksetup.yourPersona")}</label>
-        <PersonaPicker personas={personas} value={chat.personaId ?? null} onChange={setPersona} />
+        <PersonaPicker
+          personas={personas}
+          characters={characters}
+          characterGroups={(allCharacterGroups ?? []) as CharacterGroup[]}
+          showCharacterIdentities={showCharacterIdentities}
+          value={chat.personaId ?? null}
+          characterValue={chat.personaCharacterId ?? null}
+          onChange={setPersona}
+          onCharacterChange={setPersonaCharacter}
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -1769,7 +2091,19 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
         onPrimary={isLast ? handleStartChatting : goNext}
         primaryLabel={isLast ? "Start Chatting" : "Next"}
         primaryIcon={isLast ? <MessageCircle size="0.75rem" /> : <ChevronRight size="0.75rem" />}
-        primaryDisabled={isLast && (!hasConnection || !hasCharacters)}
+        primaryDisabled={metadata.multiplayerSetup !== true && isLast && (!hasConnection || !hasCharacters)}
+        secondaryAction={
+          isLast
+            ? defaultsAction({
+                autonomousMessages: autonomousEnabled,
+                conversationSchedulesEnabled: generateSchedule,
+                characterCommands: commandsEnabled,
+                conversationCommandToggles,
+                chatParameters: customizeParameters ? generationParameters : null,
+                customSystemPrompt: customConversationPromptEnabled ? conversationSystemPromptDraft : null,
+              })
+            : undefined
+        }
         busyContent={busyContent}
       >
         {content}
@@ -1782,8 +2116,10 @@ function ConversationQuickSetup({ chat, onFinish }: ChatSetupWizardProps) {
 // Roleplay Setup Wizard — step-by-step guided setup
 // ──────────────────────────────────────────────
 
-function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
+function RoleplaySetupWizard({ chat, onFinish, defaultsApplied, defaultsAction }: WizardWithDefaultsProps) {
   const { t: localizeUi } = useUiTranslation();
+  const defaultDisplayStyle = useUIStore((state) => state.roleplayDisplayStyle);
+  const showCharacterIdentities = useUIStore((state) => state.showCharactersInPersonaPickers);
   const STEPS = ROLEPLAY_STEPS;
   const roleplayConnectionSelectId = useId();
 
@@ -1791,6 +2127,9 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
   const currentStep = STEPS[step]!;
   const isLast = step === STEPS.length - 1;
   const [showChoiceModal, setShowChoiceModal] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  // The character whose onboarding the player picked as their persona; Next asks its questions.
+  const [onboardingCharacterId, setOnboardingCharacterId] = useState<string | null>(null);
   // Open in shortcut mode if the chat store flag was set (e.g. via right-click "Quick Start").
   const [shortcutMode, setShortcutMode] = useState(() => {
     const flag = useChatStore.getState().shouldOpenWizardInShortcutMode;
@@ -1861,8 +2200,13 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
     [connectionOptions, chat.connectionId],
   );
   const parameterDefaults = useMemo(
-    () => getEditableGenerationParameters(ROLEPLAY_PARAMETER_DEFAULTS, selectedConnection?.defaultParameters),
-    [selectedConnection?.defaultParameters],
+    () =>
+      getEditableGenerationParameters(
+        ROLEPLAY_PARAMETER_DEFAULTS,
+        selectedConnection?.defaultParameters,
+        selectedConnection?.provider,
+      ),
+    [selectedConnection?.defaultParameters, selectedConnection?.provider],
   );
 
   const metadata = useMemo(() => {
@@ -2012,7 +2356,21 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
           Boolean(character),
       );
     const selectedPersona = chat.personaId ? personas.find((persona) => persona.id === chat.personaId) : null;
+    const identityCharacter =
+      chat.personaCharacterId && !chatCharIds.includes(chat.personaCharacterId)
+        ? characters.find((character) => character.id === chat.personaCharacterId)
+        : null;
     return [
+      ...(identityCharacter
+        ? [
+            {
+              id: identityCharacter.id,
+              name: charName(identityCharacter),
+              subtitle: charTitle(identityCharacter),
+              avatarPath: identityCharacter.avatarPath ?? null,
+            },
+          ]
+        : []),
       ...selectedCharacters.map((character) => ({
         id: character.id,
         name: charName(character),
@@ -2030,12 +2388,12 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
           ]
         : []),
     ];
-  }, [chat.personaId, chatCharIds, charName, charTitle, characters, personas]);
+  }, [chat.personaId, chat.personaCharacterId, chatCharIds, charName, charTitle, characters, personas]);
 
   // Track whether the user has manually edited the chat name.
   // The Connection step's Name input flips this to true onBlur when the
   // user changes it, which suppresses auto-rename on character selection.
-  const [userEditedName, setUserEditedName] = useState(false);
+  const [userEditedName, setUserEditedName] = useState(defaultsApplied);
 
   // Build an auto-generated chat name from character IDs
   const buildAutoName = useCallback(
@@ -2064,14 +2422,20 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
 
   // Auto-select the default preset for new chats
   useEffect(() => {
-    if (!chat.promptPresetId && defaultPreset?.id) {
+    if (!defaultsApplied && !chat.promptPresetId && defaultPreset?.id) {
       updateChat.mutate({ id: chat.id, promptPresetId: defaultPreset.id });
     }
   }, [defaultPreset?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPersona = useCallback(
     (personaId: string | null) => {
-      updateChat.mutate({ id: chat.id, personaId });
+      updateChat.mutate({ id: chat.id, personaId, personaCharacterId: null });
+    },
+    [chat.id, updateChat],
+  );
+  const setPersonaCharacter = useCallback(
+    (personaCharacterId: string | null) => {
+      updateChat.mutate({ id: chat.id, personaId: null, personaCharacterId });
     },
     [chat.id, updateChat],
   );
@@ -2105,6 +2469,8 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
       if (idx >= 0) {
         current.splice(idx, 1);
         setChatCharIds(current);
+        // Re-adding the card later must not silently restore "Create your persona".
+        if (onboardingCharacterId === charId) setOnboardingCharacterId(null);
         // Auto-rename the chat if the user hasn't manually edited the name
         const updateData: { id: string; characterIds: string[]; name?: string } = {
           id: chat.id,
@@ -2123,7 +2489,7 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
         updateChat.mutate(updateData);
       }
     },
-    [buildAutoName, chat.id, chatCharIds, updateChat, userEditedName],
+    [buildAutoName, chat.id, chatCharIds, onboardingCharacterId, updateChat, userEditedName],
   );
 
   const addCharactersFromFolder = useCallback(
@@ -2196,8 +2562,8 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
       id: chat.id,
       chatParameters: customizeParameters ? generationParameters : null,
     });
-    for (const charId of chatCharIds) {
-      await createInitialGreetingForCharacter(charId);
+    if (metadata.multiplayerSetup !== true) {
+      for (const charId of chatCharIds) await createInitialGreetingForCharacter(charId);
     }
     onFinish();
   }, [
@@ -2208,9 +2574,11 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
     generationParameters,
     onFinish,
     updateMeta,
+    metadata.multiplayerSetup,
   ]);
 
   const seedInitialGreetingsIfEmpty = useCallback(async () => {
+    if (metadata.multiplayerSetup === true) return;
     if (chatCharIds.length === 0) return;
     try {
       const messages = await api.get<Array<Pick<Message, "role">>>(`/chats/${chat.id}/messages`);
@@ -2222,7 +2590,7 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
     for (const charId of chatCharIds) {
       await createInitialGreetingForCharacter(charId);
     }
-  }, [chat.id, chatCharIds, createInitialGreetingForCharacter]);
+  }, [chat.id, chatCharIds, createInitialGreetingForCharacter, metadata.multiplayerSetup]);
 
   const handleShortcutApply = useCallback(async () => {
     if (!shortcutPresetId) {
@@ -2255,9 +2623,96 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
     setCharacterPickerLimit(CHARACTER_PICKER_PAGE_SIZE);
   }, [charSearch]);
 
-  // On the preset step, wait for full preset data before allowing advance
+  // Wait for the selected preset to save and load before deciding whether it has choices.
   const isPresetStep = currentStep.key === "preset";
-  const nextDisabled = isPresetStep && !!chat.promptPresetId && presetFullLoading;
+  const nextDisabled = isPresetStep && (updateChat.isPending || (!!chat.promptPresetId && presetFullLoading));
+
+  // Every card that ships enabled onboarding with something to offer: marked in
+  // the character list, and once chosen, offered as a persona to create. An
+  // enabled-but-empty block is filtered out here, so the wizard never offers a
+  // window with no questions and no field text behind it.
+  const onboardingByCharacterId = useMemo(() => {
+    const byId = new Map<string, CardOnboarding>();
+    for (const character of characters) {
+      // One parse for the wizard, the drawer and the server; unreadable card data
+      // comes back as null instead of throwing.
+      const entry = readCardOnboarding(character.data);
+      if (!entry?.onboarding.enabled || !hasOnboardingContent(entry.onboarding)) continue;
+      byId.set(character.id, entry);
+    }
+    return byId;
+  }, [characters]);
+  const onboardingCharacters = useMemo(
+    () =>
+      chatCharIds.flatMap((id) => {
+        const character = characters.find((entry) => entry.id === id);
+        const entry = onboardingByCharacterId.get(id);
+        return character && entry ? [{ character, ...entry }] : [];
+      }),
+    [characters, chatCharIds, onboardingByCharacterId],
+  );
+  // Removing the character from the chat drops its onboarding choice too.
+  // Resolved from the FULL character list rather than `onboardingCharacters`:
+  // that list drops any character without an onboarding block, so a template
+  // pick for such a character would resolve to nothing and the window would fall
+  // back to a name it found elsewhere.
+  const onboardingCharacter = useMemo(() => {
+    if (!onboardingCharacterId) return undefined;
+    const character = characters.find((entry) => entry.id === onboardingCharacterId);
+    if (!character) return undefined;
+    const entry = onboardingByCharacterId.get(onboardingCharacterId);
+    return entry ? { character, ...entry } : undefined;
+  }, [onboardingCharacterId, characters, onboardingByCharacterId]);
+  // EVERY chosen card with something to ask, not just the first: two characters
+  // can both declare card questions, and each answer lands in its own card's
+  // field, so one window has to ask both. A card that only ships persona field
+  // text (no questions) is not asked about here.
+  const onboardingCardTargets = useMemo<OnboardingCardTarget[]>(
+    () =>
+      onboardingCharacters
+        .filter((entry) => getRelevantCardVariables(entry.onboarding, entry.cardFields, {}).length > 0)
+        .map((entry) => ({
+          characterId: entry.character.id,
+          name: entry.name,
+          onboarding: entry.onboarding,
+          cardFields: entry.cardFields,
+        })),
+    [onboardingCharacters],
+  );
+  // The window opens when a persona is being created OR any card has card
+  // questions; the persona section appears only for the former.
+  const showOnboardingWindow = !!onboardingCharacter || onboardingCardTargets.length > 0;
+  // Offered as a "Create your persona" template only when the card can actually
+  // fill one in. A card that declares card questions alone still opens the
+  // window, but picking it here would create a persona from a bare name — which
+  // is the button the player saw with no persona questions at all.
+  const personaTemplateCharacters = useMemo(
+    () => onboardingCharacters.filter((entry) => canBuildPersona(entry.onboarding)),
+    [onboardingCharacters],
+  );
+  // The persona the chat will use if the player creates nothing. Its name is the
+  // player's name for `{{user}}` in card question headings.
+  const personaForOnboarding = useMemo(
+    () => (chat.personaId ? personas.find((persona) => persona.id === chat.personaId) : undefined),
+    [chat.personaId, personas],
+  );
+
+  // The player's name when it already exists: an existing persona's. Card
+  // question headings show `{{user}}`, and without this they printed the raw tag
+  // while a persona question in the same window resolved — a mismatch the user
+  // caught. When a NEW persona is being created the name comes from its answer.
+  const knownPlayerName = useMemo(
+    () => (personaForOnboarding && personaForOnboarding.name.trim() ? personaForOnboarding.name.trim() : undefined),
+    [personaForOnboarding],
+  );
+
+  // Every participant's name, in wizard order, for the window's opening line.
+  // Built from `onboardingCharacters` (which covers every selected character
+  // with an onboarding block) rather than from the card-question targets: a
+  // participant without card questions still belongs in that sentence, and
+  // deriving it from the targets dropped its name — or, with no card questions
+  // at all, left the sentence with no subject.
+  const participantNames = useMemo(() => onboardingCharacters.map((entry) => entry.name), [onboardingCharacters]);
 
   const next = useCallback(() => {
     if (isLast) {
@@ -2268,13 +2723,70 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
         setShowChoiceModal(true);
         return;
       }
+      // Leaving the participants step: ask every chosen card's own questions,
+      // and the persona's when one is being created. Either reason opens it.
+      if (currentStep.key === "participants" && showOnboardingWindow) {
+        setShowOnboarding(true);
+        return;
+      }
       setStep((s) => s + 1);
       setCharSearch("");
       setLbSearch("");
       setAgentSearch("");
       setAgentAddPreview(null);
     }
-  }, [isLast, finishWizard, currentStep.key, chat.promptPresetId, presetFull?.choiceBlocks?.length]);
+  }, [
+    isLast,
+    finishWizard,
+    currentStep.key,
+    chat.promptPresetId,
+    presetFull?.choiceBlocks?.length,
+    showOnboardingWindow,
+  ]);
+
+  // The new persona replaces the onboarding choice, so going Back and Next again
+  // doesn't ask twice. The questions window stays open (and locked) until every
+  // write settles, so Next can't run in between. If selecting the new persona
+  // fails, the window is closed and the template choice cleared: the persona
+  // already exists, so a second Create would duplicate it.
+  const finishOnboarding = useCallback(
+    async (personaId: string | null, cardVariables: Record<string, string>) => {
+      // Chat variables go in their OWN request: `PATCH /chats/:id/metadata`
+      // rejects `macroVariables` alongside any other key, and they are a
+      // metadata write while `personaId` is a chat-column write.
+      try {
+        if (Object.keys(cardVariables).length > 0) {
+          await updateMeta.mutateAsync({ id: chat.id, macroVariables: cardVariables });
+        }
+      } catch {
+        // The answers are lost but the chat is usable: the card falls back to
+        // whatever the unseeded field reads, and the wizard still moves on.
+        toast.error(localizeUi("ui.characters.onboarding.cardVariablesFailed"));
+      }
+      if (personaId) {
+        try {
+          await updateChat.mutateAsync({ id: chat.id, personaId, personaCharacterId: null });
+        } catch {
+          // The persona itself was already created by the window, so leaving the
+          // window open would let a second Create make a duplicate. Close it and
+          // drop the template choice instead: the persona is in the list, so the
+          // player picks it again and no second one is written.
+          toast.error(localizeUi("ui.characters.onboarding.selectFailed"));
+          setOnboardingCharacterId(null);
+          setShowOnboarding(false);
+          return;
+        }
+      }
+      setOnboardingCharacterId(null);
+      setShowOnboarding(false);
+      setStep((s) => s + 1);
+      setCharSearch("");
+      setLbSearch("");
+      setAgentSearch("");
+      setAgentAddPreview(null);
+    },
+    [chat.id, localizeUi, updateChat, updateMeta],
+  );
 
   const previous = useCallback(() => {
     setStep((s) => Math.max(0, s - 1));
@@ -2294,9 +2806,19 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
         config,
         contextSize: normalizePositiveInteger(mergedSettings.contextSize, DEFAULT_AGENT_CONTEXT_SIZE, 200),
         maxTokens: normalizeAgentMaxTokens(mergedSettings.maxTokens),
-        runInterval: intervalMeta
-          ? normalizePositiveInteger(mergedSettings.runInterval, intervalMeta.defaultValue, intervalMeta.max)
-          : null,
+        runInterval: !intervalMeta
+          ? null
+          : agent.id === "illustrator"
+            ? // Illustrator's Run Interval belongs to this chat; the agent's value (maybe saved as text) is only its default.
+              (normalizeIllustratorRunInterval(metadata.illustratorRunInterval) ??
+              normalizeIllustratorRunInterval(mergedSettings.runInterval) ??
+              intervalMeta.defaultValue)
+            : normalizePositiveInteger(
+                mergedSettings.runInterval,
+                intervalMeta.defaultValue,
+                intervalMeta.max,
+                intervalMeta.min,
+              ),
         setup: buildInitialAgentAddSetupState({
           agentId: agent.id,
           settings: mergedSettings,
@@ -2332,7 +2854,8 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
       maxTokens: normalizeAgentMaxTokens(maxTokens),
     };
     const intervalMeta = getAgentRunIntervalMeta(agent.id, !!builtInMeta);
-    if (intervalMeta && runInterval != null) nextSettings.runInterval = runInterval;
+    // Illustrator saves its Run Interval to this chat, so the agent's value stays the default for other chats.
+    if (intervalMeta && runInterval != null && agent.id !== "illustrator") nextSettings.runInterval = runInterval;
     nextSettings = applyAgentAddSetupToAgentSettings(agent.id, setup, nextSettings, {
       allowSecretPlot: supportsNarrativeDirectorSecretPlot,
     });
@@ -2370,9 +2893,13 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
         ...buildAgentAddMetadataPatch(agent.id, setup, metadata, {
           allowSecretPlot: supportsNarrativeDirectorSecretPlot,
           defaultPromptTemplateId: resolveDefaultAgentPromptTemplateId(nextSettings),
+          runInterval,
           illustratorDefaults: {
             includeCharacterAppearance: nextSettings.includeCharacterAppearance === true,
             useAvatarReferences: nextSettings.useAvatarReferences === true,
+            runInterval: intervalMeta
+              ? (normalizeIllustratorRunInterval(nextSettings.runInterval) ?? intervalMeta.defaultValue)
+              : undefined,
           },
         }),
       });
@@ -2407,6 +2934,34 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
   function renderConnection() {
     return (
       <div className="space-y-4">
+        <MultiplayerPrepareButton chatId={chat.id} prepared={metadata.multiplayerSetup === true} />
+        <fieldset className="space-y-2">
+          <legend className={WIZARD_FIELD_LABEL}>{localizeUi("chat.roleplayVn.displayStyle")}</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {(["classic", "visual-novel"] as const).map((style) => (
+              <label
+                key={style}
+                className={cn(
+                  "flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[var(--primary)]",
+                  (metadata.roleplayDisplayStyle ?? defaultDisplayStyle) === style
+                    ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                    : "border-[var(--border)]",
+                )}
+              >
+                <input
+                  type="radio"
+                  name={`roleplay-display-${chat.id}`}
+                  value={style}
+                  checked={(metadata.roleplayDisplayStyle ?? defaultDisplayStyle) === style}
+                  onChange={() => updateMeta.mutate({ id: chat.id, roleplayDisplayStyle: style })}
+                  className="accent-[var(--primary)]"
+                />
+                {localizeUi(style === "classic" ? "chat.roleplayVn.classic" : "chat.roleplayVn.visualNovel")}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-[var(--muted-foreground)]">{localizeUi("chat.roleplayVn.changeAnytime")}</p>
+        </fieldset>
         <div className="space-y-1.5">
           <label className={WIZARD_FIELD_LABEL}>{localizeUi("ui.characters.metadatatab.name")}</label>
           <input
@@ -2455,7 +3010,7 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
         <SetupGenerationParametersPanel
           enabled={customizeParameters}
           value={generationParameters}
-          showOpenRouterServiceTier={selectedConnection?.provider === "openrouter"}
+          connection={selectedConnection}
           onEnabledChange={setCustomizeParameters}
           onChange={setGenerationParameters}
         />
@@ -2465,23 +3020,54 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
 
   function renderPreset() {
     return (
-      <WizardSelect
-        value={chat.promptPresetId ?? ""}
-        ariaLabel={localizeUi("chat.toolbar.preset")}
-        options={[
-          { value: "", label: localizeUi("ui.game.gamesurfacecomponent.none") },
-          ...((presets ?? []) as Array<{ id: string; name: string; isDefault?: boolean | string }>).map((preset) => ({
-            value: preset.id,
-            label: preset.name,
-          })),
-        ]}
-        onChange={(nextValue) => setPreset(nextValue || null)}
-      />
+      <div className="space-y-4">
+        <WizardSelect
+          value={chat.promptPresetId ?? ""}
+          ariaLabel={localizeUi("chat.toolbar.preset")}
+          options={[
+            { value: "", label: localizeUi("ui.game.gamesurfacecomponent.none") },
+            ...((presets ?? []) as Array<{ id: string; name: string; isDefault?: boolean | string }>).map((preset) => ({
+              value: preset.id,
+              label: preset.name,
+            })),
+          ]}
+          onChange={(nextValue) => setPreset(nextValue || null)}
+        />
+        <section className="space-y-2 border-t border-[var(--border)] pt-4">
+          <h4 className="text-sm font-semibold">{localizeUi("chat.setup.pickBackground")}</h4>
+          <ActiveChatBackgroundPicker />
+        </section>
+      </div>
     );
   }
 
   function renderPersona() {
-    return <PersonaPicker personas={personas} value={chat.personaId ?? null} onChange={setPersona} />;
+    return (
+      <PersonaPicker
+        personas={personas}
+        characters={characters}
+        characterGroups={(allCharacterGroups ?? []) as CharacterGroup[]}
+        showCharacterIdentities={showCharacterIdentities}
+        value={onboardingCharacter ? null : (chat.personaId ?? null)}
+        characterValue={onboardingCharacter ? null : (chat.personaCharacterId ?? null)}
+        onChange={(personaId) => {
+          setOnboardingCharacterId(null);
+          setPersona(personaId);
+        }}
+        onCharacterChange={(characterId) => {
+          setOnboardingCharacterId(null);
+          setPersonaCharacter(characterId);
+        }}
+        templates={personaTemplateCharacters.map((entry) => entry.character)}
+        templateValue={onboardingCharacter?.character.id ?? null}
+        onTemplateChange={(characterId) => {
+          setOnboardingCharacterId(characterId);
+          // The chat's saved persona matches the picker, so skipping the wizard
+          // doesn't start the chat as the persona picked before.
+          if (chat.personaId || chat.personaCharacterId) setPersona(null);
+        }}
+      />
+    );
   }
 
   function renderCharacters() {
@@ -2500,6 +3086,17 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
       const character = pool[Math.floor(Math.random() * pool.length)];
       if (character) toggleCharacter(character.id);
     };
+    const onboardingMarker = (characterId: string) =>
+      onboardingByCharacterId.has(characterId) && (
+        <span
+          role="img"
+          aria-label={localizeUi("ui.characters.onboarding.hasOnboarding")}
+          title={localizeUi("ui.characters.onboarding.hasOnboarding")}
+          className="shrink-0 text-[var(--primary)]"
+        >
+          <UserPlus size="0.75rem" />
+        </span>
+      );
 
     return (
       <div className="space-y-2">
@@ -2536,6 +3133,7 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
                       </span>
                     )}
                   </div>
+                  {onboardingMarker(cid)}
                   <button
                     onClick={() => toggleCharacter(cid)}
                     className="flex h-5 w-5 items-center justify-center rounded-md text-[var(--muted-foreground)] transition-colors hover:bg-[var(--destructive)]/15 hover:text-[var(--destructive)]"
@@ -2644,6 +3242,7 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
                       </span>
                     )}
                   </div>
+                  {onboardingMarker(c.id)}
                   <Plus size="0.75rem" className="text-[var(--muted-foreground)]" />
                 </button>
               );
@@ -2800,43 +3399,14 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
     const agentAddIntervalMeta = agentAddPreview
       ? getAgentRunIntervalMeta(agentAddPreview.agent.id, agentAddPreview.agent.builtIn)
       : null;
-
-    if (agentConfigsLoading || installedAgentsLoading) {
-      return (
-        <div className="flex min-h-40 items-center justify-center gap-2 text-xs text-[var(--muted-foreground)]">
-          <Loader2 size="0.875rem" className="animate-spin" />
-          {localizeUi("ui.chat.roleplaysetupwizard.loadingAgents")}
-        </div>
-      );
-    }
-
-    if (availableAgents.length === 0) {
-      return (
-        <div
-          data-component="ChatSetupWizard.AgentEmptyState"
-          className="flex min-h-52 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--secondary)]/35 px-5 py-8 text-center"
-        >
-          <p className="max-w-sm text-sm font-medium leading-6 text-[var(--muted-foreground)]">
-            {localizeUi("ui.chat.roleplaysetupwizard.noAgentsDownloadedYetHeadToAgentsTabAnd")}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              onFinish();
-              openRightPanel("agents");
-            }}
-            className={cn(WIZARD_PRIMARY_BUTTON_CLASS, "gap-2")}
-          >
-            <Sparkles size="0.8125rem" />
-            {localizeUi("ui.chat.roleplaysetupwizard.openAgentsTab")}
-          </button>
-        </div>
-      );
-    }
+    const agentsLoading = agentConfigsLoading || installedAgentsLoading;
 
     return (
       <div className="space-y-3">
         <button
+          type="button"
+          role="switch"
+          aria-checked={agentsEnabled}
           onClick={() =>
             updateMeta.mutate({
               id: chat.id,
@@ -2870,7 +3440,46 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
           </div>
         </button>
 
-        {agentsEnabled && (
+        {import.meta.env.VITE_MARINARA_LITE !== "true" && (
+          <AdvancedMemorySettings
+            variant="wizard"
+            chatId={chat.id}
+            metadataSettings={metadata.advancedMemory}
+            individual={metadata.groupChatMode === "individual"}
+            characters={chatCharIds.map((id) => ({ id, name: charInfoMap.get(id)?.name ?? id }))}
+            connections={filterLanguageGenerationConnections((connections ?? []) as ConnectionSetupOption[])}
+            hasHistory={!!chat.lastMessageAt}
+          />
+        )}
+
+        {agentsLoading && (
+          <div className="flex min-h-40 items-center justify-center gap-2 text-xs text-[var(--muted-foreground)]">
+            <Loader2 size="0.875rem" className="animate-spin" />
+            {localizeUi("ui.chat.roleplaysetupwizard.loadingAgents")}
+          </div>
+        )}
+        {!agentsLoading && availableAgents.length === 0 && (
+          <div
+            data-component="ChatSetupWizard.AgentEmptyState"
+            className="flex min-h-52 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--secondary)]/35 px-5 py-8 text-center"
+          >
+            <p className="max-w-sm text-sm font-medium leading-6 text-[var(--muted-foreground)]">
+              {localizeUi("ui.chat.roleplaysetupwizard.noAgentsDownloadedYetHeadToAgentsTabAnd")}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onFinish();
+                openRightPanel("agents");
+              }}
+              className={cn(WIZARD_PRIMARY_BUTTON_CLASS, "gap-2")}
+            >
+              <Sparkles size="0.8125rem" />
+              {localizeUi("ui.chat.roleplaysetupwizard.openAgentsTab")}
+            </button>
+          </div>
+        )}
+        {!agentsLoading && availableAgents.length > 0 && agentsEnabled && (
           <>
             {agentAddPreview && (
               <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--secondary)]/70 p-3">
@@ -2951,7 +3560,7 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
                       {agentAddIntervalMeta.label}
                     </span>
                     <DraftNumberInput
-                      min={1}
+                      min={agentAddIntervalMeta.min ?? 1}
                       max={agentAddIntervalMeta.max}
                       value={agentAddPreview.runInterval}
                       onCommit={(value) => {
@@ -2959,7 +3568,10 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
                           current
                             ? {
                                 ...current,
-                                runInterval: Math.max(1, Math.min(agentAddIntervalMeta.max, value)),
+                                runInterval: Math.max(
+                                  agentAddIntervalMeta.min ?? 1,
+                                  Math.min(agentAddIntervalMeta.max, value),
+                                ),
                               }
                             : current,
                         );
@@ -2969,7 +3581,9 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
                       className={WIZARD_NUMBER_INPUT_CLASS}
                     />
                     <span className="block text-[0.5625rem] text-[var(--muted-foreground)]">
-                      {agentAddIntervalMeta.help}
+                      {agentAddPreview.agent.id === "illustrator"
+                        ? localizeUi("agents.illustrator.chatRunIntervalHelp")
+                        : agentAddIntervalMeta.help}
                     </span>
                   </label>
                 )}
@@ -3027,7 +3641,7 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
                   const activeCount = section.agents.filter((agent) => activeAgentIds.includes(agent.id)).length;
                   return (
                     <div key={section.category} className="border-b border-[var(--border)]/70 last:border-b-0">
-                      <div className="sticky top-0 z-10 flex items-center justify-between bg-[var(--secondary)]/95 px-3 py-1.5 backdrop-blur-sm">
+                      <div className="flex items-center justify-between bg-[var(--secondary)] px-3 py-1.5">
                         <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                           {section.title}
                         </span>
@@ -3121,7 +3735,23 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
 
       <div className="space-y-1.5">
         <label className={WIZARD_FIELD_LABEL}>{localizeUi("ui.characters.cardlibrarydetailcard.persona")}</label>
-        <PersonaPicker personas={personas} value={chat.personaId ?? null} onChange={setPersona} />
+        <PersonaPicker
+          personas={personas}
+          characters={characters}
+          characterGroups={(allCharacterGroups ?? []) as CharacterGroup[]}
+          showCharacterIdentities={showCharacterIdentities}
+          value={chat.personaId ?? null}
+          characterValue={chat.personaCharacterId ?? null}
+          // A persona picked here replaces "Create your persona", as in the step picker.
+          onChange={(personaId) => {
+            setOnboardingCharacterId(null);
+            setPersona(personaId);
+          }}
+          onCharacterChange={(characterId) => {
+            setOnboardingCharacterId(null);
+            setPersonaCharacter(characterId);
+          }}
+        />
       </div>
 
       <div className="space-y-1.5">
@@ -3158,7 +3788,41 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
         chatId={chat.id}
       />
 
+      {showOnboardingWindow && (
+        <CharacterOnboardingModal
+          // Re-keyed by the whole card set AND the persona template: adding or
+          // removing a participant has to rebuild the answer state, not keep
+          // another chat's answers.
+          //
+          // The template belongs in the key because it can drop out while this
+          // modal is already open: removing the card, or turning its onboarding
+          // off elsewhere, clears `onboardingCharacterId` and flips `withPersona`
+          // to false on the mounted modal. Persona answers are held by scope
+          // rather than by character, so without the re-key the answers typed for
+          // the old template would linger instead of being discarded.
+          key={`${onboardingCardTargets.map((card) => card.characterId).join("|") || "persona"}|${onboardingCharacterId ?? "no-template"}`}
+          open={showOnboarding}
+          cards={onboardingCardTargets}
+          participantNames={participantNames}
+          persona={
+            onboardingCharacter
+              ? { characterName: onboardingCharacter.name, onboarding: onboardingCharacter.onboarding }
+              : null
+          }
+          playerName={knownPlayerName}
+          // A persona is created only when the card was picked AS a template.
+          // A card that merely carries character questions asks those, and the
+          // window must not promise a persona it will not write.
+          withPersona={!!onboardingCharacter}
+          onBack={() => setShowOnboarding(false)}
+          onCreated={finishOnboarding}
+        />
+      )}
+
+      {/* Hidden only while the questions window is actually shown: if its card
+          drops out (deleted or turned off elsewhere), the wizard comes back. */}
       {!showChoiceModal &&
+        !(showOnboarding && showOnboardingWindow) &&
         (shortcutMode ? (
           <SetupWizardShell
             title={localizeUi("ui.chat.roleplaysetupwizard.quickSetup")}
@@ -3191,15 +3855,18 @@ function RoleplaySetupWizard({ chat, onFinish }: ChatSetupWizardProps) {
             primaryIcon={isLast ? <Check size="0.75rem" /> : <ChevronRight size="0.75rem" />}
             primaryDisabled={nextDisabled}
             secondaryAction={
-              <button
-                type="button"
-                onClick={() => setShortcutMode(true)}
-                title={localizeUi("chat.settingsProfile.wizard.applyDescription")}
-                className={WIZARD_SECONDARY_BUTTON_CLASS}
-              >
-                <span className="hidden xs:inline sm:inline">{localizeUi("chat.settingsProfile.wizard.action")}</span>
-                <span className="inline xs:hidden sm:hidden">{localizeUi("chat.settingsProfile.label")}</span>
-              </button>
+              <>
+                {isLast && defaultsAction({ chatParameters: customizeParameters ? generationParameters : null })}
+                <button
+                  type="button"
+                  onClick={() => setShortcutMode(true)}
+                  title={localizeUi("chat.settingsProfile.wizard.applyDescription")}
+                  className={WIZARD_SECONDARY_BUTTON_CLASS}
+                >
+                  <span className="hidden xs:inline sm:inline">{localizeUi("chat.settingsProfile.wizard.action")}</span>
+                  <span className="inline xs:hidden sm:hidden">{localizeUi("chat.settingsProfile.label")}</span>
+                </button>
+              </>
             }
           >
             {stepRenderers[currentStep.key]?.()}

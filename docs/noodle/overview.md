@@ -23,7 +23,7 @@ Note on content: the built-in instructions Noodle sends to the AI treat every ac
 
 Noodle is a downloadable agent package. Install it once before looking for its Home tab:
 
-1. Open **Agents**, choose **Download Agents**, and install **Noodle & NoodleR**.
+1. Open **Agents**, choose **Download Agents**, and install **Noodle**.
 2. Restart YunYun Engine when prompted so its server and Home contributions can load.
 3. Open **Home** and click the **Noodle** tab beside **Home** and **Professor**.
 
@@ -87,7 +87,12 @@ Notifications need an active persona. Without one, the panel stays empty.
 
 Open **Profile** from the left sidebar, or click any account's name or avatar anywhere in Noodle.
 
-Your own profile has an **Edit Profile** button. Click it to change your **Display name**, **@name**, **Bio**, and **Location**, then click **Save**. You can also click the banner or avatar to upload an image. You can only edit your own persona's profile. A character's profile is written by the AI and cannot be edited by hand.
+Your own profile has an **Edit Profile** button. Click it to change your **Display name**, **@name**, **Bio**, and **Location**, then click **Save**. You can also click the banner or avatar to upload an image. The AI writes a character's profile, and you can change it the same way once the character is invited.
+
+When you edit a character's profile, two more settings appear below the profile fields. They save right away.
+
+- **Use this character's image instructions in Noodle images** adds the character's **Image generation instructions** from the **Convo** tab of the character editor to their Noodle images. **Edit image instructions** opens that tab. Slurp uses the same choice until you set one for this character in Slurp. This needs Noodle 1.5.4 or later.
+- **Image connection** picks the image connection for this character's Noodle images. **Use Noodle image connection** keeps the one from [Noodle's settings](settings.md#image-generation). This needs Noodle 1.5.5 or later.
 
 Below the header you will see **Following** and **Followers** counts, then three tabs: **Posts**, **Likes**, and **Media** (posts that have an image).
 
@@ -104,7 +109,7 @@ Your persona can follow any invited character, but only after that character has
 
 Each persona you create gets its own Noodle account. At the bottom of the left sidebar, your persona's name and avatar are a button. Click it to open **Switch account** and pick a different persona.
 
-Switching accounts here changes which persona you post, like, reply, and follow as inside Noodle. It does not change the app's active persona anywhere else in YunYun.
+Switching accounts here changes which persona you post, like, reply, and follow as inside Noodle. Each chat keeps its own persona selection.
 
 ## Refresh timeline
 

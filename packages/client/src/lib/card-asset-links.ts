@@ -56,7 +56,10 @@ export function normalizeCardAssetImageSyntax(text: string): string {
       continue;
     }
 
-    const safeAlt = text.slice(candidateStart + 1, index).replace(/[\]\r\n]/g, " ").trim();
+    const safeAlt = text
+      .slice(candidateStart + 1, index)
+      .replace(/[\]\r\n]/g, " ")
+      .trim();
     result += `${text.slice(outputCursor, candidateStart)}![${safeAlt}](${text.slice(urlStart, urlEnd)})`;
     outputCursor = urlEnd + 1;
     index = urlEnd;
@@ -131,7 +134,9 @@ export function resolveSelfCardAssets(
     // unknown ownership, not confirmed non-ownership, and treating them the
     // same would flash another character's same-named image until it resolves.
     if (!speakerOwns && galleryIndex.byCharacter.has(characterId)) {
-      const owner = galleryIndex.order.find((id) => id !== characterId && galleryIndex.byCharacter.get(id)?.has(filename));
+      const owner = galleryIndex.order.find(
+        (id) => id !== characterId && galleryIndex.byCharacter.get(id)?.has(filename),
+      );
       if (owner) return `${prefixFor(owner)}${rawFilename}`;
     }
     return `${speakerPrefix}${rawFilename}`;
@@ -192,6 +197,19 @@ export function resolveCardAssetUrl(rawUrl: string): string {
   return rawUrl;
 }
 
+// <img src="card://..."> written as HTML, such as a greeting image saved to the
+// gallery (#7221). The tag stops at the next bracket so hostile text can't backtrack for long.
+const HTML_IMG_CARD_SRC_RE = /(<img\b[^<>]*?\ssrc\s*=\s*)(["'])(card:\/\/[^"'\s>]+)\2/gi;
+
+/** Resolve card:// image sources in HTML before sanitizing, which drops the unknown card: scheme. */
+export function resolveCardAssetImageSources(html: string): string {
+  // Resolved URLs are built from encoded segments, and unresolved ones match no quote, so the attribute stays intact.
+  return html.replace(
+    HTML_IMG_CARD_SRC_RE,
+    (_match, prefix: string, quote: string, url: string) => `${prefix}${quote}${resolveCardAssetUrl(url)}${quote}`,
+  );
+}
+
 export function buildCardAssetMarkdown(label: string, cardUrl: string): string {
   const alt = label.replace(/[\]\r\n]/g, " ").trim() || "image";
   return `![${alt}](${cardUrl})`;
@@ -199,5 +217,7 @@ export function buildCardAssetMarkdown(label: string, cardUrl: string): string {
 
 export function dispatchCardAssetInsert(markdown: string, chatId?: string): void {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent<CardAssetInsertDetail>(CARD_ASSET_INSERT_EVENT, { detail: { markdown, chatId } }));
+  window.dispatchEvent(
+    new CustomEvent<CardAssetInsertDetail>(CARD_ASSET_INSERT_EVENT, { detail: { markdown, chatId } }),
+  );
 }

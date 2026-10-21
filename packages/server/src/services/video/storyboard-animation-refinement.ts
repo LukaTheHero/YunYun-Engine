@@ -1,13 +1,15 @@
 import {
   normalizeAgentPromptTemplateOptions,
+  removeCopiedPromptGuidance,
   type StoryboardAnimationSuitability,
 } from "@marinara-engine/shared";
 import type { ChatMessage } from "../llm/base-provider.js";
+import { appendVideoPromptInstructions } from "../generation/image-prompt-instructions.js";
 import { renderTemplate } from "../prompt-overrides/index.js";
 import { compactVideoPromptText } from "./prompt-context.js";
 import type { VideoReferenceImage } from "./video-generation.js";
 
-const MAX_REFINEMENT_CHARS = 6_000;
+export const STORYBOARD_ANIMATION_PROMPT_MAX_CHARS = 6_000;
 const MAX_RENDERED_PROMPT_CHARS = 18_000;
 
 const STORYBOARD_ANIMATION_REFINEMENT_VARIABLES = [
@@ -48,6 +50,10 @@ function segmentCount(value: string): number | null {
   return segments.every(Boolean) ? segments.length : null;
 }
 
+export function compactStoryboardAnimationPrompt(value: unknown): string {
+  return compactVideoPromptText(value, STORYBOARD_ANIMATION_PROMPT_MAX_CHARS);
+}
+
 export function buildStoryboardAnimationRefinementMessages(args: {
   templates: unknown;
   templateId: unknown;
@@ -59,6 +65,8 @@ export function buildStoryboardAnimationRefinementMessages(args: {
   durationSeconds: number;
   aspectRatio: "16:9" | "9:16";
   referenceImage: VideoReferenceImage;
+  /** The video connection's Video Prompting Instructions. */
+  videoPromptInstructions?: string | null;
 }): ChatMessage[] {
   const template = resolveTemplate(args.templates, args.templateId);
   if (!template) throw new Error("The Storyboard Agent has no image-aware shot planner prompt configured.");
@@ -79,13 +87,15 @@ export function buildStoryboardAnimationRefinementMessages(args: {
     MAX_RENDERED_PROMPT_CHARS,
   );
   if (!prompt) throw new Error("The Storyboard Agent image-aware shot planner prompt rendered empty.");
-  return [{ role: "user", content: prompt, images: [imageDataUrl(args.referenceImage)] }];
+  // Added after the template, so a custom shot planner prompt gets them too.
+  const content = appendVideoPromptInstructions(prompt, args.videoPromptInstructions);
+  return [{ role: "user", content, images: [imageDataUrl(args.referenceImage)] }];
 }
 
 export function resolveStoryboardAnimationRefinement(
   value: unknown,
   motionIntent: string,
-  maxLength: number,
+  guidance: ReadonlyArray<string | null | undefined> = [],
 ): StoryboardAnimationRefinement | null {
   if (typeof value !== "string") return null;
   let parsed: unknown;
@@ -106,10 +116,11 @@ export function resolveStoryboardAnimationRefinement(
     return null;
   }
   const candidate = record.narrationBeat ?? record.animationPrompt ?? record.videoPrompt ?? record.prompt;
-  const narrationBeat =
-    typeof candidate === "string"
-      ? compactVideoPromptText(candidate, Math.min(Math.max(1, maxLength), MAX_REFINEMENT_CHARS))
-      : "";
+  const plannedBeat = compactStoryboardAnimationPrompt(candidate);
+  // A sentence of the connection's instructions the planner copied word for word is not video-model
+  // text; keep the planner's beat when removing it would drop one of its | segments.
+  const strippedBeat = removeCopiedPromptGuidance(plannedBeat, guidance);
+  const narrationBeat = segmentCount(strippedBeat) === segmentCount(plannedBeat) ? strippedBeat : plannedBeat;
   const expectedSegments = segmentCount(motionIntent);
   if (!narrationBeat || expectedSegments === null || segmentCount(narrationBeat) !== expectedSegments) return null;
   return { classification, narrationBeat };

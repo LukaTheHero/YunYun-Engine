@@ -1,6 +1,20 @@
 import { api } from "./api-client";
 import type { CharacterData } from "@marinara-engine/shared";
 
+// The server takes a native .marinara.json as a JSON request up to 256 MiB (IMPORT_BODY_LIMIT_BYTES), less
+// headroom for the fields sent with it. A bigger export, such as a character with a large gallery, is
+// uploaded as a file instead; the server reads it in pieces.
+const NATIVE_JSON_REQUEST_MAX_BYTES = 255 * 1024 * 1024;
+
+/**
+ * A JSON object too large to send as a JSON request. Only a YunYun export gets that big, and its "type" field may not
+ * come first if another tool re-saved it, so any object goes to the upload route, which rejects a non-YunYun file.
+ */
+export async function isOversizedMarinaraJson(file: File): Promise<boolean> {
+  if (file.size <= NATIVE_JSON_REQUEST_MAX_BYTES) return false;
+  return /^\uFEFF?\s*\{/.test(await file.slice(0, 256).text());
+}
+
 export interface EmbeddedLorebookImportPreview {
   filename: string;
   success: boolean;
@@ -65,14 +79,13 @@ const CHARACTER_CARD_STRING_FIELDS = [
   "character_version",
 ] as const;
 
-const LEGACY_CHARACTER_CARD_FIELDS: Partial<
-  Record<(typeof CHARACTER_CARD_STRING_FIELDS)[number], readonly string[]>
-> = {
-  description: ["char_persona"],
-  scenario: ["world_scenario"],
-  first_mes: ["char_greeting"],
-  mes_example: ["example_dialogue"],
-} as const;
+const LEGACY_CHARACTER_CARD_FIELDS: Partial<Record<(typeof CHARACTER_CARD_STRING_FIELDS)[number], readonly string[]>> =
+  {
+    description: ["char_persona"],
+    scenario: ["world_scenario"],
+    first_mes: ["char_greeting"],
+    mes_example: ["example_dialogue"],
+  } as const;
 
 function firstPresentValue(source: Record<string, unknown>, keys: readonly string[]): unknown {
   for (const key of keys) {

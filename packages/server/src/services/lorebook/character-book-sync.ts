@@ -21,6 +21,7 @@
 import { like } from "../../db/file-query.js";
 import type { DB } from "../../db/connection.js";
 import type { CharacterBook, CharacterBookEntry } from "@marinara-engine/shared";
+import { parseLorebookDecisionActivation } from "@marinara-engine/shared";
 import { characters } from "../../db/schema/index.js";
 import { createLorebooksStorage } from "../storage/lorebooks.storage.js";
 import { createCharactersStorage } from "../storage/characters.storage.js";
@@ -46,7 +47,12 @@ function asBoolean(value: unknown, fallback = false): boolean {
 }
 
 function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(String).map((item) => item.trim()).filter(Boolean) : [];
+  return Array.isArray(value)
+    ? value
+        .map(String)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
 }
 
 /**
@@ -59,12 +65,13 @@ function asStringArray(value: unknown): string[] {
 function toCharacterBookEntry(entry: LoreEntryRow, index: number): CharacterBookEntry {
   const order = asNumber(entry.order, 100);
   const positionValue = asNumber(entry.position, 0);
-  const position = positionValue === 7 ? 7 : positionValue === 2 ? 4 : positionValue === 1 ? "after_char" : "before_char";
+  const position =
+    positionValue === 7 ? 7 : positionValue === 2 ? 4 : positionValue === 1 ? "after_char" : "before_char";
   const role = entry.role === "user" ? 1 : entry.role === "assistant" ? 2 : 0;
   return {
     keys: asStringArray(entry.keys),
     content: asString(entry.content),
-    extensions: {},
+    extensions: Array.isArray(entry.images) && entry.images.length ? { marinaraImages: entry.images } : {},
     enabled: asBoolean(entry.enabled),
     insertion_order: order,
     case_sensitive: asBoolean(entry.caseSensitive),
@@ -101,6 +108,8 @@ function toCharacterBookEntry(entry: LoreEntryRow, index: number): CharacterBook
     delayUntilRecursion: asBoolean(entry.delayUntilRecursion),
     vectorized: !asBoolean(entry.excludeFromVectorization),
     excludeFromVectorization: asBoolean(entry.excludeFromVectorization),
+    // YunYun extension (#6570), passed back through on import.
+    ...parseLorebookDecisionActivation(entry),
   };
 }
 
@@ -164,8 +173,7 @@ export async function resolveEmbeddedCharacterId(
 ): Promise<string | null> {
   const charactersStorage = createCharactersStorage(db);
 
-  const lorebook =
-    lorebookHint ?? ((await createLorebooksStorage(db).getById(lorebookId)) as LorebookRow | null);
+  const lorebook = lorebookHint ?? ((await createLorebooksStorage(db).getById(lorebookId)) as LorebookRow | null);
   const derived = typeof lorebook?.characterId === "string" ? lorebook.characterId : null;
   if (derived) {
     const character = await charactersStorage.getById(derived);
@@ -182,7 +190,10 @@ export async function resolveEmbeddedCharacterId(
   const linkCount = Array.isArray(lorebook?.characterIds) ? (lorebook.characterIds as unknown[]).length : 0;
   if (linkCount <= 1) return null;
 
-  const rows = await db.select().from(characters).where(like(characters.data, `%"${lorebookId}"%`));
+  const rows = await db
+    .select()
+    .from(characters)
+    .where(like(characters.data, `%"${lorebookId}"%`));
   for (const row of rows) {
     if (getEmbeddedLorebookId(parseCharacterData(row.data)) === lorebookId) return row.id;
   }
@@ -259,27 +270,42 @@ export async function embedLorebookIntoCharacter(
  * (entry create/update/delete) has already succeeded by the time this is
  * called, and a sync failure should not surface as an HTTP error.
  */
-export async function syncCharacterBookFromLorebook(db: DB, lorebookId: string): Promise<void> {
+/**
+ * #5793: the outcome of one derived character-book write, so the mari-db
+ * read-back can verify (or honestly refuse to verify) the sync alongside the
+ * planned rows. "skipped" = nothing to write (not embedded, character gone);
+ * "synced" = the derived book was written and carries the exact value to
+ * assert; "failed" = the write could not be confirmed (the error stays
+ * swallowed so a sync failure still never breaks the mutation itself).
+ */
+export type CharacterBookSyncOutcome =
+  | { status: "skipped" }
+  | { status: "synced"; characterId: string; expectedBook: unknown }
+  | { status: "failed"; lorebookId: string; error: string };
+
+export async function syncCharacterBookFromLorebook(db: DB, lorebookId: string): Promise<CharacterBookSyncOutcome> {
   try {
     const lorebookStorage = createLorebooksStorage(db);
     const lorebook = (await lorebookStorage.getById(lorebookId)) as LorebookRow | null;
-    if (!lorebook) return;
+    if (!lorebook) return { status: "skipped" };
     const characterId = await resolveEmbeddedCharacterId(db, lorebookId, lorebook);
-    if (!characterId) return;
+    if (!characterId) return { status: "skipped" };
 
     const charactersStorage = createCharactersStorage(db);
     const character = await charactersStorage.getById(characterId);
-    if (!character) return;
+    if (!character) return { status: "skipped" };
 
     const currentData = parseCharacterData(character.data);
-    if (getEmbeddedLorebookId(currentData) !== lorebookId) return;
+    if (getEmbeddedLorebookId(currentData) !== lorebookId) return { status: "skipped" };
 
     const entries = (await lorebookStorage.listEntries(lorebookId)) as LoreEntryRow[];
     const nextBook = toCharacterBook(lorebook, entries);
 
     await charactersStorage.update(characterId, { character_book: nextBook }, undefined, { skipVersionSnapshot: true });
+    return { status: "synced", characterId, expectedBook: nextBook };
   } catch (err) {
     logger.error(err, "Failed to sync character_book from lorebook %s", lorebookId);
+    return { status: "failed", lorebookId, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -361,11 +387,9 @@ export async function clearEmbeddedLorebookFromCharacter(db: DB, characterId: st
     extensions.importMetadata = importMetadata;
   }
 
-  await charactersStorage.update(
-    characterId,
-    { character_book: null, extensions: extensions as never },
-    undefined,
-    { skipVersionSnapshot: true, mergeExtensions: false },
-  );
+  await charactersStorage.update(characterId, { character_book: null, extensions: extensions as never }, undefined, {
+    skipVersionSnapshot: true,
+    mergeExtensions: false,
+  });
   return true;
 }

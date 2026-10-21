@@ -12,6 +12,11 @@ When upgrading from a version that bundled first-party agents, maps, calls, or C
 
 If you use a downloaded documentation language (**Settings** → **General** → **Documentation Language**), the first start after an update also checks that language pack for changes and refreshes it automatically. If the download source cannot be reached, YunYun keeps your installed pack (any guides missing from it show in English) and tries again on the next start. Your language choice is never reset by an update.
 
+UI language packs use a separate, manual download flow. On the first upgrade from bundled UI translations,
+the interface returns to English; reselect your language in **Settings** → **General** → **Language** to download
+its pack. Later updates keep downloaded packs in the data folder. Use **Refresh language pack** for updated
+translations; missing packs or untranslated keys display English, and startup never downloads a UI pack.
+
 To learn where your data lives and how to save a copy, see [Backing Up and Restoring YunYun](data/backup-and-restore.md).
 
 ## Back up first
@@ -27,6 +32,14 @@ Upgrades are safe, but a backup is cheap insurance. Make one before any large ju
 You should see the button change to **Creating backup…** while it works. When it finishes, your browser saves a `.zip` archive of your data.
 
 Full steps for backups and restoring are in [Backing Up and Restoring YunYun](data/backup-and-restore.md).
+
+## Updating from 2.5.0
+
+The steps for each platform below are the same as before. A few changes can affect a server that other devices or people use:
+
+- **A reverse proxy or tunnel on the same computer.** By default, visitors that nginx, Caddy, Cloudflare Tunnel, Tailscale Serve, or ngrok pass to YunYun now count as remote. Without Basic Auth they see the setup page, and backups and other protected actions need the admin secret. See [Reverse proxies and tunnels on the same computer](REMOTE_ACCESS.md#reverse-proxies-and-tunnels-on-the-same-computer).
+- **Docker with a password or an allowlist.** With Basic Auth set, the browser on the host computer now asks for the login too. With only `IP_ALLOWLIST` set, the host browser is refused unless you list the container's gateway, so use Basic Auth instead. See [Tailscale and Docker bypass](REMOTE_ACCESS.md#tailscale-and-docker-bypass).
+- **Chats and profiles moved to another install.** A chat log, settings profile, or full profile no longer carries its **Discord Mirror**, **DeepLX URL**, **DeepL API Key**, or **Intiface URL** to a different install. Enter them again there. Your own settings profiles, and a full profile restored on the same install, keep them.
 
 ## Upgrade by platform
 
@@ -100,7 +113,7 @@ cd Marinara-Engine
 
 For a persistent opt-out, set `AUTO_UPDATE_ENABLED=false` in the project `.env`. This affects only launcher-managed Engine updates; manual updates and the in-app update controls remain available.
 
-If you use the Android app icon (the APK), open it and tap **Install / Start YunYun**. The APK is a sideloaded app, which means you installed it outside the official app store. It is a shell over Termux, so it updates the same Termux copy behind it.
+If you use the Android app icon (the APK), [download the latest APK](https://github.com/Pasta-Devs/Marinara-Engine/releases/latest/download/marinara-engine-android.apk) and open the downloaded file so Android updates the wrapper itself. Then open YunYun Engine and tap **Install / Start YunYun** to update and start the Termux copy behind it. The app preserves and exchanges its private localhost credential automatically; an update never asks you for signing credentials or that secret.
 
 ### iPhone and iPad
 
@@ -153,7 +166,7 @@ The **Apply Update** button appears only when your install can update itself fro
 - A git-based install (Docker and packaged installs cannot apply this way).
 - The server owner set `UPDATES_APPLY_ENABLED=true` in the server `.env` file. An `.env` file holds server settings.
 
-If you click **Apply Update** on the machine that runs the server, this is all you need. No secret is required there.
+If you click **Apply Update** on the machine that runs the server, this is all you need. No secret is required there. This means opening YunYun at `http://127.0.0.1:7860` or `http://localhost:7860`, and the same goes for the channel switch above. By default, an address served by a reverse proxy or tunnel counts as a different device, even on the same computer. Setting `REQUIRE_AUTH_FOR_LOOPBACK_PROXY=false` treats those forwarded visitors as local, including the local admin-secret bypass; keep it on for a public proxy or tunnel.
 
 Applying from a different device is off by default. It needs all three of the following.
 
@@ -186,6 +199,12 @@ The button shows **Refreshing…** while it works, then the app reloads.
 Upgrades are always safe, but going backwards is not always possible directly. Newer versions of YunYun store chat messages in a newer on-disk format, and a version older than your data's format cannot read it. To protect your chat history, the launcher skips auto-updates that would land on an incompatible version, and the in-app updater refuses to apply one.
 
 If you need an older version anyway, a one-command conversion puts your data back in the old format first. See [Chats show no messages after switching to an older version](TROUBLESHOOTING.md#chats-show-no-messages-after-switching-to-an-older-version) for the steps.
+
+### Going back to 2.5.0
+
+Version 2.5.0 uses the same storage format as the versions after it, so going back to it is not blocked and it opens your chats normally. It does not know the data that newer features added, though: some connection settings, the details used to regenerate chat images, and parts of game checkpoints, ruleset clocks and scene videos. When 2.5.0 saves a chat or a connection, for example when you send a message, play a game turn, make an image or change a connection, it drops that newer data from the whole chat or connection. Updating again does not bring it back.
+
+To be able to return to exactly where you were, make a backup before you update. See [Back up first](#back-up-first) and [Backing Up and Restoring YunYun](data/backup-and-restore.md).
 
 ## If an upgrade fails
 

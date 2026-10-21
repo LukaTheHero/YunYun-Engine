@@ -1,55 +1,85 @@
+import { allowsDefaultChatModel } from "./local-context-limit.js";
 import type { ChatCompletionResult, ChatMessage, ChatOptions, LLMUsage } from "./base-provider.js";
-import { BaseLLMProvider } from "./base-provider.js";
+import { BaseLLMProvider, LLMHttpError, isRateLimitError } from "./base-provider.js";
 import { createLLMProvider } from "./provider-registry.js";
-import {
-  mergeCustomParameters,
-  parseStoredGenerationParameters,
-} from "../../routes/generate/generate-route-utils.js";
+import { RateLimitAwareProvider, withRateLimitAwareProvider } from "./rate-limit-aware-provider.js";
+import { mergeCustomParameters, parseStoredGenerationParameters } from "../../routes/generate/generate-route-utils.js";
 import { logger } from "../../lib/logger.js";
+import { keepsCodexDefaultEffort, minContextLimit } from "../generation/generation-parameters.js";
 import { notifyGenerationFallback, type GenerationFallbackNotifier } from "../generation/fallback-notification.js";
 import {
   isConnectionAdmissionFailure,
   splitConnectionAttemptAcrossFallback,
   withConnectionAdmissionProvider,
-  type ConnectionAdmissionMode,
 } from "../generation/connection-admission.js";
 
-export type FallbackConnection = {
-  id: string;
-  name?: string | null;
-  provider: string;
-  baseUrl: string | null;
-  apiKey: string;
-  model: string;
-  maxContext?: number | null;
-  openrouterProvider?: string | null;
-  maxTokensOverride?: number | null;
-  defaultParameters?: unknown;
-  maxParallelJobs?: number | null;
-  enableCaching?: string | boolean | null;
-  anthropicExtendedCacheTtl?: string | boolean | null;
-  cachingAtDepth?: number | null;
-  claudeFastMode?: string | boolean | null;
-  treatAsLocalEndpoint?: string | boolean | null;
-};
+import type {
+  FallbackConnection,
+  GenerationFallbackNotice,
+  GenerationFallbackReason,
+  GenerationProviderOrigin,
+} from "@marinara-engine/shared";
+export type { FallbackConnection, GenerationProviderOrigin } from "@marinara-engine/shared";
 
-export type GenerationProviderOrigin =
-  | { kind: "primary" }
-  | { kind: "fallback"; provider: string; model: string };
-
-type ConnectionFallbackProviderArgs = {
+type ConnectionFallbackProviderArgs = Omit<
+  import("@marinara-engine/shared").CapabilityConnectionFallbackOptions,
+  "primary"
+> & {
   primary: BaseLLMProvider;
-  primaryConnectionId: string;
-  fallbackConnection: FallbackConnection | null | undefined;
-  fallbackBaseUrl: string;
-  category: "main" | "agents";
-  onFallback?: GenerationFallbackNotifier;
-  onProviderUsed?: (origin: GenerationProviderOrigin) => void;
-  admissionMode?: ConnectionAdmissionMode;
+  wrapProvider?: (provider: BaseLLMProvider) => BaseLLMProvider;
 };
 
 function isEnabled(value: unknown): boolean {
   return value === true || value === "true";
+}
+
+type FallbackFailure = { reason: GenerationFallbackReason; status?: number };
+
+const NETWORK_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ENETUNREACH",
+  "EHOSTUNREACH",
+  "EPIPE",
+  "UND_ERR_SOCKET",
+]);
+const TIMEOUT_ERROR_CODES = new Set([
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+]);
+
+/**
+ * Sorts a primary failure into the short reason the fallback toast names (#7697).
+ * ponytail: reads LLMHttpError statuses and Node error codes; a provider that throws a plain
+ * Error is reported as "error" until it throws LLMHttpError too.
+ */
+export function describeFallbackFailure(error: unknown): FallbackFailure {
+  if (error instanceof LLMHttpError) {
+    const { status } = error;
+    // Anthropic's 529 means the provider is overloaded, not that this key hit its limit.
+    if (status === 529) return { reason: "server", status };
+    if (isRateLimitError(error)) return { reason: "rate_limit", status };
+    // Only 401 says the key was refused: a 403 can also be moderation or an unsupported region.
+    if (status === 401) return { reason: "auth", status };
+    if (status === 404) return { reason: "not_found", status };
+    if (status === 408 || status === 504) return { reason: "timeout", status };
+    return { reason: status >= 500 ? "server" : "error", status };
+  }
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === "object"; depth += 1) {
+    const candidate = current as { name?: unknown; code?: unknown; cause?: unknown };
+    if (candidate.name === "TimeoutError") return { reason: "timeout" };
+    if (typeof candidate.code === "string") {
+      if (TIMEOUT_ERROR_CODES.has(candidate.code)) return { reason: "timeout" };
+      if (NETWORK_ERROR_CODES.has(candidate.code)) return { reason: "network" };
+    }
+    current = candidate.cause;
+  }
+  return { reason: "error" };
 }
 
 function isAbortFailure(error: unknown, signal?: AbortSignal): boolean {
@@ -57,6 +87,42 @@ function isAbortFailure(error: unknown, signal?: AbortSignal): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { name?: unknown; code?: unknown };
   return candidate.name === "AbortError" || candidate.code === "ABORT_ERR";
+}
+
+export function prepareAssistantReasoningPrefillMessages(messages: ChatMessage[], supported: boolean): ChatMessage[] {
+  if (supported) return messages;
+
+  return messages.flatMap((message) => {
+    const metadata = message.providerMetadata;
+    if (metadata?.partial !== true || typeof metadata.reasoning_content !== "string") return [message];
+
+    const { partial: _partial, reasoning_content: _reasoningContent, ...remainingMetadata } = metadata;
+    const next: ChatMessage = { ...message };
+    if (Object.keys(remainingMetadata).length > 0) next.providerMetadata = remainingMetadata;
+    else delete next.providerMetadata;
+
+    const hasPayload =
+      !!next.content.trim() ||
+      !!next.images?.length ||
+      !!next.files?.length ||
+      Object.keys(next.providerMetadata ?? {}).length > 0 ||
+      !!next.tool_calls?.length ||
+      !!next.tool_call_id;
+    return hasPayload ? [next] : [];
+  });
+}
+
+export function isFallbackConnectionUsable(
+  fallbackConnection: FallbackConnection | null | undefined,
+  primaryConnectionId: string,
+  fallbackBaseUrl: string,
+): fallbackConnection is FallbackConnection {
+  return (
+    !!fallbackConnection &&
+    fallbackConnection.id !== primaryConnectionId &&
+    (!!fallbackConnection.model?.trim() || allowsDefaultChatModel(fallbackConnection)) &&
+    !!fallbackBaseUrl.trim()
+  );
 }
 
 function fallbackOptions(options: ChatOptions, connection: FallbackConnection): ChatOptions {
@@ -73,13 +139,15 @@ function fallbackOptions(options: ChatOptions, connection: FallbackConnection): 
         : undefined;
   const reasoningSendDisabled = stored?.enabledParameters?.reasoningEffort === false;
   const hasStoredReasoningEffort = stored?.reasoningEffort !== undefined;
-  const reasoningEffort = reasoningSendDisabled
-    ? undefined
-    : stored?.reasoningEffort === "maximum"
-      ? "max"
-      : stored?.reasoningEffort === null
-        ? "none"
-        : (stored?.reasoningEffort ?? options.reasoningEffort);
+  // A Codex fallback with no saved level keeps Codex's default rather than taking the main connection's level.
+  const reasoningEffort =
+    reasoningSendDisabled || keepsCodexDefaultEffort(connection.provider, stored)
+      ? undefined
+      : stored?.reasoningEffort === "maximum"
+        ? "max"
+        : stored?.reasoningEffort === null
+          ? "none"
+          : (stored?.reasoningEffort ?? options.reasoningEffort);
   const enableThinking = reasoningSendDisabled
     ? false
     : hasStoredReasoningEffort
@@ -126,11 +194,25 @@ export class ConnectionFallbackProvider extends BaseLLMProvider {
     /** Reports the one logical attempt's outcome once the primary-plus-fallback chain settles. */
     private readonly settleAttempt?: (outcome: "completed" | "failed") => Promise<void>,
     private readonly onProviderUsed?: (origin: GenerationProviderOrigin) => void,
+    private readonly primarySupportsAssistantReasoningPrefill = true,
+    private readonly fallbackSupportsAssistantReasoningPrefill = true,
+    /** The connection that failed, so the notice can name it alongside the fallback. */
+    private readonly primaryConnection?: { id: string; name?: string | null },
   ) {
-    super("", "", primary.maxContextValue ?? undefined, null, primary.maxTokensOverrideValue);
+    super(
+      "",
+      "",
+      minContextLimit(primary.maxContextValue ?? undefined, fallback.maxContextValue ?? undefined),
+      null,
+      primary.maxTokensOverrideValue,
+    );
   }
 
-  private async logFallback(error: unknown): Promise<void> {
+  private async logFallback(
+    error: unknown,
+    primaryModel: string | undefined,
+    failure: FallbackFailure = describeFallbackFailure(error),
+  ): Promise<void> {
     logger.warn(
       error,
       "[%s-fallback] Primary generation failed before producing usable output; retrying with %s (%s)",
@@ -138,13 +220,20 @@ export class ConnectionFallbackProvider extends BaseLLMProvider {
       this.connection.name?.trim() || this.connection.id,
       this.connection.model,
     );
+    const notice: GenerationFallbackNotice = {
+      category: this.category,
+      connectionId: this.connection.id,
+      connectionName: this.connection.name?.trim() || this.connection.id,
+      model: this.connection.model,
+    };
+    if (this.primaryConnection) {
+      notice.failed = { connectionId: this.primaryConnection.id, ...failure };
+      const primaryName = this.primaryConnection.name?.trim();
+      if (primaryName) notice.failed.connectionName = primaryName;
+      if (primaryModel?.trim()) notice.failed.model = primaryModel.trim();
+    }
     try {
-      await (this.onFallback ?? notifyGenerationFallback)({
-        category: this.category,
-        connectionId: this.connection.id,
-        connectionName: this.connection.name?.trim() || this.connection.id,
-        model: this.connection.model,
-      });
+      await (this.onFallback ?? notifyGenerationFallback)(notice);
     } catch (noticeError) {
       logger.warn(noticeError, "[%s-fallback] Failed to report fallback activation", this.category);
     }
@@ -203,7 +292,10 @@ export class ConnectionFallbackProvider extends BaseLLMProvider {
             },
           }
         : options;
-      const generation = this.primary.chat(messages, primaryOptions);
+      const generation = this.primary.chat(
+        prepareAssistantReasoningPrefillMessages(messages, this.primarySupportsAssistantReasoningPrefill),
+        primaryOptions,
+      );
       try {
         let result = await generation.next();
         while (!result.done) {
@@ -227,10 +319,13 @@ export class ConnectionFallbackProvider extends BaseLLMProvider {
           logger.warn(closeError, "[%s-fallback] Failed to close the primary generation stream", this.category);
         });
       }
-      await this.logFallback(new Error("Primary provider returned an empty completion"));
+      await this.logFallback(new Error("Primary provider returned an empty completion"), options.model, {
+        reason: "empty",
+      });
     } catch (error) {
-      if (emittedUsableOutput || isAbortFailure(error, options.signal) || isConnectionAdmissionFailure(error)) throw error;
-      await this.logFallback(error);
+      if (emittedUsableOutput || isAbortFailure(error, options.signal) || isConnectionAdmissionFailure(error))
+        throw error;
+      await this.logFallback(error, options.model);
     }
     options.signal?.throwIfAborted();
     let reportedFallback = false;
@@ -251,7 +346,10 @@ export class ConnectionFallbackProvider extends BaseLLMProvider {
         await onToken(chunk);
       };
     }
-    const fallbackGeneration = this.fallback.chat(messages, nextOptions);
+    const fallbackGeneration = this.fallback.chat(
+      prepareAssistantReasoningPrefillMessages(messages, this.fallbackSupportsAssistantReasoningPrefill),
+      nextOptions,
+    );
     try {
       let result = await fallbackGeneration.next();
       while (!result.done) {
@@ -281,19 +379,27 @@ export class ConnectionFallbackProvider extends BaseLLMProvider {
 
   private async chatCompleteChain(messages: ChatMessage[], options: ChatOptions): Promise<ChatCompletionResult> {
     try {
-      const result = await this.primary.chatComplete(messages, options);
+      const result = await this.primary.chatComplete(
+        prepareAssistantReasoningPrefillMessages(messages, this.primarySupportsAssistantReasoningPrefill),
+        options,
+      );
       const hasUsableOutput = Boolean(result.content?.trim()) || result.toolCalls.length > 0;
       if (hasUsableOutput || options.signal?.aborted) {
         if (hasUsableOutput) this.onProviderUsed?.({ kind: "primary" });
         return result;
       }
-      await this.logFallback(new Error("Primary provider returned an empty completion"));
+      await this.logFallback(new Error("Primary provider returned an empty completion"), options.model, {
+        reason: "empty",
+      });
     } catch (error) {
       if (isAbortFailure(error, options.signal) || isConnectionAdmissionFailure(error)) throw error;
-      await this.logFallback(error);
+      await this.logFallback(error, options.model);
     }
     options.signal?.throwIfAborted();
-    const result = await this.fallback.chatComplete(messages, fallbackOptions(options, this.connection));
+    const result = await this.fallback.chatComplete(
+      prepareAssistantReasoningPrefillMessages(messages, this.fallbackSupportsAssistantReasoningPrefill),
+      fallbackOptions(options, this.connection),
+    );
     this.onProviderUsed?.({
       kind: "fallback",
       provider: this.connection.provider,
@@ -309,39 +415,58 @@ export class ConnectionFallbackProvider extends BaseLLMProvider {
 
 export function withConnectionFallbackProvider({
   primary,
+  wrapProvider = (provider) => provider,
   primaryConnectionId,
+  primaryConnectionName,
   fallbackConnection,
   fallbackBaseUrl,
   category,
   onFallback,
   onProviderUsed,
   admissionMode = { kind: "foreground" },
+  primarySupportsAssistantReasoningPrefill = true,
+  fallbackSupportsAssistantReasoningPrefill = true,
 }: ConnectionFallbackProviderArgs): BaseLLMProvider {
   const { primaryMode, fallbackMode, settle } = splitConnectionAttemptAcrossFallback(admissionMode);
-  if (
-    !fallbackConnection ||
-    fallbackConnection.id === primaryConnectionId ||
-    !fallbackConnection.model?.trim() ||
-    !fallbackBaseUrl
-  ) {
+  if (!isFallbackConnectionUsable(fallbackConnection, primaryConnectionId, fallbackBaseUrl)) {
     // No fallback exists, so the primary is the whole logical attempt and owns its own outcome.
-    return withConnectionAdmissionProvider(primary, primaryConnectionId, admissionMode);
+    // Rate-limit-aware wraps outside admission so a 429 pauses/retries this connection here too —
+    // the main chat/agent path builds `primary` without a connectionId, so it is added here.
+    return withRateLimitAwareProvider(
+      withConnectionAdmissionProvider(wrapProvider(primary), primaryConnectionId, admissionMode),
+      primaryConnectionId,
+    );
   }
-  const admittedPrimary = withConnectionAdmissionProvider(primary, primaryConnectionId, primaryMode);
-  const fallback = withConnectionAdmissionProvider(
-    createLLMProvider(
-      fallbackConnection.provider,
-      fallbackBaseUrl,
-      fallbackConnection.apiKey,
-      fallbackConnection.maxContext,
-      fallbackConnection.openrouterProvider,
-      fallbackConnection.maxTokensOverride,
-      isEnabled(fallbackConnection.claudeFastMode),
-      isEnabled(fallbackConnection.treatAsLocalEndpoint),
-      fallbackConnection.defaultParameters,
+  // A fallback exists, so a transient failure on the primary goes straight to it instead of
+  // waiting out a transient backoff first (PROVIDER_RETRY_TRANSIENT_ERRORS). Rate limits are
+  // unchanged. A primary that is already wrapped (createLLMProvider with a connectionId, or a
+  // capability package passing one to llm.withFallback) has its own wrapper opted out too, since
+  // admission may sit between it and the outer wrapper below.
+  const primaryLeg = primary instanceof RateLimitAwareProvider ? primary.withoutTransientRetry() : primary;
+  const admittedPrimary = withRateLimitAwareProvider(
+    withConnectionAdmissionProvider(wrapProvider(primaryLeg), primaryConnectionId, primaryMode),
+    primaryConnectionId,
+    { transientRetry: false },
+  );
+  const fallback = withRateLimitAwareProvider(
+    withConnectionAdmissionProvider(
+      wrapProvider(
+        createLLMProvider(
+          fallbackConnection.provider,
+          fallbackBaseUrl,
+          fallbackConnection.apiKey,
+          fallbackConnection.maxContext,
+          fallbackConnection.openrouterProvider,
+          fallbackConnection.maxTokensOverride,
+          isEnabled(fallbackConnection.claudeFastMode),
+          isEnabled(fallbackConnection.treatAsLocalEndpoint),
+          fallbackConnection.defaultParameters,
+        ),
+      ),
+      fallbackConnection.id,
+      fallbackMode,
     ),
     fallbackConnection.id,
-    fallbackMode,
   );
   return new ConnectionFallbackProvider(
     admittedPrimary,
@@ -351,5 +476,8 @@ export function withConnectionFallbackProvider({
     onFallback,
     settle,
     onProviderUsed,
+    primarySupportsAssistantReasoningPrefill,
+    fallbackSupportsAssistantReasoningPrefill,
+    { id: primaryConnectionId, name: primaryConnectionName },
   );
 }

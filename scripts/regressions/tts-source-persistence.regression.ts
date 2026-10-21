@@ -4,15 +4,30 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { TTS_API_KEY_MASK, ttsConfigSchema } from "../../packages/shared/src/types/tts.js";
-import { buildTTSVoiceRequests } from "../../packages/client/src/lib/tts-dialogue.ts";
-import { normalizeTTSPlaybackDelayMs } from "../../packages/client/src/lib/tts-service.ts";
+import ts from "typescript";
+import { setCharacterVoiceAssignment, TTS_API_KEY_MASK, ttsConfigSchema } from "../../packages/shared/src/types/tts.js";
+import {
+  buildTTSVoiceRequests,
+  cleanTTSInputText,
+  splitTTSChunks,
+  filterTTSText,
+  findTTSCharacterIdBySpeakerName,
+  getCharacterNameVoice,
+  getCharacterVoiceAssignment,
+  resolveTTSVoiceForSpeaker,
+} from "../../packages/client/src/lib/tts-dialogue.ts";
+import { buildExtractedRoleplayTTSVoiceRequests } from "../../packages/client/src/lib/tts-roleplay-speaker-extractor.ts";
+import { normalizeTTSPlaybackDelayMs, ttsService } from "../../packages/client/src/lib/tts-service.ts";
 import {
   buildOfficialPocketTtsForm,
+  buildElevenLabsTextInput,
+  buildRoleplaySpeakerExtractorPrompt,
+  buildRoleplaySpeakerExtractorUserPrompt,
   maskTTSConfigForResponse,
   fetchAllElevenLabsVoiceOptions,
   fetchElevenLabsVoiceOptions,
   parseElevenLabsModelOptions,
+  parseRoleplaySpeakerExtractorOutput,
   prepareTTSConfigForStorage,
   resolvePocketTtsApiMode,
 } from "../../packages/server/src/routes/tts.routes.ts";
@@ -22,10 +37,10 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 
 assert.equal(resolvePocketTtsApiMode({ paths: { "/tts": {}, "/health": {} } }), "official");
 assert.equal(resolvePocketTtsApiMode({ paths: { "/v1/audio/speech": {}, "/v1/voices": {} } }), "openai");
-assert.deepEqual(
-  Object.fromEntries(buildOfficialPocketTtsForm("Hello from YunYun.", "alba").entries()),
-  { text: "Hello from YunYun.", voice_url: "alba" },
-);
+assert.deepEqual(Object.fromEntries(buildOfficialPocketTtsForm("Hello from YunYun.", "alba").entries()), {
+  text: "Hello from YunYun.",
+  voice_url: "alba",
+});
 const ttsRouteSource = readFileSync(join(repositoryRoot, "packages/server/src/routes/tts.routes.ts"), "utf8");
 assert.match(
   ttsRouteSource,
@@ -36,6 +51,11 @@ assert.match(
   ttsRouteSource,
   /clearPocketTtsApiModeCache\(existing\);\s*clearPocketTtsApiModeCache\(storedConfig\);/u,
   "Saving TTS settings must invalidate the old and new PocketTTS mode cache entries",
+);
+assert.match(
+  ttsRouteSource,
+  /\[debug\/tts\/speaker-extractor\] raw response:/u,
+  "Speaker extractor debug mode must log the provider's raw response",
 );
 
 assert.deepEqual(
@@ -169,6 +189,146 @@ try {
 
 const legacyConfigWithoutDialoguePause = ttsConfigSchema.parse({});
 assert.equal(legacyConfigWithoutDialoguePause.dialoguePauseMs, 1000);
+assert.equal(legacyConfigWithoutDialoguePause.skipTagContent, false);
+assert.equal(legacyConfigWithoutDialoguePause.skipCodeBlocks, true);
+assert.equal(legacyConfigWithoutDialoguePause.skipBracketedText, false);
+const filteredConfig = ttsConfigSchema.parse({ skipTagContent: true, skipBracketedText: true });
+const detailedCue = "[Low, steady voice, restrained urgency] Stay close. [Brief pause] Keep moving.";
+const emotionalConfig = ttsConfigSchema.parse({
+  skipBracketedText: true,
+  roleplaySpeakerExtractorEmotionsEnabled: true,
+});
+assert.deepEqual(splitTTSChunks(detailedCue, emotionalConfig), [detailedCue]);
+for (const cue of [
+  "[Low, steady voice, restrained urgency]",
+  "[Quietly with controlled fear]",
+  "[Quietly. With controlled fear]",
+]) {
+  const line = `${"word ".repeat(177)}${cue} stay close.`;
+  const chunks = splitTTSChunks(line, emotionalConfig);
+  assert.ok(chunks.length > 1 && chunks.every((chunk) => chunk.length <= 900));
+  assert.ok(
+    chunks.some((chunk) => chunk.includes(cue)),
+    "a detailed cue must stay in one audio request",
+  );
+  assert.equal(chunks.join(" "), line.trim(), "chunking preserves the words and the complete delivery cue");
+}
+const unclosedBracketLine = `${"word ".repeat(181)}[unfinished cue`;
+const unclosedBracketChunks = splitTTSChunks(unclosedBracketLine, emotionalConfig);
+assert.ok(unclosedBracketChunks.length > 1 && unclosedBracketChunks.every((chunk) => chunk.length <= 900));
+assert.equal(
+  unclosedBracketChunks.join("").replace(/\s/g, ""),
+  unclosedBracketLine.replace(/\s/g, ""),
+  "splitting oversized speech retains an unclosed bracket and every non-whitespace character",
+);
+assert.deepEqual(splitTTSChunks(detailedCue, filteredConfig), ["Stay close. Keep moving."]);
+assert.equal(cleanTTSInputText("[main] [happy] Hello. [side]", emotionalConfig), "[happy] Hello.");
+assert.equal(
+  cleanTTSInputText("[YunYun][main][angry]: [Quietly, with controlled fear] Stay.", emotionalConfig),
+  "[Quietly, with controlled fear] Stay.",
+  "speaker structure stays silent while descriptive delivery cues survive",
+);
+const detailedSource = '"Stay close. Keep moving."';
+const annotatedDialogue = '[Low, steady voice, restrained urgency] "Stay close. [Brief pause] Keep moving."';
+const detailedSegments = parseRoleplaySpeakerExtractorOutput(
+  JSON.stringify({ dialogue: [{ speaker: "YunYun", text: detailedSource, speech: annotatedDialogue }] }),
+  detailedSource,
+  true,
+).segments;
+assert.equal(buildExtractedRoleplayTTSVoiceRequests(detailedSegments, emotionalConfig)[0]?.text, annotatedDialogue);
+assert.equal(
+  buildExtractedRoleplayTTSVoiceRequests(detailedSegments, filteredConfig)[0]?.text,
+  detailedSource,
+  "turning emotional cues off keeps the existing skip-brackets behavior",
+);
+// Exercise the component's cache helpers without mounting its browser-only combat surface.
+const combatSource = ts.createSourceFile(
+  "GameCombatUI.tsx",
+  readFileSync(join(repositoryRoot, "packages/client/src/components/game/GameCombatUI.tsx"), "utf8"),
+  ts.ScriptTarget.Latest,
+  true,
+  ts.ScriptKind.TSX,
+);
+const combatCacheFunctions = ["hashCombatVoiceKey", "buildCombatVoiceConfigSignature", "buildCombatVoiceLineKey"];
+const combatCacheCode = combatCacheFunctions
+  .map((name) => {
+    const declaration = combatSource.statements.find(
+      (statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === name,
+    );
+    assert.ok(declaration, `${name} remains available for the combat cache regression`);
+    return declaration.getText(combatSource);
+  })
+  .join("\n");
+const combatCache = new Function(
+  `${ts.transpileModule(combatCacheCode, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText}
+   return { signature: buildCombatVoiceConfigSignature, key: buildCombatVoiceLineKey };`,
+)() as {
+  signature: (config: typeof filteredConfig) => string;
+  key: (
+    signature: string,
+    line: { character: string; type: string; content: string },
+    chunks: string[],
+    voice?: string,
+  ) => string;
+};
+const combatLine = { character: "YunYun", type: "main", content: "Strike! [Private tactic] <secret>Wait.</secret>" };
+const combatConfig = ttsConfigSchema.parse({});
+const combatSignature = combatCache.signature(combatConfig);
+const combatKey = combatCache.key(combatSignature, combatLine, splitTTSChunks(combatLine.content, combatConfig));
+for (const flag of ["skipTagContent", "skipCodeBlocks", "skipBracketedText"] as const) {
+  const changed = { ...combatConfig, [flag]: !combatConfig[flag] };
+  assert.notEqual(combatCache.signature(changed), combatSignature, `${flag} must invalidate combat audio`);
+  assert.notEqual(
+    combatCache.key(combatCache.signature(changed), combatLine, splitTTSChunks(combatLine.content, changed)),
+    combatKey,
+  );
+}
+assert.notEqual(
+  combatCache.key(combatSignature, combatLine, ["Strike!", "Wait."]),
+  combatCache.key(combatSignature, combatLine, ["Strike! Wait."]),
+  "A changed filtered chunk boundary cannot reuse audio by chunk index",
+);
+assert.notEqual(
+  combatCache.key(combatSignature, combatLine, ["Strike!"]),
+  combatCache.key(combatSignature, combatLine, ["Wait."]),
+  "Combat audio is keyed to the text actually spoken",
+);
+assert.equal(
+  cleanTTSInputText("Visible <simulation>private <b>nested</b> planning</simulation> ending.", filteredConfig),
+  "Visible ending.",
+);
+assert.equal(
+  cleanTTSInputText("Visible <!-- <unclosed> --> <div>card</div> ending.", filteredConfig),
+  "Visible ending.",
+);
+assert.equal(
+  cleanTTSInputText("<div>Readable card</div> [aside]", legacyConfigWithoutDialoguePause),
+  "Readable card [aside]",
+);
+assert.deepEqual(splitTTSChunks("Before.\n```xml\n<secret>hidden</secret>\n```\nAfter.", filteredConfig), [
+  "Before.",
+  "After.",
+]);
+assert.equal(cleanTTSInputText("Before '''\nprivate code\n''' after.", filteredConfig), "Before after.");
+assert.equal(
+  cleanTTSInputText("Before ```text\nspoken code\n``` after.", { skipCodeBlocks: false }),
+  "Before spoken code after.",
+);
+assert.equal(
+  cleanTTSInputText("Before [private aside] [linked aside](https://example.invalid) after.", filteredConfig),
+  "Before after.",
+);
+assert.deepEqual(
+  buildTTSVoiceRequests(
+    '<speaker="YunYun">"Hello." <simulation>"Do not read."</simulation></speaker>',
+    filteredConfig,
+  ).map((request) => ({ text: request.text, speaker: request.speaker })),
+  [{ text: "Hello.", speaker: "YunYun" }],
+);
+assert.ok(
+  !filterTTSText("Visible <simulation>secret thought</simulation>", filteredConfig).includes("secret"),
+  "Speaker extraction must receive filtered text",
+);
 
 const legacySubSecondPause = ttsConfigSchema.parse({ dialoguePauseMs: 300 });
 assert.equal(legacySubSecondPause.dialoguePauseMs, 1000);
@@ -215,6 +375,499 @@ assert.equal(normalizeTTSPlaybackDelayMs(60_001), 60_000);
 assert.equal(normalizeTTSPlaybackDelayMs(-1), 0);
 assert.equal(normalizeTTSPlaybackDelayMs(Number.NaN), 0);
 assert.throws(() => ttsConfigSchema.parse({ dialoguePauseMs: 60_001 }));
+
+const originalFetch = globalThis.fetch;
+const originalAudioDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Audio");
+let activeTTSRequests = 0;
+let peakActiveTTSRequests = 0;
+const startedTTSChunks: number[] = [];
+
+class RegressionAudio {
+  volume = 1;
+  muted = false;
+  onended: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+
+  src = "";
+  constructor(_url?: string) {}
+  removeAttribute(name: string): void {
+    if (name === "src") this.src = "";
+  }
+  load(): void {}
+
+  play(): Promise<void> {
+    if (!this.src.startsWith("data:audio/")) setTimeout(() => this.onended?.(), 0);
+    return Promise.resolve();
+  }
+
+  pause(): void {}
+}
+
+try {
+  Object.defineProperty(globalThis, "Audio", { configurable: true, value: RegressionAudio });
+  globalThis.fetch = async () => {
+    activeTTSRequests += 1;
+    peakActiveTTSRequests = Math.max(peakActiveTTSRequests, activeTTSRequests);
+    const exceedsProviderConcurrency = activeTTSRequests > 1;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    activeTTSRequests -= 1;
+    if (exceedsProviderConcurrency) {
+      return new Response(JSON.stringify({ error: "Provider concurrency limit reached" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(new Blob(["audio"]), { status: 200, headers: { "Content-Type": "audio/mpeg" } });
+  };
+
+  await ttsService.speakSequence(
+    [{ text: "First narration." }, { text: "Second narration." }, { text: "Third narration." }],
+    "tts-concurrency-regression",
+    {
+      throwOnError: true,
+      onChunkStart: (_request, index) => startedTTSChunks.push(index),
+    },
+  );
+  assert.equal(peakActiveTTSRequests, 1, "Non-progressive TTS pre-generation must respect serial providers");
+  assert.deepEqual(startedTTSChunks, [0, 1, 2], "A provider limit must not silently remove narration chunks");
+
+  let failedProgressiveFetches = 0;
+  globalThis.fetch = async () => {
+    failedProgressiveFetches += 1;
+    return new Response(JSON.stringify({ error: "First chunk failed" }), {
+      status: 502,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  await ttsService.speakSequence(
+    [{ text: "Failed first chunk." }, { text: "Must not start." }, { text: "Also must not start." }],
+    "tts-progressive-failure",
+    { progressive: true },
+  );
+  assert.equal(failedProgressiveFetches, 1, "Progressive TTS must not start a later request after a chunk fails");
+
+  const callerAbortController = new AbortController();
+  const callerSignal = callerAbortController.signal;
+  const callerAddEventListener = callerSignal.addEventListener.bind(callerSignal);
+  const callerRemoveEventListener = callerSignal.removeEventListener.bind(callerSignal);
+  let callerAbortListenersAdded = 0;
+  let callerAbortListenersRemoved = 0;
+  Object.defineProperty(callerSignal, "addEventListener", {
+    configurable: true,
+    value: (...args: Parameters<AbortSignal["addEventListener"]>) => {
+      if (args[0] === "abort") callerAbortListenersAdded += 1;
+      return callerAddEventListener(...args);
+    },
+  });
+  Object.defineProperty(callerSignal, "removeEventListener", {
+    configurable: true,
+    value: (...args: Parameters<AbortSignal["removeEventListener"]>) => {
+      if (args[0] === "abort") callerAbortListenersRemoved += 1;
+      return callerRemoveEventListener(...args);
+    },
+  });
+  let staleFetchStarted!: () => void;
+  const staleFetchReady = new Promise<void>((resolve) => {
+    staleFetchStarted = resolve;
+  });
+  globalThis.fetch = async (_input, init) => {
+    staleFetchStarted();
+    return await new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    });
+  };
+  const staleSequence = ttsService.speakSequence(
+    [{ text: "Cancelled narration.", cacheKey: "tts-abort-cleanup-regression" }],
+    "tts-abort-cleanup",
+    { signal: callerSignal },
+  );
+  await staleFetchReady;
+  ttsService.stop();
+  await staleSequence;
+  assert.equal(callerAbortListenersAdded, 1, "TTS should attach one caller abort listener per sequence");
+  assert.equal(callerAbortListenersRemoved, 1, "A superseded TTS sequence must detach its caller abort listener");
+} finally {
+  ttsService.stop();
+  globalThis.fetch = originalFetch;
+  if (originalAudioDescriptor) Object.defineProperty(globalThis, "Audio", originalAudioDescriptor);
+  else Reflect.deleteProperty(globalThis, "Audio");
+}
+
+assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorEnabled, false);
+assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorConnectionId, "");
+assert.equal(legacyConfigWithoutDialoguePause.roleplaySpeakerExtractorEmotionsEnabled, false);
+
+const extractorMessage = 'Dominic sighs. "Enough of this," he says. A pause follows. "Skill issue," YunYun chuckles.';
+const extractedSegments = parseRoleplaySpeakerExtractorOutput(
+  JSON.stringify({
+    dialogue: [
+      { speaker: "Dominic", text: '"Enough of this,"', speech: '[irritated] "Enough of this,"' },
+      { speaker: "YunYun", text: '"Skill issue,"', speech: '[chuckle] "Skill issue,"' },
+    ],
+  }),
+  extractorMessage,
+  true,
+).segments;
+assert.deepEqual(extractedSegments, [
+  { kind: "narration", text: "Dominic sighs." },
+  { kind: "dialogue", speaker: "Dominic", text: '[irritated] "Enough of this,"' },
+  { kind: "narration", text: "he says. A pause follows." },
+  { kind: "dialogue", speaker: "YunYun", text: '[chuckle] "Skill issue,"' },
+  { kind: "narration", text: "YunYun chuckles." },
+]);
+assert.throws(
+  () =>
+    parseRoleplaySpeakerExtractorOutput(
+      JSON.stringify({ dialogue: [{ speaker: "Dominic", text: '"Changed dialogue"' }] }),
+      extractorMessage,
+      false,
+    ),
+  /changed or could not locate/,
+);
+assert.throws(
+  () =>
+    parseRoleplaySpeakerExtractorOutput(
+      JSON.stringify({
+        dialogue: [
+          {
+            speaker: "Dominic",
+            text: '"Enough of this,"',
+            speech: '[irritated] "I have had enough,"',
+          },
+        ],
+      }),
+      extractorMessage,
+      true,
+    ),
+  /changed dialogue while adding emotion indicators/,
+);
+assert.throws(
+  () =>
+    parseRoleplaySpeakerExtractorOutput(
+      JSON.stringify({
+        dialogue: [{ speaker: "Dominic", text: '"Wait  here."', speech: '[tense] "Wait here."' }],
+      }),
+      'Dominic says, "Wait  here."',
+      true,
+    ),
+  /changed dialogue while adding emotion indicators/,
+  "emotion annotation must not normalize or rewrite source whitespace",
+);
+assert.deepEqual(
+  parseRoleplaySpeakerExtractorOutput(
+    JSON.stringify({
+      dialogue: [{ speaker: "Dominic", text: '"Use [A] now."', speech: '[firm] "Use [A] now."' }],
+    }),
+    'Dominic orders, "Use [A] now."',
+    true,
+  ).segments,
+  [
+    { kind: "narration", text: "Dominic orders," },
+    { kind: "dialogue", speaker: "Dominic", text: '[firm] "Use [A] now."' },
+  ],
+  "source-authored brackets must survive alongside inserted emotion indicators",
+);
+assert.match(
+  buildRoleplaySpeakerExtractorPrompt({
+    group: "Lab group",
+    user: "YunYun",
+    characters: ["Dominic", "YunYun"],
+    messageAuthor: "Dominic",
+    includeEmotions: true,
+  }),
+  /"speech":"Exact dialogue with only inserted \[indicators\]"/,
+);
+assert.match(
+  buildRoleplaySpeakerExtractorPrompt({
+    group: "Lab group",
+    user: "YunYun",
+    characters: ["Dominic", "YunYun"],
+    messageAuthor: "Dominic",
+    includeEmotions: true,
+  }),
+  /\[Low, steady voice, restrained irritation\].*\[Firm, controlled impatience\].*\[sigh\]/s,
+);
+assert.match(
+  buildRoleplaySpeakerExtractorPrompt({
+    group: "Lab group",
+    user: "YunYun",
+    characters: ["Dominic", "Maurus"],
+    messageAuthor: "Maurus",
+    includeEmotions: true,
+  }),
+  /response was generated for Maurus.*exact name.*not explicitly attributed to a different speaker/su,
+);
+const responsesCompatibleExtractorInput = buildRoleplaySpeakerExtractorUserPrompt('Columbina says, "Sing."');
+assert.match(responsesCompatibleExtractorInput, /\bjson\b/u);
+assert.match(responsesCompatibleExtractorInput, /Message to prepare:\nColumbina says, "Sing\."/u);
+
+const reportedLongRoleplayMessage = `Columbina guides the clam’s narrow hinge into the freshly scored bolt.
+
+“One verse. When it ends, the sea remembers its weight.”
+
+Her first note vibrates through YunYun’s teeth. Moonlight spreads in pale rings, and the surrounding ocean leans away from Belleau. YunYun’s new Hydro sense reels beneath the scale of it: tons of water peel from the maintenance throat and gather in a revolving halo behind Columbina.
+
+Warm air hisses through the rosette.
+
+The scratched bolt turns by a quarter. Hidden cams retract all five corroded fasteners at once. The shell fractures between YunYun’s fingers; the brass cover springs outward and lands neatly in Columbina’s waiting palm.
+
+A shoulder-wide passage climbs into Belleau. Fresh scrapes mark its lower wall. Eleven meters in, an open isolation wheel gleams beneath a blue lamp.
+
+Red light floods the shaft.
+
+An alarm shudders through the station—the same one now screaming around Maurus’s tea table. Fagio’s cable lashes upward. Columbina catches its hook between two fingers, and the line draws taut enough to sing.
+
+A warning races across Fagio’s distant slate:
+
+> **INNER ISOLATION: OPEN**
+> **FLOOD DEFENSE CYCLE: 00:43**
+> **CLOSE VALVE OR RESTORE COVER**
+
+Columbina continues her verse. Each note keeps the ocean curved around the opening.
+
+The first red digit falls.
+
+**00:42.**`;
+const reportedLongRoleplaySegments = parseRoleplaySpeakerExtractorOutput(
+  JSON.stringify({
+    dialogue: [
+      {
+        speaker: "Columbina",
+        text: "“One verse. When it ends, the sea remembers its weight.”",
+      },
+    ],
+  }),
+  reportedLongRoleplayMessage,
+  false,
+).segments;
+const reportedLongRoleplayRequests = buildExtractedRoleplayTTSVoiceRequests(
+  reportedLongRoleplaySegments,
+  ttsConfigSchema.parse({ source: "openai", voice: "alloy", narratorVoiceEnabled: true, narratorVoice: "sage" }),
+  "Columbina",
+);
+const reportedLongRoleplaySpeech = reportedLongRoleplayRequests.map(({ text }) => text).join(" ");
+assert.match(reportedLongRoleplaySpeech, /Her first note vibrates through YunYun’s teeth\./);
+assert.match(reportedLongRoleplaySpeech, /Red light floods the shaft\./);
+assert.match(reportedLongRoleplaySpeech, /INNER ISOLATION: OPEN/);
+assert.match(reportedLongRoleplaySpeech, /The first red digit falls\. 00:42\./);
+assert.ok(
+  reportedLongRoleplayRequests.length <= 4,
+  "Adjacent narration paragraphs should be packed instead of creating a provider request burst",
+);
+
+const extractedVoiceConfig = ttsConfigSchema.parse({
+  source: "openai",
+  voice: "global",
+  voiceMode: "per-character",
+  voiceAssignments: [
+    { characterId: "dominic-id", characterName: "Dominic", voice: "dominic-voice" },
+    { characterId: "mari-id", characterName: "YunYun", voice: "mari-voice" },
+  ],
+  narratorVoiceEnabled: true,
+  narratorVoice: "narrator-voice",
+});
+const extractedCharacterIds: Record<string, string> = { Dominic: "dominic-id", YunYun: "mari-id" };
+const extractedVoiceRequests = buildExtractedRoleplayTTSVoiceRequests(
+  extractedSegments,
+  extractedVoiceConfig,
+  "Dominic",
+  "dominic-id",
+  (speaker) => extractedCharacterIds[speaker ?? ""],
+);
+assert.deepEqual(
+  extractedVoiceRequests.map(({ speaker, voice, text }) => ({ speaker, voice, text })),
+  [
+    { speaker: "Narrator", voice: "narrator-voice", text: "Dominic sighs." },
+    { speaker: "Dominic", voice: "dominic-voice", text: '[irritated] "Enough of this,"' },
+    { speaker: "Narrator", voice: "narrator-voice", text: "he says. A pause follows." },
+    { speaker: "YunYun", voice: "mari-voice", text: '[chuckle] "Skill issue,"' },
+    { speaker: "Narrator", voice: "narrator-voice", text: "YunYun chuckles." },
+  ],
+);
+const extractedGlobalNarrationRequests = buildExtractedRoleplayTTSVoiceRequests(
+  extractedSegments,
+  { ...extractedVoiceConfig, narratorVoiceEnabled: false, narratorVoice: "" },
+  "Dominic",
+  "dominic-id",
+  (speaker) => extractedCharacterIds[speaker ?? ""],
+);
+assert.deepEqual(
+  extractedGlobalNarrationRequests
+    .filter(({ speaker }) => speaker === "Narrator")
+    .map(({ speaker, voice }) => ({ speaker, voice })),
+  [
+    { speaker: "Narrator", voice: "global" },
+    { speaker: "Narrator", voice: "global" },
+    { speaker: "Narrator", voice: "global" },
+  ],
+);
+const extractedDialogueOnlyRequests = buildExtractedRoleplayTTSVoiceRequests(
+  extractedSegments,
+  { ...extractedVoiceConfig, dialogueOnly: true, dialoguePauseMs: 2000 },
+  "Dominic",
+  "dominic-id",
+);
+assert.deepEqual(
+  extractedDialogueOnlyRequests.map(({ speaker, pauseAfterMs }) => ({ speaker, pauseAfterMs })),
+  [
+    { speaker: "Dominic", pauseAfterMs: 2000 },
+    { speaker: "YunYun", pauseAfterMs: undefined },
+  ],
+);
+
+const extractedVoiceFallbackConfig = ttsConfigSchema.parse({
+  source: "openai",
+  voice: "global-voice",
+  voiceMode: "per-character",
+  voiceAssignments: [{ characterId: "columbina-id", characterName: "Columbina", voice: "columbina-voice" }],
+  npcDefaultVoicesEnabled: true,
+  npcDefaultMaleVoices: ["random-npc-voice"],
+  npcDefaultFemaleVoices: ["random-npc-voice"],
+});
+const extractedVoiceFallbackRequests = buildExtractedRoleplayTTSVoiceRequests(
+  [
+    { kind: "dialogue", speaker: "Columbina", text: '"Come closer."' },
+    { kind: "dialogue", speaker: "Dominic", text: '"How unfortunate."' },
+    { kind: "dialogue", speaker: "Fatui Guard", text: '"At once."' },
+  ],
+  extractedVoiceFallbackConfig,
+  null,
+  null,
+  (speaker) =>
+    speaker === "Columbina" ? "columbina-id" : speaker === "Dominic" ? "dominic-without-assignment-id" : null,
+);
+assert.deepEqual(
+  extractedVoiceFallbackRequests.map(({ speaker, voice }) => ({ speaker, voice })),
+  [
+    { speaker: "Columbina", voice: "columbina-voice" },
+    { speaker: "Dominic", voice: "random-npc-voice" },
+    { speaker: "Fatui Guard", voice: "random-npc-voice" },
+  ],
+);
+const extractedDecoratedSpeakerRequests = buildExtractedRoleplayTTSVoiceRequests(
+  [{ kind: "dialogue", speaker: "**Maurus:** [chuckle]", text: '[chuckle] "I said it."' }],
+  {
+    ...extractedVoiceFallbackConfig,
+    voiceAssignments: [{ characterId: "maurus-id", characterName: "Maurus", voice: "maurus-voice" }],
+  },
+  null,
+  null,
+  (speaker) => findTTSCharacterIdBySpeakerName(speaker, [["maurus-id", { name: "Maurus" }]] as const),
+);
+assert.deepEqual(
+  extractedDecoratedSpeakerRequests.map(({ speaker, voice }) => ({ speaker, voice })),
+  [{ speaker: "**Maurus:** [chuckle]", voice: "maurus-voice" }],
+  "Extractor label formatting must not send a known character through the Random NPC Voice pool",
+);
+assert.equal(
+  findTTSCharacterIdBySpeakerName("Maurus", [
+    ["maurus-one", { name: "Maurus" }],
+    ["maurus-two", { name: "Maurus" }],
+  ]),
+  null,
+  "duplicate exact character names must not select an arbitrary voice assignment",
+);
+
+// The Character Editor's Voice section edits one character's row of the shared list (Agents#1176).
+const sharedVoiceRows = [
+  { characterId: "alice-original", characterName: "Alice", voice: "original-voice" },
+  { characterId: "dominic-id", characterName: "Dominic", voice: "dominic-voice" },
+];
+const withAuVoice = setCharacterVoiceAssignment(
+  sharedVoiceRows,
+  { characterId: "alice-au", characterName: "Alice" },
+  "au-voice",
+);
+assert.deepEqual(withAuVoice, [
+  ...sharedVoiceRows,
+  { characterId: "alice-au", characterName: "Alice", voice: "au-voice" },
+]);
+assert.equal(sharedVoiceRows.length, 2, "setting a voice must not mutate the saved list");
+assert.equal(getCharacterVoiceAssignment(withAuVoice, "alice-au"), "au-voice");
+const characterVoiceConfig = ttsConfigSchema.parse({
+  source: "openai",
+  voice: "default-voice",
+  voiceMode: "per-character",
+  voiceAssignments: withAuVoice,
+});
+assert.equal(
+  resolveTTSVoiceForSpeaker(characterVoiceConfig, "Alice", "alice-au"),
+  "au-voice",
+  "a character's own voice must win over an earlier card that only shares its name",
+);
+assert.equal(resolveTTSVoiceForSpeaker(characterVoiceConfig, "Alice", "alice-original"), "original-voice");
+assert.equal(
+  resolveTTSVoiceForSpeaker(characterVoiceConfig, "Alice", null),
+  "original-voice",
+  "speakers known only by name keep the first matching row",
+);
+const renamedDominic = setCharacterVoiceAssignment(
+  withAuVoice,
+  { characterId: "dominic-id", characterName: "Dominic" },
+  "new-dominic-voice",
+);
+assert.deepEqual(
+  renamedDominic.map(({ characterName, voice }) => `${characterName}:${voice}`),
+  ["Alice:original-voice", "Dominic:new-dominic-voice", "Alice:au-voice"],
+  "changing a voice updates the existing row in place with the current name",
+);
+const clearedDominic = setCharacterVoiceAssignment(
+  [...renamedDominic, { characterId: "dominic-id", characterName: "Dominic", voice: "" }],
+  { characterId: "dominic-id", characterName: "Dominic" },
+  " ",
+);
+assert.deepEqual(
+  clearedDominic.map(({ characterId }) => characterId),
+  ["alice-original", "alice-au"],
+  "a blank voice removes every row for that character",
+);
+assert.equal(
+  resolveTTSVoiceForSpeaker({ ...characterVoiceConfig, voiceAssignments: clearedDominic }, "Dominic", "dominic-id"),
+  "default-voice",
+  "a character without its own row falls back to the default voice",
+);
+// Without a row of its own, a card still speaks with a voice set for its name, so the section must say so.
+const auCard = { characterId: "alice-au", characterName: "Alice" };
+assert.equal(
+  resolveTTSVoiceForSpeaker({ ...characterVoiceConfig, voiceAssignments: sharedVoiceRows }, "Alice", "alice-au"),
+  "original-voice",
+);
+assert.equal(getCharacterNameVoice(sharedVoiceRows, auCard), "original-voice", "an AU card shows the voice it uses");
+assert.equal(getCharacterNameVoice(withAuVoice, auCard), "original-voice", "its own row is not the name's voice");
+assert.equal(getCharacterNameVoice(withAuVoice, { characterId: "dominic-id", characterName: "Dominic" }), "");
+assert.equal(
+  getCharacterNameVoice([{ characterId: "alice-au", characterName: "Alice (Modern AU)", voice: "au-voice" }], {
+    characterId: "alice-original",
+    characterName: "Alice",
+  }),
+  "au-voice",
+  "a voice shared by every variant of the name counts too",
+);
+assert.equal(
+  getCharacterNameVoice([{ characterId: "", characterName: "Alice", voice: "legacy-voice" }], auCard),
+  "legacy-voice",
+  "a row saved with only a name counts too",
+);
+// Replay and autoplay find the speaking card the same way, so same-named cards in one chat keep their voices.
+const twoAlices = new Map([
+  ["alice-original", { name: "Alice" }],
+  ["alice-au", { name: "Alice" }],
+]);
+assert.deepEqual(
+  buildTTSVoiceRequests('"Hello there."', characterVoiceConfig, "Alice", "alice-au", (speaker) =>
+    findTTSCharacterIdBySpeakerName(speaker, twoAlices),
+  ).map(({ voice }) => voice),
+  ["au-voice"],
+);
+for (const file of ["ChatArea.tsx", "ChatMessage.tsx"]) {
+  assert.match(
+    readFileSync(join(repositoryRoot, "packages/client/src/components/chat", file), "utf8"),
+    /findTTSCharacterIdBySpeakerName\([^)]*\)/u,
+    `${file} must find the speaking card like the other chat playback path`,
+  );
+}
+assert.equal(buildElevenLabsTextInput('"Skill issue."', "chuckle"), '[chuckle] "Skill issue."');
+assert.equal(buildElevenLabsTextInput('[chuckle] "Skill issue."', "chuckle"), '[chuckle] "Skill issue."');
 
 const legacyOpenAiConfig = ttsConfigSchema.parse({
   enabled: true,

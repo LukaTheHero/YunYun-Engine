@@ -210,8 +210,16 @@ function ThoughtBubble({
             <button
               type="button"
               onClick={onToggleHidden}
-              title={hidden ?localizeUi("ui.trackerPanel.thoughtbubble.showThoughts") :localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")}
-              aria-label={hidden ?localizeUi("ui.trackerPanel.thoughtbubble.showThoughts") :localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")}
+              title={
+                hidden
+                  ? localizeUi("ui.trackerPanel.thoughtbubble.showThoughts")
+                  : localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")
+              }
+              aria-label={
+                hidden
+                  ? localizeUi("ui.trackerPanel.thoughtbubble.showThoughts")
+                  : localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")
+              }
               aria-pressed={hidden}
               className={cn(
                 "px-0 py-0 text-left font-medium italic text-[color-mix(in_srgb,var(--foreground)_86%,transparent)] transition-colors hover:bg-[var(--foreground)]/8",
@@ -221,7 +229,7 @@ function ThoughtBubble({
               style={thoughtTextStyle}
             >
               <span className={cn("break-words", thoughtTextFit.previewClassName)}>
-                {hidden ?localizeUi("ui.trackerPanel.thoughtbubble.hidden") : thoughtText}
+                {hidden ? localizeUi("ui.trackerPanel.thoughtbubble.hidden") : thoughtText}
               </span>
             </button>
           ) : (
@@ -297,7 +305,7 @@ export function InlineThoughtBubble({
     >
       <div
         className={cn(
-          "relative z-[1] max-h-[3.25rem] min-w-0 overflow-hidden rounded-[1.05rem] border border-[color-mix(in_srgb,var(--tracker-profile-dialogue-border)_24%,transparent)] bg-[linear-gradient(150deg,color-mix(in_srgb,var(--tracker-profile-surface-solid)_78%,var(--tracker-profile-display-solid)_12%)_0%,color-mix(in_srgb,var(--tracker-profile-surface-solid)_72%,var(--tracker-profile-accent-solid)_10%)_54%,color-mix(in_srgb,var(--background)_34%,var(--tracker-profile-surface-solid)_66%)_100%)] px-2.5 py-1 text-[color:var(--tracker-profile-text)] shadow-[0_3px_8px_color-mix(in_srgb,var(--background)_22%,transparent),0_0_6px_color-mix(in_srgb,var(--tracker-profile-accent-solid)_7%,transparent),inset_0_1px_0_color-mix(in_srgb,var(--foreground)_4%,transparent)]",
+          "relative z-[1] max-h-[3.25rem] min-w-0 overflow-hidden rounded-[1.05rem] border border-[color-mix(in_srgb,var(--tracker-profile-dialogue-border)_24%,transparent)] bg-[image:var(--tracker-profile-field-material)] [background-blend-mode:var(--tracker-profile-field-material-blend)] px-2.5 py-1 text-[color:var(--tracker-profile-text)] shadow-[0_3px_8px_color-mix(in_srgb,var(--background)_22%,transparent),0_0_6px_color-mix(in_srgb,var(--tracker-profile-accent-solid)_7%,transparent),inset_0_1px_0_color-mix(in_srgb,var(--foreground)_4%,transparent)]",
           surfaceClassName,
         )}
       >
@@ -307,8 +315,16 @@ export function InlineThoughtBubble({
             <button
               type="button"
               onClick={onToggleHidden}
-              title={hidden ?localizeUi("ui.trackerPanel.thoughtbubble.showThoughts") :localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")}
-              aria-label={hidden ?localizeUi("ui.trackerPanel.thoughtbubble.showThoughts") :localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")}
+              title={
+                hidden
+                  ? localizeUi("ui.trackerPanel.thoughtbubble.showThoughts")
+                  : localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")
+              }
+              aria-label={
+                hidden
+                  ? localizeUi("ui.trackerPanel.thoughtbubble.showThoughts")
+                  : localizeUi("ui.trackerPanel.thoughtbubble.hideThoughts")
+              }
               aria-pressed={hidden}
               className={cn(
                 "w-full px-0 py-0 text-left font-medium italic text-[color:var(--tracker-profile-text)] transition-colors hover:bg-[color-mix(in_srgb,var(--tracker-profile-accent-solid)_10%,transparent)]",
@@ -317,7 +333,7 @@ export function InlineThoughtBubble({
               style={thoughtTextStyle}
             >
               <span className={cn("break-words", getThoughtPreviewClampClass(previewLineCount))}>
-                {hidden ?localizeUi("ui.trackerPanel.thoughtbubble.hidden") : thoughtText}
+                {hidden ? localizeUi("ui.trackerPanel.thoughtbubble.hidden") : thoughtText}
               </span>
             </button>
           ) : (
@@ -326,7 +342,7 @@ export function InlineThoughtBubble({
               onSave={onSave}
               placeholder={localizeUi("ui.trackerPanel.thoughtbubble.thoughts")}
               className={cn(
-                "w-full px-0 py-0 font-medium italic [--foreground:color-mix(in_srgb,var(--tracker-profile-text)_94%,var(--tracker-profile-accent-solid)_6%)] [--muted-foreground:color-mix(in_srgb,var(--tracker-profile-muted-text)_84%,var(--tracker-profile-text)_16%)] hover:bg-[color-mix(in_srgb,var(--tracker-profile-accent-solid)_10%,transparent)]",
+                "w-full px-0 py-0 font-medium italic [--foreground:var(--tracker-profile-text)] [--muted-foreground:var(--tracker-profile-muted-text)] hover:bg-[color-mix(in_srgb,var(--tracker-profile-accent-solid)_10%,transparent)]",
                 editMinHeightClassName,
               )}
               style={thoughtTextStyle}

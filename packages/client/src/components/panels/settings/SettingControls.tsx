@@ -23,6 +23,20 @@ import { cn } from "../../../lib/utils";
 import { localizeStringNode, useLocalizedUiText } from "../../../localization/use-localized-ui-text";
 import { HelpTooltip } from "../../ui/HelpTooltip";
 
+/** Secondary: buttons in a row, a header, next to a field or on a list item; also toggle and segmented items (aria-pressed). */
+export const SETTINGS_BUTTON_CLASS = "mari-chrome-control mari-chrome-control--small text-[0.6875rem]";
+/** Primary: a section's or sub-form's one main action; prefer SETTINGS_PRIMARY_FULL_BUTTON_CLASS. */
+export const SETTINGS_PRIMARY_BUTTON_CLASS = "mari-chrome-control mari-chrome-control--primary text-xs";
+/** Primary on its own full-width line, with a leading 0.8125rem icon. */
+export const SETTINGS_PRIMARY_FULL_BUTTON_CLASS = `${SETTINGS_PRIMARY_BUTTON_CLASS} w-full`;
+/** Primary emphasis at secondary size, for the main action inside a dense row of secondary buttons. */
+export const SETTINGS_COMPACT_PRIMARY_BUTTON_CLASS =
+  "mari-chrome-control mari-chrome-control--primary mari-chrome-control--small text-[0.6875rem]";
+/** Square icon-only button with an aria-label and a 0.75rem icon; add mari-chrome-control--danger to delete. */
+export const SETTINGS_ICON_BUTTON_CLASS = "mari-chrome-control mari-chrome-control--small mari-chrome-control--icon";
+/** One-of-N choice card (title, description, optional preview); selected look comes from aria-pressed. */
+export const SETTINGS_CHOICE_CARD_CLASS = "mari-chrome-control mari-chrome-control--card text-xs";
+
 export function SettingsIntro({ children }: { children: ReactNode }) {
   const localize = useLocalizedUiText();
   return (
@@ -187,12 +201,16 @@ export function ConversationSoundSetting() {
       setPreference(false);
       toast.error(
         permission === "insecure"
-          ?localizeUi("ui.panels.conversationsoundsetting.browserNotificationsRequireHttpsOrLocalhostOpenMarinaraThrough")
+          ? localizeUi(
+              "ui.panels.conversationsoundsetting.browserNotificationsRequireHttpsOrLocalhostOpenMarinaraThrough",
+            )
           : permission === "unsupported"
-            ?localizeUi("ui.panels.conversationsoundsetting.browserNotificationsAreNotAvailableInThisEnvironment")
+            ? localizeUi("ui.panels.conversationsoundsetting.browserNotificationsAreNotAvailableInThisEnvironment")
             : permission === "denied"
-              ?localizeUi("ui.panels.conversationsoundsetting.browserNotificationsAreBlockedResetThisSiteSNotification")
-              :localizeUi("ui.panels.conversationsoundsetting.browserNotificationPermissionWasNotGranted"),
+              ? localizeUi(
+                  "ui.panels.conversationsoundsetting.browserNotificationsAreBlockedResetThisSiteSNotification",
+                )
+              : localizeUi("ui.panels.conversationsoundsetting.browserNotificationPermissionWasNotGranted"),
       );
     });
   };
@@ -217,8 +235,8 @@ export function ConversationSoundSetting() {
         setPreference(false);
         toast.error(
           permission === "unsupported"
-            ?localizeUi("ui.panels.conversationsoundsetting.mobileNotificationsRequireTheMarinaraAndroidApp")
-            :localizeUi("ui.panels.conversationsoundsetting.androidNotificationPermissionWasNotGranted"),
+            ? localizeUi("ui.panels.conversationsoundsetting.mobileNotificationsRequireTheMarinaraAndroidApp")
+            : localizeUi("ui.panels.conversationsoundsetting.androidNotificationPermissionWasNotGranted"),
         );
       })
       .catch(() => {
@@ -306,8 +324,8 @@ export function ConversationSoundSetting() {
         disabled={!nativeNotificationsAvailable}
         help={
           nativeNotificationsAvailable
-            ?localizeUi("ui.panels.conversationsoundsetting.usesNativeAndroidNotificationsFromTheInstalledMarinaraApp")
-            :localizeUi("ui.panels.conversationsoundsetting.availableInTheUpdatedMarinaraAndroidApkBrowserAnd")
+            ? localizeUi("ui.panels.conversationsoundsetting.usesNativeAndroidNotificationsFromTheInstalledMarinaraApp")
+            : localizeUi("ui.panels.conversationsoundsetting.availableInTheUpdatedMarinaraAndroidApkBrowserAnd")
         }
       />
       <div className="mt-1 flex items-center gap-1.5">
@@ -346,8 +364,8 @@ export function ConversationSoundSetting() {
         disabled={!nativeNotificationsAvailable}
         help={
           nativeNotificationsAvailable
-            ?localizeUi("ui.panels.conversationsoundsetting.usesNativeAndroidNotificationsFromTheInstalledMarinaraApp")
-            :localizeUi("ui.panels.conversationsoundsetting.availableInTheUpdatedMarinaraAndroidApkBrowserAnd")
+            ? localizeUi("ui.panels.conversationsoundsetting.usesNativeAndroidNotificationsFromTheInstalledMarinaraApp")
+            : localizeUi("ui.panels.conversationsoundsetting.availableInTheUpdatedMarinaraAndroidApkBrowserAnd")
         }
       />
     </div>
@@ -428,22 +446,18 @@ function CustomNotificationSoundSetting() {
             type="button"
             onClick={() => playNotificationPing()}
             disabled={isLoading}
-            className="mari-chrome-control inline-flex min-h-9 items-center gap-1.5 px-2.5 text-[0.625rem] disabled:opacity-50"
+            className={SETTINGS_BUTTON_CLASS}
           >
-            <Play size="0.6875rem" />
+            <Play size="0.75rem" />
             {t("settings.notifications.customSound.actions.preview")}
           </button>
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={isBusy}
-            className="mari-chrome-control inline-flex min-h-9 items-center gap-1.5 px-2.5 text-[0.625rem] disabled:opacity-50"
+            className={SETTINGS_BUTTON_CLASS}
           >
-            {uploadSound.isPending ? (
-              <Loader2 size="0.6875rem" className="animate-spin" />
-            ) : (
-              <Upload size="0.6875rem" />
-            )}
+            {uploadSound.isPending ? <Loader2 size="0.75rem" className="animate-spin" /> : <Upload size="0.75rem" />}
             {status?.configured
               ? t("settings.notifications.customSound.actions.replace")
               : t("settings.notifications.customSound.actions.choose")}
@@ -453,13 +467,9 @@ function CustomNotificationSoundSetting() {
               type="button"
               onClick={() => void handleRemove()}
               disabled={isBusy}
-              className="mari-chrome-control inline-flex min-h-9 items-center gap-1.5 px-2.5 text-[0.625rem] text-[var(--destructive)] disabled:opacity-50"
+              className={cn(SETTINGS_BUTTON_CLASS, "mari-chrome-control--danger")}
             >
-              {removeSound.isPending ? (
-                <Loader2 size="0.6875rem" className="animate-spin" />
-              ) : (
-                <Trash2 size="0.6875rem" />
-              )}
+              {removeSound.isPending ? <Loader2 size="0.75rem" className="animate-spin" /> : <Trash2 size="0.75rem" />}
               {t("settings.notifications.customSound.actions.remove")}
             </button>
           )}
@@ -578,7 +588,7 @@ export function SettingsCheckbox({
     <label
       id={anchorId}
       className={cn(
-        "flex scroll-mt-3 cursor-pointer rounded-lg transition-colors hover:bg-[var(--secondary)]/50",
+        "flex scroll-mt-3 cursor-pointer rounded-lg transition-colors hover:bg-[var(--accent)]/50",
         align === "between" ? "items-center justify-between gap-3 p-1.5" : "items-start gap-2.5 p-1.5",
         disabled && "cursor-not-allowed opacity-60 hover:bg-transparent",
         className,
@@ -600,6 +610,28 @@ export function SettingsCheckbox({
 }
 
 type SettingsSwitchAccessibleLabel = { label: ReactNode; ariaLabel?: never } | { label?: undefined; ariaLabel: string };
+
+export function SettingsSwitchTrack({ checked, className }: { checked: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-settings-switch-track
+      className={cn(
+        "inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors",
+        checked ? "bg-[var(--primary)]/70 mari-accent-animated" : "bg-[var(--border)]",
+        className,
+      )}
+    >
+      <span
+        data-settings-switch-thumb
+        className={cn(
+          "pointer-events-none block h-4 w-4 shrink-0 rounded-full bg-[var(--background)] shadow-sm ring-1 ring-[var(--border)] transition-transform",
+          checked && "translate-x-4",
+        )}
+      />
+    </span>
+  );
+}
 
 type SettingsSwitchProps = SettingsSwitchAccessibleLabel & {
   checked: boolean;
@@ -641,7 +673,11 @@ export function SettingsSwitch({
   const localizedDescription = localizeStringNode(description, localize);
   const localizedTitle = title ? localize(title) : undefined;
   const switchControl = (
-    <span className="relative inline-flex h-5 w-9 shrink-0">
+    <label
+      htmlFor={inputId}
+      title={localizedTitle}
+      className={cn("relative inline-flex h-5 w-9 shrink-0", disabled ? "cursor-not-allowed" : "cursor-pointer")}
+    >
       <input
         id={inputId}
         type="checkbox"
@@ -651,25 +687,11 @@ export function SettingsSwitch({
         onChange={(e) => onChange(e.target.checked)}
         className="peer sr-only"
       />
-      <label
-        htmlFor={inputId}
-        title={localizedTitle}
-        className={cn(
-          "relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--ring)]",
-          checked ? "bg-[var(--primary)]/70" : "bg-[var(--border)]",
-          checked && "mari-accent-animated",
-          disabled ? "cursor-not-allowed" : "cursor-pointer",
-          switchClassName,
-        )}
-      >
-        <span
-          className={cn(
-            "pointer-events-none absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-[var(--background)] shadow-sm ring-1 ring-[var(--border)] transition-transform",
-            checked && "translate-x-4",
-          )}
-        />
-      </label>
-    </span>
+      <SettingsSwitchTrack
+        checked={checked}
+        className={cn("peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--ring)]", switchClassName)}
+      />
+    </label>
   );
   const switchCluster = (
     <span className="inline-flex shrink-0 items-center gap-1.5">
@@ -705,7 +727,7 @@ export function SettingsSwitch({
       id={anchorId}
       title={localizedTitle}
       className={cn(
-        "flex scroll-mt-3 items-center gap-3 rounded-xl p-2 transition-colors hover:bg-[var(--secondary)]/50",
+        "flex scroll-mt-3 items-center gap-3 rounded-xl p-2 transition-colors hover:bg-[var(--accent)]/50",
         disabled && "cursor-not-allowed opacity-60 hover:bg-transparent",
         className,
       )}

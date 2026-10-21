@@ -9,6 +9,8 @@ import { ChatSettingsSection } from "../ChatSettingsSection";
 import { PickerDropdown } from "../PickerDropdown";
 
 interface LorebooksSectionProps {
+  /** Open on arrival (the reply checkup's "Lorebook token budget" link). */
+  forceOpen?: boolean;
   chatId: string;
   activeLorebooks: ActiveLorebookView[];
   lorebooks: Lorebook[];
@@ -26,6 +28,7 @@ interface LorebooksSectionProps {
 }
 
 export function LorebooksSection({
+  forceOpen,
   chatId,
   activeLorebooks,
   lorebooks,
@@ -64,15 +67,19 @@ export function LorebooksSection({
   return (
     <ChatSettingsSection
       id="lorebooks"
+      forceOpen={forceOpen}
       label={localizeUi("navigation.topbar.lorebooks")}
       icon={<BookOpen size="0.875rem" />}
       count={activeLorebooks.length}
       help={localizeUi("ui.chatSettings.lorebookssection.lorebooksContainWorldInfoCharacterBackstoriesAndLoreThat")}
     >
       <div className="mb-2 rounded-lg bg-[var(--secondary)]/70 p-3 ring-1 ring-[var(--border)]">
-        <label className="mb-1.5 flex items-center gap-1 text-xs font-medium">{localizeUi("ui.chatSettings.lorebookssection.lorebookTokenBudget")}{" "}
+        <label className="mb-1.5 flex items-center gap-1 text-xs font-medium">
+          {localizeUi("ui.chatSettings.lorebookssection.lorebookTokenBudget")}{" "}
           <HelpTooltip
-            text={localizeUi("ui.chatSettings.lorebookssection.contextCapForActivatedLorebookRetrievalsInThisChat", { value1: LIMITS.DEFAULT_LOREBOOK_TOKEN_BUDGET })}
+            text={localizeUi("ui.chatSettings.lorebookssection.contextCapForActivatedLorebookRetrievalsInThisChat", {
+              value1: LIMITS.DEFAULT_LOREBOOK_TOKEN_BUDGET,
+            })}
           />
         </label>
         <input
@@ -96,7 +103,9 @@ export function LorebooksSection({
       </div>
 
       {activeLorebooks.length === 0 ? (
-        <p className="text-[0.6875rem] text-[var(--muted-foreground)]">{localizeUi("ui.chatSettings.lorebookssection.noLorebooksActiveInThisChat")}</p>
+        <p className="text-[0.6875rem] text-[var(--muted-foreground)]">
+          {localizeUi("ui.chatSettings.lorebookssection.noLorebooksActiveInThisChat")}
+        </p>
       ) : (
         <div className="flex flex-col gap-1">
           {activeLorebooks.map((lorebook) => {
@@ -122,7 +131,9 @@ export function LorebooksSection({
                     </span>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {lorebook.isExcluded ? (
-                        <span className="rounded-full bg-[var(--background)]/70 px-1.5 py-0.5 text-[0.5625rem] font-medium text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">{localizeUi("ui.agents.agenteditor.disabled")}</span>
+                        <span className="rounded-full bg-[var(--background)]/70 px-1.5 py-0.5 text-[0.5625rem] font-medium text-[var(--muted-foreground)] ring-1 ring-[var(--border)]">
+                          {localizeUi("ui.agents.agenteditor.disabled")}
+                        </span>
                       ) : (
                         lorebook.activeReasons.map((reason) => (
                           <span
@@ -190,7 +201,8 @@ export function LorebooksSection({
           }}
           className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)] transition-colors hover:border-[var(--primary)]/40 hover:text-[var(--primary)]"
         >
-          <Plus size="0.75rem" /> {localizeUi("ui.chatSettings.lorebookssection.addLorebook")}</button>
+          <Plus size="0.75rem" /> {localizeUi("ui.chatSettings.lorebookssection.addLorebook")}
+        </button>
       ) : (
         <PickerDropdown
           search={lorebookSearch}
@@ -214,7 +226,9 @@ export function LorebooksSection({
           ))}
           {visibleInactiveLorebooks.length === 0 && (
             <p className="px-3 py-2 text-[0.6875rem] text-[var(--muted-foreground)]">
-              {inactiveLorebooks.length === 0 ?localizeUi("ui.chatSettings.lorebookssection.allAvailableLorebooksAreAlreadyActiveHere") :localizeUi("ui.lorebooks.linkedresourcepicker.noMatches")}
+              {inactiveLorebooks.length === 0
+                ? localizeUi("ui.chatSettings.lorebookssection.allAvailableLorebooksAreAlreadyActiveHere")
+                : localizeUi("ui.lorebooks.linkedresourcepicker.noMatches")}
             </p>
           )}
         </PickerDropdown>

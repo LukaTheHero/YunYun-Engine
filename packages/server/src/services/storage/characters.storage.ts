@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, like, ne, or } from "../../db/file-query.j
 import type { DB } from "../../db/connection.js";
 import {
   characters,
+  chats,
   characterCardVersions,
   personas,
   personaCardVersions,
@@ -45,6 +46,52 @@ function parsePersonaSnapshot(data: string): PersonaCardSnapshot {
 
 function characterDataChanged(current: CharacterData, next: CharacterData) {
   return JSON.stringify(current) !== JSON.stringify(next);
+}
+
+function characterVersionedContent(data: CharacterData) {
+  const { character_version: _version, extensions, ...content } = data;
+  const {
+    versioningEnabled: _versioningEnabled,
+    // Conversation runtime state, not card content. A schedule is regenerated
+    // every week and presence changes by the minute, so counting these would
+    // bump the card version and snapshot a revision for nothing.
+    conversationSchedule: _schedule,
+    conversationStatusOverride: _override,
+    conversationStatus: _status,
+    conversationActivity: _activity,
+    ...versionedExtensions
+  } = extensions ?? {};
+  return { ...content, extensions: versionedExtensions };
+}
+
+function characterVersionedContentChanged(current: CharacterData, next: CharacterData) {
+  return JSON.stringify(characterVersionedContent(current)) !== JSON.stringify(characterVersionedContent(next));
+}
+
+function personaVersionedContent(data: PersonaCardSnapshot) {
+  const { personaVersion: _version, versioningEnabled: _versioningEnabled, ...content } = data;
+  return content;
+}
+
+function personaVersionedContentChanged(current: PersonaCardSnapshot, next: PersonaCardSnapshot) {
+  return JSON.stringify(personaVersionedContent(current)) !== JSON.stringify(personaVersionedContent(next));
+}
+
+export function bumpCardVersion(version: string): string {
+  const trimmedVersion = version.trim();
+  const parts = trimmedVersion
+    .match(/^\d+(?:\.\d+){1,2}$/u)?.[0]
+    .split(".")
+    .map(Number);
+  if (!parts || parts.some((part) => !Number.isSafeInteger(part))) return trimmedVersion;
+  const last = parts.length - 1;
+  if (parts[last] === Number.MAX_SAFE_INTEGER) return trimmedVersion;
+  parts[last]! += 1;
+  return parts.join(".");
+}
+
+function characterVersioningEnabled(data: CharacterData): boolean {
+  return data.extensions?.versioningEnabled !== false;
 }
 
 function normalizeCharacterData(data: CharacterData): CharacterData {
@@ -115,6 +162,7 @@ export type PersonaStorageWriteFields = Pick<
   | "comment"
   | "creator"
   | "personaVersion"
+  | "versioningEnabled"
   | "creatorNotes"
   | "phoneticName"
   | "description"
@@ -122,6 +170,8 @@ export type PersonaStorageWriteFields = Pick<
   | "scenario"
   | "backstory"
   | "appearance"
+  | "imageAppearanceEnabled"
+  | "imageAppearance"
   | "characterSheetImageId"
   | "useCharacterSheetAsReference"
   | "avatarCrop"
@@ -239,6 +289,7 @@ function buildPersonaSnapshot(persona: PersonaStorageRow): PersonaCardSnapshot {
     name: persona.name ?? "",
     creator: persona.creator ?? "",
     personaVersion: persona.personaVersion?.trim() ? persona.personaVersion : "1.0",
+    versioningEnabled: persona.versioningEnabled === "false" ? "false" : "true",
     creatorNotes: persona.creatorNotes ?? "",
     phoneticName: persona.phoneticName ?? "",
     description: persona.description ?? "",
@@ -246,6 +297,8 @@ function buildPersonaSnapshot(persona: PersonaStorageRow): PersonaCardSnapshot {
     scenario: persona.scenario ?? "",
     backstory: persona.backstory ?? "",
     appearance: persona.appearance ?? "",
+    imageAppearanceEnabled: persona.imageAppearanceEnabled ?? "false",
+    imageAppearance: persona.imageAppearance ?? "",
     characterSheetImageId: persona.characterSheetImageId ?? "",
     useCharacterSheetAsReference: persona.useCharacterSheetAsReference ?? "false",
     avatarCrop: persona.avatarCrop ?? "",
@@ -270,6 +323,7 @@ function mergePersonaSnapshot(
     ...current,
     ...updates,
     personaVersion: updates.personaVersion !== undefined ? updates.personaVersion : current.personaVersion,
+    versioningEnabled: updates.versioningEnabled !== undefined ? updates.versioningEnabled : current.versioningEnabled,
   };
 }
 
@@ -278,6 +332,7 @@ function normalizePersonaSnapshot(data: PersonaCardSnapshot): PersonaCardSnapsho
     name: data.name ?? "",
     creator: data.creator ?? "",
     personaVersion: data.personaVersion?.trim() ? data.personaVersion : "1.0",
+    versioningEnabled: data.versioningEnabled === "false" ? "false" : "true",
     creatorNotes: data.creatorNotes ?? "",
     phoneticName: data.phoneticName ?? "",
     description: data.description ?? "",
@@ -285,6 +340,8 @@ function normalizePersonaSnapshot(data: PersonaCardSnapshot): PersonaCardSnapsho
     scenario: data.scenario ?? "",
     backstory: data.backstory ?? "",
     appearance: data.appearance ?? "",
+    imageAppearanceEnabled: data.imageAppearanceEnabled ?? "false",
+    imageAppearance: data.imageAppearance ?? "",
     characterSheetImageId: data.characterSheetImageId ?? "",
     useCharacterSheetAsReference: data.useCharacterSheetAsReference ?? "false",
     avatarCrop: data.avatarCrop ?? "",
@@ -320,7 +377,11 @@ async function insertCharacterVersionSnapshot(database: DB, existing: CharacterR
   return id;
 }
 
-async function insertPersonaVersionSnapshot(database: DB, existing: PersonaStorageRow, options?: VersionSnapshotOptions) {
+async function insertPersonaVersionSnapshot(
+  database: DB,
+  existing: PersonaStorageRow,
+  options?: VersionSnapshotOptions,
+) {
   const currentData = buildPersonaSnapshot(existing);
   const id = newId();
   await database.insert(personaCardVersions).values({
@@ -487,7 +548,11 @@ export function createCharactersStorage(db: DB) {
       const create = async () => {
         const id = newId();
         const timestamp = resolveTimestamps(timestampOverrides);
-        const normalizedData = normalizeCharacterData(data);
+        const normalizedData = normalizeCharacterData({
+          ...data,
+          character_version: data.character_version?.trim() || "1.0",
+          extensions: { ...data.extensions, versioningEnabled: data.extensions?.versioningEnabled !== false },
+        });
         await db.insert(characters).values({
           id,
           data: JSON.stringify(normalizedData),
@@ -525,16 +590,21 @@ export function createCharactersStorage(db: DB) {
       const existing = await this.getById(id);
       if (!existing) return null;
       const currentData = parseCharacterData(existing.data);
-      const merged = mergeCharacterData(currentData, data, {
+      let merged = mergeCharacterData(currentData, data, {
         mergeExtensions: options?.mergeExtensions,
       });
       const nextComment = options?.comment !== undefined ? (options.comment ?? "") : (existing.comment ?? "");
       const nextAvatarPath = avatarPath !== undefined ? avatarPath : existing.avatarPath;
+      const versionedContentChanged =
+        characterVersionedContentChanged(currentData, merged) ||
+        nextComment !== (existing.comment ?? "") ||
+        nextAvatarPath !== existing.avatarPath;
+      const requestedVersionChanged =
+        Object.hasOwn(data, "character_version") && merged.character_version !== currentData.character_version;
       const shouldSnapshot =
         !options?.skipVersionSnapshot &&
-        (characterDataChanged(currentData, merged) ||
-          nextComment !== (existing.comment ?? "") ||
-          nextAvatarPath !== existing.avatarPath);
+        characterVersioningEnabled(merged) &&
+        (versionedContentChanged || requestedVersionChanged);
       if (shouldSnapshot) {
         await this.createVersionSnapshot(id, {
           source: options?.versionSource ?? "manual",
@@ -544,6 +614,9 @@ export function createCharactersStorage(db: DB) {
           // restored version keeps its real date in history (#4040).
           createdAt: existing.updatedAt ?? options?.updatedAt ?? null,
         });
+        if (versionedContentChanged && !requestedVersionChanged) {
+          merged = { ...merged, character_version: bumpCardVersion(currentData.character_version) };
+        }
       }
       const updatedAt = normalizeTimestampOverrides({
         createdAt: options?.updatedAt,
@@ -567,13 +640,29 @@ export function createCharactersStorage(db: DB) {
           const rows = await tx.select().from(characters).where(eq(characters.id, id));
           const existing = rows[0];
           if (!existing) return null;
-          if (existing.avatarPath !== avatarPath) {
+          const currentData = normalizeCharacterData(parseCharacterData(existing.data));
+          const versioningEnabled = characterVersioningEnabled(currentData);
+          if (existing.avatarPath !== avatarPath && versioningEnabled) {
             await insertCharacterVersionSnapshot(tx, existing, {
               source: "manual",
               reason: avatarPath ? "Avatar update" : "Avatar removed",
             });
           }
-          await tx.update(characters).set({ avatarPath, updatedAt: now() }).where(eq(characters.id, id));
+          await tx
+            .update(characters)
+            .set({
+              avatarPath,
+              ...(existing.avatarPath !== avatarPath && versioningEnabled
+                ? {
+                    data: JSON.stringify({
+                      ...currentData,
+                      character_version: bumpCardVersion(currentData.character_version),
+                    }),
+                  }
+                : {}),
+              updatedAt: now(),
+            })
+            .where(eq(characters.id, id));
           const updatedRows = await tx.select().from(characters).where(eq(characters.id, id));
           return updatedRows[0] ?? null;
         }),
@@ -652,7 +741,7 @@ export function createCharactersStorage(db: DB) {
         if (!existing) return false;
         const data = normalizeCharacterData({
           ...parseCharacterData(existing.data),
-          character_version: "0.0",
+          character_version: "1.0",
         });
         await tx.delete(characterCardVersions).where(eq(characterCardVersions.characterId, characterId));
         await tx
@@ -697,6 +786,48 @@ export function createCharactersStorage(db: DB) {
             .where(eq(lorebooks.id, lorebookId));
         }
         await tx.delete(characters).where(eq(characters.id, id));
+        // Every chat, not only Game: otherwise a deleted card's id stays in a Roleplay or
+        // Conversation chat's member list and Chat Settings counts it (#6084). The Game
+        // party/setup branches below are no-ops for the other modes.
+        const memberChats = await tx.select().from(chats);
+        for (const chat of memberChats) {
+          let memberIds: unknown;
+          let metadata: Record<string, unknown>;
+          try {
+            memberIds = JSON.parse(chat.characterIds);
+            metadata = JSON.parse(chat.metadata);
+          } catch {
+            continue;
+          }
+          if (!Array.isArray(memberIds) || !metadata || typeof metadata !== "object" || Array.isArray(metadata))
+            continue;
+          const config = metadata.gameSetupConfig;
+          const setup =
+            config && typeof config === "object" && !Array.isArray(config)
+              ? (config as Record<string, unknown>)
+              : undefined;
+          const partyIds = Array.isArray(metadata.gamePartyCharacterIds) ? metadata.gamePartyCharacterIds : [];
+          const setupPartyIds = Array.isArray(setup?.partyCharacterIds) ? setup.partyCharacterIds : [];
+          if (
+            !memberIds.includes(id) &&
+            !partyIds.includes(id) &&
+            !setupPartyIds.includes(id) &&
+            setup?.gmCharacterId !== id
+          )
+            continue;
+          if (partyIds.includes(id)) metadata.gamePartyCharacterIds = partyIds.filter((memberId) => memberId !== id);
+          if (setup && setupPartyIds.includes(id))
+            setup.partyCharacterIds = setupPartyIds.filter((memberId) => memberId !== id);
+          if (setup?.gmCharacterId === id) setup.gmCharacterId = null;
+          await tx
+            .update(chats)
+            .set({
+              characterIds: JSON.stringify(memberIds.filter((memberId) => memberId !== id)),
+              metadata: JSON.stringify(metadata),
+              updatedAt: now(),
+            })
+            .where(eq(chats.id, chat.id));
+        }
         const groups = await tx.select().from(characterGroups);
         for (const group of groups) {
           let memberIds: string[];
@@ -870,6 +1001,7 @@ export function createCharactersStorage(db: DB) {
         comment: extra?.comment ?? "",
         creator: extra?.creator ?? "",
         personaVersion: extra?.personaVersion?.trim() ? extra.personaVersion : "1.0",
+        versioningEnabled: extra?.versioningEnabled === "false" ? "false" : "true",
         creatorNotes: extra?.creatorNotes ?? "",
         phoneticName: extra?.phoneticName ?? "",
         description,
@@ -877,6 +1009,8 @@ export function createCharactersStorage(db: DB) {
         scenario: extra?.scenario ?? "",
         backstory: extra?.backstory ?? "",
         appearance: extra?.appearance ?? "",
+        imageAppearanceEnabled: extra?.imageAppearanceEnabled ?? "false",
+        imageAppearance: extra?.imageAppearance ?? "",
         avatarPath: avatarPath ?? null,
         characterSheetImageId: extra?.characterSheetImageId ?? null,
         useCharacterSheetAsReference: extra?.useCharacterSheetAsReference ?? "false",
@@ -896,16 +1030,6 @@ export function createCharactersStorage(db: DB) {
         updatedAt: timestamp.updatedAt,
       });
       return this.getPersona(id);
-    },
-
-    async setActivePersona(id: string) {
-      return db.transaction(async (tx) => {
-        const existing = await tx.select({ id: personas.id }).from(personas).where(eq(personas.id, id));
-        if (!existing[0]) return false;
-        await tx.update(personas).set({ isActive: "false" });
-        await tx.update(personas).set({ isActive: "true", updatedAt: now() }).where(eq(personas.id, id));
-        return true;
-      });
     },
 
     async removePersona(id: string) {
@@ -940,6 +1064,7 @@ export function createCharactersStorage(db: DB) {
           comment: source.comment ?? "",
           creator: source.creator ?? "",
           personaVersion: source.personaVersion?.trim() ? source.personaVersion : "1.0",
+          versioningEnabled: source.versioningEnabled === "false" ? "false" : "true",
           creatorNotes: source.creatorNotes ?? "",
           phoneticName: source.phoneticName ?? "",
           description: source.description ?? "",
@@ -947,6 +1072,8 @@ export function createCharactersStorage(db: DB) {
           scenario: source.scenario ?? "",
           backstory: source.backstory ?? "",
           appearance: source.appearance ?? "",
+          imageAppearanceEnabled: source.imageAppearanceEnabled ?? "false",
+          imageAppearance: source.imageAppearance ?? "",
           avatarPath: source.avatarPath,
           characterSheetImageId: null,
           useCharacterSheetAsReference: "false",
@@ -990,6 +1117,7 @@ export function createCharactersStorage(db: DB) {
       if (updates.comment !== undefined) sets.comment = updates.comment;
       if (updates.creator !== undefined) sets.creator = updates.creator;
       if (updates.personaVersion !== undefined) sets.personaVersion = updates.personaVersion;
+      if (updates.versioningEnabled !== undefined) sets.versioningEnabled = updates.versioningEnabled;
       if (updates.creatorNotes !== undefined) sets.creatorNotes = updates.creatorNotes;
       if (updates.phoneticName !== undefined) sets.phoneticName = updates.phoneticName;
       if (updates.description !== undefined) sets.description = updates.description;
@@ -997,6 +1125,8 @@ export function createCharactersStorage(db: DB) {
       if (updates.scenario !== undefined) sets.scenario = updates.scenario;
       if (updates.backstory !== undefined) sets.backstory = updates.backstory;
       if (updates.appearance !== undefined) sets.appearance = updates.appearance;
+      if (updates.imageAppearanceEnabled !== undefined) sets.imageAppearanceEnabled = updates.imageAppearanceEnabled;
+      if (updates.imageAppearance !== undefined) sets.imageAppearance = updates.imageAppearance;
       if (updates.avatarPath !== undefined) sets.avatarPath = updates.avatarPath;
       if (updates.characterSheetImageId !== undefined) sets.characterSheetImageId = updates.characterSheetImageId;
       if (updates.useCharacterSheetAsReference !== undefined) {
@@ -1022,6 +1152,7 @@ export function createCharactersStorage(db: DB) {
           ...(updates.name !== undefined && { name: updates.name }),
           ...(updates.creator !== undefined && { creator: updates.creator }),
           ...(updates.personaVersion !== undefined && { personaVersion: updates.personaVersion }),
+          ...(updates.versioningEnabled !== undefined && { versioningEnabled: updates.versioningEnabled }),
           ...(updates.creatorNotes !== undefined && { creatorNotes: updates.creatorNotes }),
           ...(updates.phoneticName !== undefined && { phoneticName: updates.phoneticName }),
           ...(updates.description !== undefined && { description: updates.description }),
@@ -1029,6 +1160,10 @@ export function createCharactersStorage(db: DB) {
           ...(updates.scenario !== undefined && { scenario: updates.scenario }),
           ...(updates.backstory !== undefined && { backstory: updates.backstory }),
           ...(updates.appearance !== undefined && { appearance: updates.appearance }),
+          ...(updates.imageAppearanceEnabled !== undefined && {
+            imageAppearanceEnabled: updates.imageAppearanceEnabled,
+          }),
+          ...(updates.imageAppearance !== undefined && { imageAppearance: updates.imageAppearance }),
           ...(updates.characterSheetImageId !== undefined && {
             characterSheetImageId: updates.characterSheetImageId ?? "",
           }),
@@ -1049,11 +1184,16 @@ export function createCharactersStorage(db: DB) {
         });
         const nextComment = updates.comment !== undefined ? updates.comment : (current.comment ?? "");
         const nextAvatarPath = updates.avatarPath !== undefined ? updates.avatarPath : current.avatarPath;
+        const versionedContentChanged =
+          personaVersionedContentChanged(currentData, nextData) ||
+          nextComment !== (current.comment ?? "") ||
+          nextAvatarPath !== current.avatarPath;
+        const requestedVersionChanged =
+          updates.personaVersion !== undefined && nextData.personaVersion !== currentData.personaVersion;
         const shouldSnapshot =
           !options?.skipVersionSnapshot &&
-          (personaSnapshotChanged(currentData, nextData) ||
-            nextComment !== (current.comment ?? "") ||
-            nextAvatarPath !== current.avatarPath);
+          nextData.versioningEnabled !== "false" &&
+          (versionedContentChanged || requestedVersionChanged);
         if (shouldSnapshot) {
           await insertPersonaVersionSnapshot(database, current, {
             source: options?.versionSource ?? "manual",
@@ -1061,6 +1201,9 @@ export function createCharactersStorage(db: DB) {
             // Keep the replaced card's own edit time in history (#4040).
             createdAt: current.updatedAt ?? null,
           });
+          if (versionedContentChanged && !requestedVersionChanged) {
+            sets.personaVersion = bumpCardVersion(currentData.personaVersion);
+          }
         }
         await database.update(personas).set(sets).where(eq(personas.id, id));
         const rows = await database.select().from(personas).where(eq(personas.id, id));
@@ -1105,6 +1248,7 @@ export function createCharactersStorage(db: DB) {
             comment: version.comment ?? "",
             creator: data.creator,
             personaVersion: data.personaVersion,
+            versioningEnabled: data.versioningEnabled,
             creatorNotes: data.creatorNotes,
             phoneticName: data.phoneticName ?? "",
             description: data.description,
@@ -1112,6 +1256,8 @@ export function createCharactersStorage(db: DB) {
             scenario: data.scenario,
             backstory: data.backstory,
             appearance: data.appearance,
+            imageAppearanceEnabled: data.imageAppearanceEnabled ?? "false",
+            imageAppearance: data.imageAppearance ?? "",
             avatarPath: version.avatarPath ?? null,
             characterSheetImageId: data.characterSheetImageId || null,
             useCharacterSheetAsReference: data.useCharacterSheetAsReference,
@@ -1160,7 +1306,7 @@ export function createCharactersStorage(db: DB) {
         const rows = await tx.select().from(personas).where(eq(personas.id, personaId));
         if (!rows[0]) return false;
         await tx.delete(personaCardVersions).where(eq(personaCardVersions.personaId, personaId));
-        await tx.update(personas).set({ personaVersion: "0.0", updatedAt: now() }).where(eq(personas.id, personaId));
+        await tx.update(personas).set({ personaVersion: "1.0", updatedAt: now() }).where(eq(personas.id, personaId));
         return true;
       });
       if (!reset) return null;

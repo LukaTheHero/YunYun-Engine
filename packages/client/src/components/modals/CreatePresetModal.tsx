@@ -23,14 +23,20 @@ const DEFAULT_PARAMS = {
 interface Props {
   open: boolean;
   onClose: () => void;
+  defaultName?: string;
 }
 
-export function CreatePresetModal({ open, onClose }: Props) {
+export function CreatePresetModal({ open, onClose, defaultName = "" }: Props) {
   const { t: localizeUi } = useUiTranslation();
   const qc = useQueryClient();
   const openPresetDetail = useUIStore((s) => s.openPresetDetail);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(defaultName);
   const [description, setDescription] = useState("");
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setName(defaultName);
+  }
 
   const createPreset = useMutation({
     mutationFn: (data: Record<string, unknown>) => api.post("/prompts", data),
@@ -60,19 +66,28 @@ export function CreatePresetModal({ open, onClose }: Props) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={localizeUi("ui.modals.createpresetmodal.createPreset")} width="max-w-sm">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={localizeUi("ui.modals.createpresetmodal.createPreset")}
+      width="max-w-sm"
+    >
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <div className="mari-panel-gradient-surface mari-panel-gradient--presets flex h-12 w-12 items-center justify-center rounded-xl">
             <FileText size="1.375rem" className="text-current" />
           </div>
           <div className="flex-1">
-            <p className="text-xs text-[var(--muted-foreground)]">{localizeUi("ui.modals.createpresetmodal.presetsDefineTheSystemPromptStructureAndGenerationParameters")}</p>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              {localizeUi("ui.modals.createpresetmodal.presetsDefineTheSystemPromptStructureAndGenerationParameters")}
+            </p>
           </div>
         </div>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-[var(--muted-foreground)]">{localizeUi("ui.modals.createcharactermodal.name")}</span>
+          <span className="text-xs font-medium text-[var(--muted-foreground)]">
+            {localizeUi("ui.modals.createcharactermodal.name")}
+          </span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -86,7 +101,9 @@ export function CreatePresetModal({ open, onClose }: Props) {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-[var(--muted-foreground)]">{localizeUi("chat.settings.inlineEditor.fields.description")}</span>
+          <span className="text-xs font-medium text-[var(--muted-foreground)]">
+            {localizeUi("chat.settings.inlineEditor.fields.description")}
+          </span>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -105,13 +122,17 @@ export function CreatePresetModal({ open, onClose }: Props) {
               reset();
             }}
             className="rounded-lg px-4 py-2 text-xs font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)]"
-          >{localizeUi("chat.delete.dialog.cancel")}</button>
+          >
+            {localizeUi("chat.delete.dialog.cancel")}
+          </button>
           <button
             onClick={handleCreate}
             disabled={!name.trim() || createPreset.isPending}
             className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 py-2 text-xs font-medium text-[var(--primary-foreground)] transition-all hover:opacity-90 disabled:opacity-50"
           >
-            {createPreset.isPending ? <Loader2 size="0.75rem" className="animate-spin" /> : <FileText size="0.75rem" />}{localizeUi("ui.modals.createcharactermodal.create")}</button>
+            {createPreset.isPending ? <Loader2 size="0.75rem" className="animate-spin" /> : <FileText size="0.75rem" />}
+            {localizeUi("ui.modals.createcharactermodal.create")}
+          </button>
         </div>
       </div>
     </Modal>

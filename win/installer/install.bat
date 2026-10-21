@@ -7,18 +7,21 @@ color 0A
 :: -- Safety net: if anything goes catastrophically wrong, the window stays open --
 :: -- This label is jumped to on fatal errors --
 set "INSTALL_ERROR="
-set "NODE_DOWNLOAD_URL=https://nodejs.org/dist/v24.15.0/node-v24.15.0-x64.msi"
-set "NODE_SHA256=feffb8e5cb5ac47f793666636d496ef3e975be82c84c4da5d20e6aa8fa4eb806"
+set "NODE_DOWNLOAD_URL=https://nodejs.org/dist/v24.21.0/node-v24.21.0-x64.msi"
+set "NODE_SHA256=bb0eaee134f9357f22aea915ee793343e627aefc1e66488164bac6915bce2cac"
 set "GIT_DOWNLOAD_URL=https://github.com/git-for-windows/git/releases/download/v2.54.0.windows.1/Git-2.54.0-64-bit.exe"
 set "GIT_SHA256=2b96e7854f0520f0f6b709c21041d9801b1be44d5e1a0d9fa621b2fbc40f1983"
-set "RELEASE_TAG=v2.4.2"
-if not defined MARINARA_RELEASE_COMMIT set "MARINARA_RELEASE_COMMIT="
+set "RELEASE_TAG=v2.5.1"
+if not defined MARINARA_RELEASE_COMMIT (
+    set "INSTALL_ERROR=This installer is missing its required release commit pin. Download the official Windows installer from the YunYun Engine GitHub release."
+    goto :fatal
+)
 set "RELEASE_COMMIT=%MARINARA_RELEASE_COMMIT%"
 
 echo.
 echo  +==========================================+
 echo  ^|   YunYun Engine - Windows Installer     ^|
-echo  ^|   v2.4.2                                  ^|
+echo  ^|   v2.5.1                                  ^|
 
 echo  +==========================================+
 echo.
@@ -212,7 +215,7 @@ if not defined NEW_HEAD (
     )
     goto :fatal
 )
-if defined RELEASE_COMMIT if /I not "!NEW_HEAD!"=="%RELEASE_COMMIT%" (
+if /I not "!NEW_HEAD!"=="%RELEASE_COMMIT%" (
     set "RECEIVED_HEAD=!NEW_HEAD!"
     call :discard_unverified_fresh_clone
     if exist "%INSTALL_DIR%\" (
@@ -242,7 +245,7 @@ if not defined TARGET_HEAD (
     set "INSTALL_ERROR=Could not resolve release %RELEASE_TAG% after fetch."
     goto :fatal
 )
-if defined RELEASE_COMMIT if /I not "!TARGET_HEAD!"=="%RELEASE_COMMIT%" (
+if /I not "!TARGET_HEAD!"=="%RELEASE_COMMIT%" (
     set "INSTALL_ERROR=Release %RELEASE_TAG% resolved to !TARGET_HEAD!, not the installer-expected %RELEASE_COMMIT%."
     goto :fatal
 )

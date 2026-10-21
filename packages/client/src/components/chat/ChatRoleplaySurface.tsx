@@ -1,6 +1,6 @@
-import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation, useTranslation as useUiTranslation } from "react-i18next";
+import { normalizeSemanticSummaryRetrievalSettings } from "@marinara-engine/shared";
 import { toast } from "sonner";
 import {
   Suspense,
@@ -13,17 +13,21 @@ import {
   useState,
   type ComponentProps,
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type RefObject,
 } from "react";
 import { isMessageShadowedByLiveStream } from "../../lib/generation-stream-policy";
+import { splitRoleplayParagraphs } from "../../lib/roleplay-vn-paragraphs";
+import { ROLEPLAY_TTS_PARAGRAPH_EVENT, type RoleplayTTSParagraphDetail } from "../../lib/roleplay-vn-tts";
+import { ttsService } from "../../lib/tts-service";
+import { usePageActivity } from "../../hooks/use-page-activity";
 import {
-  normalizeChatSummaryEntries,
+  appendContinuationMessageContent,
   isLongTermMemoryChatSummaryPromptAllowed,
   STORYBOARD_AGENT_ID,
   type GameTurnStoryboard,
   type ChatSummaryEntry,
+  type AdvancedMemoryJob,
   type MarkerConfig,
   type PromptGroup,
   type PromptSection,
@@ -34,28 +38,27 @@ import {
 import {
   BookOpen,
   FileText,
-  Image,
   Loader2,
-  PenLine,
-  ScrollText,
-  Settings2,
   ChevronUp,
-  ArrowRightLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   User,
-  X,
+  Puzzle,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useRenderTimer } from "../../lib/perf-diagnostics";
-import {
-  CHAT_FLOATING_UI_DISMISS_EVENT,
-  CHAT_SUMMARY_OPEN_REQUEST_EVENT,
-  isDesktopShellNavigationTarget,
-} from "../../lib/chat-floating-ui-events";
 import { getConnectedChatDisplayName } from "../../lib/chat-display";
 import { playConfiguredNotificationPing } from "../../lib/notification-sound";
-import { messageHasPendingPostProcessing } from "../../lib/chat-message-extra";
+import { rememberBoundedSetValue } from "../../lib/bounded-set";
+import { messageHasPendingPostProcessing, parseMessageExtraRecord } from "../../lib/chat-message-extra";
+import { normalizeSpriteExpressionMap } from "../../lib/sprite-expression-state";
 import { isMessageHiddenFromUser } from "../../lib/chat-message-visibility";
-import { getTranscriptRenderWindow, TRANSCRIPT_RENDER_WINDOW_STEP } from "../../lib/transcript-render-window";
+import {
+  getTranscriptRenderWindow,
+  resolveTranscriptRenderWindowSize,
+  TRANSCRIPT_RENDER_WINDOW_STEP,
+} from "../../lib/transcript-render-window";
 import { useUIStore } from "../../stores/ui.store";
 import { useChatStore } from "../../stores/chat.store";
 import { useGameStateStore } from "../../stores/game-state.store";
@@ -67,30 +70,19 @@ import { CapabilityElement } from "../capabilities/CapabilityElement";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { CyoaChoices } from "./CyoaChoices";
-import { ChatBranchSelector } from "./ChatBranchSelector";
-import { ChatMessageSearch } from "./ChatMessageSearch";
-import {
-  CHAT_TOOLBAR_ICON_GAP_CLASS,
-  CHAT_TOOLBAR_OVERFLOW_MENU_SELECTOR,
-  ChatToolbarButton,
-  ChatToolbarMenu,
-  getChatFloatingPanelDesktopRight,
-  getChatToolbarButtonClass,
-  readChatToolbarFloatingPanelAnchor,
-  type ChatToolbarFloatingPanelAnchor,
-} from "./ChatToolbarControls";
-import { TranscriptWindowControls } from "./TranscriptWindowControls";
+import { CHAT_CONTROL_WINDOW_IDS, ChatConnectedChatWindow, ChatControlWindow } from "./ChatControlWindow";
+import { TrackerPanelBubble } from "./TrackerPanelBubble";
+import { PHONE_BUBBLE_SIZE_PX, WINDOW_BUBBLE_SIZE_PX, WINDOW_MARGIN_PX } from "../../lib/floating-window-layout";
+import { useMatchMedia } from "../../hooks/use-match-media";
+import { CHAT_TOOLBAR_ICON_GAP_CLASS, getChatToolbarButtonClass } from "./ChatToolbarControls";
+import { HISTORY_PAGER_BUTTON_CLASS, TranscriptWindowControls } from "./TranscriptWindowControls";
 import { EndSceneBar } from "./SceneBanner";
-import { ChatCommonOverlays } from "./ChatCommonOverlays";
+import { ChatCommonOverlays, type ChatSettingsTools } from "./ChatCommonOverlays";
+import { useProvideChatGalleryActions } from "../../hooks/use-chat-gallery-actions";
 import { PinnedImageOverlay } from "./PinnedImageOverlay";
-import {
-  ROLEPLAY_POPOVER_CLOSE_BUTTON,
-  ROLEPLAY_POPOVER_CLOSE_ICON_SIZE,
-  ROLEPLAY_POPOVER_SCROLL_AREA,
-  ROLEPLAY_POPOVER_SHELL,
-  ROLEPLAY_POPOVER_TITLE,
-} from "./roleplay-popover-styles";
 import type { SpriteDisplayMode } from "./sprite-display-modes";
+import { chatAvatarParticipants } from "../../features/avatars/stage/avatar-stage-logic";
+import { useChatAvatarAgentIds } from "../../features/avatars/stage/use-chat-avatar-agents";
 import type {
   CharacterMap,
   ExpressionAvatarResolver,
@@ -108,6 +100,10 @@ import {
 
 type ChatData = ComponentProps<typeof ChatCommonOverlays>["chat"];
 
+const RoleplayTrackerWindow = lazy(async () => {
+  const module = await import("./RoleplayTrackerWindow");
+  return { default: module.RoleplayTrackerWindow };
+});
 const RoleplayHUD = lazy(async () => {
   const module = await import("./RoleplayHUD");
   return { default: module.RoleplayHUD };
@@ -123,6 +119,12 @@ const SpriteOverlay = lazy(async () => {
   return { default: module.SpriteOverlay };
 });
 
+// 2D and 3D Avatars: loads only in chats where an avatar agent is on.
+const AvatarStage = lazy(async () => {
+  const module = await import("../../features/avatars/stage/AvatarStage");
+  return { default: module.AvatarStage };
+});
+
 const EchoChamberPanel = lazy(async () => {
   const module = await import("./EchoChamberPanel");
   return { default: module.EchoChamberPanel };
@@ -133,9 +135,9 @@ const EncounterModal = lazy(async () => {
   return { default: module.EncounterModal };
 });
 
-const SummaryPopover = lazy(async () => {
-  const module = await import("./SummaryPopover");
-  return { default: module.SummaryPopover };
+const ChatSummaryPanel = lazy(async () => {
+  const module = await import("./ChatSummaryPanel");
+  return { default: module.ChatSummaryPanel };
 });
 
 const AuthorNotesPanel = lazy(async () => {
@@ -149,35 +151,8 @@ const ActiveLorebookEntriesContent = lazy(async () => {
 });
 
 const roleplayNotificationSeenKeys = new Set<string>();
-const MOBILE_FLOATING_PANEL_PADDING = 8;
-
-type MobileFloatingPanelFrame = {
-  top: number;
-  left: number;
-  width: number;
-  maxHeight: number;
-};
-
-function getMobileFloatingPanelFrame(
-  button: HTMLElement | null,
-  preferredWidth: number,
-): MobileFloatingPanelFrame | null {
-  if (!button || typeof window === "undefined") return null;
-  const rect = button.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
-  const overflowMenu = button.closest<HTMLElement>(CHAT_TOOLBAR_OVERFLOW_MENU_SELECTOR);
-  const menuRect = overflowMenu?.getBoundingClientRect();
-  const rightEdge = menuRect ? menuRect.left - MOBILE_FLOATING_PANEL_PADDING : rect.right;
-  const availableWidth = Math.max(160, rightEdge - MOBILE_FLOATING_PANEL_PADDING);
-  const width = Math.min(preferredWidth, window.innerWidth - MOBILE_FLOATING_PANEL_PADDING * 2, availableWidth);
-  const left = Math.max(
-    MOBILE_FLOATING_PANEL_PADDING,
-    Math.min(rightEdge - width, window.innerWidth - width - MOBILE_FLOATING_PANEL_PADDING),
-  );
-  const top = Math.max(MOBILE_FLOATING_PANEL_PADDING, menuRect ? menuRect.top : rect.bottom);
-  const maxHeight = Math.max(160, window.innerHeight - top - MOBILE_FLOATING_PANEL_PADDING);
-  return { top, left, width, maxHeight };
-}
+const MAX_ROLEPLAY_NOTIFICATION_SEEN_KEYS = 5_000;
+const BACKGROUND_CROSSFADE_MS = 700;
 
 function useIsMobileToolbarViewport() {
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
@@ -227,6 +202,7 @@ function CrossfadeBackground({
   const [bgB, setBgB] = useState<string | null>(null);
   const [aActive, setAActive] = useState(true);
   const activeSlot = useRef<"a" | "b">("a");
+  const cleanupTimerRef = useRef<number | null>(null);
   const backgroundBlurStyle = getBackgroundBlurStyle(blurPx);
 
   useEffect(() => {
@@ -256,17 +232,33 @@ function CrossfadeBackground({
     };
 
     function applyUrl(nextUrl: string | null) {
+      if (cleanupTimerRef.current !== null) window.clearTimeout(cleanupTimerRef.current);
       if (activeSlot.current === "a") {
         setBgB(nextUrl);
         setAActive(false);
         activeSlot.current = "b";
+        cleanupTimerRef.current = window.setTimeout(() => {
+          cleanupTimerRef.current = null;
+          setBgA(null);
+        }, BACKGROUND_CROSSFADE_MS);
       } else {
         setBgA(nextUrl);
         setAActive(true);
         activeSlot.current = "a";
+        cleanupTimerRef.current = window.setTimeout(() => {
+          cleanupTimerRef.current = null;
+          setBgB(null);
+        }, BACKGROUND_CROSSFADE_MS);
       }
     }
   }, [bgA, bgB, url]);
+
+  useEffect(
+    () => () => {
+      if (cleanupTimerRef.current !== null) window.clearTimeout(cleanupTimerRef.current);
+    },
+    [],
+  );
 
   return (
     <>
@@ -280,7 +272,7 @@ function CrossfadeBackground({
         )}
         style={{
           opacity: aActive && bgA ? 1 : 0,
-          transition: "opacity 700ms ease-in-out, filter 180ms ease-out, transform 180ms ease-out",
+          transition: `opacity ${BACKGROUND_CROSSFADE_MS}ms ease-in-out, filter 180ms ease-out, transform 180ms ease-out`,
           ...backgroundBlurStyle,
         }}
       />
@@ -294,7 +286,7 @@ function CrossfadeBackground({
         )}
         style={{
           opacity: !aActive && bgB ? 1 : 0,
-          transition: "opacity 700ms ease-in-out, filter 180ms ease-out, transform 180ms ease-out",
+          transition: `opacity ${BACKGROUND_CROSSFADE_MS}ms ease-in-out, filter 180ms ease-out, transform 180ms ease-out`,
           ...backgroundBlurStyle,
         }}
       />
@@ -302,27 +294,54 @@ function CrossfadeBackground({
   );
 }
 
+const hasVisibleStreamText = (text: string) => /\S/u.test(text);
+
 function RoleplayLiveStreamText({
   chatId,
   emptyLabel,
   renderText,
+  completedParagraphOnly = false,
+  paragraphIndex,
+  onParagraphCount,
 }: {
   chatId: string;
   emptyLabel: string;
   renderText: (text: string) => ReactNode;
+  completedParagraphOnly?: boolean;
+  paragraphIndex?: number;
+  onParagraphCount?: (count: number) => void;
 }) {
   const [text, setText] = useState("");
   const textRef = useRef("");
 
   useLayoutEffect(() => {
     let frame: number | null = null;
-    const readBuffer = () => {
-      const state = useChatStore.getState();
-      return state.streamBuffers.get(chatId) ?? (state.activeChatId === chatId ? state.streamBuffer : "");
+    const readBuffer = (state: ReturnType<typeof useChatStore.getState>) => {
+      const buffer = state.streamBuffers.get(chatId) ?? (state.activeChatId === chatId ? state.streamBuffer : "");
+      const continuation = state.continuationStreams.get(chatId);
+      return continuation
+        ? appendContinuationMessageContent(continuation.content, buffer, continuation.addNewline)
+        : buffer;
     };
     const apply = () => {
       frame = null;
-      const next = readBuffer();
+      const buffer = readBuffer(useChatStore.getState());
+      let next = buffer;
+      if (completedParagraphOnly) {
+        const paragraphs = splitRoleplayParagraphs(buffer, true);
+        if (onParagraphCount) {
+          onParagraphCount(Math.max(1, paragraphs.length));
+        }
+        if (paragraphs.length > 0) {
+          const idx =
+            paragraphIndex != null
+              ? Math.max(0, Math.min(paragraphs.length - 1, paragraphIndex))
+              : paragraphs.length - 1;
+          next = paragraphs[idx] ?? "";
+        } else {
+          next = "";
+        }
+      }
       if (textRef.current !== next) {
         textRef.current = next;
         setText(next);
@@ -333,17 +352,14 @@ function RoleplayLiveStreamText({
     };
 
     apply();
-    const unsubscribe = useChatStore.subscribe(
-      (state) => state.streamBuffers.get(chatId) ?? (state.activeChatId === chatId ? state.streamBuffer : ""),
-      schedule,
-    );
+    const unsubscribe = useChatStore.subscribe(readBuffer, schedule);
     return () => {
       if (frame !== null) cancelAnimationFrame(frame);
       unsubscribe();
     };
-  }, [chatId]);
+  }, [chatId, completedParagraphOnly, onParagraphCount, paragraphIndex]);
 
-  return <>{text ? renderText(text) : emptyLabel}</>;
+  return <>{hasVisibleStreamText(text) ? renderText(text) : emptyLabel}</>;
 }
 
 function StreamingIndicator({
@@ -355,6 +371,10 @@ function StreamingIndicator({
   chatMode,
   groupChatMode,
   expressionAvatarResolver,
+  visualNovel = false,
+  visualNovelParagraphIndex,
+  onVisualNovelParagraphCount,
+  visualNovelMediaTarget,
 }: {
   activeChatId: string;
   chatCharIds: string[];
@@ -364,14 +384,25 @@ function StreamingIndicator({
   chatMode: string;
   groupChatMode?: string;
   expressionAvatarResolver?: ExpressionAvatarResolver;
+  visualNovel?: boolean;
+  visualNovelParagraphIndex?: number;
+  onVisualNovelParagraphCount?: (count: number) => void;
+  visualNovelMediaTarget?: HTMLElement | null;
 }) {
   const { t } = useTranslation();
   const thinkingBuffer = useChatStore((s) => s.thinkingBuffer);
+  const streamingOutputStarted = useChatStore((s) =>
+    hasVisibleStreamText(s.streamBuffers.get(activeChatId) ?? (s.activeChatId === activeChatId ? s.streamBuffer : "")),
+  );
   const streamingCharacterId = useChatStore((s) => s.streamingCharacterId);
 
   return (
     <div className="animate-message-in">
       <ChatMessage
+        visualNovel={visualNovel}
+        visualNovelParagraphIndex={visualNovelParagraphIndex}
+        onVisualNovelParagraphCount={onVisualNovelParagraphCount}
+        visualNovelMediaTarget={visualNovelMediaTarget}
         message={{
           id: "__streaming__",
           chatId: activeChatId,
@@ -389,11 +420,15 @@ function StreamingIndicator({
           createdAt: new Date().toISOString(),
         }}
         isStreaming
+        streamingOutputStarted={streamingOutputStarted}
         streamingContent={(renderText) => (
           <RoleplayLiveStreamText
             chatId={activeChatId}
             emptyLabel={t("chat.message.thinking")}
             renderText={renderText}
+            completedParagraphOnly={visualNovel}
+            paragraphIndex={visualNovelParagraphIndex}
+            onParagraphCount={onVisualNovelParagraphCount}
           />
         )}
         characterMap={characterMap}
@@ -410,26 +445,55 @@ function StreamingIndicator({
 
 function RegeneratingMessageContent({
   msg,
+  visualNovelParagraphIndex,
+  onVisualNovelParagraphCount,
   ...rest
 }: {
   msg: MessageWithSwipes;
+  visualNovelParagraphIndex?: number;
+  onVisualNovelParagraphCount?: (count: number) => void;
 } & Omit<ComponentProps<typeof ChatMessage>, "message" | "isStreaming">) {
   const { t } = useTranslation();
   const thinkingBuffer = useChatStore((s) => s.thinkingBuffer);
-  // Strip old-swipe attachments so a previous illustration doesn't linger
-  // while the new swipe's text is streaming in. The same applies to old
-  // reasoning: expose the action only after this swipe receives its first
-  // reasoning chunk.
+  const isContinuation = useChatStore((s) => s.continuationStreams.get(msg.chatId)?.messageId === msg.id);
+  const streamingOutputStarted = useChatStore((s) =>
+    hasVisibleStreamText(s.streamBuffers.get(msg.chatId) ?? (s.activeChatId === msg.chatId ? s.streamBuffer : "")),
+  );
+  // A new swipe replaces the old media and reasoning; a continuation retains them.
   const parsedExtra = typeof msg.extra === "string" ? JSON.parse(msg.extra) : (msg.extra ?? {});
-  const cleanExtra = { ...parsedExtra, attachments: null, thinking: thinkingBuffer || null };
+  const cleanExtra = {
+    ...parsedExtra,
+    ...(!isContinuation
+      ? {
+          attachments: null,
+          roleplayDocuments: null,
+          roleplayCommandActivity: null,
+          roleplayPrivateCommands: null,
+          diceRollResult: null,
+        }
+      : {}),
+    thinking: thinkingBuffer || (isContinuation ? parsedExtra.thinking : null),
+  };
   return (
     <ChatMessage
       message={{ ...msg, extra: cleanExtra, content: "" }}
       isStreaming
+      streamingOutputStarted={isContinuation || streamingOutputStarted}
+      visualNovelParagraphIndex={visualNovelParagraphIndex}
+      onVisualNovelParagraphCount={onVisualNovelParagraphCount}
       streamingContent={(renderText) => (
-        <RoleplayLiveStreamText chatId={msg.chatId} emptyLabel={t("chat.message.thinking")} renderText={renderText} />
+        <RoleplayLiveStreamText
+          chatId={msg.chatId}
+          emptyLabel={t("chat.message.thinking")}
+          renderText={renderText}
+          completedParagraphOnly={rest.visualNovel}
+          paragraphIndex={visualNovelParagraphIndex}
+          onParagraphCount={onVisualNovelParagraphCount}
+        />
       )}
       {...rest}
+      storyboard={isContinuation ? rest.storyboard : null}
+      storyboardGenerating={isContinuation ? rest.storyboardGenerating : false}
     />
   );
 }
@@ -497,7 +561,8 @@ function resolveChatSummaryInjectionHintKey(
   return "chat.summary.injectionHint.disabledGroup";
 }
 
-function ActiveContextLinksButton({
+/** Roleplay's Active Context: the cards, lorebooks and preset in use (a Chat Settings drawer). */
+function ActiveContextLinksPanel({
   chat,
   chatMeta,
   chatCharIds,
@@ -509,69 +574,12 @@ function ActiveContextLinksButton({
   characterMap: CharacterMap;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [mobileFrame, setMobileFrame] = useState<MobileFloatingPanelFrame | null>(null);
-  const [desktopAnchor, setDesktopAnchor] = useState<ChatToolbarFloatingPanelAnchor>(null);
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const compact = useUIStore((s) => s.centerCompact);
   const { data: lorebooks } = useLorebooks();
   const { data: presets } = usePresets();
   const { data: activeLorebookScan, isLoading: activeLorebookScanLoading } = useActiveLorebookEntries(
     chat?.id ?? null,
-    open && !!chat?.id,
+    !!chat?.id,
   );
-
-  useEffect(() => {
-    if (!open) return;
-    const handle = (event: MouseEvent) => {
-      if (isDesktopShellNavigationTarget(event.target)) return;
-      const target = event.target as Node;
-      if (ref.current?.contains(target) || panelRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (!open) {
-      setMobileFrame(null);
-      setDesktopAnchor(null);
-      return;
-    }
-    const update = (event?: Event) => {
-      if (event?.target instanceof Node && panelRef.current?.contains(event.target)) return;
-      const mobile = window.innerWidth < 768;
-      setMobileFrame(mobile ? getMobileFloatingPanelFrame(buttonRef.current, 320) : null);
-      setDesktopAnchor(mobile ? null : readChatToolbarFloatingPanelAnchor(buttonRef.current));
-    };
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleDismiss = () => setOpen(false);
-    window.addEventListener(CHAT_FLOATING_UI_DISMISS_EVENT, handleDismiss);
-    return () => window.removeEventListener(CHAT_FLOATING_UI_DISMISS_EVENT, handleDismiss);
-  }, [open]);
 
   if (!chat) return null;
 
@@ -601,46 +609,25 @@ function ActiveContextLinksButton({
     skippedLorebookEntries.length > 0 ||
     !!promptPresetId;
 
-  if (!hasLinks) return null;
+  if (!hasLinks) {
+    return <p className="px-2 text-xs text-[var(--muted-foreground)]">{t("chat.settings.activeContextEmpty")}</p>;
+  }
 
   const lorebookNameById = new Map((lorebooks ?? []).map((book) => [book.id, book.name]));
   const presetName = promptPresetId ? presets?.find((preset) => preset.id === promptPresetId)?.name : null;
 
-  const openCharacter = (id: string) => {
-    useUIStore.getState().openCharacterDetail(id);
-    setOpen(false);
-  };
-  const openLorebook = (id: string) => {
-    useUIStore.getState().openLorebookDetail(id);
-    setOpen(false);
-  };
-  const openPreset = (id: string) => {
-    useUIStore.getState().openPresetDetail(id);
-    setOpen(false);
-  };
+  const openCharacter = (id: string) => useUIStore.getState().openCharacterDetail(id);
+  const openLorebook = (id: string) => useUIStore.getState().openLorebookDetail(id);
+  const openPreset = (id: string) => useUIStore.getState().openPresetDetail(id);
 
   const itemClassName =
     "marinara-chat-popover__item flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-[var(--marinara-chat-chrome-panel-text)] transition-colors hover:bg-[var(--marinara-chat-chrome-highlight-bg-hover)] hover:text-[var(--marinara-chat-chrome-highlight-text)]";
   const iconClassName = "shrink-0 text-[var(--marinara-chat-chrome-panel-muted)]";
-  const activeContextContent = (
-    <>
-      <div className="flex items-center gap-2 px-2 pb-1">
-        <div className={cn(ROLEPLAY_POPOVER_TITLE, "min-w-0 flex-1")}>
-          <BookOpen size="0.75rem" className="shrink-0 text-[var(--muted-foreground)]" />
-          <span className="truncate">{t("chat.toolbar.activeContext")}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className={cn(ROLEPLAY_POPOVER_CLOSE_BUTTON, "-my-1 shrink-0")}
-          aria-label={t("chat.toolbar.closeActiveContext")}
-        >
-          <X size={ROLEPLAY_POPOVER_CLOSE_ICON_SIZE} />
-        </button>
-      </div>
+  return (
+    <div data-component="RoleplayActiveContextPanel">
       <div className="space-y-1">
         {characterIds.map((id, index) => (
-          <button key={id} type="button" role="menuitem" className={itemClassName} onClick={() => openCharacter(id)}>
+          <button key={id} type="button" className={itemClassName} onClick={() => openCharacter(id)}>
             <User size="0.8125rem" className={iconClassName} />
             <span className="min-w-0 flex-1 truncate">
               {characterMap.get(id)?.name ?? t("chat.toolbar.characterFallback", { number: index + 1 })}
@@ -651,7 +638,7 @@ function ActiveContextLinksButton({
         {visibleLorebookIds.map((id, index) => {
           const entries = triggeredEntriesByLorebook.get(id) ?? [];
           return (
-            <button key={id} type="button" role="menuitem" className={itemClassName} onClick={() => openLorebook(id)}>
+            <button key={id} type="button" className={itemClassName} onClick={() => openLorebook(id)}>
               <BookOpen size="0.8125rem" className={iconClassName} />
               <span className="min-w-0 flex-1 truncate">
                 {lorebookNameById.get(id) ?? t("chat.toolbar.lorebookFallback", { number: index + 1 })}
@@ -679,443 +666,37 @@ function ActiveContextLinksButton({
           </div>
         )}
         {promptPresetId && (
-          <button type="button" role="menuitem" className={itemClassName} onClick={() => openPreset(promptPresetId)}>
+          <button type="button" className={itemClassName} onClick={() => openPreset(promptPresetId)}>
             <FileText size="0.8125rem" className={iconClassName} />
             <span className="min-w-0 flex-1 truncate">{presetName ?? t("chat.toolbar.promptPreset")}</span>
             <span className="shrink-0 text-[0.625rem] text-foreground/45">{t("chat.toolbar.preset")}</span>
           </button>
         )}
       </div>
-    </>
-  );
-
-  return (
-    <div className="relative" ref={ref} onClick={(event) => event.stopPropagation()}>
-      <button
-        ref={buttonRef}
-        onClick={() => setOpen((prev) => !prev)}
-        className={getChatToolbarButtonClass({ compact, open })}
-        title={t("chat.toolbar.activeContext")}
-        aria-label={t("chat.toolbar.activeContext")}
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <BookOpen size="0.875rem" />
-      </button>
-      {open &&
-        (isMobile
-          ? mobileFrame &&
-            createPortal(
-              <div
-                ref={panelRef}
-                role="menu"
-                data-chat-floating-panel
-                data-component="RoleplayActiveContextPanel"
-                className={cn(
-                  ROLEPLAY_POPOVER_SHELL,
-                  ROLEPLAY_POPOVER_SCROLL_AREA,
-                  "fixed z-[9999] overflow-y-auto p-2",
-                )}
-                style={{
-                  top: mobileFrame.top,
-                  left: mobileFrame.left,
-                  width: mobileFrame.width,
-                  maxHeight: mobileFrame.maxHeight,
-                }}
-              >
-                {activeContextContent}
-              </div>,
-              document.body,
-            )
-          : desktopAnchor &&
-            createPortal(
-              <div
-                ref={panelRef}
-                role="menu"
-                data-chat-floating-panel
-                data-component="RoleplayActiveContextPanel"
-                className={cn(
-                  ROLEPLAY_POPOVER_SHELL,
-                  ROLEPLAY_POPOVER_SCROLL_AREA,
-                  "fixed z-[9999] max-h-[min(32rem,calc(100vh-6rem))] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto p-2",
-                )}
-                style={{
-                  right: getChatFloatingPanelDesktopRight(desktopAnchor),
-                  top: `${desktopAnchor.top}px`,
-                }}
-              >
-                {activeContextContent}
-              </div>,
-              document.body,
-            ))}
     </div>
   );
 }
 
-function SummaryButton({
-  chatId,
-  summary,
-  summaryEntries,
-  summaryContextSize,
-  summaryPromptTemplates,
-  activeSummaryPromptTemplateId,
-  longTermMemorySummaryPromptAvailable,
-  summaryConnectionId,
-  summaryMaxTokens,
-  automaticSummaryEnabled,
-  activeAgentIds,
-  summaryRunInterval,
-  hideSummarisedMessages,
-  summaryTailMessages,
-  automaticSummariesAvailable,
-  totalMessageCount,
+/** Roleplay's Chat Summary drawer, with the hint about where the summary goes in the prompt. */
+function RoleplaySummaryPanel({
   promptPresetId,
-}: {
-  chatId: string | null;
-  summary: string | null;
-  summaryEntries?: ChatSummaryEntry[];
-  summaryContextSize: number;
-  summaryPromptTemplates?: ComponentProps<typeof SummaryPopover>["promptTemplates"];
-  activeSummaryPromptTemplateId?: string | null;
-  longTermMemorySummaryPromptAvailable: boolean;
-  summaryConnectionId?: string | null;
-  summaryMaxTokens?: number;
-  automaticSummaryEnabled: boolean;
-  activeAgentIds: string[];
-  summaryRunInterval?: number;
-  hideSummarisedMessages?: boolean;
-  summaryTailMessages?: number;
-  automaticSummariesAvailable: boolean;
-  totalMessageCount: number;
-  promptPresetId?: string | null;
-}) {
+  ...props
+}: Omit<ComponentProps<typeof ChatSummaryPanel>, "summaryInjectionHint"> & { promptPresetId?: string | null }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const [anchor, setAnchor] = useState<ComponentProps<typeof SummaryPopover>["anchor"]>(null);
-  const compact = useUIStore((s) => s.centerCompact);
   const { data: presetFull } = usePresetFull(promptPresetId ?? null);
   const summaryInjectionHintKey = useMemo(() => resolveChatSummaryInjectionHintKey(presetFull), [presetFull]);
-  const summaryInjectionHint = summaryInjectionHintKey ? t(summaryInjectionHintKey) : null;
-  const enabledSummaryCount = useMemo(
-    () =>
-      normalizeChatSummaryEntries(summaryEntries, {
-        legacySummary: summary,
-      }).filter((entry) => entry.enabled).length,
-    [summary, summaryEntries],
-  );
-  const summaryButtonLabel =
-    enabledSummaryCount > 0
-      ? t("chat.summary.toolbarLabelWithCount", { count: enabledSummaryCount })
-      : t("chat.summary.toolbarLabel");
-  const readSummaryAnchor = useCallback((): ComponentProps<typeof SummaryPopover>["anchor"] => {
-    const button = buttonRef.current;
-    if (!button || typeof window === "undefined") return null;
-    const rect = button.getBoundingClientRect();
-    const overflowMenu = button.closest<HTMLElement>(CHAT_TOOLBAR_OVERFLOW_MENU_SELECTOR);
-    if (window.innerWidth < 768 && overflowMenu) {
-      const menuRect = overflowMenu.getBoundingClientRect();
-      return {
-        top: menuRect.top,
-        right: Math.max(MOBILE_FLOATING_PANEL_PADDING, menuRect.left - MOBILE_FLOATING_PANEL_PADDING),
-        bottom: menuRect.top,
-        left: menuRect.left,
-        width: menuRect.width,
-        overflowMenu: true,
-      };
-    }
-    return {
-      top: rect.top,
-      right: rect.right,
-      bottom: rect.bottom,
-      left: rect.left,
-      width: rect.width,
-    };
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open || !buttonRef.current) return;
-    const update = () => {
-      setAnchor(readSummaryAnchor());
-    };
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [open, readSummaryAnchor]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleDismiss = () => setOpen(false);
-    window.addEventListener(CHAT_FLOATING_UI_DISMISS_EVENT, handleDismiss);
-    return () => window.removeEventListener(CHAT_FLOATING_UI_DISMISS_EVENT, handleDismiss);
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (!chatId) return;
-    const handleOpenRequest = (event: Event) => {
-      if (!(event instanceof CustomEvent)) return;
-      const requestedChatId = (event.detail as { chatId?: unknown } | null)?.chatId;
-      if (requestedChatId !== chatId) return;
-      const button = buttonRef.current;
-      if (!button) return;
-      const rect = button.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return;
-      setAnchor(readSummaryAnchor());
-      setOpen(true);
-    };
-    window.addEventListener(CHAT_SUMMARY_OPEN_REQUEST_EVENT, handleOpenRequest);
-    return () => window.removeEventListener(CHAT_SUMMARY_OPEN_REQUEST_EVENT, handleOpenRequest);
-  }, [chatId, readSummaryAnchor]);
-
-  if (!chatId) return null;
-
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <button
-        ref={buttonRef}
-        data-chat-toolbar-panel-action="summary"
-        onClick={() => {
-          setAnchor(readSummaryAnchor());
-          setOpen(!open);
-        }}
-        aria-label={summaryButtonLabel}
-        className={getChatToolbarButtonClass({
-          compact,
-          open,
-          sizeClassName: "relative h-8 w-8",
-        })}
-        title={summaryButtonLabel}
-      >
-        <ScrollText size="0.875rem" />
-        {enabledSummaryCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex min-w-4 justify-center rounded-full bg-[var(--marinara-chat-chrome-highlight-bg)] px-1 text-[0.5625rem] font-semibold leading-4 text-[var(--marinara-chat-chrome-panel-muted)]">
-            {enabledSummaryCount}
-          </span>
-        )}
-      </button>
-      {open && (
-        <Suspense fallback={null}>
-          <SummaryPopover
-            chatId={chatId}
-            summary={summary}
-            summaryEntries={summaryEntries}
-            contextSize={summaryContextSize}
-            promptTemplates={summaryPromptTemplates}
-            activePromptTemplateId={activeSummaryPromptTemplateId}
-            longTermMemorySummaryPromptAvailable={longTermMemorySummaryPromptAvailable}
-            summaryConnectionId={summaryConnectionId}
-            summaryMaxTokens={summaryMaxTokens}
-            automaticSummaryEnabled={automaticSummaryEnabled}
-            activeAgentIds={activeAgentIds}
-            summaryRunInterval={summaryRunInterval}
-            hideSummarisedMessages={hideSummarisedMessages}
-            summaryTailMessages={summaryTailMessages}
-            automaticSummariesAvailable={automaticSummariesAvailable}
-            totalMessageCount={totalMessageCount}
-            summaryInjectionHint={summaryInjectionHint}
-            anchor={anchor}
-            onClose={() => setOpen(false)}
-          />
-        </Suspense>
-      )}
-    </div>
+    <Suspense fallback={<RoleplayDrawerLoading label={t("chat.settings.toolLoading")} />}>
+      <ChatSummaryPanel {...props} summaryInjectionHint={summaryInjectionHintKey ? t(summaryInjectionHintKey) : null} />
+    </Suspense>
   );
 }
 
-function AuthorNotesButton({
-  chatId,
-  chatMeta,
-  open,
-  onOpenChange,
-  renderPanel,
-  mobilePanel,
-}: {
-  chatId: string | null;
-  chatMeta: Record<string, any>;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  renderPanel: boolean;
-  mobilePanel: boolean;
-}) {
-  const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [mobileFrame, setMobileFrame] = useState<MobileFloatingPanelFrame | null>(null);
-  const [desktopAnchor, setDesktopAnchor] = useState<ChatToolbarFloatingPanelAnchor>(null);
-  const compact = useUIStore((s) => s.centerCompact);
-  const isMobileViewport = useIsMobileToolbarViewport();
-  const useMobilePanel = mobilePanel && isMobileViewport;
-
-  useEffect(() => {
-    if (!open || !renderPanel) return;
-    const handle = (e: PointerEvent) => {
-      const target = e.target as Node;
-      if (ref.current?.contains(target) || panelRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest("[data-macro-modal]")) return;
-      // On mobile, the virtual keyboard opening can synthesise a pointer/mouse
-      // event outside the panel that would otherwise close it mid-edit; don't
-      // dismiss while a field inside the panel is focused. Mobile-only: on desktop
-      // a mousedown fires before focus moves, so guarding there would swallow the
-      // first outside click (see SummaryPopover, which only runs on touch).
-      if (useMobilePanel) {
-        const active = document.activeElement;
-        if (active instanceof Node && panelRef.current?.contains(active)) return;
-      }
-      onOpenChange(false);
-    };
-    document.addEventListener("pointerdown", handle);
-    return () => document.removeEventListener("pointerdown", handle);
-  }, [onOpenChange, open, renderPanel, useMobilePanel]);
-
-  useLayoutEffect(() => {
-    if (!open || !renderPanel || !useMobilePanel) {
-      setMobileFrame(null);
-      return;
-    }
-    const update = () => {
-      const next = getMobileFloatingPanelFrame(buttonRef.current, 288);
-      // Keep the last good frame when the anchor button is transiently
-      // unmeasurable (e.g. the mobile keyboard opening collapses the toolbar /
-      // overflow menu so the button's rect is 0) — otherwise the portal panel
-      // unmounts the instant the keyboard appears and the user can't type.
-      if (next) setMobileFrame(next);
-    };
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [open, renderPanel, useMobilePanel]);
-
-  useLayoutEffect(() => {
-    if (!open || !renderPanel || useMobilePanel) {
-      setDesktopAnchor(null);
-      return;
-    }
-    const update = () => setDesktopAnchor(readChatToolbarFloatingPanelAnchor(buttonRef.current));
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [open, renderPanel, useMobilePanel]);
-
-  useEffect(() => {
-    if (!open || !renderPanel) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onOpenChange(false);
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onOpenChange, open, renderPanel]);
-
-  useEffect(() => {
-    if (!open || !renderPanel) return;
-    const handleDismiss = () => onOpenChange(false);
-    window.addEventListener(CHAT_FLOATING_UI_DISMISS_EVENT, handleDismiss);
-    return () => window.removeEventListener(CHAT_FLOATING_UI_DISMISS_EVENT, handleDismiss);
-  }, [onOpenChange, open, renderPanel]);
-
-  if (!chatId) return null;
-
-  const hasNotes = !!String(chatMeta.authorNotes ?? "").trim();
-
+function RoleplayDrawerLoading({ label }: { label: string }) {
   return (
-    <div className="relative" ref={ref} onClick={(e) => e.stopPropagation()}>
-      <button
-        ref={buttonRef}
-        onClick={() => {
-          const nextOpen = !open;
-          setMobileFrame(nextOpen && useMobilePanel ? getMobileFloatingPanelFrame(buttonRef.current, 288) : null);
-          setDesktopAnchor(nextOpen && !useMobilePanel ? readChatToolbarFloatingPanelAnchor(buttonRef.current) : null);
-          onOpenChange(nextOpen);
-        }}
-        className={getChatToolbarButtonClass({ active: hasNotes, compact, open })}
-        title={t("chat.toolbar.authorNotes")}
-        aria-label={t("chat.toolbar.authorNotes")}
-      >
-        <PenLine size="0.875rem" />
-      </button>
-      {open &&
-        renderPanel &&
-        (useMobilePanel
-          ? mobileFrame &&
-            createPortal(
-              <div
-                ref={panelRef}
-                className={cn(
-                  ROLEPLAY_POPOVER_SHELL,
-                  ROLEPLAY_POPOVER_SCROLL_AREA,
-                  "fixed z-[9999] overflow-y-auto p-3",
-                )}
-                style={{
-                  top: mobileFrame.top,
-                  left: mobileFrame.left,
-                  width: mobileFrame.width,
-                  maxHeight: mobileFrame.maxHeight,
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-              >
-                <Suspense
-                  fallback={
-                    <div className="flex items-center gap-2 py-4 text-xs text-[var(--muted-foreground)]">
-                      <Loader2 size="0.75rem" className="animate-spin" />
-                      {t("chat.toolbar.loadingAuthorNotes")}
-                    </div>
-                  }
-                >
-                  <AuthorNotesPanel
-                    key={chatId}
-                    chatId={chatId}
-                    chatMeta={chatMeta}
-                    onClose={() => onOpenChange(false)}
-                  />
-                </Suspense>
-              </div>,
-              document.body,
-            )
-          : desktopAnchor &&
-            createPortal(
-              <div
-                ref={panelRef}
-                data-chat-floating-panel
-                className={cn(ROLEPLAY_POPOVER_SHELL, "fixed z-[70] w-72 p-3")}
-                style={{
-                  right: `${desktopAnchor.right}px`,
-                  top: `${desktopAnchor.top}px`,
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                <Suspense
-                  fallback={
-                    <div className="flex items-center gap-2 py-4 text-xs text-[var(--muted-foreground)]">
-                      <Loader2 size="0.75rem" className="animate-spin" />
-                      {t("chat.toolbar.loadingAuthorNotes")}
-                    </div>
-                  }
-                >
-                  <AuthorNotesPanel
-                    key={chatId}
-                    chatId={chatId}
-                    chatMeta={chatMeta}
-                    onClose={() => onOpenChange(false)}
-                  />
-                </Suspense>
-              </div>,
-              document.body,
-            ))}
+    <div className="flex items-center gap-2 py-3 text-xs text-[var(--muted-foreground)]">
+      <Loader2 size="0.75rem" className="animate-spin" />
+      {label}
     </div>
   );
 }
@@ -1138,6 +719,7 @@ type RoleplaySurfaceProps = {
   spriteCharacterIds: string[];
   spriteDisplayModes: SpriteDisplayMode[];
   spriteExpressions: Record<string, string>;
+  visibleExpressionSpriteIds?: readonly string[];
   expressionAvatarResolver?: ExpressionAvatarResolver;
   spritePlacements: Record<string, SpritePlacement>;
   spriteScale: number;
@@ -1169,12 +751,11 @@ type RoleplaySurfaceProps = {
   settingsOpen: boolean;
   settingsAnchor: ComponentProps<typeof ChatCommonOverlays>["settingsAnchor"];
   settingsInitialSection?: ComponentProps<typeof ChatCommonOverlays>["settingsInitialSection"];
-  galleryOpen: boolean;
-  galleryAnchor: ComponentProps<typeof ChatCommonOverlays>["galleryAnchor"];
   wizardOpen: boolean;
   peekPromptData: PeekPromptData | null;
   deleteDialogMessageId: string | null;
   deleteDialogCanDeleteSwipe: boolean;
+  deleteDialogCanDeleteOtherSwipes: boolean;
   deleteDialogActiveSwipeIndex: number;
   deleteDialogSwipeCount: number;
   multiSelectMode: boolean;
@@ -1186,6 +767,13 @@ type RoleplaySurfaceProps = {
   onDelete: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
   onEdit: (messageId: string, content: string) => void | Promise<void>;
+  /** N1: the user message whose reply failed, if any — drives the "Failed · Retry" line. */
+  failedReplyMessageId?: string | null;
+  failedReplyReason?: string;
+  onRetryFailedReply?: () => void;
+  /** R2: the reply that gets the checkup's quiet line, and the line itself. */
+  replyCheckupMessageId?: string | null;
+  replyCheckup?: ReactNode;
   onSetActiveSwipe: (messageId: string, index: number) => void;
   onToggleConversationStart: (
     messageId: string,
@@ -1193,25 +781,21 @@ type RoleplaySurfaceProps = {
     conversationStartForCharacterIds: string[],
   ) => void;
   onToggleHiddenFromAI: (messageId: string, hiddenFromAll: boolean, hiddenFromAICharacterIds?: string[]) => void;
-  onPeekPrompt: () => void;
+  onPeekPrompt: (messageId?: string) => void;
   onBranch?: (messageId: string) => void;
   onCloneSceneFromHere?: (messageId: string) => void;
   isCloneSceneFromHereDisabled?: boolean;
   onToggleSelectMessage: (toggle: MessageSelectionToggle) => void;
   onRerunTrackers: () => void;
   onRerunSingleTracker: (agentType: string) => void;
-  onRetryFailedAgents?: () => void;
   onStartEncounter: () => void;
   onConcludeScene: () => void;
   onAbandonScene: () => void;
   onForkScene: (sceneChatId: string, mode: SceneForkMode) => void;
   isForkingScene?: boolean;
-  onOpenSettings: (event?: ReactMouseEvent<HTMLElement>) => void;
-  onOpenGallery: (event?: ReactMouseEvent<HTMLElement>) => void;
   onOpenScheduleEditor?: ComponentProps<typeof ChatCommonOverlays>["onOpenScheduleEditor"];
-  onCloseSettings: () => void;
-  onCloseGallery: () => void;
-  onIllustrate?: () => void;
+  onCloseSettings: (options?: { force?: boolean }) => void;
+  onIllustrate?: (prompt?: string, messageRange?: [string, string]) => void;
   onIllustrateWithAgent?: (agentType: string) => void | Promise<void>;
   onGenerateBackground?: () => void | Promise<void>;
   onGenerateVideo?: () => void | Promise<void>;
@@ -1229,8 +813,11 @@ type RoleplaySurfaceProps = {
   onExpressionChange: (characterId: string, expression: string, options?: { immediate?: boolean }) => void;
   onSpritePlacementChange: (placementKey: string, placement: SpritePlacement) => void;
   onFinishSpritePlacement: () => void;
+  avatarLayout?: ComponentProps<typeof ChatCommonOverlays>["sceneSettings"]["avatarLayout"];
+  onAvatarsShown?: ComponentProps<typeof AvatarStage>["onShownChange"];
   onDeleteConfirm: () => void;
   onDeleteSwipe: () => void;
+  onDeleteOtherSwipes: () => void;
   onDeleteMore: () => void;
   onCloseDeleteDialog: () => void;
   onBulkDelete: () => void;
@@ -1258,6 +845,7 @@ export function ChatRoleplaySurface({
   spriteCharacterIds,
   spriteDisplayModes,
   spriteExpressions,
+  visibleExpressionSpriteIds,
   expressionAvatarResolver,
   spritePlacements,
   spriteScale,
@@ -1289,12 +877,11 @@ export function ChatRoleplaySurface({
   settingsOpen,
   settingsAnchor,
   settingsInitialSection,
-  galleryOpen,
-  galleryAnchor,
   wizardOpen,
   peekPromptData,
   deleteDialogMessageId,
   deleteDialogCanDeleteSwipe,
+  deleteDialogCanDeleteOtherSwipes,
   deleteDialogActiveSwipeIndex,
   deleteDialogSwipeCount,
   multiSelectMode,
@@ -1306,6 +893,11 @@ export function ChatRoleplaySurface({
   onDelete,
   onRegenerate,
   onEdit,
+  failedReplyMessageId,
+  failedReplyReason,
+  onRetryFailedReply,
+  replyCheckupMessageId,
+  replyCheckup,
   onSetActiveSwipe,
   onToggleConversationStart,
   onToggleHiddenFromAI,
@@ -1316,17 +908,13 @@ export function ChatRoleplaySurface({
   onToggleSelectMessage,
   onRerunTrackers,
   onRerunSingleTracker,
-  onRetryFailedAgents,
   onStartEncounter,
   onConcludeScene,
   onAbandonScene,
   onForkScene,
   isForkingScene,
-  onOpenSettings,
-  onOpenGallery,
   onOpenScheduleEditor,
   onCloseSettings,
-  onCloseGallery,
   onIllustrate,
   onIllustrateWithAgent,
   onGenerateBackground,
@@ -1343,8 +931,11 @@ export function ChatRoleplaySurface({
   onExpressionChange,
   onSpritePlacementChange,
   onFinishSpritePlacement,
+  avatarLayout,
+  onAvatarsShown,
   onDeleteConfirm,
   onDeleteSwipe,
+  onDeleteOtherSwipes,
   onDeleteMore,
   onCloseDeleteDialog,
   onBulkDelete,
@@ -1354,19 +945,34 @@ export function ChatRoleplaySurface({
   onSelectAllBelowSelection,
   isGrouped,
 }: RoleplaySurfaceProps) {
+  const continuationMessageId = useChatStore((s) => s.continuationStreams.get(activeChatId)?.messageId);
+  const inlineStreamingMessageId = regenerateMessageId ?? continuationMessageId ?? null;
   const { t: localizeUi } = useUiTranslation();
   const { t } = useTranslation();
   const { data: installedCapabilities = [] } = useInstalledCapabilityPackages();
+  const memoryContextStarts = useMemo(() => {
+    const starts = new Map<string, string[]>();
+    if (chatMeta.advancedMemory?.enabled !== true) return starts;
+    const entries = (chatMeta.advancedMemoryState as AdvancedMemoryJob | undefined)?.contextStarts;
+    if (!Array.isArray(entries)) return starts;
+    for (const entry of entries) {
+      if (!entry || typeof entry.messageId !== "string" || !Array.isArray(entry.audienceCharacterIds)) continue;
+      // Older character-specific automatic windows are no longer active.
+      if (entry.audienceCharacterIds.length) continue;
+      starts.set(entry.sceneStartMessageId ?? entry.messageId, []);
+    }
+    return starts;
+  }, [chatMeta.advancedMemory?.enabled, chatMeta.advancedMemoryState]);
   const activeAgentIds = chatMeta.activeAgentIds;
   const enabledConversationCapabilities =
     chatMeta.enableAgents === true
-    ? installedCapabilities.filter((item) => {
-        if (item.status !== "active" || !item.manifest.entrypoints.client) return false;
-        if (item.manifest.kind.includes("conversation-calls")) return false;
-        const contributedAgentIds = item.manifest.contributions?.agentDetail?.agentIds ?? [];
-        return activeAgentIds.includes(item.id) || contributedAgentIds.some((id) => activeAgentIds.includes(id));
-      })
-    : [];
+      ? installedCapabilities.filter((item) => {
+          if (item.status !== "active" || !item.manifest.entrypoints.client) return false;
+          if (item.manifest.kind.includes("conversation-calls")) return false;
+          const contributedAgentIds = item.manifest.contributions?.agentDetail?.agentIds ?? [];
+          return activeAgentIds.includes(item.id) || contributedAgentIds.some((id) => activeAgentIds.includes(id));
+        })
+      : [];
   const conversationToolbarPackages = enabledConversationCapabilities.filter((item) =>
     item.manifest.contributions?.slots?.includes("conversation-toolbar"),
   );
@@ -1380,12 +986,20 @@ export function ChatRoleplaySurface({
     chatCharIds,
     personaInfo,
   };
+  // Panel-enabled chats use the Trackers button to reopen their selected surface.
+  const phoneLayout = useMatchMedia("(max-width: 767px)");
+  const trackerPanelEnabled = useUIStore((s) => s.trackerPanelEnabled);
+  const trackerPanelOpen = useUIStore((s) => s.trackerPanelOpen);
+  const showTrackerPanelBubble =
+    trackerPanelEnabled &&
+    trackerPanelOpen &&
+    (chatMeta.enableAgents === true || chatMeta.advancedMemory?.enabled === true);
+  const phoneSlotOffset = phoneLayout && showTrackerPanelBubble ? 1 : 0;
   useRenderTimer("rp-surface"); // [#3104 diagnostic]
   const isMobileToolbarViewport = useIsMobileToolbarViewport();
-  const isStreamCommitted = useChatStore((s) => s.committedStreamChatIds.has(activeChatId));
   const streamedMessageId = useChatStore((s) => s.streamedMessageIds.get(activeChatId) ?? null);
   const hasMobileDraftInput = useChatStore((s) => isMobileToolbarViewport && s.hasCurrentInput);
-  const hasLiveStream = isStreaming && !isStreamCommitted;
+  const hasLiveStream = isStreaming;
   const linkedChatName = chat?.connectedChatId
     ? getConnectedChatDisplayName(allChats?.find((c) => c.id === chat.connectedChatId))
     : undefined;
@@ -1393,6 +1007,160 @@ export function ChatRoleplaySurface({
   const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
   const chatBackgroundBlur = useUIStore((s) => s.chatBackgroundBlur);
   const roleplayReducedPaintEffects = useUIStore((s) => s.roleplayReducedPaintEffects);
+  const defaultDisplayStyle = useUIStore((s) => s.roleplayDisplayStyle);
+  const vnSpriteScale = useUIStore((s) => s.roleplayVnSpriteScale);
+  const vnAutoPlay = useUIStore((s) => s.roleplayVnAutoPlay);
+  const vnAutoPlayDelay = useUIStore((s) => s.roleplayVnAutoPlayDelay);
+  const visualNovel = isRoleplay && (chatMeta.roleplayDisplayStyle ?? defaultDisplayStyle) === "visual-novel";
+  const chatPosition = useUIStore((s) => s.roleplayChatPosition);
+  const roleplayAvatarStyle = useUIStore((s) => s.roleplayAvatarStyle);
+  const roleplayAvatarScale = useUIStore((s) => s.roleplayAvatarScale);
+  const trackerPanelSide = useUIStore((s) => s.trackerPanelSide);
+  // Left and Right apply on wide screens only (see globals.css); a narrow chat pane keeps the centred column.
+  const sideChatPosition = chatPosition === "left" || chatPosition === "right" ? chatPosition : undefined;
+  const [vnHistoryOpen, setVnHistoryOpen] = useState(false);
+  const [vnHistoryHasDraft, setVnHistoryHasDraft] = useState(false);
+  const [vnMediaTarget, setVnMediaTarget] = useState<HTMLDivElement | null>(null);
+  const pendingVnHistoryScroll = useRef(false);
+  const activeVnSpriteIds = useMemo(
+    () =>
+      Object.keys(
+        normalizeSpriteExpressionMap(
+          parseMessageExtraRecord(messages?.find((message) => message.id === lastAssistantMessageId)?.extra)
+            .spriteExpressions,
+        ),
+      ),
+    [messages, lastAssistantMessageId],
+  );
+  const pendingVnEdit = useRef<{ messageId?: string } | null>(null);
+  const visibleVnMessages = useMemo(() => {
+    return (messages ?? []).filter((message) => message.role !== "system" && !isMessageHiddenFromUser(message));
+  }, [messages]);
+  const latestVnMessage = visibleVnMessages[visibleVnMessages.length - 1];
+  const pendingVnReply = useChatStore((s) => s.pendingVnReplies.get(activeChatId));
+
+  // Visual Novel navigation: track selected message index and paragraph index within that message.
+  // By default (or when null), it stays on the latest message.
+  const [vnSelectedMessageId, setVnSelectedMessageId] = useState<string | null>(null);
+  const [vnParagraphIndex, setVnParagraphIndex] = useState<number | null>(null);
+  const [vnParagraphCount, setVnParagraphCount] = useState<number>(1);
+  const [vnSpeech, setVnSpeech] = useState<RoleplayTTSParagraphDetail | null>(null);
+  const pendingVnPrevious = useRef<string | null>(null);
+
+  // Active message in VN view:
+  const activeVnMessage = useMemo(() => {
+    if (vnSelectedMessageId) {
+      const found = visibleVnMessages.find((m) => m.id === vnSelectedMessageId);
+      if (found) return found;
+    }
+    return latestVnMessage;
+  }, [latestVnMessage, visibleVnMessages, vnSelectedMessageId]);
+
+  const activeVnMessageIndex = useMemo(() => {
+    return activeVnMessage ? visibleVnMessages.indexOf(activeVnMessage) : -1;
+  }, [activeVnMessage, visibleVnMessages]);
+
+  // Reset VN navigation when switching chats or when live stream starts/ends.
+  useEffect(() => {
+    setVnSelectedMessageId(null);
+    setVnParagraphIndex(null);
+    setVnSpeech(null);
+    pendingVnPrevious.current = null;
+  }, [activeChatId, hasLiveStream]);
+
+  useEffect(() => {
+    const index = visibleVnMessages.findIndex((message) => message.id === pendingVnPrevious.current);
+    if (index > 0) {
+      pendingVnPrevious.current = null;
+      setVnSelectedMessageId(visibleVnMessages[index - 1]!.id);
+      setVnParagraphIndex(null);
+    }
+  }, [visibleVnMessages]);
+
+  // Consume only a generated reply, once its durable row replaces the stream.
+  // Edits, cached swipes, and history navigation never create this marker.
+  useEffect(() => {
+    if (
+      hasLiveStream ||
+      !pendingVnReply ||
+      latestVnMessage?.id !== pendingVnReply.id ||
+      latestVnMessage.activeSwipeIndex !== pendingVnReply.activeSwipeIndex ||
+      latestVnMessage.content !== pendingVnReply.content
+    )
+      return;
+    setVnSelectedMessageId(null);
+    setVnParagraphIndex(0);
+    pendingVnPrevious.current = null;
+    useChatStore.getState().setPendingVnReply(activeChatId, null);
+  }, [activeChatId, hasLiveStream, latestVnMessage, pendingVnReply]);
+
+  const currentParagraphIndex = vnParagraphIndex ?? Math.max(0, vnParagraphCount - 1);
+
+  const [ttsState, setTtsState] = useState(ttsService.getState());
+  useEffect(() => ttsService.subscribe((state) => setTtsState(state)), []);
+  useEffect(() => {
+    if (!visualNovel) return;
+    const followSpeech = (event: Event) => {
+      const detail = (event as CustomEvent<RoleplayTTSParagraphDetail>).detail;
+      if (detail?.chatId !== activeChatId || !visibleVnMessages.some((message) => message.id === detail.messageId))
+        return;
+      setVnSelectedMessageId(detail.messageId);
+      setVnSpeech(detail);
+    };
+    window.addEventListener(ROLEPLAY_TTS_PARAGRAPH_EVENT, followSpeech);
+    return () => window.removeEventListener(ROLEPLAY_TTS_PARAGRAPH_EVENT, followSpeech);
+  }, [activeChatId, visibleVnMessages, visualNovel]);
+
+  // Navigation handlers
+  const canGoPreviousParagraph =
+    !isFetchingNextPage && (currentParagraphIndex > 0 || ((activeVnMessageIndex > 0 || hasNextPage) && !hasLiveStream));
+  const canGoNextParagraph =
+    currentParagraphIndex < vnParagraphCount - 1 ||
+    (activeVnMessageIndex >= 0 && activeVnMessageIndex < visibleVnMessages.length - 1 && !hasLiveStream);
+
+  const handlePreviousParagraph = useCallback(() => {
+    if (currentParagraphIndex > 0) {
+      setVnParagraphIndex(currentParagraphIndex - 1);
+    } else if (activeVnMessageIndex > 0 && !hasLiveStream) {
+      const prevMsg = visibleVnMessages[activeVnMessageIndex - 1];
+      if (prevMsg) {
+        setVnSelectedMessageId(prevMsg.id);
+        setVnParagraphIndex(null); // defaults to last paragraph of previous message
+      }
+    } else if (!hasLiveStream && hasNextPage && !isFetchingNextPage && activeVnMessage) {
+      pendingVnPrevious.current = activeVnMessage.id;
+      onLoadMore();
+    }
+  }, [
+    activeVnMessage,
+    activeVnMessageIndex,
+    currentParagraphIndex,
+    hasLiveStream,
+    hasNextPage,
+    isFetchingNextPage,
+    onLoadMore,
+    visibleVnMessages,
+  ]);
+
+  const handleNextParagraph = useCallback(() => {
+    pendingVnPrevious.current = null;
+    if (currentParagraphIndex < vnParagraphCount - 1) {
+      setVnParagraphIndex(currentParagraphIndex + 1);
+    } else if (activeVnMessageIndex >= 0 && activeVnMessageIndex < visibleVnMessages.length - 1 && !hasLiveStream) {
+      const nextMsg = visibleVnMessages[activeVnMessageIndex + 1];
+      if (nextMsg) {
+        setVnSelectedMessageId(nextMsg.id === latestVnMessage?.id ? null : nextMsg.id);
+        setVnParagraphIndex(0); // first paragraph of next message
+      }
+    }
+  }, [
+    activeVnMessageIndex,
+    currentParagraphIndex,
+    hasLiveStream,
+    latestVnMessage?.id,
+    visibleVnMessages,
+    vnParagraphCount,
+  ]);
   const queryClient = useQueryClient();
   const automaticStoryboardMessageRef = useRef<string | undefined>(undefined);
   const initialLoadSettledRef = useRef(false);
@@ -1401,66 +1169,79 @@ export function ChatRoleplaySurface({
   const pendingPostProcessingKeysRef = useRef<Set<string>>(new Set());
   const topChromeRef = useRef<HTMLDivElement>(null);
   const inputChromeRef = useRef<HTMLDivElement>(null);
-  const composerScrollTopRef = useRef(0);
   const chromeInsetsRef = useRef<{ target: HTMLDivElement | null; top: number; bottom: number }>({
     target: null,
     top: -1,
     bottom: -1,
   });
-  const [mobileHistoryComposerCollapsed, setMobileHistoryComposerCollapsed] = useState(false);
-  const [authorNotesOpenOwner, setAuthorNotesOpenOwner] = useState<"expanded" | "compact" | null>(null);
-  const compactToolbarOwnsAuthorNotes = centerCompact || isMobileToolbarViewport;
-  const expandedAuthorNotesOpen = authorNotesOpenOwner === "expanded";
-  const compactAuthorNotesOpen = authorNotesOpenOwner === "compact";
   const keyboardOpen = useChatKeyboardOpen();
   const composerFocused = useChatComposerFocused();
+  const modalOpen = useUIStore((s) => s.modal !== null);
+  const pageActive = usePageActivity();
+  useEffect(() => {
+    if (!visualNovel || !vnAutoPlay || vnHistoryOpen || hasLiveStream || composerFocused || modalOpen || !pageActive)
+      return;
+    if (ttsState !== "idle" && ttsState !== "error") return;
+    if (currentParagraphIndex >= vnParagraphCount - 1) return;
+    const timer = window.setInterval(() => {
+      if (
+        document.hidden ||
+        document.querySelector(
+          '[data-component="Modal"], [data-component="ExpandedTextarea"], [data-macro-modal], textarea:focus, input:focus',
+        )
+      )
+        return;
+      setVnParagraphIndex(currentParagraphIndex + 1);
+    }, vnAutoPlayDelay);
+    return () => window.clearInterval(timer);
+  }, [
+    visualNovel,
+    vnAutoPlay,
+    vnAutoPlayDelay,
+    vnHistoryOpen,
+    hasLiveStream,
+    ttsState,
+    currentParagraphIndex,
+    vnParagraphCount,
+    activeVnMessage?.id,
+    composerFocused,
+    modalOpen,
+    pageActive,
+  ]);
+  const mobileComposerActive = isMobileToolbarViewport && composerFocused;
   const ambientVisualsPaused =
     generationVisualsPaused || (isMobileToolbarViewport && (keyboardOpen || composerFocused || hasMobileDraftInput));
   const weatherEffectsPaused = isMobileToolbarViewport && (keyboardOpen || composerFocused || hasMobileDraftInput);
-  const shouldKeepMobileComposerOpen =
-    keyboardOpen || composerFocused || hasLiveStream || hasMobileDraftInput || isFetchingNextPage;
-
-  useEffect(() => {
-    if (shouldKeepMobileComposerOpen) setMobileHistoryComposerCollapsed(false);
-  }, [shouldKeepMobileComposerOpen]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      const nearBottom = distFromBottom < 150;
-      const currentTop = el.scrollTop;
-      const previousTop = composerScrollTopRef.current;
-      const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
-      const composerHasFocus = document.activeElement?.matches("[data-chat-composer]") === true;
-      if (!isMobile || shouldKeepMobileComposerOpen || composerHasFocus || nearBottom) {
-        setMobileHistoryComposerCollapsed(false);
-      } else if (currentTop > previousTop + 18) {
-        setMobileHistoryComposerCollapsed(false);
-      } else if (currentTop < previousTop - 12 && distFromBottom > 180) {
-        setMobileHistoryComposerCollapsed(true);
-      }
-      composerScrollTopRef.current = currentTop;
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [scrollRef, shouldKeepMobileComposerOpen]);
-  const setExpandedAuthorNotesOpen = useCallback((open: boolean) => {
-    setAuthorNotesOpenOwner(open ? "expanded" : null);
-  }, []);
-  const setCompactAuthorNotesOpen = useCallback((open: boolean) => {
-    setAuthorNotesOpenOwner(open ? "compact" : null);
-  }, []);
-  const hideEchoChamberOnMobile = sidebarOpen || rightPanelOpen || settingsOpen || galleryOpen || wizardOpen;
+  const hideEchoChamberOnMobile = sidebarOpen || rightPanelOpen || settingsOpen || wizardOpen;
   const showSpriteOverlay = expressionAgentEnabled && spriteCharacterIds.length > 0 && spriteDisplayModes.length > 0;
+  // Avatars show independently of the Expression Engine; the user hides the full-body sprite by hand.
+  const avatarAgentIds = useChatAvatarAgentIds(chatMeta);
+  const avatarParticipants = useMemo(
+    () => chatAvatarParticipants(chatCharIds, characterMap, personaInfo),
+    [characterMap, chatCharIds, personaInfo],
+  );
 
   useLayoutEffect(() => {
     const measure = () => {
-      const top = Math.ceil(topChromeRef.current?.getBoundingClientRect().height ?? 0);
-      const bottom = Math.ceil(inputChromeRef.current?.getBoundingClientRect().height ?? 0);
+      // The Chat Settings button starts in a row at the top of the chat, so text starts below that row.
+      const buttonRow = WINDOW_MARGIN_PX + (phoneLayout ? PHONE_BUBBLE_SIZE_PX : WINDOW_BUBBLE_SIZE_PX);
+      let top = Math.max(buttonRow, Math.ceil(topChromeRef.current?.getBoundingClientRect().height ?? 0));
+      let bottom = Math.ceil(inputChromeRef.current?.getBoundingClientRect().height ?? 0);
+      if (vnMediaTarget) {
+        vnMediaTarget.style.top = `${top + 8}px`;
+        vnMediaTarget.style.bottom = `${bottom}px`;
+      }
       const scrollElement = scrollRef.current;
       if (!scrollElement) return;
+      const historyBox = scrollElement.parentElement;
+      if (historyBox) {
+        historyBox.style.top = visualNovel && vnHistoryOpen ? `${top + 8}px` : "";
+        historyBox.style.bottom = visualNovel && vnHistoryOpen ? `${bottom}px` : "";
+      }
+      if (visualNovel && vnHistoryOpen) {
+        top = 0;
+        bottom = 0;
+      }
       const current = chromeInsetsRef.current;
       if (current.target === scrollElement && current.top === top && current.bottom === bottom) return;
       chromeInsetsRef.current = { target: scrollElement, top, bottom };
@@ -1476,16 +1257,34 @@ export function ChatRoleplaySurface({
     if (topChromeRef.current) observer.observe(topChromeRef.current);
     if (inputChromeRef.current) observer.observe(inputChromeRef.current);
     return () => observer.disconnect();
-  }, [activeChatId, centerCompact, chatMeta.enableAgents, chatMeta.sceneStatus, combatAgentEnabled, scrollRef]);
+  }, [
+    activeChatId,
+    centerCompact,
+    phoneLayout,
+    chatMeta.enableAgents,
+    chatMeta.sceneStatus,
+    combatAgentEnabled,
+    scrollRef,
+    visualNovel,
+    vnHistoryOpen,
+    vnMediaTarget,
+  ]);
 
   useEffect(() => {
     initialLoadSettledRef.current = false;
     prevMessageKeysRef.current = new Set();
     pendingPostProcessingKeysRef.current = new Set();
-    setAuthorNotesOpenOwner(null);
+    setVnHistoryOpen(false);
+    setVnHistoryHasDraft(false);
+    pendingVnEdit.current = null;
+    pendingVnHistoryScroll.current = false;
   }, [activeChatId]);
 
   const [transcriptWindowStart, setTranscriptWindowStart] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    // /continue targets the latest reply, even when the reader was browsing an older window.
+    if (continuationMessageId) setTranscriptWindowStart(null);
+  }, [continuationMessageId]);
   const pendingLoadMoreRevealRef = useRef<{
     previousLength: number;
     previousStartIndex: number;
@@ -1498,11 +1297,63 @@ export function ChatRoleplaySurface({
   }, [activeChatId]);
 
   const messagesLength = messages?.length ?? 0;
+  const messagesPerPage = useUIStore((s) => s.messagesPerPage);
+  const maxMountedMessages = resolveTranscriptRenderWindowSize(messagesPerPage);
+  // The window size follows the "Messages per page" setting, which can change while
+  // this chat stays mounted. A pinned start index is relative to the old size, so
+  // re-anchor to the latest messages the same way a chat switch does.
+  useLayoutEffect(() => {
+    setTranscriptWindowStart(null);
+    pendingLoadMoreRevealRef.current = null;
+  }, [maxMountedMessages]);
   const transcriptWindow = useMemo(
-    () => getTranscriptRenderWindow(messages, { startIndex: transcriptWindowStart }),
-    [messages, transcriptWindowStart],
+    () => getTranscriptRenderWindow(messages, { maxMountedMessages, startIndex: transcriptWindowStart }),
+    [maxMountedMessages, messages, transcriptWindowStart],
   );
   const gotoRequest = useChatStore((state) => state.gotoRequest);
+  useLayoutEffect(() => {
+    if (!vnHistoryOpen || !pendingVnHistoryScroll.current) return;
+    pendingVnHistoryScroll.current = false;
+    const element = scrollRef.current;
+    if (!element) return;
+    let followOpening = true;
+    const scrollToLatest = () => {
+      if (followOpening) element.scrollTop = element.scrollHeight;
+    };
+    const stopFollowing = () => {
+      followOpening = false;
+    };
+    const frame = requestAnimationFrame(scrollToLatest);
+    // Images mount with the transcript. Keep the opening anchor while they load,
+    // but let the reader take over as soon as they interact with history.
+    element.addEventListener("load", scrollToLatest, true);
+    for (const event of ["wheel", "touchmove", "pointerdown", "keydown"])
+      element.addEventListener(event, stopFollowing, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      element.removeEventListener("load", scrollToLatest, true);
+      for (const event of ["wheel", "touchmove", "pointerdown", "keydown"])
+        element.removeEventListener(event, stopFollowing);
+    };
+  }, [vnHistoryOpen, scrollRef]);
+  useEffect(() => {
+    if (!visualNovel || vnHistoryOpen) return;
+    const revealEditor = (event: Event) => {
+      pendingVnEdit.current = (event as CustomEvent<{ messageId?: string }>).detail;
+      setVnHistoryOpen(true);
+    };
+    window.addEventListener("marinara:start-edit-message", revealEditor);
+    return () => window.removeEventListener("marinara:start-edit-message", revealEditor);
+  }, [visualNovel, vnHistoryOpen]);
+  useEffect(() => {
+    if (!vnHistoryOpen || !pendingVnEdit.current) return;
+    const detail = pendingVnEdit.current;
+    pendingVnEdit.current = null;
+    window.dispatchEvent(new CustomEvent("marinara:start-edit-message", { detail }));
+  }, [vnHistoryOpen]);
+  useLayoutEffect(() => {
+    if (multiSelectMode || gotoRequest?.chatId === activeChatId) setVnHistoryOpen(true);
+  }, [activeChatId, gotoRequest, multiSelectMode]);
   // ChatArea clears the request after scrolling; only reveal its transcript window once.
   const handledTranscriptGotoRef = useRef<typeof gotoRequest>(null);
 
@@ -1587,7 +1438,9 @@ export function ChatRoleplaySurface({
         prevMessageKeysRef.current = currentKeys;
         for (const message of messages) {
           const key = `${activeChatId}:${message.id}`;
-          if (!pendingPostProcessingKeys.has(key)) seenMessageKeysRef.current.add(key);
+          if (!pendingPostProcessingKeys.has(key)) {
+            rememberBoundedSetValue(seenMessageKeysRef.current, key, MAX_ROLEPLAY_NOTIFICATION_SEEN_KEYS);
+          }
         }
         pendingPostProcessingKeysRef.current = pendingPostProcessingKeys;
         initialLoadSettledRef.current = true;
@@ -1617,7 +1470,9 @@ export function ChatRoleplaySurface({
 
     for (const message of messages) {
       const key = `${activeChatId}:${message.id}`;
-      if (!pendingPostProcessingKeys.has(key)) seenKeys.add(key);
+      if (!pendingPostProcessingKeys.has(key)) {
+        rememberBoundedSetValue(seenKeys, key, MAX_ROLEPLAY_NOTIFICATION_SEEN_KEYS);
+      }
     }
     prevMessageKeysRef.current = currentKeys;
     pendingPostProcessingKeysRef.current = pendingPostProcessingKeys;
@@ -1628,7 +1483,10 @@ export function ChatRoleplaySurface({
     }
   }, [activeChatId, messages]);
 
-  const visibleMessages = transcriptWindow.messages;
+  // Keep an unsaved editor alive if its history is temporarily collapsed.
+  const showHistory = !visualNovel || vnHistoryOpen;
+  const showTranscript = showHistory || vnHistoryHasDraft;
+  const visibleMessages = showTranscript ? transcriptWindow.messages : [];
   const activeChatCharacterIds = useMemo(() => {
     const inactiveIds = new Set(readStringArray(chatMeta.inactiveCharacterIds));
     const activeIds = chatCharIds.filter((id) => !inactiveIds.has(id));
@@ -1645,6 +1503,8 @@ export function ChatRoleplaySurface({
   const automaticSummaryEnabled =
     chatMeta.automaticSummaryEnabled === true ||
     (chatMeta.enableAgents === true && summaryActiveAgentIds.includes("chat-summary"));
+  const semanticSummaryRetrievalEnabled = chatMeta.semanticSummaryRetrievalEnabled === true;
+  const semanticSummaryRetrievalSettings = normalizeSemanticSummaryRetrievalSettings(chatMeta);
   const summaryRunInterval =
     typeof chatMeta.summaryRunInterval === "number" && Number.isFinite(chatMeta.summaryRunInterval)
       ? chatMeta.summaryRunInterval
@@ -1764,8 +1624,81 @@ export function ChatRoleplaySurface({
     storeGeneratedStoryboard,
   ]);
 
+  const canGenerateRoleplayStoryboard =
+    storyboardAgentActive && !!latestStoryboardMessage && !generateRoleplayStoryboard.isPending;
+  const galleryActions = useMemo(
+    () => ({
+      onIllustrate,
+      onIllustrateWithAgent,
+      onGenerateStoryboard: canGenerateRoleplayStoryboard ? handleGenerateRoleplayStoryboard : undefined,
+      onGenerateVideo,
+      onAnimateImage,
+      onGenerateBackground,
+    }),
+    [
+      canGenerateRoleplayStoryboard,
+      handleGenerateRoleplayStoryboard,
+      onAnimateImage,
+      onGenerateBackground,
+      onGenerateVideo,
+      onIllustrate,
+      onIllustrateWithAgent,
+    ],
+  );
+  useProvideChatGalleryActions(activeChatId, galleryActions);
+  const chatTools: ChatSettingsTools = chat
+    ? {
+        summary: (
+          <RoleplaySummaryPanel
+            chatId={chat.id}
+            summary={chatMeta.summary ?? null}
+            summaryEntries={
+              Array.isArray(chatMeta.summaryEntries) ? (chatMeta.summaryEntries as ChatSummaryEntry[]) : []
+            }
+            contextSize={summaryContextSize}
+            promptTemplates={Array.isArray(chatMeta.summaryPromptTemplates) ? chatMeta.summaryPromptTemplates : []}
+            activePromptTemplateId={
+              typeof chatMeta.activeSummaryPromptTemplateId === "string" ? chatMeta.activeSummaryPromptTemplateId : null
+            }
+            longTermMemorySummaryPromptAvailable={longTermMemorySummaryPromptAvailable}
+            summaryConnectionId={typeof chatMeta.summaryConnectionId === "string" ? chatMeta.summaryConnectionId : null}
+            summaryMaxTokens={summaryMaxTokens}
+            automaticSummaryEnabled={automaticSummaryEnabled}
+            semanticSummaryRetrievalEnabled={semanticSummaryRetrievalEnabled}
+            semanticSummaryRecentCount={semanticSummaryRetrievalSettings.semanticSummaryRecentCount}
+            semanticSummaryOlderCount={semanticSummaryRetrievalSettings.semanticSummaryOlderCount}
+            semanticSummaryMinSimilarity={semanticSummaryRetrievalSettings.semanticSummaryMinSimilarity}
+            activeAgentIds={summaryActiveAgentIds}
+            summaryRunInterval={summaryRunInterval}
+            hideSummarisedMessages={hideSummarisedMessages}
+            summaryTailMessages={summaryTailMessages}
+            automaticSummariesAvailable={chatMode === "roleplay"}
+            totalMessageCount={totalMessageCount}
+            promptPresetId={typeof chat.promptPresetId === "string" ? chat.promptPresetId : null}
+          />
+        ),
+        activeContext: (
+          <ActiveContextLinksPanel
+            chat={chat}
+            chatMeta={chatMeta}
+            chatCharIds={chatCharIds}
+            characterMap={characterMap}
+          />
+        ),
+        authorNotes: (
+          <Suspense fallback={<RoleplayDrawerLoading label={t("chat.settings.toolLoading")} />}>
+            <AuthorNotesPanel key={chat.id} chatId={chat.id} chatMeta={chatMeta} />
+          </Suspense>
+        ),
+      }
+    : {};
+
   return (
-    <div data-component="ChatArea.Roleplay" className="flex flex-1 overflow-hidden">
+    <div
+      data-component="ChatArea.Roleplay"
+      data-mobile-composer-active={mobileComposerActive || undefined}
+      className="flex flex-1 overflow-hidden"
+    >
       <div
         className={cn(
           "rpg-chat-area mari-chat-area mari-card-css relative flex flex-1 flex-col overflow-hidden",
@@ -1773,18 +1706,41 @@ export function ChatRoleplaySurface({
           ambientVisualsPaused && "mari-generation-render-paused",
         )}
         data-chat-mode="roleplay"
-        style={{ isolation: "isolate" }}
+        data-roleplay-presentation={visualNovel ? "visual-novel" : "classic"}
+        data-chat-position={sideChatPosition}
+        data-roleplay-avatar-style={sideChatPosition ? roleplayAvatarStyle : undefined}
+        style={
+          {
+            isolation: "isolate",
+            // The compact pane keeps the transcript's narrow padding (px-3) at every width.
+            ...(centerCompact && { "--mari-roleplay-transcript-gutter": "0.75rem" }),
+            ...(sideChatPosition && {
+              "--roleplay-avatar-scale": roleplayAvatarScale,
+              // A docked Tracker Panel on the same side narrows the chat area the column moves into.
+              "--mari-chat-position-clearance":
+                trackerPanelSide === sideChatPosition ? "var(--tracker-panel-chat-clearance, 0px)" : "0px",
+            }),
+          } as CSSProperties
+        }
       >
         <CrossfadeBackground url={chatBackground} blurPx={chatBackgroundBlur} />
         <div className="rpg-overlay absolute inset-0" />
         <div className="rpg-vignette pointer-events-none absolute inset-0" />
         {weatherEffects && <WeatherEffectsConnected paused={weatherEffectsPaused} />}
+        {visualNovel && !vnHistoryOpen && (
+          <div
+            ref={setVnMediaTarget}
+            data-roleplay-vn-media
+            className="pointer-events-none absolute inset-x-3 top-0 bottom-0 z-[4] flex items-end justify-center gap-2 overflow-hidden pb-2"
+          />
+        )}
         {showSpriteOverlay && (
           <Suspense fallback={null}>
             <SpriteOverlay
               characterIds={spriteCharacterIds}
+              visibleCharacterIds={visibleExpressionSpriteIds}
               messages={msgPayload}
-              side={spritePosition}
+              side={visualNovel ? "center" : spritePosition}
               spriteDisplayModes={spriteDisplayModes}
               spriteExpressions={spriteExpressions}
               spritePlacements={spritePlacements}
@@ -1793,6 +1749,10 @@ export function ChatRoleplaySurface({
               spriteScale={spriteScale}
               expressionSpriteScale={expressionSpriteScale}
               fullBodySpriteScale={fullBodySpriteScale}
+              spriteScaleMultiplier={visualNovel ? vnSpriteScale : 1}
+              activeCharacterIds={
+                visualNovel && chatMeta.expressionOnlyActiveSprites !== true ? activeVnSpriteIds : undefined
+              }
               spriteOpacity={spriteOpacity}
               expressionSpriteOpacity={expressionSpriteOpacity}
               fullBodySpriteOpacity={fullBodySpriteOpacity}
@@ -1801,136 +1761,72 @@ export function ChatRoleplaySurface({
             />
           </Suspense>
         )}
+        {avatarAgentIds.length > 0 && avatarParticipants.length > 0 && (
+          <Suspense fallback={null}>
+            <AvatarStage
+              chatId={activeChatId}
+              mode="roleplay"
+              participants={avatarParticipants}
+              enabledAgentIds={avatarAgentIds}
+              side={visualNovel ? "center" : spritePosition}
+              placements={spritePlacements}
+              characterVisualSettings={spriteVisualSettings?.characterOverrides}
+              scale={fullBodySpriteScale}
+              scaleMultiplier={visualNovel ? vnSpriteScale : 1}
+              framings={spriteVisualSettings?.avatarFramings}
+              editing={spriteArrangeMode}
+              onPlacementChange={onSpritePlacementChange}
+              onShownChange={onAvatarsShown}
+            />
+          </Suspense>
+        )}
 
         <div className="relative flex flex-1 overflow-hidden">
           <div className="relative flex flex-1 flex-col overflow-hidden">
             <div ref={topChromeRef} className="pointer-events-none absolute inset-x-0 top-0 z-40">
-              <div
-                data-tracker-panel-anchor="roleplay-hud"
-                className={cn(
-                  "pointer-events-none relative z-40 items-center py-2 max-md:hidden",
-                  centerCompact ? "hidden" : "flex",
-                )}
-                style={{
-                  paddingLeft: "calc(1rem + var(--tracker-panel-hud-clear-left, 0px))",
-                  paddingRight: "calc(1rem + var(--tracker-panel-hud-clear-right, 0px))",
-                }}
-              >
-                {chat && chatMeta.enableAgents && (
-                  <div className="pointer-events-auto flex-1 overflow-x-auto">
-                    <Suspense fallback={null}>
-                      <RoleplayHUD
-                        chatId={chat.id}
-                        isStreaming={isStreaming}
-                        onRetriggerTrackers={onRerunTrackers}
-                        onRetryFailedAgents={onRetryFailedAgents}
-                        onRerunSingleTracker={onRerunSingleTracker}
-                        enabledAgentTypes={enabledAgentTypes}
-                        manualTrackers={manualTrackersActive}
-                        injectionSourceMessages={messages}
-                      />
-                    </Suspense>
-                  </div>
-                )}
+              {!centerCompact && (
                 <div
-                  data-roleplay-top-controls="right"
-                  className={cn("pointer-events-auto ml-auto flex shrink-0 items-center", CHAT_TOOLBAR_ICON_GAP_CLASS)}
+                  data-tracker-panel-anchor="roleplay-hud"
+                  className="pointer-events-none relative z-40 hidden items-center py-2 md:flex"
+                  style={{
+                    paddingLeft: "calc(1rem + var(--tracker-panel-hud-clear-left, 0px))",
+                    paddingRight: "calc(1rem + var(--tracker-panel-hud-clear-right, 0px))",
+                  }}
                 >
-                  {conversationToolbarPackages.map((item) => (
-                    <CapabilityElement
-                      key={`${item.id}-toolbar`}
-                      packageId={item.id}
-                      view="toolbar"
-                      capabilityProps={{
-                        ...conversationCapabilityProps,
-                        toolbarButtonClass: getChatToolbarButtonClass(),
-                      }}
-                      className="contents"
-                    />
-                  ))}
-                  <ChatBranchSelector
-                    activeChatId={activeChatId}
-                    activeChatName={chat?.name}
-                    groupId={chat?.groupId ?? null}
-                    variant="roleplay"
-                  />
-                  <ChatToolbarMenu openSummaryOnRequest>
-                    <SummaryButton
-                      chatId={chat?.id ?? null}
-                      summary={chatMeta.summary ?? null}
-                      summaryEntries={
-                        Array.isArray(chatMeta.summaryEntries) ? (chatMeta.summaryEntries as ChatSummaryEntry[]) : []
-                      }
-                      summaryContextSize={summaryContextSize}
-                      summaryPromptTemplates={
-                        Array.isArray(chatMeta.summaryPromptTemplates) ? chatMeta.summaryPromptTemplates : []
-                      }
-                      activeSummaryPromptTemplateId={
-                        typeof chatMeta.activeSummaryPromptTemplateId === "string"
-                          ? chatMeta.activeSummaryPromptTemplateId
-                          : null
-                      }
-                      longTermMemorySummaryPromptAvailable={longTermMemorySummaryPromptAvailable}
-                      summaryConnectionId={
-                        typeof chatMeta.summaryConnectionId === "string" ? chatMeta.summaryConnectionId : null
-                      }
-                      summaryMaxTokens={summaryMaxTokens}
-                      automaticSummaryEnabled={automaticSummaryEnabled}
-                      activeAgentIds={summaryActiveAgentIds}
-                      summaryRunInterval={summaryRunInterval}
-                      hideSummarisedMessages={hideSummarisedMessages}
-                      summaryTailMessages={summaryTailMessages}
-                      automaticSummariesAvailable={chatMode === "roleplay"}
-                      totalMessageCount={totalMessageCount}
-                      promptPresetId={typeof chat?.promptPresetId === "string" ? chat.promptPresetId : null}
-                    />
-                    <ActiveContextLinksButton
-                      chat={chat}
-                      chatMeta={chatMeta}
-                      chatCharIds={chatCharIds}
-                      characterMap={characterMap}
-                    />
-                    <AuthorNotesButton
-                      chatId={chat?.id ?? null}
-                      chatMeta={chatMeta}
-                      open={!compactToolbarOwnsAuthorNotes && expandedAuthorNotesOpen}
-                      onOpenChange={
-                        compactToolbarOwnsAuthorNotes ? setCompactAuthorNotesOpen : setExpandedAuthorNotesOpen
-                      }
-                      renderPanel={!compactToolbarOwnsAuthorNotes}
-                      mobilePanel={false}
-                    />
-                    <ChatToolbarButton
-                      icon={<Image size="0.875rem" />}
-                      title={t("chat.toolbar.gallery")}
-                      panelAction="gallery"
-                      onClick={onOpenGallery}
-                    />
-                    {chat?.connectedChatId && (
-                      <ChatToolbarButton
-                        icon={<ArrowRightLeft size="0.875rem" />}
-                        title={
-                          linkedChatName
-                            ? t("chat.toolbar.switchTo", { name: linkedChatName })
-                            : t("chat.toolbar.connectedChat")
-                        }
-                        onClick={() => useChatStore.getState().setActiveChatId(chat.connectedChatId!)}
-                      />
+                  {chat && chatMeta.enableAgents && (
+                    <div
+                      data-chat-help="agents"
+                      data-roleplay-agent-window
+                      className="pointer-events-auto flex-1 overflow-x-auto"
+                    >
+                      <Suspense fallback={null}>
+                        <RoleplayHUD
+                          chatId={chat.id}
+                          isStreaming={isStreaming}
+                          onRetriggerTrackers={onRerunTrackers}
+                          onRerunSingleTracker={onRerunSingleTracker}
+                          enabledAgentTypes={enabledAgentTypes}
+                          manualTrackers={manualTrackersActive}
+                        />
+                      </Suspense>
+                    </div>
+                  )}
+                  <div
+                    data-roleplay-top-controls="right"
+                    className={cn(
+                      "pointer-events-auto ml-auto flex shrink-0 items-center",
+                      CHAT_TOOLBAR_ICON_GAP_CLASS,
                     )}
-                    <ChatMessageSearch chatId={activeChatId} />
-                    <ChatToolbarButton
-                      icon={<Settings2 size="0.875rem" />}
-                      title={t("chat.toolbar.settings")}
-                      panelAction="settings"
-                      onClick={onOpenSettings}
-                    />
-                  </ChatToolbarMenu>
+                  >
+                    {/* Package toolbars and the connected chat are windows that minimize to buttons. */}
+                  </div>
                 </div>
-              </div>
+              )}
+              {/* Like the desktop row, the strip lets touches through to the transcript except on its controls. */}
               <div
                 data-tracker-panel-anchor={centerCompact ? "roleplay-hud" : undefined}
                 className={cn(
-                  "pointer-events-auto relative z-40 w-full flex-col",
+                  "pointer-events-none relative z-40 w-full flex-col",
                   centerCompact ? "flex" : "flex md:hidden",
                 )}
               >
@@ -1942,198 +1838,23 @@ export function ChatRoleplaySurface({
                       paddingRight: "calc(0.5rem + var(--tracker-panel-hud-clear-right, 0px))",
                     }}
                   >
-                    <div className="min-w-0 flex-1 overflow-x-auto">
+                    <div
+                      data-chat-help="agents"
+                      data-roleplay-agent-window
+                      className="pointer-events-auto min-w-0 flex-1 overflow-x-auto"
+                    >
                       <Suspense fallback={null}>
                         <RoleplayHUD
                           chatId={chat.id}
                           isStreaming={isStreaming}
                           onRetriggerTrackers={onRerunTrackers}
-                          onRetryFailedAgents={onRetryFailedAgents}
                           onRerunSingleTracker={onRerunSingleTracker}
                           enabledAgentTypes={enabledAgentTypes}
                           manualTrackers={manualTrackersActive}
                           mobileCompact
-                          injectionSourceMessages={messages}
                         />
                       </Suspense>
                     </div>
-                    <div
-                      data-roleplay-top-controls="right"
-                      className={cn("ml-auto flex shrink-0 items-center", CHAT_TOOLBAR_ICON_GAP_CLASS)}
-                    >
-                      {conversationToolbarPackages.map((item) => (
-                        <CapabilityElement
-                          key={`${item.id}-compact-toolbar`}
-                          packageId={item.id}
-                          view="toolbar"
-                          capabilityProps={{
-                            ...conversationCapabilityProps,
-                            toolbarButtonClass: getChatToolbarButtonClass({ compact: true }),
-                          }}
-                          className="contents"
-                        />
-                      ))}
-                      <ChatToolbarMenu openSummaryOnRequest>
-                        <ChatBranchSelector
-                          activeChatId={activeChatId}
-                          activeChatName={chat?.name}
-                          groupId={chat?.groupId ?? null}
-                          variant="roleplay"
-                          compact
-                        />
-                        <SummaryButton
-                          chatId={chat?.id ?? null}
-                          summary={chatMeta.summary ?? null}
-                          summaryEntries={
-                            Array.isArray(chatMeta.summaryEntries)
-                              ? (chatMeta.summaryEntries as ChatSummaryEntry[])
-                              : []
-                          }
-                          summaryContextSize={summaryContextSize}
-                          summaryPromptTemplates={
-                            Array.isArray(chatMeta.summaryPromptTemplates) ? chatMeta.summaryPromptTemplates : []
-                          }
-                          activeSummaryPromptTemplateId={
-                            typeof chatMeta.activeSummaryPromptTemplateId === "string"
-                              ? chatMeta.activeSummaryPromptTemplateId
-                              : null
-                          }
-                          longTermMemorySummaryPromptAvailable={longTermMemorySummaryPromptAvailable}
-                          summaryConnectionId={
-                            typeof chatMeta.summaryConnectionId === "string" ? chatMeta.summaryConnectionId : null
-                          }
-                          summaryMaxTokens={summaryMaxTokens}
-                          automaticSummaryEnabled={automaticSummaryEnabled}
-                          activeAgentIds={summaryActiveAgentIds}
-                          summaryRunInterval={summaryRunInterval}
-                          hideSummarisedMessages={hideSummarisedMessages}
-                          summaryTailMessages={summaryTailMessages}
-                          automaticSummariesAvailable={chatMode === "roleplay"}
-                          totalMessageCount={totalMessageCount}
-                          promptPresetId={typeof chat?.promptPresetId === "string" ? chat.promptPresetId : null}
-                        />
-                        <ActiveContextLinksButton
-                          chat={chat}
-                          chatMeta={chatMeta}
-                          chatCharIds={chatCharIds}
-                          characterMap={characterMap}
-                        />
-                        <AuthorNotesButton
-                          chatId={chat?.id ?? null}
-                          chatMeta={chatMeta}
-                          open={compactAuthorNotesOpen}
-                          onOpenChange={setCompactAuthorNotesOpen}
-                          renderPanel={compactToolbarOwnsAuthorNotes}
-                          mobilePanel
-                        />
-                        <ChatToolbarButton
-                          icon={<Image size="0.875rem" />}
-                          title={t("chat.toolbar.gallery")}
-                          panelAction="gallery"
-                          onClick={onOpenGallery}
-                        />
-                        {chat?.connectedChatId && (
-                          <ChatToolbarButton
-                            icon={<ArrowRightLeft size="0.875rem" />}
-                            title={
-                              linkedChatName
-                                ? t("chat.toolbar.switchTo", { name: linkedChatName })
-                                : t("chat.toolbar.connectedChat")
-                            }
-                            onClick={() => useChatStore.getState().setActiveChatId(chat.connectedChatId!)}
-                          />
-                        )}
-                        <ChatMessageSearch chatId={activeChatId} />
-                        <ChatToolbarButton
-                          icon={<Settings2 size="0.875rem" />}
-                          title={t("chat.toolbar.settings")}
-                          panelAction="settings"
-                          onClick={onOpenSettings}
-                        />
-                      </ChatToolbarMenu>
-                    </div>
-                  </div>
-                )}
-                {chat && !chatMeta.enableAgents && (
-                  <div
-                    className={cn("flex w-full items-center justify-end px-2 pb-1 pt-2", CHAT_TOOLBAR_ICON_GAP_CLASS)}
-                  >
-                    <ChatToolbarMenu openSummaryOnRequest>
-                      <ChatBranchSelector
-                        activeChatId={activeChatId}
-                        activeChatName={chat?.name}
-                        groupId={chat?.groupId ?? null}
-                        variant="roleplay"
-                        compact
-                      />
-                      <SummaryButton
-                        chatId={chat?.id ?? null}
-                        summary={chatMeta.summary ?? null}
-                        summaryEntries={
-                          Array.isArray(chatMeta.summaryEntries) ? (chatMeta.summaryEntries as ChatSummaryEntry[]) : []
-                        }
-                        summaryContextSize={summaryContextSize}
-                        summaryPromptTemplates={
-                          Array.isArray(chatMeta.summaryPromptTemplates) ? chatMeta.summaryPromptTemplates : []
-                        }
-                        activeSummaryPromptTemplateId={
-                          typeof chatMeta.activeSummaryPromptTemplateId === "string"
-                            ? chatMeta.activeSummaryPromptTemplateId
-                            : null
-                        }
-                        longTermMemorySummaryPromptAvailable={longTermMemorySummaryPromptAvailable}
-                        summaryConnectionId={
-                          typeof chatMeta.summaryConnectionId === "string" ? chatMeta.summaryConnectionId : null
-                        }
-                        summaryMaxTokens={summaryMaxTokens}
-                        automaticSummaryEnabled={automaticSummaryEnabled}
-                        activeAgentIds={summaryActiveAgentIds}
-                        summaryRunInterval={summaryRunInterval}
-                        hideSummarisedMessages={hideSummarisedMessages}
-                        summaryTailMessages={summaryTailMessages}
-                        automaticSummariesAvailable={chatMode === "roleplay"}
-                        totalMessageCount={totalMessageCount}
-                        promptPresetId={typeof chat?.promptPresetId === "string" ? chat.promptPresetId : null}
-                      />
-                      <ActiveContextLinksButton
-                        chat={chat}
-                        chatMeta={chatMeta}
-                        chatCharIds={chatCharIds}
-                        characterMap={characterMap}
-                      />
-                      <AuthorNotesButton
-                        chatId={chat?.id ?? null}
-                        chatMeta={chatMeta}
-                        open={compactAuthorNotesOpen}
-                        onOpenChange={setCompactAuthorNotesOpen}
-                        renderPanel={compactToolbarOwnsAuthorNotes}
-                        mobilePanel
-                      />
-                      <ChatToolbarButton
-                        icon={<Image size="0.875rem" />}
-                        title={t("chat.toolbar.gallery")}
-                        panelAction="gallery"
-                        onClick={onOpenGallery}
-                      />
-                      {chat?.connectedChatId && (
-                        <ChatToolbarButton
-                          icon={<ArrowRightLeft size="0.875rem" />}
-                          title={
-                            linkedChatName
-                              ? t("chat.toolbar.switchTo", { name: linkedChatName })
-                              : t("chat.toolbar.connectedChat")
-                          }
-                          onClick={() => useChatStore.getState().setActiveChatId(chat.connectedChatId!)}
-                        />
-                      )}
-                      <ChatMessageSearch chatId={activeChatId} />
-                      <ChatToolbarButton
-                        icon={<Settings2 size="0.875rem" />}
-                        title={t("chat.toolbar.settings")}
-                        panelAction="settings"
-                        onClick={onOpenSettings}
-                      />
-                    </ChatToolbarMenu>
                   </div>
                 )}
               </div>
@@ -2145,27 +1866,43 @@ export function ChatRoleplaySurface({
               </Suspense>
             )}
 
-            <div data-chat-resource-drop-surface className="absolute inset-0 z-10 overflow-hidden">
+            <div
+              data-chat-resource-drop-surface
+              className={cn(
+                "absolute z-10 overflow-hidden",
+                visualNovel && vnHistoryOpen ? "mari-roleplay-input-column inset-x-0 mx-auto px-3 md:px-0" : "inset-0",
+                visualNovel && !vnHistoryOpen && "pointer-events-none",
+              )}
+            >
               <div
                 ref={scrollRef}
                 data-chat-scroll
+                id="roleplay-chat-history"
+                aria-hidden={visualNovel && !vnHistoryOpen ? true : undefined}
+                inert={visualNovel && !vnHistoryOpen ? true : undefined}
                 className={cn(
                   "rpg-chat-messages-mobile mari-messages-scroll relative h-full overflow-y-auto overflow-x-hidden",
-                  centerCompact ? "px-3" : "px-3 md:px-8 lg:px-10 xl:px-12",
+                  "px-3 md:px-[var(--mari-roleplay-transcript-gutter)]",
+                  visualNovel && !vnHistoryOpen && "invisible pointer-events-none",
+                  visualNovel &&
+                    vnHistoryOpen &&
+                    "rounded-xl border border-[var(--border)] bg-[var(--marinara-chat-chrome-panel-bg)]",
                 )}
                 style={{
                   paddingTop: "var(--mari-roleplay-content-padding-top, 16px)",
-                  paddingBottom: "var(--mari-roleplay-content-padding-bottom, 16px)",
+                  paddingBottom:
+                    "calc(var(--mari-roleplay-content-padding-bottom, 16px) + var(--mari-message-editor-scroll-space, 0px))",
                   scrollPaddingTop: "var(--mari-roleplay-scroll-padding-top, 16px)",
-                  scrollPaddingBottom: "var(--mari-roleplay-scroll-padding-bottom, 16px)",
+                  scrollPaddingBottom:
+                    "calc(var(--mari-roleplay-scroll-padding-bottom, 16px) + var(--mari-message-editor-scroll-space, 0px))",
                 }}
               >
                 {hasNextPage && (
-                  <div className="mb-3 flex justify-center">
+                  <div className="mari-chat-load-more mb-3 flex justify-center">
                     <button
                       onClick={handleLoadMoreClick}
                       disabled={isFetchingNextPage}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-foreground/10 bg-[var(--card)] px-3 py-1.5 text-xs font-medium text-foreground/70 backdrop-blur-sm transition-all hover:bg-[var(--accent)] hover:text-foreground/90 disabled:opacity-50"
+                      className={HISTORY_PAGER_BUTTON_CLASS}
                     >
                       {isFetchingNextPage ? (
                         <Loader2 size="0.75rem" className="animate-spin" />
@@ -2195,7 +1932,7 @@ export function ChatRoleplaySurface({
                   if (
                     isMessageShadowedByLiveStream({
                       hasLiveStream,
-                      regenerateMessageId,
+                      regenerateMessageId: inlineStreamingMessageId,
                       streamedMessageId,
                       messageId: msg.id,
                     })
@@ -2205,7 +1942,7 @@ export function ChatRoleplaySurface({
                   const sourceIndex = transcriptWindow.startIndex + i;
                   const messageDepth = (messages?.length ?? 0) - 1 - sourceIndex;
                   const messageOrderIndex = loadedMessageOffset + sourceIndex;
-                  const isRegenerating = hasLiveStream && regenerateMessageId === msg.id;
+                  const isRegenerating = hasLiveStream && inlineStreamingMessageId === msg.id;
                   const inlineStoryboard =
                     roleplayStoryboardByTurn.get(`${msg.id}:${msg.activeSwipeIndex ?? 0}`) ?? null;
                   const inlineStoryboardGenerating =
@@ -2233,7 +1970,7 @@ export function ChatRoleplaySurface({
                           onSetActiveSwipe={onSetActiveSwipe}
                           onToggleConversationStart={onToggleConversationStart}
                           onToggleHiddenFromAI={onToggleHiddenFromAI}
-                          onPeekPrompt={onPeekPrompt}
+                          onPeekPrompt={() => onPeekPrompt(msg.id)}
                           onBranch={onBranch}
                           onCloneSceneFromHere={onCloneSceneFromHere}
                           isCloneSceneFromHereDisabled={isCloneSceneFromHereDisabled}
@@ -2254,18 +1991,24 @@ export function ChatRoleplaySurface({
                           onToggleSelect={onToggleSelectMessage}
                           storyboard={inlineStoryboard}
                           storyboardGenerating={inlineStoryboardGenerating}
+                          memoryStartCharacterIds={memoryContextStarts.get(msg.id)}
                         />
                       ) : (
                         <ChatMessage
                           message={msg}
+                          followSpeechParagraphs={visualNovel}
                           isStreaming={false}
                           onDelete={onDelete}
                           onRegenerate={onRegenerate}
                           onEdit={onEdit}
+                          failedReply={msg.id === failedReplyMessageId}
+                          failedReplyReason={failedReplyReason}
+                          onRetryFailedReply={onRetryFailedReply}
+                          replyCheckup={msg.id === replyCheckupMessageId ? replyCheckup : undefined}
                           onSetActiveSwipe={onSetActiveSwipe}
                           onToggleConversationStart={onToggleConversationStart}
                           onToggleHiddenFromAI={onToggleHiddenFromAI}
-                          onPeekPrompt={onPeekPrompt}
+                          onPeekPrompt={() => onPeekPrompt(msg.id)}
                           onBranch={onBranch}
                           onCloneSceneFromHere={onCloneSceneFromHere}
                           isCloneSceneFromHereDisabled={isCloneSceneFromHereDisabled}
@@ -2286,6 +2029,7 @@ export function ChatRoleplaySurface({
                           onToggleSelect={onToggleSelectMessage}
                           storyboard={inlineStoryboard}
                           storyboardGenerating={inlineStoryboardGenerating}
+                          memoryStartCharacterIds={memoryContextStarts.get(msg.id)}
                         />
                       )}
                     </div>
@@ -2300,9 +2044,9 @@ export function ChatRoleplaySurface({
                   buttonClassName="border-[var(--marinara-chat-chrome-button-border-active)] bg-[var(--marinara-chat-chrome-button-bg-active)] text-[var(--marinara-chat-chrome-button-text-active)] hover:border-[var(--marinara-chat-chrome-button-border-hover)] hover:bg-[var(--marinara-chat-chrome-button-bg-hover)] hover:text-[var(--marinara-chat-chrome-button-text-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--marinara-chat-chrome-focus-ring)]"
                 />
 
-                {!isStreaming && <CyoaChoices messages={visibleMessages} />}
+                {showHistory && !isStreaming && <CyoaChoices messages={messages} />}
 
-                {hasLiveStream && !regenerateMessageId && (
+                {showHistory && hasLiveStream && !inlineStreamingMessageId && (
                   <StreamingIndicator
                     activeChatId={activeChatId}
                     chatCharIds={chatCharIds}
@@ -2318,17 +2062,155 @@ export function ChatRoleplaySurface({
                 <div ref={messagesEndRef} />
               </div>
             </div>
-            <PinnedImageOverlay activeChatId={activeChatId} includeSceneVideos />
+            <PinnedImageOverlay activeChatId={activeChatId} />
 
             <div ref={inputChromeRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-30">
               <div
                 data-roleplay-chat-column="true"
                 className="mari-roleplay-input-column pointer-events-auto relative mx-auto px-3 md:px-0"
               >
+                {visualNovel && (
+                  <div className="relative mb-2" data-roleplay-vn>
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        className={cn(
+                          "mari-vn-history-control mari-chat-style-control relative flex h-6 w-10 items-center justify-center border border-[var(--border)] bg-[var(--marinara-chat-chrome-panel-bg)] text-[var(--marinara-chat-chrome-button-text)] before:absolute before:-inset-x-1 before:-inset-y-2.5 hover:text-[var(--marinara-chat-chrome-highlight-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)]",
+                          vnHistoryOpen ? "-mt-px rounded-b-lg border-t-0" : "rounded-t-lg border-b-0",
+                        )}
+                        aria-expanded={vnHistoryOpen}
+                        aria-controls="roleplay-chat-history"
+                        aria-label={localizeUi(
+                          vnHistoryOpen ? "chat.roleplayVn.hideHistory" : "chat.roleplayVn.showHistory",
+                        )}
+                        title={localizeUi(
+                          vnHistoryOpen ? "chat.roleplayVn.hideHistory" : "chat.roleplayVn.showHistory",
+                        )}
+                        onClick={() => {
+                          if (!vnHistoryOpen) {
+                            setTranscriptWindowStart(null);
+                            pendingVnHistoryScroll.current = true;
+                          }
+                          setVnHistoryHasDraft(
+                            vnHistoryOpen && !!scrollRef.current?.querySelector("[data-chat-message-editor]"),
+                          );
+                          setVnHistoryOpen((open) => !open);
+                        }}
+                      >
+                        {vnHistoryOpen ? <ChevronDown size="0.875rem" /> : <ChevronUp size="0.875rem" />}
+                      </button>
+                    </div>
+                    {!vnHistoryOpen && (
+                      <div className="mari-chat-style-surface rounded-xl border border-[var(--border)] bg-[var(--marinara-chat-chrome-panel-bg)] shadow-lg">
+                        {hasLiveStream ? (
+                          inlineStreamingMessageId &&
+                          messages?.find((message) => message.id === inlineStreamingMessageId) ? (
+                            <RegeneratingMessageContent
+                              msg={messages.find((message) => message.id === inlineStreamingMessageId)!}
+                              visualNovel
+                              visualNovelMediaTarget={vnMediaTarget}
+                              visualNovelParagraphIndex={vnParagraphIndex ?? undefined}
+                              onVisualNovelParagraphCount={setVnParagraphCount}
+                              chatMode="roleplay"
+                              characterMap={characterMap}
+                              personaInfo={personaInfo}
+                              groupChatMode={groupChatMode}
+                              chatCharacterIds={chatCharIds}
+                              mergedGroupCharacterIds={activeChatCharacterIds}
+                              expressionAvatarResolver={expressionAvatarResolver}
+                            />
+                          ) : (
+                            <StreamingIndicator
+                              activeChatId={activeChatId}
+                              visualNovel
+                              visualNovelMediaTarget={vnMediaTarget}
+                              visualNovelParagraphIndex={vnParagraphIndex ?? undefined}
+                              onVisualNovelParagraphCount={setVnParagraphCount}
+                              chatCharIds={chatCharIds}
+                              mergedGroupCharacterIds={activeChatCharacterIds}
+                              characterMap={characterMap}
+                              personaInfo={personaInfo}
+                              chatMode="roleplay"
+                              groupChatMode={groupChatMode}
+                              expressionAvatarResolver={expressionAvatarResolver}
+                            />
+                          )
+                        ) : activeVnMessage ? (
+                          <div>
+                            <ChatMessage
+                              key={`${activeChatId}:${activeVnMessage.id}:${activeVnMessage.activeSwipeIndex}`}
+                              message={activeVnMessage}
+                              memoryStartCharacterIds={memoryContextStarts.get(activeVnMessage.id)}
+                              failedReply={activeVnMessage.id === failedReplyMessageId}
+                              failedReplyReason={failedReplyReason}
+                              onRetryFailedReply={onRetryFailedReply}
+                              replyCheckup={activeVnMessage.id === replyCheckupMessageId ? replyCheckup : undefined}
+                              visualNovel
+                              visualNovelSpeech={vnSpeech}
+                              onVisualNovelSpeechParagraph={setVnParagraphIndex}
+                              visualNovelParagraphIndex={vnParagraphIndex ?? undefined}
+                              onVisualNovelParagraphCount={setVnParagraphCount}
+                              visualNovelMediaTarget={vnMediaTarget}
+                              chatMode="roleplay"
+                              characterMap={characterMap}
+                              personaInfo={personaInfo}
+                              groupChatMode={groupChatMode}
+                              chatCharacterIds={chatCharIds}
+                              mergedGroupCharacterIds={activeChatCharacterIds}
+                              expressionAvatarResolver={expressionAvatarResolver}
+                              messageDepth={(messages?.length ?? 1) - 1 - (messages?.indexOf(activeVnMessage) ?? 0)}
+                            />
+                            {(vnParagraphCount > 1 || visibleVnMessages.length > 1 || hasNextPage) && (
+                              <div
+                                data-roleplay-vn-navigation
+                                className="flex items-center justify-between border-t border-[var(--border)]/50 px-3 py-1.5 text-xs text-[var(--marinara-chat-chrome-accent)]"
+                              >
+                                <button
+                                  type="button"
+                                  disabled={!canGoPreviousParagraph}
+                                  onClick={handlePreviousParagraph}
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 transition-colors hover:bg-[var(--marinara-chat-chrome-button-bg-hover)] disabled:opacity-30 disabled:pointer-events-none"
+                                  aria-label={localizeUi("chat.roleplayVn.previousParagraph")}
+                                  title={localizeUi("chat.roleplayVn.previousParagraph")}
+                                >
+                                  <ChevronLeft size="0.875rem" />
+                                  <span>{localizeUi("chat.roleplayVn.previousParagraph")}</span>
+                                </button>
+                                <span className="font-mono text-[0.6875rem] opacity-75">
+                                  {localizeUi("chat.roleplayVn.paragraphCounter", {
+                                    current: currentParagraphIndex + 1,
+                                    total: vnParagraphCount,
+                                  })}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={!canGoNextParagraph}
+                                  onClick={handleNextParagraph}
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 transition-colors hover:bg-[var(--marinara-chat-chrome-button-bg-hover)] disabled:opacity-30 disabled:pointer-events-none"
+                                  aria-label={localizeUi("chat.roleplayVn.nextParagraph")}
+                                  title={localizeUi("chat.roleplayVn.nextParagraph")}
+                                >
+                                  <span>{localizeUi("chat.roleplayVn.nextParagraph")}</span>
+                                  <ChevronRight size="0.875rem" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="p-4 text-sm text-[var(--marinara-chat-chrome-text)]">
+                            {localizeUi("chat.roleplayVn.empty")}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {!vnHistoryOpen && !isStreaming && <CyoaChoices messages={messages} />}
+                  </div>
+                )}
                 {chatMeta.sceneStatus === "active" && (
                   <EndSceneBar
                     sceneChatId={activeChatId}
                     originChatId={chatMeta.sceneOriginChatId}
+                    packageOrigin={chatMeta.scenePackageOrigin}
                     onConclude={onConcludeScene}
                     onAbandon={onAbandonScene}
                     onFork={onForkScene}
@@ -2338,8 +2220,6 @@ export function ChatRoleplaySurface({
                 <ChatInput
                   key={activeChatId}
                   mode={isRoleplay ? "roleplay" : "conversation"}
-                  mobileHistoryCollapsed={mobileHistoryComposerCollapsed}
-                  onMobileHistoryCollapsedChange={setMobileHistoryComposerCollapsed}
                   combatAgentEnabled={combatAgentEnabled}
                   onStartEncounter={onStartEncounter}
                   characterNames={characterNames}
@@ -2375,17 +2255,66 @@ export function ChatRoleplaySurface({
         </Suspense>
       </div>
 
+      {/* Package toolbars, Beholder and the connected chat are windows that minimize to bubbles. */}
+      {showTrackerPanelBubble && <TrackerPanelBubble chatId={activeChatId} />}
+      {conversationToolbarPackages.map((item, index) => (
+        <ChatControlWindow
+          key={`${item.id}-toolbar-window`}
+          id={CHAT_CONTROL_WINDOW_IDS.package(item.id)}
+          title={item.manifest.name}
+          icon={<Puzzle size={14} />}
+          slot={index + 1}
+          phoneSlot={phoneSlotOffset + index + 1}
+          width={280}
+          height={140}
+          helpTarget="agent-controls"
+        >
+          <div className={cn("flex flex-wrap items-center p-2", CHAT_TOOLBAR_ICON_GAP_CLASS)}>
+            <CapabilityElement
+              packageId={item.id}
+              view="toolbar"
+              capabilityProps={{ ...conversationCapabilityProps, toolbarButtonClass: getChatToolbarButtonClass() }}
+              className="contents"
+            />
+          </div>
+        </ChatControlWindow>
+      ))}
+      {chat?.connectedChatId && (
+        <ChatConnectedChatWindow
+          name={linkedChatName}
+          onSwitch={() => useChatStore.getState().setActiveChatId(chat.connectedChatId!)}
+          phoneSlot={phoneSlotOffset}
+        />
+      )}
+
+      {/* Outside the isolated chat area, so it stacks with Chat Settings and the other chat windows. */}
+      {chat && chatMeta.enableAgents && (
+        <Suspense fallback={null}>
+          <RoleplayTrackerWindow
+            beholderSlot={conversationToolbarPackages.length + 1}
+            beholderPhoneSlot={phoneSlotOffset + conversationToolbarPackages.length + 1}
+            chatId={chat.id}
+            enabledAgentTypes={enabledAgentTypes}
+            isStreaming={isStreaming}
+            manualTrackers={manualTrackersActive}
+            onRerunTrackers={onRerunTrackers}
+            onRerunSingleTracker={onRerunSingleTracker}
+            messages={messages}
+          />
+        </Suspense>
+      )}
+
       <ChatCommonOverlays
         chat={chat}
         settingsOpen={settingsOpen}
         settingsAnchor={settingsAnchor}
         settingsInitialSection={settingsInitialSection}
-        galleryOpen={galleryOpen}
-        galleryAnchor={galleryAnchor}
+        chatTools={chatTools}
         wizardOpen={wizardOpen}
         peekPromptData={peekPromptData}
         deleteDialogMessageId={deleteDialogMessageId}
         deleteDialogCanDeleteSwipe={deleteDialogCanDeleteSwipe}
+        deleteDialogCanDeleteOtherSwipes={deleteDialogCanDeleteOtherSwipes}
         deleteDialogActiveSwipeIndex={deleteDialogActiveSwipeIndex}
         deleteDialogSwipeCount={deleteDialogSwipeCount}
         multiSelectMode={multiSelectMode}
@@ -2398,24 +2327,15 @@ export function ChatRoleplaySurface({
           onSpriteSideChange,
           spriteVisualSettings,
           onSpriteVisualSettingsChange,
+          avatarLayout,
         }}
         onCloseSettings={onCloseSettings}
-        onCloseGallery={onCloseGallery}
         onOpenScheduleEditor={onOpenScheduleEditor}
-        onIllustrate={onIllustrate}
-        onIllustrateWithAgent={onIllustrateWithAgent}
-        onGenerateStoryboard={
-          storyboardAgentActive && latestStoryboardMessage && !generateRoleplayStoryboard.isPending
-            ? handleGenerateRoleplayStoryboard
-            : undefined
-        }
-        onGenerateVideo={onGenerateVideo}
-        onAnimateImage={onAnimateImage}
-        onGenerateBackground={onGenerateBackground}
         onWizardFinish={onWizardFinish}
         onClosePeekPrompt={onClosePeekPrompt}
         onDeleteConfirm={onDeleteConfirm}
         onDeleteSwipe={onDeleteSwipe}
+        onDeleteOtherSwipes={onDeleteOtherSwipes}
         onDeleteMore={onDeleteMore}
         onCloseDeleteDialog={onCloseDeleteDialog}
         onBulkDelete={onBulkDelete}
@@ -2425,13 +2345,14 @@ export function ChatRoleplaySurface({
         onSelectAllBelowSelection={onSelectAllBelowSelection}
       />
       {conversationSurfacePackages.map((item) => (
-        <CapabilityElement
-          key={`${item.id}-conversation-surface`}
-          packageId={item.id}
-          view="surface"
-          capabilityProps={conversationCapabilityProps}
-          className="contents"
-        />
+        <div key={`${item.id}-conversation-surface`} data-roleplay-agent-window className="contents">
+          <CapabilityElement
+            packageId={item.id}
+            view="surface"
+            capabilityProps={conversationCapabilityProps}
+            className="contents"
+          />
+        </div>
       ))}
     </div>
   );

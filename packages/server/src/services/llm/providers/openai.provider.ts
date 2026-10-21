@@ -1,9 +1,12 @@
 // ──────────────────────────────────────────────
 // LLM Provider — OpenAI (& OAI-Compatible)
 // ──────────────────────────────────────────────
+import { createHash } from "node:crypto";
 import {
   BaseLLMProvider,
+  ASSISTANT_CONTINUATION_PROMPT,
   llmFetch,
+  llmHttpErrorFromResponse,
   sanitizeApiError,
   type ChatMessage,
   type ChatOptions,
@@ -12,22 +15,41 @@ import {
   type LLMToolDefinition,
   type LLMUsage,
 } from "../base-provider.js";
-import { parseTextualToolCalls } from "../textual-tool-call-parser.js";
+import { parseTextualToolCalls, stripTextualToolCalls } from "../textual-tool-call-parser.js";
 import {
+  capabilityModelId,
+  impliesProxyThinking,
   isClaudeAdaptiveOnlyNoSamplingModel,
+  isClaudeStrictRequestModel,
+  isGeminiModel,
+  isGeminiStrictRequestModel,
+  isMistralAdjustableReasoningModel,
+  isMistralGlm53Model,
   isOpenAIGpt56Model,
   isOpenAIGpt56SolProAlias,
+  isOpenAIGpt6AlwaysReasoningModel,
+  isOpenAIGpt6Model,
   isXaiAutoReasoningModel,
   isXaiConfigurableReasoningModel,
   resolveOpenAIGpt56ModelForRequest,
+  resolveProviderReasoningEffort,
   shouldSuppressUnknownModelParameters,
+  supportsXhighReasoningEffort,
 } from "@marinara-engine/shared";
-import { logger } from "../../../lib/logger.js";
-import { applyGlmThinkingParameters } from "./glm-request-compat.js";
+import { logger, logDebugOverride } from "../../../lib/logger.js";
+import { isDebugAgentsEnabled } from "../../../config/runtime-config.js";
+import { isLocalInferenceBaseUrl } from "../../../middleware/ip-allowlist.js";
+import {
+  applyGlmThinkingParameters,
+  glm53CustomGatewayReasoningEffort,
+  glm53ReasoningEffort,
+  isGlm53MandatoryReasoningModel,
+} from "./glm-request-compat.js";
 
 /**
- * Models that ONLY support the Responses API (`/responses`) and not Chat Completions.
- * GPT-5.6, GPT-5.5, GPT-5.4 variants (base, pro, mini, dated snapshots), and Codex models use Responses.
+ * Models routed through the Responses API (`/responses`).
+ * GPT-5.6, GPT-5.5, GPT-5.4 variants and Codex use these lists. GPT-6 is routed
+ * separately in useResponsesAPI because reasoning with tools requires Responses.
  * Matching is case-insensitive.
  */
 const RESPONSES_ONLY_PREFIXES = ["gpt-5.6", "gpt-5.5", "gpt-5.4", "codex-"];
@@ -48,6 +70,133 @@ type ChatCompletionsUsagePayload = {
     rejected_prediction_tokens?: number;
   };
 };
+
+export function extractOpenAICompatibleContentBlocks(
+  content: unknown,
+  createAnonymousToolCallId?: () => string,
+): { text: string; thinking: string; toolCalls: LLMToolCall[]; anonymousToolCallIds: string[] } | null {
+  if (!Array.isArray(content)) return null;
+  let text = "";
+  let thinking = "";
+  const toolCalls: LLMToolCall[] = [];
+  const anonymousToolCallIds: string[] = [];
+  for (const block of content) {
+    if (typeof block !== "object" || block === null) continue;
+    const value = block as Record<string, unknown>;
+    if (value.type === "thinking" && typeof value.thinking === "string") {
+      thinking += value.thinking;
+    } else if (value.type === "thinking" && Array.isArray(value.thinking)) {
+      // Mistral ThinkChunk: { type: "thinking", thinking: [{ type: "text", text }] }
+      thinking += extractOpenAICompatibleContentBlocks(value.thinking)?.text ?? "";
+    } else if (value.type === "text" && typeof value.text === "string") {
+      text += value.text;
+    } else if (value.type === "tool_use" && typeof value.name === "string") {
+      const name = value.name.trim();
+      if (!name) continue;
+      const providerId = typeof value.id === "string" && value.id.trim() ? value.id : null;
+      const id = providerId ?? createAnonymousToolCallId?.() ?? `tool_${toolCalls.length + 1}`;
+      if (!providerId) anonymousToolCallIds.push(id);
+      toolCalls.push({
+        id,
+        type: "function",
+        function: {
+          name,
+          arguments: typeof value.input === "string" ? value.input : JSON.stringify(value.input ?? {}),
+        },
+      });
+    }
+  }
+  return { text, thinking, toolCalls, anonymousToolCallIds };
+}
+
+/** Keep a final assistant message as history and ask for only the rest of the reply, for models that reject a prefill. */
+function appendAssistantContinuation(body: Record<string, unknown>): void {
+  if (!Array.isArray(body.messages)) return;
+  const last = body.messages.at(-1);
+  if (last?.role === "assistant" && !last.tool_calls?.length) {
+    body.messages.push({ role: "user", content: ASSISTANT_CONTINUATION_PROMPT });
+  }
+}
+
+/** The text of the final `prefix: true` assistant message actually sent, after any role-alternation retry merged it. */
+function mistralPrefixText(body: Record<string, unknown>): string | undefined {
+  const last = Array.isArray(body.messages) ? body.messages.at(-1) : undefined;
+  // ponytail: a prefix with image parts keeps any repeat in the reply; read its text parts if Mistral repeats those.
+  return last?.prefix === true && typeof last.content === "string" ? last.content : undefined;
+}
+
+/**
+ * Mistral starts its reply with the text of a final `prefix: true` assistant message
+ * (https://docs.mistral.ai/guides/prefix). This drops that repeat so callers get only the continuation, as they do from
+ * other providers. Streamed text is held back only until it can be told apart from the prefix; with no prefix every
+ * call passes text through unchanged.
+ */
+function createPrefixEchoFilter(prefix: string | undefined): { push(text: string): string; flush(): string } {
+  let held: string | null = prefix ? "" : null;
+  return {
+    push(text) {
+      if (held === null || !prefix) return text;
+      held += text;
+      if (held.length < prefix.length && prefix.startsWith(held)) return "";
+      const released = held.startsWith(prefix) ? held.slice(prefix.length) : held;
+      held = null;
+      return released;
+    },
+    flush() {
+      const released = held ?? "";
+      held = null;
+      return released;
+    },
+  };
+}
+
+/**
+ * The error strict chat templates raise for consecutive same-role messages, e.g. Mistral's "After the optional system
+ * message, conversation roles must alternate user/assistant/..." (llama.cpp and vLLM pass it through), or Gemma's.
+ * llama.cpp also rejects an Assistant Prefill after an assistant turn ("Cannot have 2 or more assistant messages at the
+ * end of the list.") before it renders any template.
+ */
+const ROLE_ALTERNATION_ERROR =
+  /\b(?:roles?|messages?|turns?)\b[^\n]{0,80}?\bmust\s+(?:strictly\s+)?alternate\b|\bcannot have 2 or more assistant messages\b/i;
+const ROLE_ALTERNATION_HINT =
+  " This model's chat template needs user and assistant messages to take turns, and YunYun could not make this request fit. Set Post-Processing Messages to Single User Message, or serve the model with a less strict chat template.";
+
+type ChatCompletionsWireMessage = Record<string, unknown> & { role?: unknown; content?: unknown };
+
+function joinWireContent(first: unknown, second: unknown): unknown {
+  if (typeof first === "string" && typeof second === "string") return [first, second].filter(Boolean).join("\n\n");
+  const parts = (content: unknown) =>
+    Array.isArray(content) ? content : typeof content === "string" && content ? [{ type: "text", text: content }] : [];
+  return [...parts(first), ...parts(second)];
+}
+
+/**
+ * Reshape Chat Completions messages for a strict chat template: one leading system message, then user and assistant
+ * turns that alternate, starting with user. Later system messages join the user turn around them; tool results and
+ * assistant tool calls are left as they are.
+ */
+function alternateWireMessageRoles(messages: ChatCompletionsWireMessage[]): ChatCompletionsWireMessage[] {
+  const isSystem = (message: ChatCompletionsWireMessage) => message.role === "system" || message.role === "developer";
+  const mergeable = (message: ChatCompletionsWireMessage) => message.role !== "tool" && !message.tool_calls;
+  const result: ChatCompletionsWireMessage[] = [];
+  for (const message of messages) {
+    const role = isSystem(message) && !result.every(isSystem) ? "user" : message.role;
+    const previous = result.at(-1);
+    if (previous && previous.role === role && mergeable(previous) && mergeable(message)) {
+      result[result.length - 1] = {
+        ...previous,
+        ...message,
+        role,
+        content: joinWireContent(previous.content, message.content),
+      };
+    } else {
+      result.push({ ...message, role });
+    }
+  }
+  const firstTurn = result.findIndex((message) => !isSystem(message));
+  if (result[firstTurn]?.role === "assistant") result.splice(firstTurn, 0, { role: "user", content: "[Start]" });
+  return result;
+}
 
 type ResponsesUsagePayload = {
   input_tokens?: number;
@@ -73,6 +222,8 @@ type OpenAIProviderKind =
   | "mistral"
   | "cohere"
   | "arli"
+  | "zai"
+  | "deepseek"
   | "custom"
   | "openai-chatgpt"
   | "local-sidecar";
@@ -84,11 +235,7 @@ export function normalizeOpenAIChatCompletionsResponseFormat(
 
   if (responseFormat.type === "json_schema") {
     if (responseFormat.json_schema && typeof responseFormat.json_schema === "object") return responseFormat;
-    if (
-      typeof responseFormat.name === "string" &&
-      responseFormat.schema &&
-      typeof responseFormat.schema === "object"
-    ) {
+    if (typeof responseFormat.name === "string" && responseFormat.schema && typeof responseFormat.schema === "object") {
       return {
         type: "json_schema",
         json_schema: {
@@ -107,6 +254,10 @@ export function normalizeOpenAIChatCompletionsResponseFormat(
  * Handles OpenAI, OpenRouter, Mistral, Cohere, and any OpenAI-compatible endpoint.
  */
 export class OpenAIProvider extends BaseLLMProvider {
+  // ponytail: remember at most 256 rejected payloads in this provider session.
+  // A new instance may retry them; persistent cleanup needs connection-scoped provenance.
+  private readonly rejectedEncryptedReasoning = new Set<string>();
+
   constructor(
     baseUrl: string,
     apiKey: string,
@@ -294,21 +445,7 @@ export class OpenAIProvider extends BaseLLMProvider {
    * OpenRouter may return `content` as an array of typed blocks instead of a plain string:
    *   [{ type: "thinking", thinking: "..." }, { type: "text", text: "..." }]
    */
-  private static extractContentBlocks(content: unknown): { text: string; thinking: string } | null {
-    if (!Array.isArray(content)) return null;
-    let text = "";
-    let thinking = "";
-    for (const block of content) {
-      if (typeof block !== "object" || block === null) continue;
-      const b = block as Record<string, unknown>;
-      if (b.type === "thinking" && typeof b.thinking === "string") {
-        thinking += b.thinking;
-      } else if (b.type === "text" && typeof b.text === "string") {
-        text += b.text;
-      }
-    }
-    return { text, thinking };
-  }
+  private static extractContentBlocks = extractOpenAICompatibleContentBlocks;
 
   private shouldSendTopK(): boolean {
     return this.apiKey === "local-sidecar" || this.isGenericCustomProvider();
@@ -507,10 +644,19 @@ export class OpenAIProvider extends BaseLLMProvider {
   private assistantReasoningPayload(
     providerMetadata: Record<string, unknown> | undefined,
     model?: string,
+    hasToolCalls = false,
   ): Record<string, unknown> {
-    if (!providerMetadata) return {};
-    if (model && !this.shouldReplayChatCompletionsReasoning(model)) return {};
+    // Mistral messages have no reasoning_content or partial field, so reasoning saved from another provider stays out.
+    if (!providerMetadata || this.providerKind === "mistral") return {};
     const metadata = OpenAIProvider.extractReasoningMetadata(providerMetadata);
+    if (model && !this.shouldReplayChatCompletionsReasoning(model)) {
+      // OpenRouter Gemini needs a tool call's reasoning_details (its thought signatures) back in the same tool loop.
+      // Only tool loops build messages with tool calls; saved chat reasoning stays out at the route (#1097).
+      // https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+      const geminiToolRound = hasToolCalls && this.isOpenRouterGeminiModel(model);
+      return geminiToolRound && metadata.reasoning_details ? { reasoning_details: metadata.reasoning_details } : {};
+    }
+    if (providerMetadata.partial === true) metadata.partial = true;
     if (Array.isArray(metadata.reasoning_details) && metadata.reasoning_details.length) {
       return { reasoning_details: metadata.reasoning_details };
     }
@@ -528,6 +674,7 @@ export class OpenAIProvider extends BaseLLMProvider {
   private buildHeaders(): Record<string, string> {
     const apiKey = this.apiKey.trim();
     const h: Record<string, string> = {
+      ...this.customRequestHeaders,
       "Content-Type": "application/json",
       // Only send auth when a real key is present: a blank `Bearer ` (a decrypt
       // failure, a whitespace-only key, or an intentionally keyless local
@@ -536,6 +683,12 @@ export class OpenAIProvider extends BaseLLMProvider {
       ...(this.extraHeaders ?? {}),
     };
     return h;
+  }
+
+  protected override embeddingHeaders(): Record<string, string> {
+    const headers = this.buildHeaders();
+    if (this.providerKind === "nanogpt" && this.apiKey.trim()) headers["x-api-key"] = this.apiKey.trim();
+    return headers;
   }
 
   private isGenericCustomProvider(): boolean {
@@ -562,6 +715,10 @@ export class OpenAIProvider extends BaseLLMProvider {
         return "Cohere OpenAI-compatible API";
       case "arli":
         return "Arli AI API";
+      case "zai":
+        return "Z.AI API";
+      case "deepseek":
+        return "DeepSeek API";
       case "local-sidecar":
         return "Local sidecar OpenAI-compatible endpoint";
       case "openai-chatgpt":
@@ -581,13 +738,62 @@ export class OpenAIProvider extends BaseLLMProvider {
     return `${this.chatCompletionsErrorLabel()} error ${status}: ${detail}${streamingHint}`;
   }
 
-  private isGpt55Model(model: string): boolean {
-    return model.toLowerCase().startsWith("gpt-5.5");
+  /**
+   * POST a Chat Completions body and throw on an HTTP error. A strict chat template's rejection of consecutive
+   * same-role messages is retried once with them merged, so endpoints that accept the original request never see a
+   * change.
+   */
+  private async postChatCompletions(
+    url: string,
+    body: Record<string, unknown>,
+    stream: boolean,
+    options: ChatOptions,
+  ): Promise<Response> {
+    const send = () =>
+      llmFetch(url, {
+        method: "POST",
+        headers: this.buildHeaders(),
+        body: JSON.stringify(body),
+        bufferResponse: !stream,
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+    let response = await send();
+    if (response.ok) return response;
+    let errorText = await response.text();
+    if (ROLE_ALTERNATION_ERROR.test(errorText) && Array.isArray(body.messages)) {
+      const messages = alternateWireMessageRoles(body.messages);
+      if (JSON.stringify(messages) !== JSON.stringify(body.messages)) {
+        logger.warn(
+          "[OpenAI] %s requires alternating roles; retrying once with consecutive same-role messages merged",
+          this.chatCompletionsErrorLabel(),
+        );
+        logDebugOverride(
+          options.debugMode === true || isDebugAgentsEnabled(),
+          "[debug/openai] role-alternation retry messages:\n%j",
+          messages,
+        );
+        body.messages = messages;
+        response = await send();
+        if (response.ok) return response;
+        errorText = await response.text();
+      }
+    }
+    const hint = ROLE_ALTERNATION_ERROR.test(errorText) ? ROLE_ALTERNATION_HINT : "";
+    throw llmHttpErrorFromResponse(
+      `${this.formatChatCompletionsHttpError(response.status, errorText, stream)}${hint}`,
+      response,
+    );
   }
 
-  private isOpenAIGpt55Or56Model(model: string): boolean {
-    const normalized = model.toLowerCase();
-    return normalized.startsWith("gpt-5.5") || isOpenAIGpt56Model(normalized);
+  private isGpt55Model(model: string): boolean {
+    return capabilityModelId(model).startsWith("gpt-5.5");
+  }
+
+  private isOpenAINoSamplingModel(model: string): boolean {
+    const normalized = capabilityModelId(model);
+    return (
+      normalized.startsWith("gpt-5.5") || isOpenAIGpt56Model(normalized) || isOpenAIGpt6AlwaysReasoningModel(normalized)
+    );
   }
 
   private isResponsesStreamingUnsupportedModel(model: string): boolean {
@@ -599,28 +805,29 @@ export class OpenAIProvider extends BaseLLMProvider {
 
   /** Check if a model ID represents an OpenAI reasoning model */
   private isReasoningModel(model: string): boolean {
-    if (this.isGenericCustomProvider() && !this.isOpenAIGpt55Or56Model(model)) return false;
-    const m = model.toLowerCase();
-    return /^(o1|o3|o4)/.test(m) || m.startsWith("gpt-5");
+    if (isOpenAIGpt6Model(model)) return true;
+    if (this.isGenericCustomProvider() && !this.isOpenAINoSamplingModel(model)) return false;
+    const m = capabilityModelId(model);
+    return /^(o1|o3|o4)/.test(m) || m.startsWith("gpt-5") || isOpenAIGpt6AlwaysReasoningModel(m);
   }
 
   private isXAIEndpoint(): boolean {
     if (this.isGenericCustomProvider()) return false;
     const baseUrl = this.baseUrl.toLowerCase();
-    return baseUrl.includes("api.x.ai") || baseUrl.includes("x.ai/");
+    return this.providerKind === "xai" || baseUrl.includes("api.x.ai") || baseUrl.includes("x.ai/");
   }
 
   private isOpenRouterXAIModel(model: string): boolean {
     return (
       !this.isGenericCustomProvider() &&
       this.baseUrl.includes("openrouter.ai") &&
-      model.toLowerCase().startsWith("x-ai/grok-")
+      capabilityModelId(model).startsWith("x-ai/grok-")
     );
   }
 
   private isXAIMultiAgentModel(model: string): boolean {
     if (this.isGenericCustomProvider()) return false;
-    return model.toLowerCase() === "grok-4.20-multi-agent";
+    return capabilityModelId(model) === "grok-4.20-multi-agent";
   }
 
   private isNativeXAIConfigurableReasoningModel(model: string): boolean {
@@ -629,7 +836,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 
   private isXAIReasoningModel(model: string): boolean {
     if (!this.isXAIEndpoint() && !this.isOpenRouterXAIModel(model)) return false;
-    const m = model.toLowerCase();
+    const m = capabilityModelId(model);
     return (
       m.startsWith("x-ai/grok-") ||
       isXaiConfigurableReasoningModel(m) ||
@@ -638,7 +845,10 @@ export class OpenAIProvider extends BaseLLMProvider {
     );
   }
 
-  private resolveXAIReasoningEffort(reasoningEffort?: string | null): "none" | "low" | "medium" | "high" | null {
+  private resolveXAIReasoningEffort(
+    model: string,
+    reasoningEffort?: string | null,
+  ): "none" | "low" | "medium" | "high" | "xhigh" | null {
     switch (reasoningEffort) {
       case "none":
       case "low":
@@ -648,7 +858,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       case "xhigh":
       case "max":
       case "maximum":
-        return "high";
+        return supportsXhighReasoningEffort(model) ? "xhigh" : "high";
       default:
         return null;
     }
@@ -659,30 +869,69 @@ export class OpenAIProvider extends BaseLLMProvider {
   }
 
   private shouldSendPenaltyParams(model: string): boolean {
-    return !this.isXAIReasoningModel(model);
+    // DeepSeek marks both penalties deprecated and states they no longer take effect. Argon and the newer Gemini Flash
+    // models reject them; a custom endpoint keeps them, as it keeps their samplers.
+    return (
+      this.providerKind !== "deepseek" &&
+      !this.isXAIReasoningModel(model) &&
+      (this.isGenericCustomProvider() || !isGeminiStrictRequestModel(model))
+    );
   }
 
   /**
    * Check if a model/config does NOT support temperature/topP.
    * o-series models never do.
-   * GPT-5.6/GPT-5.5 reject sampling params entirely; older GPT-5.x models only
+   * GPT-6 Astra, GPT-6.1 Sol and GPT-5.6/GPT-5.5 reject sampling params entirely; older GPT-5.x models only
    * reject them when reasoning effort is active.
+   * GPT-6 Sol and GPT-6 Luna allow sampling only when reasoning effort is explicitly "none";
+   * an omitted effort uses the model's reasoning default and rejects sampling.
    */
   private isNoTemperatureModel(model: string, reasoningEffort?: string): boolean {
-    if (this.isGenericCustomProvider() && !this.isOpenAIGpt55Or56Model(model)) return false;
-    const m = model.toLowerCase();
+    if (isOpenAIGpt6Model(model)) return isOpenAIGpt6AlwaysReasoningModel(model) || reasoningEffort !== "none";
+    if (this.isGenericCustomProvider() && !this.isOpenAINoSamplingModel(model) && !isClaudeStrictRequestModel(model))
+      return false;
+    const m = capabilityModelId(model);
     if (/^(o1|o3|o4)/.test(m)) return true;
-    if (isOpenAIGpt56Model(m)) return true;
-    if (this.isGpt55Model(model)) return true;
-    if (m.startsWith("gpt-5") && reasoningEffort && reasoningEffort !== "none") return true;
+    if (this.isOpenAINoSamplingModel(m)) return true;
+    if (m.startsWith("gpt-5") && ((reasoningEffort && reasoningEffort !== "none") || impliesProxyThinking(model)))
+      return true;
     // Claude adaptive-only models forbid all sampling params (covers reverse proxies).
     if (isClaudeAdaptiveOnlyNoSamplingModel(m)) return true;
+    // Argon and the newer Gemini Flash models ignore sampling and reject penalties (OpenRouter, NanoGPT).
+    if (isGeminiStrictRequestModel(m)) return true;
     return false;
   }
 
   private stripUnsupportedSamplerParameters(body: Record<string, unknown>, options: ChatOptions): void {
-    if (!this.isNoTemperatureModel(options.model, options.reasoningEffort)) return;
-    const explicitCustomParameters = this.isGenericCustomProvider() ? options.customParameters : undefined;
+    if (this.providerKind === "deepseek") {
+      // DeepSeek's two samplers belong to different modes, so only one of them is live at a time: temperature has no
+      // effect while thinking runs, and top_p is fixed at 1.0 whenever thinking is off. Strip the ignored one and let
+      // the working sampler reach the API. Unlike the GPT-5 case below, this is not "no sampling at all".
+      // Read the mode from the body, because customParameters are applied before this runs and can override
+      // reasoning_effort: picking the sampler from options alone would strip temperature while the request ships
+      // reasoning_effort "none", leaving a non-thinking request with the sampler that only works while thinking.
+      const reasoningEffort =
+        typeof body.reasoning_effort === "string" ? body.reasoning_effort : options.reasoningEffort;
+      const thinkingOff = this.hasExplicitReasoningDisable(reasoningEffort);
+      const dropped = thinkingOff ? "top_p" : "temperature";
+      const explicit = options.customParameters;
+      if (!explicit || !Object.prototype.hasOwnProperty.call(explicit, dropped)) delete body[dropped];
+      return;
+    }
+    // GPT-6 Sol/Luna allow sampling only when the dispatched request explicitly
+    // disables reasoning; an omitted/disabled parameter uses the model default.
+    const effort = isOpenAIGpt6Model(options.model)
+      ? typeof body.reasoning_effort === "string"
+        ? body.reasoning_effort
+        : body.reasoning && typeof body.reasoning === "object" && "effort" in body.reasoning
+          ? String(body.reasoning.effort)
+          : undefined
+      : options.reasoningEffort;
+    if (!this.isNoTemperatureModel(options.model, effort)) return;
+    const explicitCustomParameters =
+      this.isGenericCustomProvider() && !isClaudeStrictRequestModel(options.model)
+        ? options.customParameters
+        : undefined;
     const removeUnlessExplicit = (key: string) => {
       if (!explicitCustomParameters || !Object.prototype.hasOwnProperty.call(explicitCustomParameters, key)) {
         delete body[key];
@@ -694,6 +943,13 @@ export class OpenAIProvider extends BaseLLMProvider {
     removeUnlessExplicit("min_p");
     removeUnlessExplicit("frequency_penalty");
     removeUnlessExplicit("presence_penalty");
+    if (isOpenAIGpt6Model(options.model)) {
+      removeUnlessExplicit("logprobs");
+      removeUnlessExplicit("top_logprobs");
+      if (!this.isGenericCustomProvider() && Array.isArray(body.include)) {
+        body.include = body.include.filter((value) => value !== "message.output_text.logprobs");
+      }
+    }
   }
 
   private hasActiveReasoningEffort(reasoningEffort?: string | null): boolean {
@@ -704,9 +960,45 @@ export class OpenAIProvider extends BaseLLMProvider {
     return reasoningEffort === "none";
   }
 
+  /**
+   * True when baseUrl points at an inference server running on this machine or
+   * this LAN (llama.cpp, Ollama, vLLM, LM Studio). Such servers expose
+   * arbitrary model names that never match the OpenAI/xAI catalog patterns the
+   * reasoning gates rely on, so without this the user's explicit "reasoning
+   * off" choice is silently discarded before it reaches the request body.
+   */
+  private isLocalInferenceEndpoint(): boolean {
+    return isLocalInferenceBaseUrl(this.baseUrl);
+  }
+
+  private enforceLocalInferenceThinkingDisable(
+    body: Record<string, unknown>,
+    options: ChatOptions,
+    suppressModelParameters: boolean,
+  ): void {
+    if (
+      suppressModelParameters ||
+      isClaudeStrictRequestModel(options.model) ||
+      !this.isGenericCustomProvider() ||
+      !this.shouldSendParameter(options, "reasoningEffort") ||
+      !this.hasExplicitReasoningDisable(options.reasoningEffort) ||
+      !this.isLocalInferenceEndpoint()
+    ) {
+      return;
+    }
+    const templateOptions =
+      body.chat_template_kwargs &&
+      typeof body.chat_template_kwargs === "object" &&
+      !Array.isArray(body.chat_template_kwargs)
+        ? (body.chat_template_kwargs as Record<string, unknown>)
+        : {};
+    body.chat_template_kwargs = { ...templateOptions, enable_thinking: false };
+  }
+
   private supportsOpenAIReasoningDisable(model: string): boolean {
-    const normalized = model.toLowerCase().replace(/^openai\//, "");
+    const normalized = capabilityModelId(model).replace(/^openai\//, "");
     if (normalized.includes("-pro")) return false;
+    if (isOpenAIGpt6Model(normalized)) return !isOpenAIGpt6AlwaysReasoningModel(normalized);
     const version = normalized.match(/^gpt-5\.(\d+)/)?.[1];
     return version !== undefined && Number(version) >= 1;
   }
@@ -719,11 +1011,12 @@ export class OpenAIProvider extends BaseLLMProvider {
   }
 
   private supportsOpenRouterReasoningDisable(model: string): boolean {
-    const normalized = model.toLowerCase();
+    if (isClaudeStrictRequestModel(model)) return false;
+    const normalized = capabilityModelId(model);
     return (
       this.supportsOpenAIReasoningDisable(normalized) ||
       this.supportsXAIReasoningDisable(normalized) ||
-      normalized.startsWith("z-ai/glm-") ||
+      (normalized.startsWith("z-ai/glm-") && !isGlm53MandatoryReasoningModel(normalized)) ||
       normalized.startsWith("thudm/glm-") ||
       /^google\/gemini-2\.5-flash(?:-lite)?(?:$|-preview|-latest|:)/u.test(normalized) ||
       /^anthropic\/claude-(?:opus|sonnet)-5(?:$|[-.])/u.test(normalized)
@@ -747,7 +1040,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 
   private supportsOpenRouterUnifiedReasoning(model: string): boolean {
     if (!this.isOpenRouterEndpoint()) return false;
-    const m = model.toLowerCase();
+    const m = capabilityModelId(model);
     return (
       m.includes("claude-3.7") ||
       /claude-(?:opus|sonnet|haiku)-4(?:[.-]|\b)/.test(m) ||
@@ -757,7 +1050,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 
   private isOpenRouterGeminiModel(model: string): boolean {
     if (!this.isOpenRouterEndpoint()) return false;
-    const m = model.toLowerCase();
+    const m = capabilityModelId(model);
     return m.startsWith("google/gemini") || m.includes("/gemini-");
   }
 
@@ -770,8 +1063,45 @@ export class OpenAIProvider extends BaseLLMProvider {
   }
 
   private applyChatCompletionsReasoning(body: Record<string, unknown>, options: ChatOptions): void {
+    if (this.providerKind === "deepseek") {
+      // DeepSeek carries the effort in reasoning_effort itself: "none" turns thinking off, and low/high/max set the
+      // level. It also accepts a thinking {type} object, but sending both would duplicate the same decision.
+      if (this.hasExplicitReasoningDisable(options.reasoningEffort)) {
+        body.reasoning_effort = "none";
+      } else if (this.hasActiveReasoningEffort(options.reasoningEffort)) {
+        body.reasoning_effort = options.reasoningEffort;
+      }
+      return;
+    }
+    if (this.providerKind === "mistral") {
+      // Mistral reasoning models take only "high" or "none", and GLM 5.3 only "low", "high" or "max"; other Mistral
+      // models are not listed as taking reasoning_effort. prompt_mode is never sent because Mistral rejects it alongside
+      // reasoning_effort.
+      if (isMistralGlm53Model(options.model)) {
+        const effort = glm53ReasoningEffort(options.reasoningEffort);
+        if (effort) body.reasoning_effort = effort;
+        return;
+      }
+      if (!isMistralAdjustableReasoningModel(options.model)) return;
+      if (this.hasExplicitReasoningDisable(options.reasoningEffort)) body.reasoning_effort = "none";
+      else if (this.hasActiveReasoningEffort(options.reasoningEffort)) body.reasoning_effort = "high";
+      return;
+    }
+    if (isClaudeStrictRequestModel(options.model)) {
+      const effort = options.reasoningEffort === "none" ? "low" : options.reasoningEffort;
+      if (effort) {
+        if (this.isOpenRouterEndpoint()) body.reasoning = { effort };
+        else body.reasoning_effort = effort;
+      }
+      return;
+    }
+    if (isOpenAIGpt6AlwaysReasoningModel(options.model) && this.hasExplicitReasoningDisable(options.reasoningEffort)) {
+      if (this.isOpenRouterEndpoint()) body.reasoning = { effort: "low" };
+      else body.reasoning_effort = "low";
+      return;
+    }
     if (this.isNativeXAIConfigurableReasoningModel(options.model)) {
-      const effort = this.resolveXAIReasoningEffort(options.reasoningEffort);
+      const effort = this.resolveXAIReasoningEffort(options.model, options.reasoningEffort);
       if (effort && (effort !== "none" || this.supportsXAIReasoningDisable(options.model))) {
         body.reasoning_effort = effort;
       }
@@ -806,11 +1136,30 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
 
     if (this.isGenericCustomProvider()) {
-      if (this.hasExplicitReasoningDisable(options.reasoningEffort)) {
+      // GLM 5.3 served through a remote non-native gateway only accepts
+      // low/high/max and cannot disable reasoning: forward the configured
+      // effort mapped onto those levels, and send the lightest level instead
+      // of a rejected "none" (mirrors the native Z.AI and NanoGPT handling
+      // above). Local inference servers keep the generic behavior so their
+      // template kwarg wins.
+      const customGlmEffort = glm53CustomGatewayReasoningEffort(options.model, this.baseUrl, options.reasoningEffort);
+      if (customGlmEffort) {
+        body.reasoning_effort = customGlmEffort;
+      } else if (this.hasExplicitReasoningDisable(options.reasoningEffort)) {
         body.reasoning_effort = "none";
       } else if (this.shouldSendReasoningEffort(options.model, options.reasoningEffort)) {
         body.reasoning_effort = options.reasoningEffort;
       }
+      return;
+    }
+
+    if (
+      this.providerKind === "nanogpt" &&
+      this.hasExplicitReasoningDisable(options.reasoningEffort) &&
+      !isGlm53MandatoryReasoningModel(options.model)
+    ) {
+      // NanoGPT Kimi K3 always reasons; use its lightest supported effort for JSON agents requesting "none".
+      body.reasoning_effort = /(?:^|\/)kimi-k3(?:$|[-:])/iu.test(options.model) ? "low" : "none";
       return;
     }
 
@@ -849,6 +1198,52 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
   }
 
+  private normalizeStrictClaudeRequest(body: Record<string, unknown>, options: ChatOptions): void {
+    if (!isClaudeStrictRequestModel(options.model)) return;
+    if (body.reasoning_effort === "none") body.reasoning_effort = "low";
+    if (body.reasoning && typeof body.reasoning === "object" && !Array.isArray(body.reasoning)) {
+      const reasoning = body.reasoning as Record<string, unknown>;
+      if (reasoning.effort === "none") reasoning.effort = "low";
+      if (reasoning.enabled === false) delete reasoning.enabled;
+    }
+    if (body.tool_choice === "required" || (body.tool_choice && typeof body.tool_choice === "object")) {
+      body.tool_choice = "auto";
+    }
+    appendAssistantContinuation(body);
+  }
+
+  /** Mistral request rules, applied after Custom Parameters. */
+  private normalizeMistralRequest(body: Record<string, unknown>): void {
+    if (this.providerKind !== "mistral") return;
+    // Mistral rejects prompt_mode together with reasoning_effort; a prompt_mode from Custom Parameters wins.
+    if (body.prompt_mode !== undefined) delete body.reasoning_effort;
+    if (!Array.isArray(body.messages)) return;
+    // Mistral rejects a system message right after an assistant turn, so a mid-chat instruction there goes as user.
+    for (let index = 1; index < body.messages.length; index++) {
+      if (body.messages[index]?.role === "system" && body.messages[index - 1]?.role === "assistant") {
+        body.messages[index].role = "user";
+      }
+    }
+    // Mistral continues a final assistant message (Assistant Prefill, depth-0 injections) only when it is a prefix.
+    const last = body.messages.at(-1);
+    if (last?.role !== "assistant" || last.tool_calls?.length) return;
+    last.prefix = true;
+  }
+
+  /** Gemini request rules on OpenAI-compatible routes, applied after Custom Parameters. */
+  private normalizeGeminiRequest(body: Record<string, unknown>, model: string): void {
+    if (!isGeminiModel(model) || !Array.isArray(body.messages)) return;
+    // How OpenRouter hands Gemini a system message after the first turn (Post-Processing: Don't Apply) is undocumented,
+    // so it goes as a user turn in place.
+    const firstTurn = body.messages.findIndex((message) => message.role !== "system");
+    if (firstTurn >= 0) {
+      for (let index = firstTurn + 1; index < body.messages.length; index++) {
+        if (body.messages[index]?.role === "system") body.messages[index].role = "user";
+      }
+    }
+    if (isGeminiStrictRequestModel(model)) appendAssistantContinuation(body);
+  }
+
   private applyResponsesReasoning(body: Record<string, unknown>, options: ChatOptions): void {
     if (this.isXAIMultiAgentModel(options.model)) {
       if (this.hasActiveReasoningEffort(options.reasoningEffort)) {
@@ -858,7 +1253,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
 
     if (this.isNativeXAIConfigurableReasoningModel(options.model)) {
-      const effort = this.resolveXAIReasoningEffort(options.reasoningEffort);
+      const effort = this.resolveXAIReasoningEffort(options.model, options.reasoningEffort);
       if (effort && (effort !== "none" || this.supportsXAIReasoningDisable(options.model))) {
         body.reasoning = { effort };
       }
@@ -885,6 +1280,9 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
 
     const reasoning: Record<string, unknown> = {};
+    if (isOpenAIGpt6AlwaysReasoningModel(options.model) && this.hasExplicitReasoningDisable(options.reasoningEffort)) {
+      reasoning.effort = "low";
+    }
     if (
       this.hasExplicitReasoningDisable(options.reasoningEffort) &&
       this.supportsOpenAIReasoningDisable(options.model)
@@ -901,7 +1299,10 @@ export class OpenAIProvider extends BaseLLMProvider {
     if (isOpenAIGpt56SolProAlias(normalizedModel)) {
       reasoning.mode = "pro";
     }
-    if (isOpenAIGpt56Model(normalizedModel) && options.excludePastReasoning !== undefined) {
+    if (
+      (isOpenAIGpt56Model(normalizedModel) || isOpenAIGpt6Model(normalizedModel)) &&
+      options.excludePastReasoning !== undefined
+    ) {
       reasoning.context = options.excludePastReasoning ? "current_turn" : "all_turns";
     }
     if (!this.hasExplicitReasoningDisable(options.reasoningEffort)) {
@@ -920,8 +1321,8 @@ export class OpenAIProvider extends BaseLLMProvider {
     // (max_completion_tokens, temperature suppression) still apply via
     // isReasoningModel / isNoTemperatureModel which have their own GPT-5.5 gates.
     if (this.isGenericCustomProvider()) return false;
-    if (this.isGpt55Model(model)) return true;
-    const m = model.toLowerCase();
+    if (this.isGpt55Model(model) || (isOpenAIGpt6Model(model) && !this.isOpenRouterEndpoint())) return true;
+    const m = capabilityModelId(model);
     return (
       this.isXAIMultiAgentModel(model) ||
       (!!options?.captureReasoning && this.isXAIReasoningModel(model)) ||
@@ -932,8 +1333,8 @@ export class OpenAIProvider extends BaseLLMProvider {
 
   private shouldUseOpenRouterPromptCaching(options: ChatOptions): boolean {
     return (
-      !this.isGenericCustomProvider() &&
-      this.baseUrl.includes("openrouter.ai") &&
+      (this.providerKind === "openrouter" ||
+        (!this.isGenericCustomProvider() && this.baseUrl.includes("openrouter.ai"))) &&
       !!options.enableCaching
     );
   }
@@ -946,7 +1347,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 
   private supportsGpt5Verbosity(model: string): boolean {
     if (this.isOpenAIChatGPTProvider()) return false;
-    return this.isGenericCustomProvider() || model.toLowerCase().startsWith("gpt-5");
+    return this.isGenericCustomProvider() || capabilityModelId(model).startsWith("gpt-5") || isOpenAIGpt6Model(model);
   }
 
   private applyResponsesTextOptions(body: Record<string, unknown>, options: ChatOptions): void {
@@ -976,14 +1377,19 @@ export class OpenAIProvider extends BaseLLMProvider {
     return !!openrouterProvider && !this.isGenericCustomProvider() && this.baseUrl.includes("openrouter.ai");
   }
 
-  private resolveOpenRouterServiceTier(serviceTier?: string | null): "flex" | "priority" | null {
+  private resolveServiceTier(serviceTier?: string | null): "flex" | "priority" | null {
     if (serviceTier !== "flex" && serviceTier !== "priority") return null;
-    if (this.isGenericCustomProvider() || !this.baseUrl.includes("openrouter.ai")) return null;
+    if (
+      this.providerKind !== "nanogpt" &&
+      (this.isGenericCustomProvider() || !this.baseUrl.includes("openrouter.ai"))
+    ) {
+      return null;
+    }
     return serviceTier;
   }
 
-  private applyOpenRouterServiceTier(body: Record<string, unknown>, options: ChatOptions): void {
-    const serviceTier = this.resolveOpenRouterServiceTier(options.serviceTier);
+  private applyServiceTier(body: Record<string, unknown>, options: ChatOptions): void {
+    const serviceTier = this.resolveServiceTier(options.serviceTier);
     if (serviceTier) body.service_tier = serviceTier;
   }
 
@@ -1008,31 +1414,54 @@ export class OpenAIProvider extends BaseLLMProvider {
    */
   private usesDeveloperRole(model: string): boolean {
     if (this.isGenericCustomProvider()) return false;
-    const m = model.toLowerCase();
-    return m.startsWith("gpt-5") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4");
+    const m = capabilityModelId(model);
+    return (
+      m.startsWith("gpt-5") || isOpenAIGpt6Model(m) || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4")
+    );
+  }
+
+  /**
+   * Mistral accepts only 9-character alphanumeric tool-call ids. Ids it did not issue (tool calls read from reply text,
+   * a fallback connection's calls) are hashed to that form, the same way on the call and on its result.
+   */
+  private formatToolCallId(id: string): string {
+    if (this.providerKind !== "mistral" || /^[a-zA-Z0-9]{9}$/u.test(id)) return id;
+    return createHash("sha256").update(id).digest("hex").slice(0, 9);
   }
 
   private formatMessages(messages: ChatMessage[], model?: string) {
     const devRole = model && this.usesDeveloperRole(model);
     return messages
       .filter((m) => {
+        const reasoningPayload =
+          m.role === "assistant" ? this.assistantReasoningPayload(m.providerMetadata, model) : {};
         // Keep tool messages and assistant messages with tool_calls regardless of content
         if (m.role === "tool") return true;
         if (m.role === "assistant" && m.tool_calls?.length) return true;
+        if (Object.keys(reasoningPayload).length > 0) return true;
         // Drop messages with no text or provider-native attachments.
         return m.content?.trim() || m.images?.length || m.files?.length || m.media?.length;
       })
       .map((m) => {
         const reasoningPayload =
-          m.role === "assistant" ? this.assistantReasoningPayload(m.providerMetadata, model) : {};
+          m.role === "assistant"
+            ? this.assistantReasoningPayload(m.providerMetadata, model, !!m.tool_calls?.length)
+            : {};
         if (m.role === "tool") {
-          return { role: "tool" as const, content: m.content, tool_call_id: m.tool_call_id };
+          return {
+            role: "tool" as const,
+            content: m.content,
+            tool_call_id: m.tool_call_id && this.formatToolCallId(m.tool_call_id),
+          };
         }
         if (m.role === "assistant" && m.tool_calls?.length) {
           return {
             role: "assistant" as const,
             content: m.content || null,
-            tool_calls: m.tool_calls,
+            tool_calls:
+              this.providerKind === "mistral"
+                ? m.tool_calls.map((toolCall) => ({ ...toolCall, id: this.formatToolCallId(toolCall.id) }))
+                : m.tool_calls,
             ...reasoningPayload,
           };
         }
@@ -1108,7 +1537,8 @@ export class OpenAIProvider extends BaseLLMProvider {
         body.tools = options.tools;
         body.tool_choice = options.toolChoice ?? "auto";
       }
-      if (effectiveStream) body.stream_options = { include_usage: true };
+      // Mistral rejects stream_options and reports usage on its last chunk anyway.
+      if (effectiveStream && this.providerKind !== "mistral") body.stream_options = { include_usage: true };
 
       // o-series models never support temperature/topP; GPT-5.x only with effort=none
       if (!this.isNoTemperatureModel(options.model, options.reasoningEffort)) {
@@ -1159,8 +1589,6 @@ export class OpenAIProvider extends BaseLLMProvider {
         body.provider = { order: [openrouterProvider] };
       }
 
-      this.applyOpenRouterPromptCaching(body, options);
-
       // Force response format (e.g. JSON mode)
       const normalizedResponseFormat = this.normalizeChatCompletionsResponseFormat(options.responseFormat);
       if (normalizedResponseFormat) {
@@ -1175,9 +1603,16 @@ export class OpenAIProvider extends BaseLLMProvider {
       this.applyChatCompletionsReasoning(body, options);
     }
 
-    this.applyOpenRouterServiceTier(body, options);
+    this.applyOpenRouterPromptCaching(body, options);
+    this.applyServiceTier(body, options);
     this.applyCustomParameters(body, options);
+    // Local chat templates may ignore reasoning_effort. Apply this after custom
+    // parameters so an explicit Reasoning Effort: Off choice remains authoritative.
+    this.enforceLocalInferenceThinkingDisable(body, options, suppressModelParameters);
     this.stripUnsupportedSamplerParameters(body, options);
+    this.normalizeStrictClaudeRequest(body, options);
+    this.normalizeMistralRequest(body);
+    this.normalizeGeminiRequest(body, options.model);
 
     logger.debug(
       "[OpenAI chat()] stream=%s model=%s reasoning=%s enableThinking=%s verbosity=%s max_completion_tokens=%s max_tokens=%s temperature=%s top_p=%s tools=%s",
@@ -1193,18 +1628,8 @@ export class OpenAIProvider extends BaseLLMProvider {
       Array.isArray(body.tools) ? body.tools.length : 0,
     );
 
-    const response = await llmFetch(url, {
-      method: "POST",
-      headers: this.buildHeaders(),
-      body: JSON.stringify(body),
-      bufferResponse: !effectiveStream,
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(this.formatChatCompletionsHttpError(response.status, errorText, effectiveStream));
-    }
+    const response = await this.postChatCompletions(url, body, effectiveStream, options);
+    const prefixEcho = createPrefixEchoFilter(mistralPrefixText(body));
 
     if (!effectiveStream) {
       const json = await OpenAIProvider.parseJsonBody<Record<string, unknown>>(
@@ -1225,12 +1650,9 @@ export class OpenAIProvider extends BaseLLMProvider {
       }
       // Handle OpenRouter content block arrays (Anthropic-style)
       const blocks = OpenAIProvider.extractContentBlocks(msg?.content);
-      if (blocks) {
-        if (!reasoning && blocks.thinking && options.onThinking) options.onThinking(blocks.thinking);
-        yield blocks.text || refusal;
-      } else {
-        yield (typeof msg?.content === "string" ? msg.content : "") || refusal;
-      }
+      if (blocks && !reasoning && blocks.thinking && options.onThinking) options.onThinking(blocks.thinking);
+      const text = blocks ? blocks.text : typeof msg?.content === "string" ? msg.content : "";
+      yield prefixEcho.push(text) + prefixEcho.flush() || refusal;
       const usage = OpenAIProvider.extractChatCompletionsUsage(json.usage as ChatCompletionsUsagePayload | undefined);
       const finishReason = choices[0]?.finish_reason;
       return usage && finishReason ? { ...usage, finishReason } : usage;
@@ -1270,6 +1692,8 @@ export class OpenAIProvider extends BaseLLMProvider {
           const data = OpenAIProvider.extractSseData(trimmed);
           if (data == null) continue;
           if (data === "[DONE]") {
+            const heldText = prefixEcho.flush();
+            if (heldText) yield heldText;
             this.emitChatCompletionsReasoning(options, reasoningMetadata);
             if (streamUsage) return finishReason ? { ...streamUsage, finishReason } : streamUsage;
             return;
@@ -1317,9 +1741,11 @@ export class OpenAIProvider extends BaseLLMProvider {
           const blocks = OpenAIProvider.extractContentBlocks(content);
           if (blocks) {
             if (!reasoning && blocks.thinking && options.onThinking) options.onThinking(blocks.thinking);
-            if (blocks.text) yield blocks.text;
+            const text = blocks.text && prefixEcho.push(blocks.text);
+            if (text) yield text;
           } else if (typeof content === "string" && content) {
-            yield content;
+            const text = prefixEcho.push(content);
+            if (text) yield text;
           } else if (refusal) {
             yield refusal;
           }
@@ -1328,7 +1754,11 @@ export class OpenAIProvider extends BaseLLMProvider {
       }
     } finally {
       if (options.signal) options.signal.removeEventListener("abort", onAbort);
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
     }
+    const heldText = prefixEcho.flush();
+    if (heldText) yield heldText;
     this.emitChatCompletionsReasoning(options, reasoningMetadata);
     if (streamUsage) return finishReason ? { ...streamUsage, finishReason } : streamUsage;
   }
@@ -1390,7 +1820,7 @@ export class OpenAIProvider extends BaseLLMProvider {
 
     if (!suppressModelParameters) {
       if (this.shouldSendStopSequences(options.model) && options.stop?.length) body.stop = options.stop;
-      if (useStream) body.stream_options = { include_usage: true };
+      if (useStream && this.providerKind !== "mistral") body.stream_options = { include_usage: true };
 
       // o-series models never support temperature/topP; GPT-5.x only with effort=none
       if (!this.isNoTemperatureModel(options.model, options.reasoningEffort)) {
@@ -1441,8 +1871,6 @@ export class OpenAIProvider extends BaseLLMProvider {
         body.provider = { order: [openrouterProvider] };
       }
 
-      this.applyOpenRouterPromptCaching(body, options);
-
       // Force response format (e.g. JSON mode)
       const normalizedResponseFormat = this.normalizeChatCompletionsResponseFormat(options.responseFormat);
       if (normalizedResponseFormat) {
@@ -1457,9 +1885,14 @@ export class OpenAIProvider extends BaseLLMProvider {
       this.applyChatCompletionsReasoning(body, options);
     }
 
-    this.applyOpenRouterServiceTier(body, options);
+    this.applyOpenRouterPromptCaching(body, options);
+    this.applyServiceTier(body, options);
     this.applyCustomParameters(body, options);
+    this.enforceLocalInferenceThinkingDisable(body, options, suppressModelParameters);
     this.stripUnsupportedSamplerParameters(body, options);
+    this.normalizeStrictClaudeRequest(body, options);
+    this.normalizeMistralRequest(body);
+    this.normalizeGeminiRequest(body, options.model);
 
     logger.debug(
       "[OpenAI chatComplete()] stream=%s model=%s reasoning=%s enableThinking=%s verbosity=%s onToken=%s",
@@ -1471,18 +1904,8 @@ export class OpenAIProvider extends BaseLLMProvider {
       !!options.onToken,
     );
 
-    const response = await llmFetch(url, {
-      method: "POST",
-      headers: this.buildHeaders(),
-      body: JSON.stringify(body),
-      bufferResponse: !useStream,
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(this.formatChatCompletionsHttpError(response.status, errorText, useStream));
-    }
+    const response = await this.postChatCompletions(url, body, useStream, options);
+    const prefixEcho = createPrefixEchoFilter(mistralPrefixText(body));
 
     if (!useStream) {
       // Non-streaming path (no onToken callback)
@@ -1513,17 +1936,19 @@ export class OpenAIProvider extends BaseLLMProvider {
         if (!reasoning && blocks.thinking && options.onThinking) options.onThinking(blocks.thinking);
         resolvedContent = blocks.text || null;
       } else {
-        resolvedContent = (choice?.message?.content as string) ?? null;
+        resolvedContent = typeof choice?.message?.content === "string" ? choice.message.content : null;
       }
+      if (resolvedContent) resolvedContent = prefixEcho.push(resolvedContent) + prefixEcho.flush() || null;
       // Fall back to refusal text so the user sees why the model declined
       if (!resolvedContent && typeof choice?.message?.refusal === "string" && choice.message.refusal) {
         resolvedContent = choice.message.refusal;
       }
       const usage = OpenAIProvider.extractChatCompletionsUsage(json.usage as ChatCompletionsUsagePayload | undefined);
       let toolCalls = OpenAIProvider.normalizeToolCalls(choice?.message?.tool_calls);
+      if (toolCalls.length === 0 && blocks?.toolCalls.length) toolCalls = blocks.toolCalls;
       if (toolCalls.length === 0 && resolvedContent && options.tools?.length) {
         toolCalls = parseTextualToolCalls(resolvedContent, options.tools);
-        if (toolCalls.length > 0) resolvedContent = null;
+        if (toolCalls.length > 0) resolvedContent = stripTextualToolCalls(resolvedContent, options.tools) || null;
       }
       return {
         content: resolvedContent,
@@ -1553,15 +1978,18 @@ export class OpenAIProvider extends BaseLLMProvider {
     let finishReason = "stop";
     let streamUsage: LLMUsage | undefined;
     const reasoningMetadata: Record<string, unknown> = {};
+    let anonymousContentBlockToolCallCount = 0;
 
     // Accumulate tool calls from deltas
     const toolCallsMap = new Map<
       number,
       { id: string; type: "function"; function: { name: string; arguments: string } }
     >();
+    const contentBlockToolCallsMap = new Map<number, LLMToolCall>();
+    const providerContentBlockToolCallIndexes = new Map<string, number>();
 
     try {
-      while (true) {
+      stream: while (true) {
         const { done, value } = await reader.read();
 
         buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
@@ -1572,7 +2000,7 @@ export class OpenAIProvider extends BaseLLMProvider {
           const trimmed = line.trim();
           const data = OpenAIProvider.extractSseData(trimmed);
           if (data == null) continue;
-          if (data === "[DONE]") break;
+          if (data === "[DONE]") break stream;
 
           let parsed: Record<string, unknown>;
           try {
@@ -1632,16 +2060,31 @@ export class OpenAIProvider extends BaseLLMProvider {
             (typeof delta?.refusal === "string" && delta.refusal) ||
             (typeof message?.refusal === "string" && message.refusal) ||
             "";
-          const blocks = OpenAIProvider.extractContentBlocks(textContent);
+          const blocks = OpenAIProvider.extractContentBlocks(
+            textContent,
+            () => `content_block_tool_${++anonymousContentBlockToolCallCount}`,
+          );
           if (blocks) {
             if (!reasoning && blocks.thinking && options.onThinking) options.onThinking(blocks.thinking);
-            if (blocks.text) {
-              content += blocks.text;
-              await options.onToken?.(blocks.text);
+            const text = blocks.text && prefixEcho.push(blocks.text);
+            if (text) {
+              content += text;
+              await options.onToken?.(text);
+            }
+            for (const toolCall of blocks.toolCalls) {
+              const isAnonymous = blocks.anonymousToolCallIds.includes(toolCall.id);
+              const index = isAnonymous
+                ? contentBlockToolCallsMap.size
+                : (providerContentBlockToolCallIndexes.get(toolCall.id) ?? contentBlockToolCallsMap.size);
+              contentBlockToolCallsMap.set(index, toolCall);
+              if (!isAnonymous) providerContentBlockToolCallIndexes.set(toolCall.id, index);
             }
           } else if (typeof textContent === "string" && textContent) {
-            content += textContent;
-            await options.onToken?.(textContent);
+            const text = prefixEcho.push(textContent);
+            if (text) {
+              content += text;
+              await options.onToken?.(text);
+            }
           } else if (refusal) {
             content += refusal;
             await options.onToken?.(refusal);
@@ -1696,18 +2139,26 @@ export class OpenAIProvider extends BaseLLMProvider {
       }
     } finally {
       options.signal?.removeEventListener("abort", onAbort);
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+    const heldText = prefixEcho.flush();
+    if (heldText) {
+      content += heldText;
+      await options.onToken?.(heldText);
     }
 
     // Collect tool calls in order
     let toolCalls: LLMToolCall[] = [];
-    const sortedKeys = [...toolCallsMap.keys()].sort((a, b) => a - b);
+    const selectedToolCallsMap = toolCallsMap.size > 0 ? toolCallsMap : contentBlockToolCallsMap;
+    const sortedKeys = [...selectedToolCallsMap.keys()].sort((a, b) => a - b);
     for (const key of sortedKeys) {
-      const normalized = OpenAIProvider.normalizeToolCall(toolCallsMap.get(key), key);
+      const normalized = OpenAIProvider.normalizeToolCall(selectedToolCallsMap.get(key), key);
       if (normalized) toolCalls.push(normalized);
     }
     if (toolCalls.length === 0 && content && options.tools?.length) {
       toolCalls = parseTextualToolCalls(content, options.tools);
-      if (toolCalls.length > 0) content = "";
+      if (toolCalls.length > 0) content = stripTextualToolCalls(content, options.tools);
     }
 
     this.emitChatCompletionsReasoning(options, reasoningMetadata);
@@ -1733,7 +2184,10 @@ export class OpenAIProvider extends BaseLLMProvider {
    * Tool messages become `function_call_output` items.
    * Assistant messages with tool_calls become `function_call` items.
    */
-  private formatResponsesInput(messages: ChatMessage[]): {
+  private formatResponsesInput(
+    messages: ChatMessage[],
+    replayReasoning = false,
+  ): {
     instructions: string | undefined;
     input: Array<Record<string, unknown>>;
   } {
@@ -1774,6 +2228,16 @@ export class OpenAIProvider extends BaseLLMProvider {
       }
 
       sawNonSystemInput = true;
+
+      // Replay each turn's opaque reasoning immediately before the assistant output it belongs to.
+      const encrypted = m.providerMetadata?.encryptedReasoning;
+      if (replayReasoning && m.role === "assistant" && Array.isArray(encrypted)) {
+        for (const item of encrypted) {
+          if (!item || typeof item !== "object" || item.type !== "reasoning") continue;
+          if (typeof item.id === "string" && input.some((existing) => existing.id === item.id)) continue;
+          input.push(item);
+        }
+      }
 
       if (m.role === "tool") {
         // Tool result → function_call_output item
@@ -1843,24 +2307,54 @@ export class OpenAIProvider extends BaseLLMProvider {
     return errorText.includes("encrypted content") && errorText.includes("could not be");
   }
 
-  /** Strip encrypted reasoning items from a Responses API body for retry */
-  private stripEncryptedItems(body: Record<string, unknown>): Record<string, unknown> {
+  private encryptedReasoningKey(item: Record<string, unknown>, model: string): string {
+    return createHash("sha256").update(model).update("\0").update(JSON.stringify(item)).digest("hex");
+  }
+
+  /** Remove rejected payloads from this retry and later requests on the same provider/model. */
+  private stripEncryptedItems(body: Record<string, unknown>, errorText: string, model: string): void {
     const input = body.input as Array<Record<string, unknown>> | undefined;
-    if (input) {
-      body.input = input.filter((item) => item.type !== "reasoning");
+    if (!input) return;
+    let rejectedIndex = -1;
+    let message = errorText;
+    try {
+      const error = (JSON.parse(errorText) as { error?: { param?: string; message?: string } } | null)?.error;
+      if (typeof error?.message === "string") message = error.message;
+      const index = typeof error?.param === "string" ? /^input(?:\[(\d+)\]|\.(\d+))(?:\.|$)/.exec(error.param) : null;
+      if (index) rejectedIndex = Number(index[1] ?? index[2]);
+    } catch {
+      /* Non-JSON errors use the existing batch fallback. */
     }
-    return body;
+    const reasoningItems = input.filter((item) => item.type === "reasoning");
+    const identified = reasoningItems.filter(
+      (item) =>
+        input[rejectedIndex] === item ||
+        (typeof item.id === "string" && (message.includes(`'${item.id}'`) || message.includes(`"${item.id}"`))),
+    );
+    const rejectedKeys = new Set(
+      (identified.length ? identified : reasoningItems).map((item) => this.encryptedReasoningKey(item, model)),
+    );
+    for (const key of rejectedKeys) {
+      this.rejectedEncryptedReasoning.add(key);
+      if (this.rejectedEncryptedReasoning.size > 256) {
+        this.rejectedEncryptedReasoning.delete(this.rejectedEncryptedReasoning.values().next().value!);
+      }
+    }
+    body.input = input.filter(
+      (item) => item.type !== "reasoning" || !rejectedKeys.has(this.encryptedReasoningKey(item, model)),
+    );
   }
 
   /** Build the Responses API request body */
   private buildResponsesBody(messages: ChatMessage[], options: ChatOptions): Record<string, unknown> {
-    const { instructions, input } = this.formatResponsesInput(messages);
     const isOpenAIChatGPT = this.isOpenAIChatGPTProvider();
+    const replayReasoning = !isOpenAIChatGPT && options.reasoningEffort !== "none";
+    const { instructions, input } = this.formatResponsesInput(messages, replayReasoning);
     const suppressModelParameters = this.shouldSuppressModelParameters(options);
 
     // Replay encrypted reasoning items from the previous turn so the model
     // retains its reasoning context and avoids re-deriving (and re-narrating) the same conclusions.
-    if (!isOpenAIChatGPT && options.reasoningEffort !== "none" && options.encryptedReasoningItems?.length) {
+    if (replayReasoning && options.encryptedReasoningItems?.length) {
       let lastAssistantIdx = -1;
       for (let i = input.length - 1; i >= 0; i--) {
         if ((input[i] as Record<string, unknown>).role === "assistant") {
@@ -1869,13 +2363,21 @@ export class OpenAIProvider extends BaseLLMProvider {
         }
       }
       if (lastAssistantIdx >= 0) {
-        input.splice(lastAssistantIdx, 0, ...(options.encryptedReasoningItems as Array<Record<string, unknown>>));
+        const existingIds = new Set(input.filter((item) => item.type === "reasoning").map((item) => item.id));
+        const missing = (options.encryptedReasoningItems as Array<Record<string, unknown>>).filter(
+          (item) => !item.id || !existingIds.has(item.id),
+        );
+        input.splice(lastAssistantIdx, 0, ...missing);
       }
     }
 
     const body: Record<string, unknown> = {
       model: resolveOpenAIGpt56ModelForRequest(options.model),
-      input,
+      input: input.filter(
+        (item) =>
+          item.type !== "reasoning" ||
+          !this.rejectedEncryptedReasoning.has(this.encryptedReasoningKey(item, options.model)),
+      ),
       store: false, // don't persist responses on OpenAI side
     };
     const shouldStreamResponses =
@@ -1922,8 +2424,19 @@ export class OpenAIProvider extends BaseLLMProvider {
       if (topP != null) body.top_p = topP;
     }
 
-    if (!isOpenAIChatGPT && !suppressModelParameters && this.shouldSendParameter(options, "reasoningEffort")) {
-      this.applyResponsesReasoning(body, options);
+    if (!suppressModelParameters && this.shouldSendParameter(options, "reasoningEffort")) {
+      if (!isOpenAIChatGPT) {
+        this.applyResponsesReasoning(body, options);
+      } else if (this.isReasoningModel(options.model)) {
+        // Codex takes the same thinking levels as its own client, so a level the model lacks (max on GPT-5.5) is
+        // stepped down. It has no "none" level, so sending nothing keeps the model's default level.
+        const effort = resolveProviderReasoningEffort({
+          provider: "openai_chatgpt",
+          model: options.model,
+          reasoningEffort: options.reasoningEffort,
+        });
+        if (effort) body.reasoning = { effort };
+      }
     }
 
     // GPT-5+ verbosity and Responses structured output / JSON mode.
@@ -1941,7 +2454,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
 
     if (!isOpenAIChatGPT) {
-      this.applyOpenRouterServiceTier(body, options);
+      this.applyServiceTier(body, options);
     }
 
     if (
@@ -2001,11 +2514,10 @@ export class OpenAIProvider extends BaseLLMProvider {
       if (
         response.status === 400 &&
         this.isEncryptedContentError(errorText) &&
-        options.encryptedReasoningItems?.length
+        (body.input as Array<Record<string, unknown>>).some((item) => item.type === "reasoning")
       ) {
         logger.warn("[OpenAI chatResponses] Encrypted reasoning items rejected, retrying without them");
-        options.onEncryptedReasoning?.([]); // clear the cache
-        this.stripEncryptedItems(body);
+        this.stripEncryptedItems(body, errorText, options.model);
         response = await llmFetch(url, {
           method: "POST",
           headers: this.buildHeaders(),
@@ -2015,10 +2527,16 @@ export class OpenAIProvider extends BaseLLMProvider {
         });
         if (!response.ok) {
           const retryError = await response.text();
-          throw new Error(`OpenAI Responses API error ${response.status}: ${sanitizeApiError(retryError)}`);
+          throw llmHttpErrorFromResponse(
+            `OpenAI Responses API error ${response.status}: ${sanitizeApiError(retryError)}`,
+            response,
+          );
         }
       } else {
-        throw new Error(`OpenAI Responses API error ${response.status}: ${sanitizeApiError(errorText)}`);
+        throw llmHttpErrorFromResponse(
+          `OpenAI Responses API error ${response.status}: ${sanitizeApiError(errorText)}`,
+          response,
+        );
       }
     }
 
@@ -2188,7 +2706,7 @@ export class OpenAIProvider extends BaseLLMProvider {
               const resp = parsed.response as Record<string, unknown> | undefined;
               const error = resp?.error as Record<string, unknown> | undefined;
               const msg = (error?.message as string) ?? "unknown error";
-              logger.error(new Error(msg), "[OpenAI Responses] Stream ended with response.failed");
+              // Thrown, not logged: the caller writes the one line for this failure.
               throw new Error(`OpenAI Responses stream failed: ${msg}`);
             }
             case "response.incomplete": {
@@ -2260,11 +2778,10 @@ export class OpenAIProvider extends BaseLLMProvider {
       if (
         response.status === 400 &&
         this.isEncryptedContentError(errorText) &&
-        options.encryptedReasoningItems?.length
+        (body.input as Array<Record<string, unknown>>).some((item) => item.type === "reasoning")
       ) {
         logger.warn("[OpenAI chatCompleteResponses] Encrypted reasoning items rejected, retrying without them");
-        options.onEncryptedReasoning?.([]); // clear the cache
-        this.stripEncryptedItems(body);
+        this.stripEncryptedItems(body, errorText, options.model);
         response = await llmFetch(url, {
           method: "POST",
           headers: this.buildHeaders(),
@@ -2274,10 +2791,16 @@ export class OpenAIProvider extends BaseLLMProvider {
         });
         if (!response.ok) {
           const retryError = await response.text();
-          throw new Error(`OpenAI Responses API error ${response.status}: ${sanitizeApiError(retryError)}`);
+          throw llmHttpErrorFromResponse(
+            `OpenAI Responses API error ${response.status}: ${sanitizeApiError(retryError)}`,
+            response,
+          );
         }
       } else {
-        throw new Error(`OpenAI Responses API error ${response.status}: ${sanitizeApiError(errorText)}`);
+        throw llmHttpErrorFromResponse(
+          `OpenAI Responses API error ${response.status}: ${sanitizeApiError(errorText)}`,
+          response,
+        );
       }
     }
 
@@ -2318,6 +2841,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     let currentEvent = "";
     let emittedReasoningSummary = "";
     let streamedReasoningSummary = "";
+    let encryptedReasoning: unknown[] = [];
 
     try {
       while (true) {
@@ -2453,6 +2977,7 @@ export class OpenAIProvider extends BaseLLMProvider {
                   },
                 });
               } else if (item?.type === "reasoning") {
+                if (typeof item.encrypted_content === "string") encryptedReasoning.push(item);
                 emittedReasoningSummary = this.emitMissingResponsesReasoningSummary(
                   { output: [item] },
                   options,
@@ -2466,6 +2991,8 @@ export class OpenAIProvider extends BaseLLMProvider {
               const resp = parsed.response as Record<string, unknown> | undefined;
               if (resp) {
                 streamUsage = this.extractResponsesUsage(resp);
+                const completedReasoning = this.extractEncryptedReasoningItems(resp);
+                if (completedReasoning.length) encryptedReasoning = completedReasoning;
                 this.emitEncryptedReasoning(resp, options);
                 emittedReasoningSummary = this.emitMissingResponsesReasoningSummary(
                   resp,
@@ -2494,7 +3021,7 @@ export class OpenAIProvider extends BaseLLMProvider {
               const resp = parsed.response as Record<string, unknown> | undefined;
               const error = resp?.error as Record<string, unknown> | undefined;
               const msg = (error?.message as string) ?? "unknown error";
-              logger.error(new Error(msg), "[OpenAI Responses] chatCompleteResponses stream failed");
+              // Thrown, not logged: the caller writes the one line for this failure.
               throw new Error(`OpenAI Responses stream failed: ${msg}`);
             }
             case "response.incomplete": {
@@ -2503,6 +3030,9 @@ export class OpenAIProvider extends BaseLLMProvider {
               logger.warn("[OpenAI Responses] chatCompleteResponses stream incomplete (reason=%s)", reason);
               finishReason = OpenAIProvider.normalizeResponsesIncompleteFinishReason(reason);
               if (resp) {
+                const completedReasoning = this.extractEncryptedReasoningItems(resp);
+                if (completedReasoning.length) encryptedReasoning = completedReasoning;
+                this.emitEncryptedReasoning(resp, options);
                 emittedReasoningSummary = this.emitMissingResponsesReasoningSummary(
                   resp,
                   options,
@@ -2529,6 +3059,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       toolCalls: functionCalls,
       finishReason,
       usage: streamUsage,
+      ...(encryptedReasoning.length ? { providerMetadata: { encryptedReasoning } } : {}),
     };
   }
 
@@ -2687,6 +3218,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     const text = this.extractResponsesText(json);
     const usage = this.extractResponsesUsage(json);
     const output = json.output as Array<Record<string, unknown>> | undefined;
+    const encryptedReasoning = this.extractEncryptedReasoningItems(json);
 
     // Extract function calls from output items
     const toolCalls: LLMToolCall[] = [];
@@ -2722,6 +3254,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       toolCalls,
       finishReason,
       usage,
+      ...(encryptedReasoning.length ? { providerMetadata: { encryptedReasoning } } : {}),
     };
   }
 }

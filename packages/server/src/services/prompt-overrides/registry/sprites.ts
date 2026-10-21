@@ -136,7 +136,7 @@ export const SPRITES_ANIMATED_PORTRAIT: PromptOverrideKeyDef<SpritesAnimatedPort
     {
       name: "appearance",
       description: "Character appearance description and identity constraints.",
-      example: "Dottore wearing a mask that covers his eyes, blue hair, ornate coat",
+      example: "Dominic wearing a mask that covers his eyes, blue hair, ornate coat",
     },
     { name: "expression", description: "Facial expression to animate.", example: "angry" },
     { name: "durationSeconds", description: "Clip duration in seconds.", example: "3" },
@@ -161,7 +161,7 @@ export const SPRITES_ANIMATED_PORTRAIT: PromptOverrideKeyDef<SpritesAnimatedPort
       `Single character only. No extra people. No text, captions, UI, logos, watermarks, speech bubbles, split panels, or collage.`,
     ].join(" "),
   exampleContext: {
-    appearance: "Dottore wearing a mask that covers his eyes, blue hair, ornate coat",
+    appearance: "Dominic wearing a mask that covers his eyes, blue hair, ornate coat",
     expression: "angry",
     durationSeconds: 3,
     aspectRatio: "9:16",

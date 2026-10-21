@@ -14,19 +14,35 @@
 // edits trigger a push — transient UI state (modal open, detail panels, etc.)
 // is filtered out via `pickSyncedSettings`.
 import { useEffect } from "react";
+import { toast } from "sonner";
 import {
+  MAX_APP_SETTINGS_VALUE_LENGTH,
   normalizeImageStyleProfileSettings,
   normalizeQuoteFormat,
   type AppSettingsResponse,
 } from "@marinara-engine/shared";
 import { api } from "../lib/api-client";
+import { translate } from "../localization/i18n";
 import { normalizeConversationTimeZone } from "../lib/conversation-time-zone";
+import { normalizeApprovedRemoteImageUrls } from "../lib/remote-images";
+import { normalizeChatWidgetFont } from "../lib/font-family";
 import {
+  normalizeChatWidgetColor,
+  normalizeChatWidgetButtonSize,
+  normalizeChatWidgetPreset,
+  normalizeChatWidgetShape,
+  normalizeTrackerPanelCollapsedSections,
+  normalizeTrackerPanelSectionOrder,
   normalizeTrackerPanelSizeProfile,
   normalizeTrackerStatDisplayMode,
   normalizeTrackerTemperatureUnit,
   normalizeTrackerThoughtBubbleDisplay,
   normalizeScenePromptPreferences,
+  normalizeConversationBackgroundImageOpacity,
+  normalizeMariWindowHeightRem,
+  normalizeMariWindowWidthRem,
+  normalizeOmnibarWindowWidthRem,
+  normalizeOmnibarWindowHeightRem,
   pickSyncedSettings,
   useUIStore,
 } from "../stores/ui.store";
@@ -36,12 +52,14 @@ const SETTINGS_PATH = `/app-settings/${SETTINGS_KEY}`;
 const LOCAL_SETTINGS_KEY = "marinara-engine-ui";
 const LOCAL_UPDATED_AT_KEY = "marinara-engine-ui-updated-at";
 const DEBOUNCE_MS = 1000;
+const SETTINGS_TOO_LARGE_TOAST_ID = "settings-sync-too-large";
 
 type SyncedSettingsObject = ReturnType<typeof pickSyncedSettings>;
 type ServerSettingsPayload = SyncedSettingsObject & { __updatedAt?: number };
 type ParsedSettings = Partial<SyncedSettingsObject> & Record<string, unknown>;
 
 const LOCAL_ONLY_SETTING_KEYS = [
+  "appAccentPulseMode",
   "fontSize",
   "chatFontSize",
   "trackerPanelOpen",
@@ -53,6 +71,23 @@ export function omitLocalOnlySettings(settings: ParsedSettings): ParsedSettings 
   const sanitized = { ...settings };
   for (const key of LOCAL_ONLY_SETTING_KEYS) {
     delete sanitized[key];
+  }
+  if ("conversationBackgroundImageOpacity" in sanitized) {
+    sanitized.conversationBackgroundImageOpacity = normalizeConversationBackgroundImageOpacity(
+      sanitized.conversationBackgroundImageOpacity,
+    );
+  }
+  if ("mariWindowHeightRem" in sanitized) {
+    sanitized.mariWindowHeightRem = normalizeMariWindowHeightRem(sanitized.mariWindowHeightRem);
+  }
+  if ("mariWindowWidthRem" in sanitized) {
+    sanitized.mariWindowWidthRem = normalizeMariWindowWidthRem(sanitized.mariWindowWidthRem);
+  }
+  if ("omnibarWindowWidthRem" in sanitized) {
+    sanitized.omnibarWindowWidthRem = normalizeOmnibarWindowWidthRem(sanitized.omnibarWindowWidthRem);
+  }
+  if ("omnibarWindowHeightRem" in sanitized) {
+    sanitized.omnibarWindowHeightRem = normalizeOmnibarWindowHeightRem(sanitized.omnibarWindowHeightRem);
   }
   return sanitized;
 }
@@ -76,7 +111,11 @@ function readLocalUpdatedAt(): number | null {
 }
 
 function writeLocalUpdatedAt(updatedAt: number): void {
-  window.localStorage.setItem(LOCAL_UPDATED_AT_KEY, String(updatedAt));
+  try {
+    window.localStorage.setItem(LOCAL_UPDATED_AT_KEY, String(updatedAt));
+  } catch {
+    // Full or blocked browser storage must not stop the push; the server copy stays the source of truth.
+  }
 }
 
 function hasLocalPersistedUiState(): boolean {
@@ -89,6 +128,15 @@ function serializeSettings(settings: SyncedSettingsObject): string {
 
 function buildServerSettingsValue(settings: SyncedSettingsObject, updatedAt: number): string {
   return JSON.stringify({ ...settings, __updatedAt: updatedAt } satisfies ServerSettingsPayload);
+}
+
+/** Saves the settings value, or says so plainly when it is too large for the server instead of failing silently. */
+async function putServerSettingsValue(value: string): Promise<void> {
+  if (value.length > MAX_APP_SETTINGS_VALUE_LENGTH) {
+    toast.error(translate("settings.sync.tooLarge"), { id: SETTINGS_TOO_LARGE_TOAST_ID });
+    throw new Error("Settings are larger than the server accepts");
+  }
+  await api.put(SETTINGS_PATH, { value });
 }
 
 function parseServerSettingsValue(value: string): {
@@ -104,6 +152,8 @@ function parseServerSettingsValue(value: string): {
   const updatedAt =
     typeof payload.__updatedAt === "number" && Number.isFinite(payload.__updatedAt) ? payload.__updatedAt : null;
   delete payload.__updatedAt;
+  payload.imageCharacterSheetWidth ??= payload.imageBackgroundWidth ?? 1280;
+  payload.imageCharacterSheetHeight ??= payload.imageBackgroundHeight ?? 720;
   return { settings: payload, updatedAt };
 }
 
@@ -127,7 +177,7 @@ export function useSettingsSync() {
       pendingUpdatedAt = null;
       writeLocalUpdatedAt(updatedAt);
       lastPushed = settingsFingerprint;
-      api.put(SETTINGS_PATH, { value: buildServerSettingsValue(settings, updatedAt) }).catch(() => {
+      putServerSettingsValue(buildServerSettingsValue(settings, updatedAt)).catch(() => {
         // Server unreachable — next change will retry. We keep `lastPushed`
         // as the failed payload so we only re-send when the user actually
         // changes something again.
@@ -208,6 +258,38 @@ export function useSettingsSync() {
                 );
                 delete parsed.settings.trackerPanelWidth;
               }
+              // The synced blob predates every section added after it was written, so a
+              // server order captured before a new tracker section shipped would hide
+              // that section forever — `migrate` only normalizes the browser-local copy,
+              // and the `setState` below overwrites it. `staleSyncedShape` forces the
+              // corrected value back to the server; without it the stale array survives
+              // and re-arrives on every other device.
+              let staleSyncedShape = false;
+              if ("trackerPanelSectionOrder" in parsed.settings) {
+                const normalizedOrder = normalizeTrackerPanelSectionOrder(parsed.settings.trackerPanelSectionOrder);
+                if (!Array.isArray(parsed.settings.trackerPanelSectionOrder)) {
+                  staleSyncedShape = true;
+                } else if (
+                  parsed.settings.trackerPanelSectionOrder.length !== normalizedOrder.length ||
+                  normalizedOrder.some(
+                    (section, index) => parsed.settings.trackerPanelSectionOrder?.[index] !== section,
+                  )
+                ) {
+                  staleSyncedShape = true;
+                }
+                parsed.settings.trackerPanelSectionOrder = normalizedOrder;
+              }
+              if ("trackerPanelCollapsedSections" in parsed.settings) {
+                const normalizedCollapsed = normalizeTrackerPanelCollapsedSections(
+                  parsed.settings.trackerPanelCollapsedSections,
+                );
+                if (
+                  JSON.stringify(parsed.settings.trackerPanelCollapsedSections) !== JSON.stringify(normalizedCollapsed)
+                ) {
+                  staleSyncedShape = true;
+                }
+                parsed.settings.trackerPanelCollapsedSections = normalizedCollapsed;
+              }
               if ("trackerPanelThoughtBubbleDisplay" in parsed.settings) {
                 parsed.settings.trackerPanelThoughtBubbleDisplay = normalizeTrackerThoughtBubbleDisplay(
                   parsed.settings.trackerPanelThoughtBubbleDisplay,
@@ -245,6 +327,55 @@ export function useSettingsSync() {
                   parsed.settings.conversationTimeZone,
                 );
               }
+              if ("chatWidgetPreset" in parsed.settings) {
+                parsed.settings.chatWidgetPreset = normalizeChatWidgetPreset(parsed.settings.chatWidgetPreset);
+              }
+              if ("chatWidgetFont" in parsed.settings) {
+                parsed.settings.chatWidgetFont = normalizeChatWidgetFont(parsed.settings.chatWidgetFont);
+              }
+              if ("chatWidgetShape" in parsed.settings) {
+                parsed.settings.chatWidgetShape = normalizeChatWidgetShape(parsed.settings.chatWidgetShape);
+              }
+              if ("chatWidgetButtonSize" in parsed.settings) {
+                parsed.settings.chatWidgetButtonSize = normalizeChatWidgetButtonSize(
+                  parsed.settings.chatWidgetButtonSize,
+                );
+              }
+              for (const key of ["chatWidgetApplyFont", "chatWidgetApplyShape", "chatWidgetApplyColors"] as const) {
+                if (key in parsed.settings) parsed.settings[key] = parsed.settings[key] === true;
+              }
+              for (const key of [
+                "chatWidgetBorderColor",
+                "chatWidgetBackgroundColor",
+                "chatWidgetTextColor",
+              ] as const) {
+                if (key in parsed.settings) {
+                  parsed.settings[key] = normalizeChatWidgetColor(parsed.settings[key]);
+                }
+              }
+
+              // Dismissal is permanent, even if it happened while this request was pending.
+              // A newer preference blob must not restore guidance dismissed on either device.
+              for (const key of ["chatSettingsMoveTipDismissed", "chatWindowIntroDismissed"] as const) {
+                const locallyDismissed = useUIStore.getState()[key] === true;
+                if (locallyDismissed || parsed.settings[key] === true) {
+                  if (parsed.settings[key] !== true) staleSyncedShape = true;
+                  parsed.settings[key] = true;
+                  if (!locallyDismissed) {
+                    useUIStore.setState({ [key]: true });
+                  }
+                }
+              }
+
+              // A loaded image stays loaded: keep approvals from this browser and the server alike.
+              const localApprovals = useUIStore.getState().approvedRemoteImageUrls;
+              const serverApprovals = normalizeApprovedRemoteImageUrls(parsed.settings.approvedRemoteImageUrls);
+              const approvals = normalizeApprovedRemoteImageUrls([...localApprovals, ...serverApprovals]);
+              if (JSON.stringify(approvals) !== JSON.stringify(serverApprovals)) staleSyncedShape = true;
+              parsed.settings.approvedRemoteImageUrls = approvals;
+              if (JSON.stringify(approvals) !== JSON.stringify(localApprovals)) {
+                useUIStore.setState({ approvedRemoteImageUrls: approvals });
+              }
 
               const serverUpdatedAt = parsed.updatedAt;
               const localIsNewer =
@@ -259,9 +390,9 @@ export function useSettingsSync() {
                 lastPushed = serialize();
                 const rewriteUpdatedAt = Date.now();
                 try {
-                  await api.put(SETTINGS_PATH, {
-                    value: buildServerSettingsValue(pickSyncedSettings(useUIStore.getState()), rewriteUpdatedAt),
-                  });
+                  await putServerSettingsValue(
+                    buildServerSettingsValue(pickSyncedSettings(useUIStore.getState()), rewriteUpdatedAt),
+                  );
                   writeLocalUpdatedAt(rewriteUpdatedAt);
                 } catch {
                   // Best-effort recovery. The in-memory merge still protects
@@ -274,12 +405,13 @@ export function useSettingsSync() {
                 useUIStore.setState(parsed.settings);
                 lastPushed = serialize();
                 if (serverUpdatedAt !== null) writeLocalUpdatedAt(serverUpdatedAt);
-                if (hadLocalOnlySettings || hadMissingSyncedSettings) {
+                if (hadLocalOnlySettings || hadMissingSyncedSettings || staleSyncedShape) {
                   try {
-                    const rewriteUpdatedAt = hadMissingSyncedSettings ? Date.now() : (serverUpdatedAt ?? Date.now());
-                    await api.put(SETTINGS_PATH, {
-                      value: buildServerSettingsValue(pickSyncedSettings(useUIStore.getState()), rewriteUpdatedAt),
-                    });
+                    const rewriteUpdatedAt =
+                      hadMissingSyncedSettings || staleSyncedShape ? Date.now() : (serverUpdatedAt ?? Date.now());
+                    await putServerSettingsValue(
+                      buildServerSettingsValue(pickSyncedSettings(useUIStore.getState()), rewriteUpdatedAt),
+                    );
                     writeLocalUpdatedAt(rewriteUpdatedAt);
                   } catch {
                     // Rewriting legacy/incomplete blobs is best-effort. This
@@ -302,7 +434,7 @@ export function useSettingsSync() {
           const payload = serializeSettings(settings);
           lastPushed = payload;
           try {
-            await api.put(SETTINGS_PATH, { value: buildServerSettingsValue(settings, updatedAt) });
+            await putServerSettingsValue(buildServerSettingsValue(settings, updatedAt));
           } catch {
             // Seed failed; leave `lastPushed` set so the next change triggers a retry.
           }
@@ -311,7 +443,10 @@ export function useSettingsSync() {
         // Server unreachable at startup — run with local state only.
         lastPushed = serialize();
       } finally {
-        if (!disposed) ready = true;
+        if (!disposed) {
+          ready = true;
+          useUIStore.setState({ settingsSyncReady: true });
+        }
       }
     })();
 

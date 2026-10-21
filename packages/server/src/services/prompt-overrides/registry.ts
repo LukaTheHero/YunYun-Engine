@@ -6,6 +6,7 @@
 // ──────────────────────────────────────────────
 import type { PromptOverrideKeyDef } from "./types.js";
 
+import { CHARACTERS_REFERENCE_SHEET } from "./registry/characters.js";
 import {
   SPRITES_ANIMATED_PORTRAIT,
   SPRITES_EXPRESSION_SHEET,
@@ -22,7 +23,7 @@ import {
   GAME_IMAGE_PROMPT_DIRECTOR,
   GAME_VIDEO,
 } from "./registry/game-assets.js";
-import { CONVERSATION_SELFIE } from "./registry/conversation.js";
+import { CONVERSATION_SELFIE, CONVERSATION_VIDEO } from "./registry/conversation.js";
 import { ROLEPLAY_GALLERY_VIDEO_DIRECTOR } from "./registry/roleplay.js";
 import {
   CONVERSATION_CALL_VIDEO_CLIP_INSTRUCTION_BY_KIND,
@@ -34,6 +35,7 @@ import {
 import { NOODLE_IMAGE_POST, NOODLE_TIMELINE_BASE, NOODLE_TIMELINE_VOICE } from "./registry/noodle.js";
 
 export const PROMPT_OVERRIDE_REGISTRY = [
+  CHARACTERS_REFERENCE_SHEET,
   SPRITES_EXPRESSION_SHEET,
   SPRITES_SINGLE_PORTRAIT,
   SPRITES_ANIMATED_PORTRAIT,
@@ -50,6 +52,7 @@ export const PROMPT_OVERRIDE_REGISTRY = [
   ...CONVERSATION_CALL_VIDEO_PROMPTS,
   CONVERSATION_CALL_CUSTOM_VIDEO_PROMPT,
   CONVERSATION_SELFIE,
+  CONVERSATION_VIDEO,
   NOODLE_IMAGE_POST,
   NOODLE_TIMELINE_BASE,
   NOODLE_TIMELINE_VOICE,
@@ -79,6 +82,7 @@ export function listPromptOverrideKeys(): string[] {
 
 // Re-export the typed key defs for direct import at call sites.
 export {
+  CHARACTERS_REFERENCE_SHEET,
   SPRITES_EXPRESSION_SHEET,
   SPRITES_SINGLE_PORTRAIT,
   SPRITES_ANIMATED_PORTRAIT,
@@ -98,10 +102,12 @@ export {
   CONVERSATION_CALL_VIDEO_CLIP_INSTRUCTION_BY_KIND,
   CONVERSATION_CALL_VIDEO_CLIP_LABEL_BY_KIND,
   CONVERSATION_SELFIE,
+  CONVERSATION_VIDEO,
   NOODLE_IMAGE_POST,
   NOODLE_TIMELINE_BASE,
   NOODLE_TIMELINE_VOICE,
 };
+export type { CharactersReferenceSheetCtx } from "./registry/characters.js";
 export type {
   SpritesExpressionSheetCtx,
   SpritesSinglePortraitCtx,

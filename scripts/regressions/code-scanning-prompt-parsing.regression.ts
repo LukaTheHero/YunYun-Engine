@@ -45,11 +45,11 @@ const nestedHistory = [
     role: "assistant" as const,
     content: "<last_message>\nPrivate clue\n</last_message>",
     contextKind: "history" as const,
-    hiddenFromAICharacterIds: ["pantalone"],
+    hiddenFromAICharacterIds: ["peregrine"],
   },
 ];
 assert.deepEqual(
-  filterPromptMessagesForCharacterAudience(nestedHistory, ["pantalone"]).map((message) => message.content),
+  filterPromptMessagesForCharacterAudience(nestedHistory, ["peregrine"]).map((message) => message.content),
   ["<last_message>\nVisible setup\n</last_message>"],
   "nested legacy history wrappers should still be stripped before wrapper repair",
 );
@@ -94,10 +94,10 @@ assert.deepEqual(
         role: "assistant",
         content: "<last_message>Hidden</last_message>",
         contextKind: "history",
-        hiddenFromAICharacterIds: ["pantalone"],
+        hiddenFromAICharacterIds: ["peregrine"],
       },
     ],
-    ["pantalone"],
+    ["peregrine"],
   ).map((message) => message.content),
   ["<last_message>\nVisible\n</last_message>"],
 );

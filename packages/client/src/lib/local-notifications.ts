@@ -1,4 +1,4 @@
-import { getAndroidBridgeToken } from "@/lib/android-bridge";
+import { getAndroidBridgeToken } from "./android-bridge";
 
 export type LocalNotificationPermission = NotificationPermission | "insecure" | "unsupported";
 export type NativeNotificationPermission = "default" | "denied" | "granted" | "unsupported";
@@ -54,7 +54,9 @@ export function getNativeNotificationPermission(): NativeNotificationPermission 
   const bridge = getAndroidNotificationBridge();
   if (typeof bridge?.getNotificationPermission !== "function") return "unsupported";
   const token = getAndroidBridgeToken();
-  return normalizeNativePermission(token ? bridge.getNotificationPermission(token) : bridge.getNotificationPermission());
+  return normalizeNativePermission(
+    token ? bridge.getNotificationPermission(token) : bridge.getNotificationPermission(),
+  );
 }
 
 export async function requestNativeNotificationPermission(): Promise<NativeNotificationPermission> {
@@ -119,18 +121,40 @@ export async function showLocalMessageNotification({
   if (getBrowserNotificationPermission() !== "granted") return false;
   if (typeof window === "undefined" || !("Notification" in window)) return false;
 
-  const notification = new window.Notification(resolveMessageNotificationTitle(title, characterName), {
+  const notificationTitle = resolveMessageNotificationTitle(title, characterName);
+  const options = {
     body: "Open YunYun to read it.",
     icon: "/yunyun-icon-192.png",
     tag,
-  });
-
-  notification.onclick = () => {
-    window.focus();
-    notification.close();
+    // Each completed reply should alert, even when replacing this chat's notification.
+    renotify: Boolean(tag),
   };
 
-  return true;
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (isAppFocusedForNotifications()) return false;
+    if (registration?.active && typeof registration.showNotification === "function") {
+      await registration.showNotification(notificationTitle, options);
+      return true;
+    }
+  } catch (error) {
+    console.warn("[Notifications] Service worker delivery failed:", error);
+  }
+
+  if (isAppFocusedForNotifications()) return false;
+  try {
+    // Development and browsers without an active worker can use desktop notifications.
+    const notification = new window.Notification(notificationTitle, options);
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+
+    return true;
+  } catch (error) {
+    console.warn("[Notifications] Browser delivery failed:", error);
+    return false;
+  }
 }
 
 export function showNativeMessageNotification({

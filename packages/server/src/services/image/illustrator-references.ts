@@ -1,4 +1,4 @@
-import { stripMacroComments } from "@marinara-engine/shared";
+import { readImageAppearanceOverride, stripMacroComments } from "@marinara-engine/shared";
 import { readPreferredFullBodySpriteBase64 } from "../game/sprite.service.js";
 import { readAvatarBase64 } from "../game/game-asset-generation.js";
 import { readFile } from "node:fs/promises";
@@ -17,6 +17,8 @@ type CharacterReferenceSource = {
   name: string;
   avatarPath: string | null;
   appearance: string | null;
+  /** Normalized `extensions.imageAppearance` when the toggle is on (#7053); wins over `appearance`. */
+  appearanceOverride?: string | null;
   aliases: string[];
   promptAliases: string[];
   sourceOrder: number;
@@ -37,6 +39,11 @@ export type IllustratorPersonaReference = {
   name: string;
   avatarPath?: string | null;
   appearance?: string | null;
+  /**
+   * Image-prompt appearance override (#7053). Same contract as the character
+   * field: when set it wins over `appearance` for image prompts only.
+   */
+  appearanceOverride?: string | null;
   characterSheetImageId?: string | null;
   useCharacterSheetAsReference?: boolean;
 };
@@ -46,6 +53,12 @@ export type IllustratorChatCharacterReference = {
   name: string;
   avatarPath?: string | null;
   appearance?: string | null;
+  /**
+   * Image-prompt appearance override (#7053). When set it wins over BOTH the
+   * caller `appearance` and the DB row, because the card's explicit override is
+   * authoritative for image prompts regardless of which caller supplied text.
+   */
+  appearanceOverride?: string | null;
 };
 
 export type IllustratorReferenceResolution = {
@@ -55,6 +68,7 @@ export type IllustratorReferenceResolution = {
   referenceNames: string[];
   referenceLine: string | null;
   appearanceNames: string[];
+  appearanceSources: Array<{ name: string; appearance: string }>;
   appearanceBlock: string | null;
 };
 
@@ -138,7 +152,7 @@ export function suppressesReferencePromptLine(
 
 const MAX_ILLUSTRATOR_REFERENCE_IMAGES = 6;
 const MAX_ILLUSTRATOR_APPEARANCE_CHARS = 1400;
-const NAME_STOPWORDS = new Set(["the", "a", "an", "il", "la", "le", "de", "van", "von", "dr", "mr", "ms"]);
+export const NAME_STOPWORDS = new Set(["the", "a", "an", "il", "la", "le", "de", "van", "von", "dr", "mr", "ms"]);
 
 export const ILLUSTRATOR_TEXT_NEGATIVE_PROMPT =
   "dialogue boxes, speech bubbles, word balloons, captions, narration boxes, text boxes, manga sound effect text, SFX lettering, readable text, letters, subtitles, watermark, logo, signature";
@@ -298,9 +312,19 @@ export function normalizeIllustratorAppearance(value: unknown): string | null {
   return `${(wordBoundary > 0 ? clipped.slice(0, wordBoundary) : clipped).trimEnd()}...`;
 }
 
+/**
+ * Resolves the appearance text used for IMAGE prompts (#7053): the card's
+ * `extensions.imageAppearance` wins over `extensions.appearance`/`appearance`
+ * when the toggle is on and the override is non-empty. Both candidates go
+ * through `normalizeIllustratorAppearance` so macro-stripping and clipping are
+ * unchanged; the helper only picks override-vs-fallback.
+ */
 export function readIllustratorAppearance(data: Record<string, unknown>): string | null {
   const extensions = parseRecord(data.extensions);
-  return normalizeIllustratorAppearance(extensions.appearance) ?? normalizeIllustratorAppearance(data.appearance);
+  const stored =
+    normalizeIllustratorAppearance(extensions.appearance) ?? normalizeIllustratorAppearance(data.appearance);
+  // The helper is trim-only, so the override is normalized here too.
+  return normalizeIllustratorAppearance(readImageAppearanceOverride(extensions, stored));
 }
 
 function textContainsAlias(normalizedText: string, alias: string): boolean {
@@ -318,6 +342,7 @@ function characterRowToSource(row: CharacterRowLike, sourceOrder: number): Chara
     name: rawName,
     avatarPath: typeof row.avatarPath === "string" ? row.avatarPath : null,
     appearance: readIllustratorAppearance(data),
+    appearanceOverride: readImageAppearanceOverride(extensions, null),
     aliases: buildNameAliases(rawName),
     promptAliases: buildNameAliases(rawName, { includeStandaloneTokens: false }),
     sourceOrder,
@@ -449,6 +474,71 @@ export async function readPreferredPersonaReferenceImage(args: {
   return sprite ? { base64: sprite, source: "sprite" } : null;
 }
 
+/**
+ * Re-read the reference images a regenerated chat image was originally sent with (#7767),
+ * from the characters/persona it recorded, using their current sheet/avatar/sprite.
+ * Sources that no longer exist or have no picture are skipped.
+ */
+export async function readRecordedReferenceImages(args: {
+  characterIds: readonly string[];
+  personaId: string | null;
+  /** The persona picture first sent; "sprite" skips the avatar like Game mode's lookup does. */
+  personaSource?: "character-sheet" | "avatar" | "sprite" | null;
+  charactersStore: {
+    getById: (id: string) => Promise<CharacterRowLike | null>;
+    getPersona: (id: string) => Promise<{
+      id: string;
+      avatarPath?: string | null;
+      characterSheetImageId?: string | null;
+      useCharacterSheetAsReference?: unknown;
+    } | null>;
+  };
+  characterGallery?: CharacterGalleryReferenceStore;
+  personaGallery?: PersonaGalleryReferenceStore;
+}): Promise<string[]> {
+  const images: string[] = [];
+  for (const characterId of args.characterIds) {
+    const row = await args.charactersStore.getById(characterId).catch(() => null);
+    const source = row ? characterRowToSource(row, 0) : null;
+    if (!source) continue;
+    const image = await readPreferredCharacterReferenceImage({
+      characterId: source.id,
+      avatarPath: source.avatarPath,
+      characterSheetImageId: source.characterSheetImageId,
+      useCharacterSheetAsReference: source.useCharacterSheetAsReference,
+      characterGallery: args.characterGallery,
+    });
+    if (image) images.push(image.base64);
+  }
+  if (args.personaId) {
+    const persona = await args.charactersStore.getPersona(args.personaId).catch(() => null);
+    // The recorded picture comes first, so a sheet enabled (or avatar added) since does not change
+    // the re-roll; the usual order applies when it is gone or unknown. A sprite-sourced persona
+    // never falls back to the avatar, matching Game mode's lookup.
+    const recorded =
+      persona && args.personaSource === "sprite"
+        ? readPreferredFullBodySpriteBase64(persona.id)?.base64
+        : persona && args.personaSource === "avatar"
+          ? readAvatarBase64(persona.avatarPath)
+          : undefined;
+    const image = recorded
+      ? { base64: recorded }
+      : persona
+        ? await readPreferredPersonaReferenceImage({
+            personaId: persona.id,
+            avatarPath: persona.avatarPath,
+            characterSheetImageId: persona.characterSheetImageId ?? null,
+            useCharacterSheetAsReference:
+              persona.useCharacterSheetAsReference === true || persona.useCharacterSheetAsReference === "true",
+            personaGallery: args.personaGallery,
+            ...(args.personaSource === "sprite" ? { loaders: { avatar: () => undefined } } : {}),
+          })
+        : null;
+    if (image) images.push(image.base64);
+  }
+  return images;
+}
+
 export async function resolveIllustratorCharacterReferences(args: {
   charactersStore: { list: () => Promise<CharacterRowLike[]> };
   chatCharacters: IllustratorChatCharacterReference[];
@@ -472,11 +562,18 @@ export async function resolveIllustratorCharacterReferences(args: {
   const sourcesById = new Map<string, CharacterReferenceSource>();
   args.chatCharacters.forEach((character, index) => {
     const fromDb = allSourcesById.get(character.id);
+    // #7053: an explicit override wins over BOTH the caller appearance and the
+    // DB row — the card's override is authoritative for image prompts no matter
+    // which caller supplied text.
+    const override =
+      normalizeIllustratorAppearance(character.appearanceOverride) ??
+      normalizeIllustratorAppearance(fromDb?.appearanceOverride) ??
+      null;
     sourcesById.set(character.id, {
       id: character.id,
       name: character.name,
       avatarPath: character.avatarPath ?? fromDb?.avatarPath ?? null,
-      appearance: normalizeIllustratorAppearance(character.appearance) ?? fromDb?.appearance ?? null,
+      appearance: override ?? normalizeIllustratorAppearance(character.appearance) ?? fromDb?.appearance ?? null,
       aliases: buildNameAliases(character.name),
       promptAliases: buildNameAliases(character.name, { includeStandaloneTokens: false }),
       sourceOrder: index,
@@ -489,22 +586,40 @@ export async function resolveIllustratorCharacterReferences(args: {
   }
 
   const sources = [...sourcesById.values()];
+  const chatIds = new Set(args.chatCharacters.map((character) => character.id));
+  const chatSources = sources.filter((source) => chatIds.has(source.id));
+  const globalSources = sources.filter((source) => !chatIds.has(source.id));
   const normalizedPromptText = normalizeReferenceName(args.promptText);
   const requestedNames = args.requestedNames.map((name) => normalizeReferenceName(name)).filter(Boolean);
   const selected = new Map<string, CharacterReferenceSource>();
 
   for (const requestedName of requestedNames) {
-    const match = sources.find(
-      (source) =>
-        source.aliases.some((alias) => alias === requestedName || textContainsAlias(requestedName, alias)) ||
-        source.aliases.some((alias) => textContainsAlias(alias, requestedName)),
-    );
-    if (match) selected.set(match.id, match);
+    const exactChatMatches = chatSources.filter((source) => normalizeReferenceName(source.name) === requestedName);
+    const chatMatches =
+      exactChatMatches.length > 0
+        ? exactChatMatches
+        : chatSources.filter(
+            (source) =>
+              source.aliases.some((alias) => alias === requestedName || textContainsAlias(requestedName, alias)) ||
+              source.aliases.some((alias) => textContainsAlias(alias, requestedName)),
+          );
+    // Chat aliases are useful for nicknames; outside the chat, require a unique full name.
+    const matches =
+      chatMatches.length > 0
+        ? chatMatches
+        : globalSources.filter((source) => normalizeReferenceName(source.name) === requestedName);
+    if (matches.length === 1) selected.set(matches[0]!.id, matches[0]!);
   }
 
-  for (const source of sources) {
+  for (const source of chatSources) {
     if (selected.has(source.id)) continue;
-    if (source.promptAliases.some((alias) => textContainsAlias(normalizedPromptText, alias))) {
+    if (
+      source.promptAliases.some(
+        (alias) =>
+          textContainsAlias(normalizedPromptText, alias) &&
+          chatSources.filter((candidate) => candidate.promptAliases.includes(alias)).length === 1,
+      )
+    ) {
       selected.set(source.id, source);
     }
   }
@@ -532,14 +647,14 @@ export async function resolveIllustratorCharacterReferences(args: {
   const orderedSources = orderedSelectedSources.slice(0, maxReferences);
   const referenceImages: string[] = [];
   const referenceNames: string[] = [];
-  const appearanceLines: string[] = [];
+  const appearanceSources: IllustratorReferenceResolution["appearanceSources"] = [];
   const appearanceNames: string[] = [];
 
   const pushAppearanceLine = (name: string, appearance: string | null | undefined) => {
     const trimmed = normalizeIllustratorAppearance(appearance);
     if (!trimmed || appearanceNames.includes(name)) return;
     appearanceNames.push(name);
-    appearanceLines.push(`${name}'s Appearance: ${trimmed}`);
+    appearanceSources.push({ name, appearance: trimmed });
   };
 
   for (const source of orderedSources) {
@@ -576,7 +691,14 @@ export async function resolveIllustratorCharacterReferences(args: {
     }
   }
   if (args.persona && personaRequested) {
-    pushAppearanceLine(args.persona.name, args.persona.appearance);
+    // #7053: personas take the same override-wins rule as characters. Without
+    // this the persona half of `appearanceBlock` (the text appended verbatim to
+    // provider prompts, e.g. Chroma/NanoGPT) kept sending the raw Appearance
+    // prose while the character half sent image tags.
+    pushAppearanceLine(
+      args.persona.name,
+      normalizeIllustratorAppearance(args.persona.appearanceOverride) ?? args.persona.appearance,
+    );
   }
 
   return {
@@ -592,8 +714,12 @@ export async function resolveIllustratorCharacterReferences(args: {
         ? `Attached are reference images of ${referenceNames.join(", ")}. Use them only to preserve character likeness and visual identity; the written scene prompt is authoritative for composition, setting, action, mood, framing, and whether any text appears.`
         : null,
     appearanceNames,
+    appearanceSources,
     // No "Character appearance notes:" header: every consumer appends this straight to an image
     // prompt, so the label is only ever read by a diffusion model as something to draw.
-    appearanceBlock: appearanceLines.length > 0 ? appearanceLines.join("\n") : null,
+    appearanceBlock:
+      appearanceSources.length > 0
+        ? appearanceSources.map(({ name, appearance }) => `${name}'s Appearance: ${appearance}`).join("\n")
+        : null,
   };
 }

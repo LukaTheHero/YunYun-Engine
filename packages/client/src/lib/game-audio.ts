@@ -6,12 +6,12 @@
 // for smooth transitions.
 // ──────────────────────────────────────────────
 
+import { worldFamilySound } from "@marinara-engine/shared";
 import { gameAssetFileUrl } from "./game-asset-urls";
+import { SILENT_AUDIO_DATA_URI } from "./silent-audio";
 
 const CROSSFADE_MS = 2000;
 const SFX_POOL_SIZE = 8;
-const SILENT_AUDIO_DATA_URI =
-  "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
 
 type AssetMap = Record<string, { path: string }>;
 type AudioSessionType = "auto" | "ambient" | "playback" | "transient" | "transient-solo" | "play-and-record";
@@ -88,6 +88,8 @@ class GameAudioManager {
   private sfxPool: HTMLAudioElement[] = [];
   private sfxIndex = 0;
   private sfxAudioContext: AudioContext | null = null;
+  private proceduralSfxTimers = new Set<ReturnType<typeof setTimeout>>();
+  private sfxGeneration = 0;
   private mediaUnlockElement: HTMLAudioElement | null = null;
   private mediaNodes = new WeakMap<HTMLAudioElement, { source: MediaElementAudioSourceNode; gain: GainNode }>();
   private audioContextUnlocked = false;
@@ -97,6 +99,8 @@ class GameAudioManager {
   private isMuted = false;
   private currentMusicTag: string | null = null;
   private currentAmbientTag: string | null = null;
+  /** The open game's art family (worldgen W6f), so its sounds are its setting's. */
+  private artFamily: string | undefined;
   private fadeInterval: ReturnType<typeof setInterval> | null = null;
   /** Tracks tags whose play() was rejected by autoplay policy. */
   private pendingMusic: { tag: string; manifest?: Record<string, { path: string }> | null } | null = null;
@@ -791,22 +795,55 @@ class GameAudioManager {
     this.fadeInterval = interval;
   }
 
-  /** Play a one-shot sound effect. */
-  playSfx(tag: string, manifest?: AssetMap | null): void {
+  /** The open game's art family: its own sound for an event when it has one, and none from another
+   *  family (no swords in a shoot-out). Undefined for a game without a setting kit. */
+  setArtFamily(family: string | undefined): void {
+    this.artFamily = family;
+  }
+
+  /** Play a sound effect once or repeat it sequentially for a scene beat. */
+  playSfx(requested: string, manifest?: AssetMap | null, loopCount = 1): void {
     if (this.isMuted || this.sfxVolume <= 0 || !this.userHasInteracted) return;
+    const tag = worldFamilySound(requested, this.artFamily, manifest);
+    if (!tag) return;
+    const generation = this.sfxGeneration;
     const url = this.resolveAssetUrl(tag, manifest);
     const audio = this.sfxPool[this.sfxIndex % SFX_POOL_SIZE]!;
     this.sfxIndex++;
-    audio.onerror = () => {
+    let remainingPlays = Number.isFinite(loopCount) ? Math.max(1, Math.min(5, Math.floor(loopCount))) : 1;
+    const playProceduralFallback = () => {
+      if (generation !== this.sfxGeneration || remainingPlays <= 0) return;
+      const fallbackPlays = remainingPlays;
+      remainingPlays = 0;
       audio.onerror = null;
-      this.playProceduralSfx(tag);
+      audio.onended = null;
+      for (let index = 0; index < fallbackPlays; index++) {
+        const timer = setTimeout(() => {
+          this.proceduralSfxTimers.delete(timer);
+          if (generation !== this.sfxGeneration) return;
+          this.playProceduralSfx(tag);
+        }, index * 350);
+        this.proceduralSfxTimers.add(timer);
+      }
+    };
+    audio.onerror = playProceduralFallback;
+    audio.onended = () => {
+      remainingPlays -= 1;
+      if (remainingPlays <= 0) {
+        audio.onended = null;
+        return;
+      }
+      audio.currentTime = 0;
+      audio.play().catch(() => {
+        playProceduralFallback();
+      });
     };
     audio.src = url;
     this.setElementLayerVolume(audio, this.sfxVolume);
     audio.muted = false;
     audio.currentTime = 0;
     audio.play().catch(() => {
-      this.playProceduralSfx(tag);
+      playProceduralFallback();
     });
   }
 
@@ -931,9 +968,14 @@ class GameAudioManager {
 
   /** Stop everything and clean up. */
   dispose(): void {
+    this.sfxGeneration += 1;
     this.stopMusic(true);
     this.stopAmbient();
+    for (const timer of this.proceduralSfxTimers) clearTimeout(timer);
+    this.proceduralSfxTimers.clear();
     for (const el of this.sfxPool) {
+      el.onerror = null;
+      el.onended = null;
       releaseAudio(el);
     }
   }

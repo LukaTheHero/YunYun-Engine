@@ -2,8 +2,12 @@
 // Peek Prompt Modal — collapsible section viewer
 // ──────────────────────────────────────────────
 import { useState, useMemo } from "react";
-import { X, ChevronRight, ChevronDown } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { X, ChevronRight, ChevronDown, Copy } from "lucide-react";
+import { toast } from "sonner";
+import { cn, copyToClipboard } from "../../lib/utils";
+import { generationLevelLabel } from "../../lib/generation-level-label";
+import { describeGenerationFallback } from "../../lib/generation-fallback-notice";
+import { useBackdropDismiss } from "../../hooks/use-backdrop-dismiss";
 import {
   NEUTRAL_PANEL_HEADER,
   NEUTRAL_PANEL_SCROLL_AREA,
@@ -11,6 +15,15 @@ import {
   NEUTRAL_PANEL_TITLE,
 } from "../ui/neutral-surface-styles";
 import { useTranslation as useUiTranslation } from "react-i18next";
+import {
+  estimateTextTokens,
+  type GameToolPlanningInfo,
+  type DecisionDebugPreview,
+  type ReplyCheckupFinding,
+  type ReplyCheckupLink,
+} from "@marinara-engine/shared";
+import { DecisionDebugPanel } from "./DecisionDebugPanel";
+import { ReplyCheckupFacts } from "./ReplyCheckup";
 
 const PROMPT_TAG_CLASS =
   "border border-[var(--marinara-chat-chrome-button-border)] bg-[var(--marinara-chat-chrome-highlight-bg)] text-[var(--marinara-chat-chrome-highlight-text)]";
@@ -18,7 +31,7 @@ const PROMPT_TAG_ACTIVE_CLASS =
   "border border-[var(--marinara-chat-chrome-button-border-active)] bg-[var(--marinara-chat-chrome-button-bg-active)] text-[var(--marinara-chat-chrome-button-text-active)]";
 
 function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  return estimateTextTokens(text);
 }
 
 function fmtTokens(n: number): string {
@@ -37,21 +50,30 @@ interface GenerationInfo {
   assistantPrefill?: string | null;
   tokensPrompt?: number | null;
   tokensCompletion?: number | null;
+  tokensLastRequestInput?: number | null;
+  requestCount?: number;
   tokensCachedPrompt?: number | null;
   tokensCacheWritePrompt?: number | null;
   durationMs?: number | null;
   finishReason?: string | null;
+  fallback?: unknown;
 }
 
 interface PeekPromptModalProps {
   data: {
+    chatId?: string;
+    characterId?: string;
     messages: Array<{ role: string; content: string }>;
     chatMode?: string;
     parameters: unknown;
     source?: "cached" | "live_preview" | "raw_messages";
     exact?: boolean;
     generationInfo?: GenerationInfo | null;
+    gameToolPlanning?: GameToolPlanningInfo | null;
     agentNote?: string;
+    decisions?: { unanswered: string[]; dropped?: string[]; decisionModelSet: boolean };
+    /** R2: the checkup of the reply this prompt produced. */
+    checkup?: { findings: ReplyCheckupFinding[]; onLink: (link: ReplyCheckupLink) => void };
   };
   onClose: () => void;
 }
@@ -69,7 +91,7 @@ function sourceBadgeClass(data: PeekPromptModalProps["data"]): string {
 }
 
 function prettifyTag(tag: string): string {
-  return tag.replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return tag.replace(/[_-]/g, " ").replace(/(?<![\p{L}\p{M}\p{N}])\p{L}/gu, (c) => c.toUpperCase());
 }
 
 // ═══════════════════════════════════════════════
@@ -131,7 +153,7 @@ function conversationHistoryDisplayRole(role: string, content: string): string {
 function parseXmlSections(content: string, fallbackLabel: string): SectionBlock[] {
   const blocks: SectionBlock[] = [];
   // Match <tag_name>\n...\n</tag_name> where both tags sit on their own line.
-  const tagRegex = /(?:^|\n)(<([a-z_][a-z0-9_-]*)>\n[\s\S]*?\n<\/\2>)(?:\n|$)/gi;
+  const tagRegex = /(?:^|\n)(<([\p{L}_][\p{L}\p{M}\p{N}_-]*)>\n[\s\S]*?\n<\/\2>)(?:\n|$)/giu;
   let lastIndex = 0;
 
   for (const match of content.matchAll(tagRegex)) {
@@ -372,7 +394,7 @@ function CollapsibleBlock({
     <div className="rounded-lg border border-[var(--border)] bg-[var(--secondary)]/50 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--accent)]/50"
+        className="mari-chat-style-control flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--accent)]/50"
       >
         {open ? (
           <ChevronDown size="0.75rem" className="shrink-0 text-[var(--muted-foreground)]" />
@@ -383,12 +405,13 @@ function CollapsibleBlock({
           {prettifyTag(label)}
         </span>
         <span className="ml-auto text-[0.625rem] text-[var(--muted-foreground)]">
-          ~{fmtTokens(tokens)} {localizeUi("ui.chat.collapsibleblock.token")}{tokens !== 1 ?localizeUi("ui.noodle.stageprofileview.s") : ""}
+          ~{fmtTokens(tokens)} {localizeUi("ui.chat.collapsibleblock.token")}
+          {tokens !== 1 ? localizeUi("ui.noodle.stageprofileview.s") : ""}
         </span>
       </button>
       {open && (
         <div className="border-t border-[var(--border)]/50 px-3 py-2">
-          <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--foreground)]/80">
+          <pre className="mari-chat-style-text whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--foreground)]/80">
             {content}
           </pre>
         </div>
@@ -419,7 +442,7 @@ function ChatHistorySection({
     <div className="rounded-lg border border-[var(--border)] bg-[var(--secondary)]/50 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--accent)]/50"
+        className="mari-chat-style-control flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--accent)]/50"
       >
         {open ? (
           <ChevronDown size="0.75rem" className="shrink-0 text-[var(--muted-foreground)]" />
@@ -431,12 +454,21 @@ function ChatHistorySection({
             "rounded-md px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider",
             PROMPT_TAG_ACTIVE_CLASS,
           )}
-        >{localizeUi("ui.chat.chathistorysection.chatHistory")}</span>
+        >
+          {localizeUi("ui.chat.chathistorysection.chatHistory")}
+        </span>
         <span className="text-[0.625rem] text-[var(--muted-foreground)]">
-          {localizeUi("ui.chat.chathistorysection.value1Value2Value3", { value1: entries.length, value2: providerBlocks ?localizeUi("ui.chat.chathistorysection.providerBlock") :localizeUi("ui.chat.chathistorysection.message"), value3: entries.length !== 1 ?localizeUi("ui.noodle.stageprofileview.s") : "" })}
+          {localizeUi("ui.chat.chathistorysection.value1Value2Value3", {
+            value1: entries.length,
+            value2: providerBlocks
+              ? localizeUi("ui.chat.chathistorysection.providerBlock")
+              : localizeUi("ui.chat.chathistorysection.message"),
+            value3: entries.length !== 1 ? localizeUi("ui.noodle.stageprofileview.s") : "",
+          })}
         </span>
         <span className="ml-auto text-[0.625rem] text-[var(--muted-foreground)]">
-          ~{fmtTokens(tokens)} {localizeUi("ui.chat.collapsibleblock.token")}{tokens !== 1 ?localizeUi("ui.noodle.stageprofileview.s") : ""}
+          ~{fmtTokens(tokens)} {localizeUi("ui.chat.collapsibleblock.token")}
+          {tokens !== 1 ? localizeUi("ui.noodle.stageprofileview.s") : ""}
         </span>
       </button>
       {open && (
@@ -459,7 +491,7 @@ function ChatHistoryMessage({ entry, roleColor }: { entry: ChatHistoryEntry; rol
     <div className="rounded-md border border-[var(--border)]/30 bg-[var(--background)]/50 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-[var(--accent)]/30"
+        className="mari-chat-style-control flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-[var(--accent)]/30"
       >
         {open ? (
           <ChevronDown size="0.625rem" className="shrink-0 text-[var(--muted-foreground)]" />
@@ -476,7 +508,7 @@ function ChatHistoryMessage({ entry, roleColor }: { entry: ChatHistoryEntry; rol
       </button>
       {open && (
         <div className="border-t border-[var(--border)]/30 px-2.5 py-1.5">
-          <pre className="whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--foreground)]/80">
+          <pre className="mari-chat-style-text whitespace-pre-wrap break-words text-[0.6875rem] leading-relaxed text-[var(--foreground)]/80">
             {entry.content}
           </pre>
         </div>
@@ -489,8 +521,22 @@ function ChatHistoryMessage({ entry, roleColor }: { entry: ChatHistoryEntry; rol
 //  Main Modal
 // ═══════════════════════════════════════════════
 
-export function PeekPromptModal({ data, onClose }: PeekPromptModalProps) {
+export function PeekPromptModal({ data: originalData, onClose }: PeekPromptModalProps) {
   const { t: localizeUi } = useUiTranslation();
+  const [tested, setTested] = useState<DecisionDebugPreview | null>(null);
+  const [showTest, setShowTest] = useState(false);
+  const data: PeekPromptModalProps["data"] =
+    showTest && tested
+      ? {
+          messages: tested.prompt.messages,
+          parameters: tested.parameters,
+          decisions: tested.prompt.decisions,
+          chatMode: originalData.chatMode,
+          source: "live_preview",
+          exact: false,
+        }
+      : originalData;
+  const backdropDismiss = useBackdropDismiss(onClose);
   const sections = useMemo(
     () => buildDisplaySections(data.messages, data.chatMode === "conversation"),
     [data.chatMode, data.messages],
@@ -498,6 +544,8 @@ export function PeekPromptModal({ data, onClose }: PeekPromptModalProps) {
   const totalTokens = useMemo(() => estimateTokens(data.messages.map((m) => m.content).join("")), [data.messages]);
 
   const gen = data.generationInfo;
+  const fallbackNote = describeGenerationFallback(gen?.fallback);
+  const planner = data.gameToolPlanning;
   const params = data.parameters as Record<string, unknown> | null;
 
   // Build parameter pills from generationInfo (cached) or assembled parameters
@@ -507,8 +555,9 @@ export function PeekPromptModal({ data, onClose }: PeekPromptModalProps) {
       if (gen.temperature != null) pills.push({ label: "Temperature", value: String(gen.temperature) });
       if (gen.maxTokens != null) pills.push({ label: "Max Output Tokens", value: fmtTokens(gen.maxTokens) });
       if (gen.showThoughts) pills.push({ label: "Thinking", value: "On" });
-      if (gen.reasoningEffort) pills.push({ label: "Reasoning", value: gen.reasoningEffort });
-      if (gen.verbosity) pills.push({ label: "Verbosity", value: gen.verbosity });
+      if (gen.reasoningEffort)
+        pills.push({ label: "Reasoning", value: generationLevelLabel(gen.reasoningEffort, localizeUi) });
+      if (gen.verbosity) pills.push({ label: "Verbosity", value: generationLevelLabel(gen.verbosity, localizeUi) });
       if (gen.serviceTier) pills.push({ label: "Service Tier", value: gen.serviceTier });
       if (gen.assistantPrefill) pills.push({ label: "Assistant Prefill", value: "On" });
     } else if (params) {
@@ -523,53 +572,157 @@ export function PeekPromptModal({ data, onClose }: PeekPromptModalProps) {
       if (params.presencePenalty != null && params.presencePenalty !== 0)
         pills.push({ label: "Pres Penalty", value: String(params.presencePenalty) });
       if (params.showThoughts) pills.push({ label: "Thinking", value: "On" });
-      if (params.reasoningEffort) pills.push({ label: "Reasoning", value: String(params.reasoningEffort) });
-      if (params.verbosity) pills.push({ label: "Verbosity", value: String(params.verbosity) });
+      if (params.reasoningEffort)
+        pills.push({ label: "Reasoning", value: generationLevelLabel(String(params.reasoningEffort), localizeUi) });
+      if (params.verbosity)
+        pills.push({ label: "Verbosity", value: generationLevelLabel(String(params.verbosity), localizeUi) });
       if (params.serviceTier) pills.push({ label: "Service Tier", value: String(params.serviceTier) });
       if (params.assistantPrefill) pills.push({ label: "Assistant Prefill", value: "On" });
     }
     return pills;
-  }, [gen, params]);
+  }, [gen, params, localizeUi]);
 
   const sectionRoleColor = (role: string, label: string) => {
     if (/last.?message/i.test(label) || role === "assistant") return PROMPT_TAG_ACTIVE_CLASS;
     return PROMPT_TAG_CLASS;
   };
 
+  // Copies the messages this viewer shows (the saved request when it is exact), never a rebuild:
+  // each message verbatim, in send order, under a "[role]" line.
+  const handleCopyPrompt = async () => {
+    const text = data.messages.map((message) => `[${message.role}]\n${message.content}`).join("\n\n");
+    if (await copyToClipboard(text)) {
+      toast.success(localizeUi("ui.chat.peekpromptmodal.promptCopied"));
+    } else {
+      toast.error(localizeUi("ui.chat.peekpromptmodal.promptCopyFailed"));
+    }
+  };
+
   return (
     <div
+      data-chat-floating-panel
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 max-md:pt-[env(safe-area-inset-top)]"
-      onClick={onClose}
+      {...backdropDismiss}
     >
       <div
-        className={cn(NEUTRAL_PANEL_SHELL, "mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden")}
+        className={cn(
+          NEUTRAL_PANEL_SHELL,
+          "mari-chat-style-surface mari-chat-action-panel mx-4 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden",
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={cn(NEUTRAL_PANEL_HEADER, "shrink-0 flex items-center justify-between gap-3 px-5 py-3")}>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h3 className={cn(NEUTRAL_PANEL_TITLE, "shrink-0 text-sm")}>{localizeUi("ui.chat.peekpromptmodal.assembledPrompt")}</h3>
+            <h3 className={cn(NEUTRAL_PANEL_TITLE, "shrink-0 text-sm")}>
+              {localizeUi("ui.chat.peekpromptmodal.assembledPrompt")}
+            </h3>
             <span
               className={cn(
                 "shrink-0 rounded-md border px-2 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wider",
                 sourceBadgeClass(data),
               )}
             >
-              {sourceLabel(data)}
+              {showTest ? localizeUi("decisionDebug.testedPrompt") : sourceLabel(data)}
             </span>
             <span className="min-w-0 text-[0.625rem] text-[var(--muted-foreground)]">
-              {sections.length} {localizeUi("ui.chat.peekpromptmodal.section")}{sections.length !== 1 ?localizeUi("ui.noodle.stageprofileview.s") : ""} {localizeUi("ui.chat.peekpromptmodal.middot")}{fmtTokens(totalTokens)} {localizeUi("ui.agents.agenteditor.tokens")}</span>
+              {sections.length} {localizeUi("ui.chat.peekpromptmodal.section")}
+              {sections.length !== 1 ? localizeUi("ui.noodle.stageprofileview.s") : ""}{" "}
+              {localizeUi("ui.chat.peekpromptmodal.middot")}
+              {fmtTokens(totalTokens)} {localizeUi("ui.agents.agenteditor.tokens")}
+            </span>
           </div>
-          <button
-            onClick={onClose}
-            className="mari-chrome-control mari-chrome-control--small p-1.5"
-            aria-label={localizeUi("ui.chat.peekpromptmodal.closeAssembledPrompt")}
-          >
-            <X size="1rem" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void handleCopyPrompt()}
+              className="mari-chat-style-control mari-chrome-control mari-chrome-control--small p-1.5"
+              title={localizeUi("ui.chat.peekpromptmodal.copyPromptHint")}
+              aria-label={localizeUi("ui.chat.peekpromptmodal.copyPrompt")}
+            >
+              <Copy size="1rem" />
+            </button>
+            <button
+              onClick={onClose}
+              className="mari-chat-style-control mari-chrome-control mari-chrome-control--small p-1.5"
+              aria-label={localizeUi("ui.chat.peekpromptmodal.closeAssembledPrompt")}
+            >
+              <X size="1rem" />
+            </button>
+          </div>
         </div>
+        {!showTest && originalData.checkup && originalData.checkup.findings.length > 0 && (
+          <div className={cn(NEUTRAL_PANEL_HEADER, "mari-reply-checkup shrink-0 px-5 pb-3")} data-peek-checkup>
+            <p className="mb-1 font-medium text-[var(--foreground)]">
+              {localizeUi("chat.replyCheckup.peekTitle", "Reply checkup")}
+            </p>
+            <ReplyCheckupFacts findings={originalData.checkup.findings} onLink={originalData.checkup.onLink} />
+          </div>
+        )}
         <div className={cn(NEUTRAL_PANEL_SCROLL_AREA, "min-h-0 flex-1 overflow-y-auto p-4 space-y-2")}>
+          {originalData.chatId && (
+            <DecisionDebugPanel
+              key={`${originalData.chatId}:${originalData.characterId ?? ""}`}
+              chatId={originalData.chatId}
+              characterId={originalData.characterId}
+              onPreview={(preview) => {
+                setTested(preview);
+                setShowTest(preview !== null);
+              }}
+            />
+          )}
+          {tested && (
+            <div className="flex flex-col items-start gap-2 py-2 text-xs sm:flex-row sm:items-center">
+              <p className="flex-1 text-[var(--muted-foreground)]">
+                {localizeUi(showTest ? "decisionDebug.testedHint" : "decisionDebug.originalHint")}
+              </p>
+              <button
+                type="button"
+                className="mari-chat-style-control mari-chrome-control min-h-10 px-3"
+                onClick={() => setShowTest(!showTest)}
+              >
+                {localizeUi(showTest ? "decisionDebug.showOriginal" : "decisionDebug.showTest")}
+              </button>
+            </div>
+          )}
+          {/* A preview never asks the Decision model, so a decision branch it could not
+              answer is shown as "no". Saying so keeps a preview from being read as final. */}
+          {data.decisions && data.decisions.unanswered.length > 0 && (
+            <div
+              role="status"
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[0.6875rem] text-[var(--foreground)]"
+            >
+              <p>
+                {localizeUi(
+                  data.decisions.decisionModelSet
+                    ? "ui.chat.peekpromptmodal.decisionsUnanswered"
+                    : "ui.chat.peekpromptmodal.decisionsNoModel",
+                  { count: data.decisions.unanswered.length },
+                )}
+              </p>
+              <ul className="mt-1 list-disc pl-4 text-[var(--muted-foreground)]">
+                {data.decisions.unanswered.slice(0, 12).map((statement) => (
+                  <li key={statement}>{statement}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {/* Statements past Decision statements per turn are never asked, so they read as
+              no every turn. Listing them shows an author what the limit costs. */}
+          {data.decisions?.dropped && data.decisions.dropped.length > 0 && (
+            <div
+              role="status"
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[0.6875rem] text-[var(--foreground)]"
+            >
+              <p>{localizeUi("ui.chat.peekpromptmodal.decisionsDropped", { count: data.decisions.dropped.length })}</p>
+              <ul className="mt-1 list-disc pl-4 text-[var(--muted-foreground)]">
+                {data.decisions.dropped.slice(0, 12).map((statement) => (
+                  <li key={statement}>{statement}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* Generation info panel */}
-          {(gen || paramPills.length > 0) && (
+          {(gen || planner || paramPills.length > 0) && (
             <div className="rounded-lg border border-[var(--border)] bg-[var(--secondary)]/30 px-4 py-3 space-y-2">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.6875rem]">
                 {gen?.model && (
@@ -581,13 +734,58 @@ export function PeekPromptModal({ data, onClose }: PeekPromptModalProps) {
                   </span>
                 )}
                 <span className="text-[var(--muted-foreground)]">
-                  ~{fmtTokens(totalTokens)} {localizeUi("ui.chat.peekpromptmodal.estTokens")}{gen?.tokensPrompt != null && <> · {fmtTokens(gen.tokensPrompt)} {localizeUi("ui.chat.peekpromptmodal.actualPromptTokens")}</>}
-                  {(gen?.tokensCachedPrompt ?? 0) > 0 && <> · {fmtTokens(gen?.tokensCachedPrompt ?? 0)} {localizeUi("ui.chat.peekpromptmodal.cached")}</>}
+                  ~{fmtTokens(totalTokens)} {localizeUi("ui.chat.peekpromptmodal.estTokens")}
+                  {gen?.tokensPrompt != null && (
+                    <>
+                      {" "}
+                      · {fmtTokens(gen.tokensPrompt)}{" "}
+                      {(gen.requestCount ?? 0) > 1
+                        ? localizeUi("ui.chat.peekpromptmodal.turnPromptTokens", { count: gen.requestCount })
+                        : localizeUi("ui.chat.peekpromptmodal.reportedPromptTokens")}
+                    </>
+                  )}
+                  {(gen?.tokensCachedPrompt ?? 0) > 0 && (
+                    <>
+                      {" "}
+                      · {fmtTokens(gen?.tokensCachedPrompt ?? 0)} {localizeUi("ui.chat.peekpromptmodal.cached")}
+                    </>
+                  )}
                   {(gen?.tokensCacheWritePrompt ?? 0) > 0 && (
-                    <> · {fmtTokens(gen?.tokensCacheWritePrompt ?? 0)} {localizeUi("ui.chat.peekpromptmodal.cacheWrite")}</>
+                    <>
+                      {" "}
+                      · {fmtTokens(gen?.tokensCacheWritePrompt ?? 0)} {localizeUi("ui.chat.peekpromptmodal.cacheWrite")}
+                    </>
                   )}
                 </span>
               </div>
+              {fallbackNote && <p className="text-[0.6875rem] text-[var(--muted-foreground)]">{fallbackNote}</p>}
+              {gen?.tokensLastRequestInput != null && (
+                <p className="text-[0.6875rem] text-[var(--muted-foreground)]">
+                  {localizeUi("ui.chat.peekpromptmodal.lastRequestInput", {
+                    tokens: fmtTokens(gen.tokensLastRequestInput),
+                  })}
+                </p>
+              )}
+              {(gen?.requestCount ?? 0) > 1 && (
+                <p className="text-[0.6875rem] text-[var(--muted-foreground)]">
+                  {localizeUi("ui.chat.peekpromptmodal.toolRequestUsageHint")}
+                </p>
+              )}
+              {planner && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] text-[var(--muted-foreground)]">
+                  <span>
+                    {localizeUi("ui.chat.peekpromptmodal.toolPlanner")}: {planner.provider} / {planner.model}
+                  </span>
+                  <span>
+                    {planner.usage?.promptTokens != null && planner.usage.completionTokens != null
+                      ? localizeUi("ui.chat.peekpromptmodal.plannerUsage", {
+                          input: fmtTokens(planner.usage.promptTokens),
+                          output: fmtTokens(planner.usage.completionTokens),
+                        })
+                      : localizeUi("ui.chat.peekpromptmodal.plannerUsageUnavailable")}
+                  </span>
+                </div>
+              )}
               {paramPills.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {paramPills.map((p) => (
@@ -604,7 +802,8 @@ export function PeekPromptModal({ data, onClose }: PeekPromptModalProps) {
             </div>
           )}
           {data.agentNote && (
-            <div className="rounded-lg border border-[var(--marinara-chat-chrome-button-border)] bg-[var(--marinara-chat-chrome-highlight-bg)] px-3 py-2 text-[0.6875rem] text-[var(--marinara-chat-chrome-panel-text)]">{localizeUi("ui.chat.peekpromptmodal.note")} {data.agentNote}
+            <div className="rounded-lg border border-[var(--marinara-chat-chrome-button-border)] bg-[var(--marinara-chat-chrome-highlight-bg)] px-3 py-2 text-[0.6875rem] text-[var(--marinara-chat-chrome-panel-text)]">
+              {localizeUi("ui.chat.peekpromptmodal.note")} {data.agentNote}
             </div>
           )}
           {sections.map((s, i) =>

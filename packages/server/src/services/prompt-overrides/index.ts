@@ -6,6 +6,7 @@ export { renderTemplate, validateTemplate } from "./template.js";
 export type { TemplateValidationResult } from "./template.js";
 export {
   PROMPT_OVERRIDE_REGISTRY,
+  CHARACTERS_REFERENCE_SHEET,
   SPRITES_ANIMATED_PORTRAIT,
   SPRITES_EXPRESSION_SHEET,
   SPRITES_SINGLE_PORTRAIT,
@@ -25,6 +26,7 @@ export {
   CONVERSATION_CALL_VIDEO_CLIP_INSTRUCTION_BY_KIND,
   CONVERSATION_CALL_VIDEO_CLIP_LABEL_BY_KIND,
   CONVERSATION_SELFIE,
+  CONVERSATION_VIDEO,
   NOODLE_IMAGE_POST,
   NOODLE_TIMELINE_BASE,
   NOODLE_TIMELINE_VOICE,
@@ -34,6 +36,7 @@ export {
 export type {
   PromptOverrideKeyDef,
   PromptVariable,
+  CharactersReferenceSheetCtx,
   SpritesExpressionSheetCtx,
   SpritesSinglePortraitCtx,
   SpritesAnimatedPortraitCtx,

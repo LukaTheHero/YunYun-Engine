@@ -88,6 +88,7 @@ function seedWhisperModels() {
 try {
   const {
     capabilityCatalogSchema,
+    parseCapabilityCatalogWithCompat,
     capabilityPackageManifestSchema,
     compareCapabilityPackageVersions,
     getCapabilityApiCompatibilityIssue,
@@ -103,7 +104,7 @@ try {
   const legacyManifest = capabilityPackageManifestSchema.parse(installedPackage("legacy", ["agent"]).manifest);
   assert.equal(legacyManifest.schemaVersion, 1, "Existing manifest v1 packages must remain readable");
   assert.equal(getCapabilityApiCompatibilityIssue(legacyManifest), null);
-  assert.deepEqual(supportedCapabilityApi, { major: 1, minor: 9 });
+  assert.deepEqual(supportedCapabilityApi, { major: 1, minor: 341 });
 
   const manifestV2 = capabilityPackageManifestSchema.parse({
     ...legacyManifest,
@@ -139,20 +140,128 @@ try {
   });
   assert.match(
     getCapabilityApiCompatibilityIssue(unsupportedMajorManifest) ?? "",
-    /requires capability API 2\.0; this Engine supports 1\.9/,
+    /requires capability API 2\.0; this Engine supports 1\.341/,
   );
   const currentMinorManifest = capabilityPackageManifestSchema.parse({
     ...manifestV2,
-    capabilityApi: { major: 1, minor: 9 },
+    capabilityApi: { major: 1, minor: 341 },
   });
   assert.equal(getCapabilityApiCompatibilityIssue(currentMinorManifest), null);
+  assert.equal(
+    getCapabilityApiCompatibilityIssue({
+      ...currentMinorManifest,
+      capabilityApi: { major: 1, minor: 28 },
+    }),
+    null,
+    "the pre-merge capability minor remains compatible",
+  );
+  // Every minor this Engine added stays installable alongside the newest.
+  const supportedMinors: Array<[number, string]> = [
+    [144, "party sheet"],
+    [151, "builder choices"],
+    [152, "builder allocation"],
+    [153, "builder spending"],
+    [154, "builder named rows"],
+    [155, "builder legality"],
+    [156, "contextual effects"],
+    [157, "starting coins"],
+    [158, "starting values"],
+    [159, "priced choices"],
+    [160, "creation profiles"],
+    [161, "row checks"],
+    [162, "creation rolls"],
+    [163, "shared party creation"],
+    [164, "trades"],
+    [205, "row counts"],
+    [206, "row prices"],
+    [207, "unpriced offers"],
+    [208, "more fields"],
+    [209, "roll abilities"],
+    [210, "worked-out list columns"],
+    [211, "partial score increases"],
+    [212, "row check stances"],
+    [213, "ability specialties"],
+    [214, "no-cancel check effects"],
+    [215, "item access"],
+    [216, "row dots"],
+    [217, "best-rating check effects"],
+    [218, "track costs"],
+    [219, "advancement lists up to 64 fields"],
+    [339, "the Game Master's intro message"],
+    [340, "the newest minor before this one"],
+  ];
+  for (const [minor, label] of supportedMinors) {
+    assert.equal(
+      getCapabilityApiCompatibilityIssue(
+        capabilityPackageManifestSchema.parse({ ...manifestV2, capabilityApi: { major: 1, minor } }),
+      ),
+      null,
+      `Capability API 1.${minor} (${label}) is supported`,
+    );
+  }
   const unsupportedMinorManifest = capabilityPackageManifestSchema.parse({
     ...manifestV2,
-    capabilityApi: { major: 1, minor: 10 },
+    capabilityApi: { major: 1, minor: 342 },
   });
   assert.match(
     getCapabilityApiCompatibilityIssue(unsupportedMinorManifest) ?? "",
-    /requires capability API 1\.10; this Engine supports 1\.9/,
+    /requires capability API 1\.342; this Engine supports 1\.341/,
+  );
+  const startupManifest = {
+    ...currentMinorManifest,
+    contributions: { slots: ["game-surface"], gameSurface: { prepareBeforeStart: true } },
+  };
+  assert.equal(
+    capabilityPackageManifestSchema.parse(startupManifest).contributions?.gameSurface?.prepareBeforeStart,
+    true,
+  );
+  assert.throws(
+    () => capabilityPackageManifestSchema.parse({ ...startupManifest, capabilityApi: { major: 1, minor: 16 } }),
+    /prepareBeforeStart requires schemaVersion 2 and capabilityApi 1\.17/,
+  );
+  assert.throws(
+    () =>
+      capabilityPackageManifestSchema.parse({
+        ...startupManifest,
+        contributions: { gameSurface: { prepareBeforeStart: true } },
+      }),
+    /prepareBeforeStart requires the .*game-surface.* slot/,
+  );
+
+  const inlineSetupManifest = {
+    ...startupManifest,
+    contributions: {
+      slots: ["game-surface"],
+      gameSurface: {
+        setup: {
+          seed: { key: "worldSeed" },
+          config: { generate: true },
+          requires: { enableCustomWidgets: false },
+        },
+      },
+    },
+  };
+  const inlineSetup = capabilityPackageManifestSchema.parse(inlineSetupManifest);
+  assert.equal(inlineSetup.contributions?.gameSurface?.setup?.seed?.key, "worldSeed");
+  assert.throws(
+    () => capabilityPackageManifestSchema.parse({ ...inlineSetupManifest, capabilityApi: { major: 1, minor: 17 } }),
+    /requires.*1\.18/,
+  );
+  assert.throws(
+    () =>
+      capabilityPackageManifestSchema.parse({
+        ...inlineSetupManifest,
+        contributions: {
+          slots: ["game-surface"],
+          gameSurface: {
+            setup: {
+              seed: { key: "worldSeed" },
+              config: { worldSeed: 7 },
+            },
+          },
+        },
+      }),
+    /cannot override.*seed/,
   );
 
   const forwardCompatibleCatalog = capabilityCatalogSchema.parse({
@@ -192,6 +301,35 @@ try {
     "Capability API 1.3 agent-detail metadata must remain compatible with the 1.3 host",
   );
 
+  // A catalog entry built for a NEWER Engine (unknown manifest key under this
+  // Engine's strict schemas) must be dropped per-entry, never fail the whole
+  // document — all-or-nothing parsing bricked browsing/install/updates for
+  // every package at once (#5091 review finding).
+  const mixedGenerationCatalog = parseCapabilityCatalogWithCompat({
+    schemaVersion: 1,
+    generatedAt: "2026-08-15T00:00:00.000Z",
+    packages: [
+      forwardCompatibleCatalog.packages[0],
+      {
+        manifest: {
+          ...manifestV2,
+          id: "from-the-future",
+          contributions: { slots: ["chat-settings"], holograms: { enabled: true } },
+        },
+        category: "misc",
+        artifact: { url: "https://example.com/from-the-future.zip", sha256: "2".repeat(64), bytes: 1 },
+      },
+    ],
+  });
+  assert.equal(mixedGenerationCatalog.droppedEntries, 1, "the unparseable entry must be dropped, not fatal");
+  assert.deepEqual(
+    mixedGenerationCatalog.droppedIds,
+    ["from-the-future"],
+    "dropped entries must be identified by manifest id so operators can name what vanished",
+  );
+  assert.equal(mixedGenerationCatalog.catalog.packages.length, 1);
+  assert.equal(mixedGenerationCatalog.catalog.packages[0]?.manifest.id, "hierarchical-maps");
+
   writeRegistry([installedPackage("conversation-calls", ["agent", "conversation-calls"])]);
   seedWhisperModels();
 
@@ -208,6 +346,94 @@ try {
     resolveCapabilityPackageIconUrl,
     validatePackageArchiveEntries,
   } = await import("../../packages/server/src/services/capability-packages/package-manager.service.js");
+  const validInstalled = installedPackage("conversation-calls", ["agent", "conversation-calls"]);
+  const futureInstalled = installedPackage("future-package", ["agent"]);
+  const unsupportedInstalledRecord = {
+    ...futureInstalled,
+    manifest: { ...futureInstalled.manifest, unknownFutureField: { preserve: ["exact", 42] } },
+  };
+  const futureRecord = installedPackage("future-record", ["agent"]);
+  const unsupportedTopLevelRecord = { ...futureRecord, unknownFutureField: { preserve: ["exact", 43] } };
+  writeFileSync(
+    registryPath,
+    JSON.stringify({
+      schemaVersion: 1,
+      packages: [validInstalled, unsupportedInstalledRecord, unsupportedTopLevelRecord],
+    }),
+  );
+  await capabilityPackageManager.markRuntimeReadiness(validInstalled.id, "ready");
+  const preservedRegistry = JSON.parse(readFileSync(registryPath, "utf8"));
+  assert.equal(
+    preservedRegistry.packages.find((item: { id: string }) => item.id === validInstalled.id).readiness,
+    "ready",
+  );
+  assert.deepEqual(
+    preservedRegistry.packages.find((item: { id: string }) => item.id === futureInstalled.id),
+    unsupportedInstalledRecord,
+    "A real readiness write must preserve the unsupported sibling, including unknown nested fields",
+  );
+  assert.deepEqual(
+    preservedRegistry.packages.find((item: { id: string }) => item.id === futureRecord.id),
+    unsupportedTopLevelRecord,
+    "A real readiness write must preserve an otherwise supported record with unknown top-level fields",
+  );
+  assert.deepEqual(
+    (await capabilityPackageManager.installed()).map((item) => item.id),
+    [validInstalled.id],
+    "Unsupported records must not prevent supported packages loading",
+  );
+  const registryGuardCatalog = capabilityPackageManager.catalog;
+  capabilityPackageManager.catalog = async () => ({
+    schemaVersion: 1,
+    generatedAt: "2026-09-14T00:00:00.000Z",
+    packages: [futureInstalled, futureRecord].map((item) => ({
+      manifest: capabilityPackageManifestSchema.parse({ ...item.manifest, version: "0.9.0" }),
+      artifact: { url: "https://invalid.example/never-download.zip", sha256: "0".repeat(64), bytes: 1 },
+    })),
+  });
+  try {
+    for (const item of [futureInstalled, futureRecord]) {
+      await assert.rejects(
+        () => capabilityPackageManager.install(item.id, "0.9.0", "0".repeat(64)),
+        /refusing to downgrade/,
+        "Unsupported records must not hide the installed version from the pre-download downgrade guard",
+      );
+    }
+    assert.deepEqual(JSON.parse(readFileSync(registryPath, "utf8")), preservedRegistry);
+  } finally {
+    capabilityPackageManager.catalog = registryGuardCatalog;
+  }
+  writeFileSync(
+    registryPath,
+    JSON.stringify({ schemaVersion: 1, packages: [validInstalled, futureInstalled, unsupportedInstalledRecord] }),
+  );
+  await capabilityPackageManager.markRuntimeReadiness(futureInstalled.id, "ready");
+  assert.equal(
+    JSON.parse(readFileSync(registryPath, "utf8")).packages.filter(
+      (item: { id: string }) => item.id === futureInstalled.id,
+    ).length,
+    1,
+    "A now-valid replacement must not duplicate its old unsupported record",
+  );
+  for (const invalidRegistry of [
+    "",
+    "{",
+    "null",
+    "{}",
+    '{"schemaVersion":2,"packages":[]}',
+    '{"schemaVersion":1,"packages":{}}',
+  ]) {
+    writeFileSync(registryPath, invalidRegistry);
+    await assert.rejects(() => capabilityPackageManager.installed(), "Malformed outer registries remain strict");
+    await assert.rejects(() => capabilityPackageManager.markRuntimeReadiness(validInstalled.id, "ready"));
+    assert.equal(readFileSync(registryPath, "utf8"), invalidRegistry, "Rejected files must not be rewritten");
+  }
+  writeRegistry([]);
+  assert.deepEqual(await capabilityPackageManager.installed(), [], "An empty registry remains supported");
+  rmSync(registryPath);
+  assert.deepEqual(await capabilityPackageManager.installed(), [], "A missing registry remains a fresh installation");
+  writeRegistry([validInstalled]);
+
   const directoryFloodArchive = {
     getEntries: () => Array.from({ length: 8_193 }, (_, index) => ({ isDirectory: true, entryName: `dir-${index}/` })),
   } as unknown as Parameters<typeof validatePackageArchiveEntries>[0];
@@ -215,6 +441,26 @@ try {
     () => validatePackageArchiveEntries(directoryFloodArchive),
     /Package contains too many files/u,
     "directory-only ZIP entries count toward the archive entry limit",
+  );
+  // Case-insensitive duplicate guard (#5091): NTFS/APFS extract `Tiles.PNG`
+  // onto `tiles.png`, leaving one on-disk file behind two declared hashes, so
+  // an artifact carrying both casings is rejected before extraction. (The
+  // manifest-level case-folded guard sits BEHIND this one in the live install
+  // flow — a zip cannot reach it with a case collision the entry guard missed.)
+  const { createRequire } = await import("node:module");
+  const serverRequire = createRequire(new URL("../../packages/server/src/app.ts", import.meta.url));
+  const AdmZipCtor = serverRequire("adm-zip") as new () => {
+    addFile: (name: string, data: Buffer) => void;
+    toBuffer: () => Buffer;
+  };
+  const { openZipArchive } = await import("../../packages/server/src/lib/zip-reader.js");
+  const collisionZip = new AdmZipCtor();
+  collisionZip.addFile("art/tiles.png", Buffer.from("first casing"));
+  collisionZip.addFile("art/Tiles.PNG", Buffer.from("second casing"));
+  assert.throws(
+    () => validatePackageArchiveEntries(openZipArchive(collisionZip.toBuffer())),
+    /duplicate file/u,
+    "case-only filename collisions must be rejected at archive validation",
   );
   assert.equal(
     resolveCapabilityCatalogUrl("2.3.1", "", "main"),
@@ -359,6 +605,7 @@ try {
   const routeApp = {
     server: routeServer,
     hasRoute: () => false,
+    addContentTypeParser: () => routeApp,
     route: () => {
       registeredRoutes++;
     },
@@ -397,6 +644,7 @@ try {
   const rootRouteApp = {
     server: { listening: false },
     hasRoute: () => false,
+    addContentTypeParser: () => rootRouteApp,
     route: (definition: { url: string }) => assert.equal(definition.url, "/api/root-package"),
   } as Parameters<typeof registerCapabilityPrivilegedRoutes>[0];
   const rootRoutePackage = installedPackage("root-package", ["agent"]);
@@ -428,7 +676,7 @@ try {
   deactivateReactivatedRoutes();
   deactivateInitialRoutes();
 
-  const { withLongTermMemoryRuntimeTimeout } =
+  const { withLongTermMemoryEmbeddingChange, withLongTermMemoryRuntimeTimeout } =
     await import("../../packages/server/src/services/generation/long-term-memory-runtime.js");
   const timeoutStartedAt = Date.now();
   await assert.rejects(
@@ -445,6 +693,16 @@ try {
     capabilityLanguageModelSource,
     /reasoningEffort:\s*options\.reasoningEffort,/u,
     "Capability model calls must preserve an explicit reasoning effort of none",
+  );
+  assert.match(
+    capabilityLanguageModelSource,
+    /AbortSignal\.any\(\[options\.signal,\s*timeoutSignal\]\)[\s\S]*withLlmRequestTimeout\(\s*timeoutMs,\s*async\s*\(\)\s*=>[\s\S]*provider\.chatComplete\(/u,
+    "Capability model calls must enforce AGENT_CALL_TIMEOUT_MS as a total-duration cap while scoping the transport timeout",
+  );
+  assert.match(
+    capabilityLanguageModelSource,
+    /const\s+timeoutSignal\s*=\s*AbortSignal\.timeout\(\s*timeoutMs\s*\);/u,
+    "Capability model calls must build their deadline signal from AbortSignal.timeout",
   );
   assert.doesNotMatch(
     capabilityLanguageModelSource,
@@ -503,6 +761,10 @@ try {
   const stagingCatalogUrl = resolveCapabilityCatalogUrl("development", "", "staging");
   const activeCatalogUrl = resolveCapabilityCatalogUrl();
   let requestedCatalogUrl: string | URL | undefined;
+  // The explicit null preview URL keeps this block pinning the PUBLISHED catalog
+  // selection: run from a `staging` checkout the preview overlay fetch would
+  // otherwise land second and overwrite requestedCatalogUrl. Overlay behaviour
+  // has its own coverage in capability-preview-overlay.regression.ts.
   const normalizedCatalog = await capabilityPackageManager.catalog(async (url) => {
     requestedCatalogUrl = url;
     return new Response(
@@ -513,7 +775,7 @@ try {
       }),
       { status: 200, headers: { "content-type": "application/json" } },
     );
-  });
+  }, null);
   assert.equal(
     requestedCatalogUrl,
     activeCatalogUrl,
@@ -999,14 +1261,20 @@ try {
   });
   syncBuiltinESMExports();
   try {
-    const browserTabAsset = await capabilityPackageManager.browserTabAsset(agentSuite.id, "suite-tab.png");
+    const browserTabAsset = await capabilityPackageManager.packageAsset(agentSuite.id, "suite-tab.png");
     assert.equal(browserTabAsset?.contentType, "image/png");
     assert.equal(
       browserTabAsset?.file,
       join(packagesRoot, "versions", agentSuite.id, agentSuite.version, "suite-tab.png"),
     );
-    assert.deepEqual(await capabilityPackageManager.browserTabAsset(agentSuite.id, "suite-tab.png"), browserTabAsset);
-    assert.equal(assetHashCount, 1, "An unchanged browser-tab asset must reuse its successful verification");
+    assert.equal(browserTabAsset?.data?.toString("utf8"), "x", "Every serve must hand back the exact bytes it hashed");
+    const repeatAsset = await capabilityPackageManager.packageAsset(agentSuite.id, "suite-tab.png");
+    assert.deepEqual(repeatAsset, browserTabAsset, "Repeated resolution must be deterministic");
+    assert.equal(
+      assetHashCount,
+      2,
+      "EVERY served body is hash-verified — a stat-only fast path could send bytes written after verification",
+    );
 
     const changedRegistry = JSON.parse(readFileSync(registryPath, "utf8")) as {
       packages: Array<ReturnType<typeof installedPackage>>;
@@ -1019,22 +1287,22 @@ try {
     changedAssetDeclaration.sha256 = "0".repeat(64);
     writeFileSync(registryPath, JSON.stringify(changedRegistry, null, 2));
     await assert.rejects(
-      capabilityPackageManager.browserTabAsset(agentSuite.id, "suite-tab.png"),
+      capabilityPackageManager.packageAsset(agentSuite.id, "suite-tab.png"),
       /integrity verification/u,
       "Changed manifest integrity metadata must not reuse an older successful verification",
     );
-    assert.equal(assetHashCount, 2, "Changed manifest integrity metadata must force a fresh integrity check");
+    assert.equal(assetHashCount, 3, "Changed manifest integrity metadata must force a fresh integrity check");
 
     changedAssetDeclaration.sha256 = originalAssetSha256;
     writeFileSync(registryPath, JSON.stringify(changedRegistry, null, 2));
-    assert.ok(await capabilityPackageManager.browserTabAsset(agentSuite.id, "suite-tab.png"));
+    assert.ok(await capabilityPackageManager.packageAsset(agentSuite.id, "suite-tab.png"));
     writeFileSync(join(packagesRoot, "versions", agentSuite.id, agentSuite.version, "suite-tab.png"), "y");
     await assert.rejects(
-      capabilityPackageManager.browserTabAsset(agentSuite.id, "suite-tab.png"),
+      capabilityPackageManager.packageAsset(agentSuite.id, "suite-tab.png"),
       /integrity verification/u,
       "Capability assets changed outside the reviewed package must not be served",
     );
-    assert.equal(assetHashCount, 4, "Changed asset metadata must force a fresh integrity check");
+    assert.equal(assetHashCount, 5, "Changed asset metadata must force a fresh integrity check");
   } finally {
     Object.defineProperty(crypto, "createHash", { configurable: true, value: originalCreateHash });
     syncBuiltinESMExports();
@@ -1042,12 +1310,12 @@ try {
   writeFileSync(join(packagesRoot, "versions", agentSuite.id, agentSuite.version, "suite-tab.png"), "x");
   refreshRegistryFileIntegrity();
   assert.equal(
-    await capabilityPackageManager.browserTabAsset(agentSuite.id, "server.mjs"),
+    await capabilityPackageManager.packageAsset(agentSuite.id, "server.mjs"),
     null,
     "Package payloads not declared as tab artwork must not be exposed as public assets",
   );
   assert.equal(
-    await capabilityPackageManager.browserTabAsset(agentSuite.id, "../installed.json"),
+    await capabilityPackageManager.packageAsset(agentSuite.id, "../installed.json"),
     null,
     "Home tab asset requests must retain package traversal protection",
   );
@@ -1114,6 +1382,8 @@ try {
   const blocked = installedPackage("hierarchical-maps", ["agent", "maps"]);
   const failing = installedPackage("readiness-failure", ["agent"]);
   const ready = installedPackage("readiness-success", ["agent"]);
+  failing.manifest.permissions.push("chat-read");
+  ready.manifest.permissions.push("chat-read");
   ready.manifest.files.push({ path: "runtime-dependency.mjs", sha256: "0".repeat(64), bytes: 1 });
   writeRegistry([blocked, failing, ready]);
   writeFileSync(
@@ -1159,6 +1429,9 @@ try {
       if (typeof api.runtime.getAgentConfig !== "function") {
         throw new Error("Capability API 1.5 agent config host is unavailable");
       }
+      if (typeof api.runtime.resolveEmbeddings !== "function") {
+        throw new Error("Capability API 1.15 embedding resolver is unavailable");
+      }
       if (typeof api.runtime.embeddings?.embed !== "function" || !api.runtime.embeddings.spaceId) {
         throw new Error("Capability embedding host is unavailable");
       }
@@ -1172,7 +1445,7 @@ try {
       await api.runtime.persistence.listExistingLorebookEntryIds([]);
       await api.runtime.resources.listCharacters([]);
       await api.runtime.resources.listEligibleLorebookEntries({ lorebookIds: [], entryIds: [] });
-      api.registerService("readiness:success", { active: true, debugAgentsEnabled });
+      api.registerService("readiness:success", { active: true, debugAgentsEnabled, runtime: api.runtime });
     }
     export async function selfCheck({ api }) {
       const dependency = await import("./runtime-dependency.mjs");
@@ -1201,19 +1474,23 @@ try {
   );
   if (configuredDataDir === undefined) delete process.env.DATA_DIR;
   else process.env.DATA_DIR = configuredDataDir;
-  const { getCapabilityService } =
+  const { getCapabilityService, registerCapabilityService } =
     await import("../../packages/server/src/services/capability-packages/capability-service-registry.service.js");
   const { closeDB, getDB } = await import("../../packages/server/src/db/connection.js");
   closeDatabase = closeDB;
   const db = await getDB();
   const { createConnectionsStorage } =
     await import("../../packages/server/src/services/storage/connections.storage.js");
-  const remoteEmbeddingConnection = await createConnectionsStorage(db).create({
+  const connections = createConnectionsStorage(db);
+  const { createAgentsStorage } = await import("../../packages/server/src/services/storage/agents.storage.js");
+  const agents = createAgentsStorage(db);
+  const remoteEmbeddingConnection = await connections.create({
     name: "Capability remote embeddings",
     provider: "custom",
     baseUrl: "https://chat.example.invalid/v1",
     embeddingBaseUrl: "https://embeddings.example.invalid/v1",
     embeddingModel: "text-embedding-regression",
+    isDefault: true,
   });
   const configuredEmbeddingHost = await createConfiguredCapabilityEmbeddingHost(db, remoteEmbeddingConnection.id);
   assert.equal(configuredEmbeddingHost.label, "Capability remote embeddings (text-embedding-regression)");
@@ -1227,7 +1504,7 @@ try {
     repeatedConfiguredEmbeddingHost.spaceId,
     "the same configured embedding source must keep a stable space ID",
   );
-  const caseDistinctEmbeddingConnection = await createConnectionsStorage(db).create({
+  const caseDistinctEmbeddingConnection = await connections.create({
     name: "Capability case-distinct embeddings",
     provider: "custom",
     baseUrl: "https://chat.example.invalid/v1",
@@ -1243,6 +1520,41 @@ try {
     caseDistinctEmbeddingHost.spaceId,
     "opaque embedding model IDs must retain case distinctions",
   );
+  // Engine save/header contract only; reuse the existing connection fixture.
+  let refreshedModel: string | undefined;
+  const refreshHeaders: unknown[][] = [];
+  const refreshReply = {
+    header(name: string, value: unknown) {
+      refreshHeaders.push([name, value]);
+      return undefined!;
+    },
+  };
+  const releaseRefresh = registerCapabilityService("long-term-memory:runtime", {
+    async refresh({ signal }: { signal: AbortSignal }) {
+      signal.throwIfAborted();
+      refreshedModel = (await connections.getById(remoteEmbeddingConnection.id))?.embeddingModel;
+      if (refreshedModel === "failed-model") throw new Error("Refresh fixture failed");
+      return { status: "refreshed" };
+    },
+  });
+  try {
+    for (const embeddingModel of ["refreshed-model", "refreshed-model", "failed-model"]) {
+      const saved = await withLongTermMemoryEmbeddingChange(db, refreshReply, () =>
+        connections.update(remoteEmbeddingConnection.id, { embeddingModel }),
+      );
+      assert.equal(saved?.embeddingModel, embeddingModel);
+      assert.equal(refreshedModel, embeddingModel, "refresh must observe the persisted save before it returns");
+    }
+    assert.deepEqual(refreshHeaders, [
+      ["X-Marinara-LTM-Refresh", "refreshed"],
+      ["X-Marinara-LTM-Refresh", "failed"],
+    ]);
+  } finally {
+    releaseRefresh();
+    await connections.update(remoteEmbeddingConnection.id, {
+      embeddingModel: remoteEmbeddingConnection.embeddingModel,
+    });
+  }
   const { createCapabilityPersistenceHost } =
     await import("../../packages/server/src/services/capability-packages/capability-persistence.service.js");
   const { createCapabilityResourceHost } =
@@ -1380,6 +1692,21 @@ try {
   assert.equal(rollbackChatBefore.name, "Capability persistence rollback fixture");
   assert.deepEqual(rollbackChatBefore.characterIds, []);
   assert.equal(rollbackChatBefore.connectionId, null);
+  const namedBranchChat = await chatsStore.create({
+    name: "Capability branch parent fallback",
+    mode: "roleplay",
+    characterIds: [],
+  });
+  assert.ok(namedBranchChat);
+  await chatsStore.patchMetadata(namedBranchChat.id, {
+    branchName: "NPC_First Kiss",
+    branchParentChatId: rollbackChat.id,
+  });
+  const capabilityBranchChat = await persistence.getChat(namedBranchChat.id);
+  assert.ok(capabilityBranchChat);
+  assert.equal(capabilityBranchChat.name, "NPC_First Kiss");
+  assert.equal(capabilityBranchChat.branch?.title, "NPC_First Kiss");
+  assert.equal(capabilityBranchChat.branch?.parentChatId, rollbackChat.id);
   const gameStates = createGameStateStorage(db);
   const gameStateBase = {
     chatId: rollbackChat.id,
@@ -1627,6 +1954,46 @@ try {
       ?.debugAgentsEnabled,
     "boolean",
   );
+  const liveEmbeddingRuntime = getCapabilityService<{
+    runtime: { embeddings: { label: string }; resolveEmbeddings(): Promise<{ label: string }> };
+  }>("readiness:success")?.runtime;
+  assert.ok(liveEmbeddingRuntime, "activated package must expose its capability runtime");
+  assert.equal(
+    liveEmbeddingRuntime.embeddings.label,
+    "Capability remote embeddings (text-embedding-regression)",
+    "legacy static embeddings must retain the activation-time source",
+  );
+  const replacementEmbeddingConnection = await connections.create({
+    name: "Capability replacement embeddings",
+    provider: "custom",
+    baseUrl: "https://chat.example.invalid/v1",
+    embeddingBaseUrl: "https://embeddings.example.invalid/v1",
+    embeddingModel: "text-embedding-replacement",
+  });
+  await connections.update(remoteEmbeddingConnection.id, { isDefault: false });
+  await connections.update(replacementEmbeddingConnection.id, { isDefault: true });
+  assert.equal(
+    (await liveEmbeddingRuntime.resolveEmbeddings()).label,
+    "Capability replacement embeddings (text-embedding-replacement)",
+    "live capability embeddings must follow a changed global default without reactivation",
+  );
+  const packageConfig = await agents.create({
+    type: "readiness-success",
+    name: "Readiness success",
+    phase: "parallel",
+    connectionId: remoteEmbeddingConnection.id,
+  });
+  assert.equal(
+    (await liveEmbeddingRuntime.resolveEmbeddings()).label,
+    "Capability remote embeddings (text-embedding-regression)",
+    "a package-specific connection must override the global embedding default",
+  );
+  await agents.update(packageConfig!.id, { connectionId: null });
+  assert.equal(
+    (await liveEmbeddingRuntime.resolveEmbeddings()).label,
+    "Capability replacement embeddings (text-embedding-replacement)",
+    "clearing a package override must resume the current global embedding default",
+  );
   assert.equal(await capabilityPackageManager.clientEntrypoint("hierarchical-maps"), null);
   assert.equal(await capabilityPackageManager.clientEntrypoint("readiness-failure"), null);
   assert.ok(await capabilityPackageManager.clientEntrypoint("readiness-success"));
@@ -1650,7 +2017,9 @@ try {
   assert.equal(getCapabilityService("readiness:success"), null, "Runtime stop must remove ready contributions");
   const runtimeSnapshotsRoot = join(dataDir, "capability-runtime-snapshots");
   assert.equal(
-    existsSync(runtimeSnapshotsRoot) ? readdirSync(runtimeSnapshotsRoot).length : 0,
+    existsSync(runtimeSnapshotsRoot)
+      ? readdirSync(runtimeSnapshotsRoot).filter((entry) => entry !== "node_modules").length
+      : 0,
     0,
     "runtime snapshots are retained during activation and removed at stop",
   );

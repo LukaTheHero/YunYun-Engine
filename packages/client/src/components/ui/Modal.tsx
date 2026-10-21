@@ -14,7 +14,10 @@ import {
 } from "./neutral-surface-styles";
 import { useDialogFocusScope } from "../../hooks/use-dialog-focus-scope";
 import { useBackdropDismiss } from "../../hooks/use-backdrop-dismiss";
+import { useBackDismiss } from "../../hooks/use-back-dismiss";
+import { registerModalOverlay, type ModalOverlayRegistration } from "../../lib/modal-overlay-registry";
 import { useLocalizedUiText } from "../../localization/use-localized-ui-text";
+import { useUIStore } from "../../stores/ui.store";
 import { useTranslation as useUiTranslation } from "react-i18next";
 
 interface ModalProps {
@@ -40,6 +43,8 @@ interface ModalProps {
   closeDisabled?: boolean;
   /** Let drag hit-testing reach content behind the modal while keeping the panel interactive. */
   dragThrough?: boolean;
+  /** Always open on the omnibar's layer, above every other app overlay (app dialogs, even over a package screen). */
+  topLayer?: boolean;
 }
 
 export function Modal({
@@ -59,6 +64,7 @@ export function Modal({
   panelStyle,
   closeDisabled = false,
   dragThrough = false,
+  topLayer = false,
 }: ModalProps) {
   const { t: localizeUi } = useUiTranslation();
   const localize = useLocalizedUiText();
@@ -69,9 +75,25 @@ export function Modal({
   // before actually removing the DOM nodes.
   const [mounted, setMounted] = useState(false);
   const [animating, setAnimating] = useState<"enter" | "exit" | null>(null);
+  // A dialog the omnibar or YunYun opens (a confirm, say) must not land beneath them.
+  const [overOmnibar, setOverOmnibar] = useState(false);
   const enterRafRef = useRef<number | null>(null);
   const backdropDismiss = useBackdropDismiss(onClose, closeDisabled);
-  useDialogFocusScope(open && mounted, panelRef, initialFocusRef, restoreFocusRef, focusScopePortalSelector);
+  const overlayRegistrationRef = useRef<ModalOverlayRegistration | null>(null);
+  useDialogFocusScope(
+    open && mounted,
+    panelRef,
+    initialFocusRef,
+    restoreFocusRef,
+    focusScopePortalSelector,
+    () => overlayRegistrationRef.current?.isTopmost() ?? true,
+  );
+  // Hardware / gesture back closes the topmost modal. While closing is disabled
+  // the press is absorbed rather than ignored, matching Escape: an in-flight
+  // operation must not be interrupted by backgrounding the app.
+  useBackDismiss(open, () => {
+    if (!closeDisabled) onClose();
+  });
 
   useEffect(() => {
     if (enterRafRef.current !== null) {
@@ -81,12 +103,19 @@ export function Modal({
 
     if (open) {
       setMounted(true);
+      setOverOmnibar(useUIStore.getState().omnibarOpen);
       // Start enter animation on next frame so the DOM is present
       enterRafRef.current = requestAnimationFrame(() => {
         setAnimating("enter");
       });
     } else if (mounted) {
-      setAnimating("exit");
+      // Reduced motion has no fade (globals.css), so there is no transitionend to wait for.
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setMounted(false);
+        setAnimating(null);
+      } else {
+        setAnimating("exit");
+      }
     }
 
     return () => {
@@ -97,11 +126,30 @@ export function Modal({
     };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Close on Escape
+  // Register as an open overlay, in opening order. Two readers: screens that
+  // draw their own full-page shell learn that a dialog is stacked above them,
+  // and the Escape listener below asks whether THIS dialog is the topmost one,
+  // since every open Modal hears the same keypress and none stops propagation.
+  useEffect(() => {
+    if (!open) return;
+    const registration = registerModalOverlay();
+    overlayRegistrationRef.current = registration;
+    return () => {
+      registration.release();
+      overlayRegistrationRef.current = null;
+    };
+  }, [open]);
+
+  // Close on Escape, but only the topmost open dialog: a confirm opened over a
+  // settings dialog must not take the settings dialog down with it.
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !closeDisabled) onClose();
+      // Escape while an IME is composing cancels the composition first.
+      if (e.isComposing) return;
+      if (e.key !== "Escape" || closeDisabled) return;
+      if (!overlayRegistrationRef.current?.isTopmost()) return;
+      onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -140,10 +188,10 @@ export function Modal({
       aria-label={localizedTitle}
       data-chat-floating-panel={chatFloatingPanel ? "true" : undefined}
       data-component="Modal"
-      className={`mari-modal fixed inset-0 z-[10000] flex items-center justify-center ${dragThrough ? "pointer-events-none" : ""} ${
+      className={`mari-modal fixed inset-0 ${overOmnibar || topLayer ? "z-(--mari-layer-omnibar)" : "z-[10000]"} flex items-center justify-center ${dragThrough ? "pointer-events-none" : ""} ${
         mobileFullscreen
           ? "p-0 sm:p-4"
-          : "p-3 max-md:pt-[max(0.75rem,env(safe-area-inset-top))] max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4"
+          : "p-3 max-md:pt-[max(0.75rem,env(safe-area-inset-top))] max-md:pb-[max(0.75rem,var(--mari-safe-area-inset-bottom,env(safe-area-inset-bottom)))] sm:p-4"
       }`}
       style={{
         opacity: isEntering ? 1 : 0,
@@ -168,13 +216,14 @@ export function Modal({
         tabIndex={-1}
         className={`mari-modal-panel ${NEUTRAL_PANEL_SHELL} relative flex w-full flex-col ${dragThrough ? "pointer-events-auto" : ""} ${width} max-h-[calc(100dvh-1.5rem)] sm:max-h-[min(90dvh,52rem)]${
           mobileFullscreen
-            ? " max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:border-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)]"
+            ? " max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:border-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[var(--mari-safe-area-inset-bottom,env(safe-area-inset-bottom))]"
             : ""
         } ${panelClassName ?? ""}`}
         style={{
           ...panelStyle,
           opacity: isEntering ? 1 : 0,
-          transform: isEntering ? "scale(1) translateY(0)" : "scale(0.97) translateY(6px)",
+          // Settle at `none`: an identity transform keeps the entire image library in a composited layer.
+          transform: isEntering ? undefined : "scale(0.97) translateY(6px)",
           transition: "opacity 150ms ease-out, transform 150ms ease-out",
         }}
       >
@@ -186,7 +235,7 @@ export function Modal({
             onClick={onClose}
             disabled={closeDisabled}
             aria-label={localizeUi("ui.ui.modal.value1Value2", { value1: localize("Close"), value2: localizedTitle })}
-            className="rounded-lg p-1.5 text-[var(--marinara-chat-chrome-panel-muted)] transition-colors hover:bg-[var(--marinara-chat-chrome-highlight-bg-hover)] hover:text-[var(--marinara-chat-chrome-highlight-text)] disabled:cursor-wait disabled:opacity-40"
+            className="flex shrink-0 items-center justify-center rounded-lg p-1.5 text-[var(--marinara-chat-chrome-panel-muted)] transition-colors max-md:h-9 max-md:w-9 [@media(pointer:coarse)]:h-9 [@media(pointer:coarse)]:w-9 hover:bg-[var(--marinara-chat-chrome-highlight-bg-hover)] hover:text-[var(--marinara-chat-chrome-highlight-text)] disabled:cursor-wait disabled:opacity-40"
           >
             <X size="1rem" />
           </button>

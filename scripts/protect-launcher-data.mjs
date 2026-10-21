@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { chmod, cp, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { chmod, cp, lstat, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { parseEnv } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
-const serverRoot = resolve(repositoryRoot, "packages/server");
 const defaultBackupRoot = resolve(repositoryRoot, "..", ".marinara-engine-update-backups");
 const retainedBackupCount = 2;
 
@@ -138,26 +137,108 @@ export async function checkTargetStorageFormat({
   return { compatible: targetFormat >= onDiskFormat, verified: true, onDiskFormat, targetFormat };
 }
 
-// Kept in sync with SHARDED_TABLES in packages/server/src/db/file-backed-store.ts
+// Kept in sync with FILE_BACKED_TABLES in packages/server/src/db/file-backed-store.ts.
+// Every file-backed table is sharded as of storage format 5.
 // (this script must run offline, so it cannot import server code).
 const SHARDED_TABLES = [
+  "chats",
   "messages",
   "message_swipes",
-  "memory_chunks",
-  "chat_images",
-  "agent_runs",
-  "agent_memory",
   "conversation_call_sessions",
   "conversation_call_messages",
+  "conversation_call_sounds",
+  "characters",
+  "character_card_versions",
+  "personas",
+  "persona_card_versions",
+  "character_groups",
+  "persona_groups",
+  "noodle_accounts",
+  "noodle_posts",
+  "noodle_account_subscriptions",
+  "noodle_post_unlocks",
+  "noodle_interactions",
+  "noodler_creator_reply_claims",
+  "noodler_prepared_posts",
+  "noodler_automatic_attempts",
+  "noodler_reserve_state",
+  "noodler_fan_activity_state",
+  "noodle_activity_digests",
+  "noodle_refresh_runs",
+  "slurp_accounts",
+  "slurp_posts",
+  "slurp_account_subscriptions",
+  "slurp_post_unlocks",
+  "slurp_interactions",
+  "slurp_creator_reply_claims",
+  "slurp_prepared_posts",
+  "slurp_automatic_attempts",
+  "slurp_reserve_state",
+  "slurp_fan_activity_state",
+  "slurp_activity_digests",
+  "slurp_refresh_runs",
+  "lorebooks",
+  "lorebook_character_links",
+  "lorebook_persona_links",
+  "lorebook_folders",
+  "lorebook_entries",
+  "lorebook_entry_activation_stats",
+  "prompt_presets",
+  "prompt_groups",
+  "prompt_sections",
+  "choice_blocks",
+  "api_connections",
+  "assets",
+  "agent_configs",
+  "agent_runs",
+  "agent_memory",
+  "custom_tools",
   "game_state_snapshots",
+  "spatial_context_snapshots",
+  "capability_documents",
   "game_engine_state",
   "game_checkpoints",
-  "game_turn_storyboards",
   "game_scene_videos",
-  "spatial_context_snapshots",
+  "game_turn_storyboards",
+  "game_turn_storyboard_keyframes",
+  "game_dice_pools",
+  "game_world_snapshots",
+  "game_rulesets",
+  "game_ruleset_catalogs",
+  "game_tile_packs",
+  "game_creature_packs",
+  "game_board_packs",
+  "game_worlds",
+  "regex_scripts",
+  "chat_images",
+  "character_images",
+  "persona_images",
+  "gallery_folders",
+  "global_images",
+  "custom_emojis",
+  "custom_stickers",
   "ooc_influences",
   "conversation_notes",
+  "message_trash",
+  "memory_chunks",
+  "advanced_memory_records",
+  "chat_folders",
+  "api_connection_folders",
+  "custom_themes",
+  "app_settings",
+  "achievement_unlocks",
+  "chat_presets",
+  "prompt_overrides",
+  "installed_extensions",
+  "library_folders",
+  "mari_instructions",
+  "mari_workspace_context",
 ];
+const PRIMARY_KEY_COLUMNS = {
+  lorebook_entry_activation_stats: "entryId",
+  app_settings: "key",
+  prompt_overrides: "key",
+};
 const UNSHARD_SENTINEL = ".unshard-in-progress";
 
 async function pathExists(path) {
@@ -316,17 +397,18 @@ export async function unshardLauncherStorage({
       }
       rows.push(...records);
     }
-    // Mirror the store's load normalization: (createdAt, id) order, then
+    // Mirror the store's load normalization: (createdAt, primary key) order, then
     // keep-first dedup on primary key.
+    const primaryKey = PRIMARY_KEY_COLUMNS[table] ?? "id";
     rows.sort(
       (a, b) =>
         String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")) ||
-        String(a.id ?? "").localeCompare(String(b.id ?? "")),
+        String(a[primaryKey] ?? "").localeCompare(String(b[primaryKey] ?? "")),
     );
     const seenIds = new Set();
     const deduped = [];
     for (const row of rows) {
-      const id = typeof row.id === "string" ? row.id : null;
+      const id = typeof row[primaryKey] === "string" ? row[primaryKey] : null;
       if (id && seenIds.has(id)) continue;
       if (id) seenIds.add(id);
       deduped.push(row);
@@ -462,6 +544,15 @@ export async function snapshotLauncherData({
   const backupName = `update-${timestamp}-${process.pid}`;
   const incompleteDir = resolve(backupRoot, `.incomplete-${backupName}`);
   const backupDir = resolve(backupRoot, backupName);
+  const capabilityRuntimeLink = resolve(dataDir, "capability-packages", "node_modules");
+  const capabilityRuntimeSnapshots = resolve(dataDir, "capability-runtime-snapshots");
+  const downloadableDataDirs = ["models", "sidecar-runtime"].map((name) => resolve(dataDir, name));
+  // The storage writer lease is per-process runtime state (owner record plus the
+  // live.sock liveness socket, #5389). A snapshot taken while the previous server
+  // is still up, or after it died without releasing the lease, would try to copy
+  // that socket and fail with EINVAL, aborting the whole update (#6046). Nothing
+  // in the lease is user data, so leave the directory out entirely.
+  const writerLeaseDir = resolve(dataDir, "storage", ".writer-lease");
 
   await rm(incompleteDir, { recursive: true, force: true });
   try {
@@ -470,6 +561,30 @@ export async function snapshotLauncherData({
       recursive: true,
       preserveTimestamps: true,
       errorOnExist: true,
+      filter: async (source) => {
+        const sourcePath = resolve(source);
+        if (
+          sourcePath === capabilityRuntimeLink ||
+          sourcePath === capabilityRuntimeSnapshots ||
+          sourcePath === writerLeaseDir
+        ) return false;
+        if (
+          !downloadableDataDirs.every(
+            (downloadableDir) => sourcePath !== downloadableDir && !sourcePath.startsWith(`${downloadableDir}${sep}`),
+          )
+        ) {
+          return false;
+        }
+        // Sockets and FIFOs cannot be copied (fs.cp rejects them with EINVAL) and
+        // carry no data worth restoring, wherever they live under the data dir.
+        try {
+          const entry = await lstat(sourcePath);
+          if (entry.isSocket() || entry.isFIFO()) return false;
+        } catch (error) {
+          if (error?.code !== "ENOENT") throw error;
+        }
+        return true;
+      },
     });
     await writeFile(
       resolve(incompleteDir, "manifest.json"),

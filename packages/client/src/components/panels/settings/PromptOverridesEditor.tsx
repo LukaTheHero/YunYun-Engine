@@ -4,6 +4,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronDown, Code2, FileText, Loader2, RotateCcw, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { estimateTextTokens } from "@marinara-engine/shared";
+import { formatEstimatedTokens } from "../../../lib/character-token-count";
 import {
   usePromptOverride,
   usePromptOverrideDefault,
@@ -16,7 +18,7 @@ import { ApiError } from "../../../lib/api-client";
 import { showConfirmDialog } from "../../../lib/app-dialogs";
 import { cn } from "../../../lib/utils";
 import { HelpTooltip } from "../../ui/HelpTooltip";
-import { SettingsSwitch } from "./SettingControls";
+import { SETTINGS_BUTTON_CLASS, SETTINGS_COMPACT_PRIMARY_BUTTON_CLASS, SettingsSwitch } from "./SettingControls";
 import { useTranslation as useUiTranslation } from "react-i18next";
 
 const PREFERRED_PROMPT_KEY = "conversation.selfie";
@@ -279,9 +281,11 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
     }
 
     const confirmed = await showConfirmDialog({
-      title:localizeUi("ui.panels.promptoverrideseditorbody.resetPromptOverride"),
-      message:localizeUi("ui.panels.promptoverrideseditorbody.value1WillUseItsBuiltInDefaultAgainYour", { value1: localizedEntryLabel(selectedEntry) }),
-      confirmLabel:localizeUi("ui.panels.promptoverrideseditorbody.resetToDefault"),
+      title: localizeUi("ui.panels.promptoverrideseditorbody.resetPromptOverride"),
+      message: localizeUi("ui.panels.promptoverrideseditorbody.value1WillUseItsBuiltInDefaultAgainYour", {
+        value1: localizedEntryLabel(selectedEntry),
+      }),
+      confirmLabel: localizeUi("ui.panels.promptoverrideseditorbody.resetToDefault"),
       cancelLabel: "Cancel",
       tone: "destructive",
     });
@@ -303,7 +307,9 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
   if (listFailed) {
     return (
       <div className="flex items-start gap-2 text-xs text-[var(--destructive)]">
-        <AlertTriangle size="0.875rem" className="mt-0.5 shrink-0" />{localizeUi("ui.panels.promptoverrideseditorbody.couldNotLoadRegisteredPromptOverrides")}</div>
+        <AlertTriangle size="0.875rem" className="mt-0.5 shrink-0" />
+        {localizeUi("ui.panels.promptoverrideseditorbody.couldNotLoadRegisteredPromptOverrides")}
+      </div>
     );
   }
 
@@ -311,9 +317,11 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
     <div className="flex flex-col gap-2.5">
       <label className="flex flex-col gap-1">
         <span className="flex items-center justify-between gap-2">
-          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">{localizeUi("ui.panels.promptoverrideseditorbody.registeredPrompt")}</span>
+          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">
+            {localizeUi("ui.panels.promptoverrideseditorbody.registeredPrompt")}
+          </span>
           <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[0.5625rem] font-semibold", status.className)}>
-            {loadingEntries ?localizeUi("ui.panels.promptoverrideseditorbody.loading") : status.label}
+            {loadingEntries ? localizeUi("ui.panels.promptoverrideseditorbody.loading") : status.label}
           </span>
         </span>
         <select
@@ -322,8 +330,12 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
           onChange={(event) => setSelectedKey(event.target.value)}
           className="w-full rounded-lg bg-[var(--background)] px-3 py-2 text-xs text-[var(--foreground)] outline-none ring-1 ring-[var(--border)] focus:ring-[var(--primary)] disabled:opacity-60"
         >
-          {loadingEntries && <option value="">{localizeUi("ui.panels.promptoverrideseditorbody.loadingPrompts")}</option>}
-          {!loadingEntries && filteredEntries.length === 0 && <option value="">{localizeUi("ui.panels.promptoverrideseditorbody.noRegisteredPrompts")}</option>}
+          {loadingEntries && (
+            <option value="">{localizeUi("ui.panels.promptoverrideseditorbody.loadingPrompts")}</option>
+          )}
+          {!loadingEntries && filteredEntries.length === 0 && (
+            <option value="">{localizeUi("ui.panels.promptoverrideseditorbody.noRegisteredPrompts")}</option>
+          )}
           {filteredEntries.map((entry) => (
             <option key={entry.key} value={entry.key}>
               {localizedEntryLabel(entry)}
@@ -340,7 +352,9 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
 
       {variables.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">{localizeUi("ui.panels.promptoverrideseditorbody.availableVariables")}</span>
+          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">
+            {localizeUi("ui.panels.promptoverrideseditorbody.availableVariables")}
+          </span>
           <div className="flex flex-wrap gap-1.5">
             {variables.map((variable) => (
               <button
@@ -353,7 +367,11 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
                     ? localizeUi("settings.promptOverrides.roleplayGalleryVideoDirector.durationSeconds")
                     : variable.description
                 }
-                className="inline-flex items-center gap-1 rounded-md bg-[var(--background)] px-2 py-1 font-mono text-[0.6rem] text-[var(--primary)] ring-1 ring-[var(--border)] transition-colors hover:bg-[var(--accent)]"
+                // Compact regular-weight chips keep two per row in the default panel width, as before #7174.
+                className={cn(
+                  SETTINGS_BUTTON_CLASS,
+                  "mari-chrome-control--chip mari-chrome-control--regular-label font-mono text-[0.6rem]",
+                )}
               >
                 <Code2 size="0.625rem" />
                 {"${" + variable.name + "}"}
@@ -365,8 +383,12 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
 
       <label className="flex flex-col gap-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">{localizeUi("ui.panels.promptoverrideseditorbody.template")}</span>
-          <span className="text-[0.5625rem] text-[var(--muted-foreground)]">{draft.length} {localizeUi("ui.panels.promptoverrideseditorbody.chars")}</span>
+          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">
+            {localizeUi("ui.panels.promptoverrideseditorbody.template")}
+          </span>
+          <span className="text-[0.5625rem] text-[var(--muted-foreground)]">
+            {formatEstimatedTokens(loadingPrompt ? 0 : estimateTextTokens(draft), localizeUi)}
+          </span>
         </div>
         <textarea
           ref={textareaRef}
@@ -376,24 +398,33 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
             setDraft(event.target.value);
             setLastError(null);
           }}
-          placeholder={loadingPrompt ?localizeUi("ui.panels.promptoverrideseditorbody.loadingTemplate") :localizeUi("ui.panels.promptoverrideseditorbody.writeAPromptTemplate")}
+          placeholder={
+            loadingPrompt
+              ? localizeUi("ui.panels.promptoverrideseditorbody.loadingTemplate")
+              : localizeUi("ui.panels.promptoverrideseditorbody.writeAPromptTemplate")
+          }
           className="min-h-52 resize-y rounded-lg border border-[var(--border)] bg-[var(--background)] p-2.5 font-mono text-[0.6875rem] leading-relaxed text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)]/45 focus:border-[var(--primary)]/50 disabled:cursor-wait disabled:opacity-60"
         />
       </label>
 
       <div className="rounded-lg bg-[var(--background)]/55 p-2.5 ring-1 ring-[var(--border)]/70">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">{localizeUi("ui.panels.promptoverrideseditorbody.renderedPreview")}</span>
-          <span className="text-[0.5625rem] text-[var(--muted-foreground)]">{localizeUi("ui.panels.promptoverrideseditorbody.exampleValues")}</span>
+          <span className="text-[0.625rem] font-medium text-[var(--muted-foreground)]">
+            {localizeUi("ui.panels.promptoverrideseditorbody.renderedPreview")}
+          </span>
+          <span className="text-[0.5625rem] text-[var(--muted-foreground)]">
+            {localizeUi("ui.panels.promptoverrideseditorbody.exampleValues")}
+          </span>
         </div>
         <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-[var(--secondary)]/70 p-2 font-mono text-[0.625rem] leading-relaxed text-[var(--foreground)]">
           {loadingPrompt
             ? localizeUi("ui.panels.promptoverrideseditorbody.loadingPreview")
-            : renderedPreview.rendered ||
-              localizeUi("ui.panels.promptoverrideseditorbody.nothingToPreview")}
+            : renderedPreview.rendered || localizeUi("ui.panels.promptoverrideseditorbody.nothingToPreview")}
         </pre>
         {renderedPreview.unknownVariables.length > 0 && (
-          <p className="mt-1.5 text-[0.5625rem] text-amber-500">{localizeUi("ui.panels.promptoverrideseditorbody.unknownVariables")} {renderedPreview.unknownVariables.join(", ")}
+          <p className="mt-1.5 text-[0.5625rem] text-amber-500">
+            {localizeUi("ui.panels.promptoverrideseditorbody.unknownVariables")}{" "}
+            {renderedPreview.unknownVariables.join(", ")}
           </p>
         )}
       </div>
@@ -421,30 +452,32 @@ function PromptOverridesEditorBody({ keys, preferredKey }: { keys?: readonly str
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className={cn(
-            "mari-chrome-control flex-1 text-xs disabled:cursor-not-allowed",
-            canSave && "mari-chrome-control--selected",
-          )}
+          className={cn(SETTINGS_COMPACT_PRIMARY_BUTTON_CLASS, "flex-auto")}
         >
-          {saveOverride.isPending ? <Loader2 size="0.8125rem" className="animate-spin" /> : <Save size="0.8125rem" />}{localizeUi("ui.noodle.noodlehome.save")}</button>
+          {saveOverride.isPending ? <Loader2 size="0.75rem" className="animate-spin" /> : <Save size="0.75rem" />}
+          {localizeUi("ui.noodle.noodlehome.save")}
+        </button>
         <button
           type="button"
           onClick={() => void handleReset()}
           disabled={!canReset}
-          className="mari-chrome-control flex-1 text-xs disabled:cursor-not-allowed"
+          className={cn(SETTINGS_BUTTON_CLASS, "flex-auto")}
         >
           {resetOverride.isPending ? (
-            <Loader2 size="0.8125rem" className="animate-spin" />
+            <Loader2 size="0.75rem" className="animate-spin" />
           ) : detail?.override ? (
-            <RotateCcw size="0.8125rem" />
+            <RotateCcw size="0.75rem" />
           ) : (
-            <Sparkles size="0.8125rem" />
-          )}{localizeUi("ui.panels.promptoverrideseditorbody.resetToDefault")}</button>
+            <Sparkles size="0.75rem" />
+          )}
+          {localizeUi("ui.panels.promptoverrideseditorbody.resetToDefault")}
+        </button>
       </div>
 
       {detail?.override && !isDirty && (
         <div className="flex items-center gap-1.5 text-[0.625rem] text-[var(--muted-foreground)]">
-          <Check size="0.6875rem" className="text-green-500" />{localizeUi("chat.settings.inlineEditor.saved")} {new Date(detail.override.updatedAt).toLocaleString()}
+          <Check size="0.6875rem" className="text-green-500" />
+          {localizeUi("chat.settings.inlineEditor.saved")} {new Date(detail.override.updatedAt).toLocaleString()}
         </div>
       )}
     </div>

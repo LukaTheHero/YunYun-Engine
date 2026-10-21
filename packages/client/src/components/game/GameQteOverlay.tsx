@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { GAME_SECTION_CLASS } from "../../lib/chat-widget-colors";
 import { useTranslation as useUiTranslation } from "react-i18next";
 
 interface QteAction {
@@ -90,7 +91,13 @@ export function GameQteOverlay({ actions, timerSeconds, onSelect, onTimeout, onD
         )}
       />
 
-      <div className="relative z-10 w-full max-w-lg rounded-lg border border-white/20 bg-black/80 px-5 py-5 shadow-2xl shadow-black/60 ring-1 ring-amber-300/30 backdrop-blur-md">
+      <div
+        data-game-section="qte"
+        className={cn(
+          GAME_SECTION_CLASS,
+          "relative z-10 w-full max-w-lg rounded-lg border border-white/20 bg-black/80 px-5 py-5 shadow-2xl shadow-black/60 ring-1 ring-amber-300/30 backdrop-blur-md",
+        )}
+      >
         {onDismiss && (
           <button
             type="button"
@@ -119,8 +126,12 @@ export function GameQteOverlay({ actions, timerSeconds, onSelect, onTimeout, onD
               isUrgent ? "text-red-400 animate-pulse" : "text-amber-300",
             )}
           >
-            {timeLeft.toFixed(1)}{localizeUi("ui.noodle.stageprofileview.s")}</span>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-white/60">{localizeUi("ui.game.gameqteoverlay.reactQuickly")}</p>
+            {timeLeft.toFixed(1)}
+            {localizeUi("ui.noodle.stageprofileview.s")}
+          </span>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-white/60">
+            {localizeUi("ui.game.gameqteoverlay.reactQuickly")}
+          </p>
         </div>
 
         {/* Action buttons */}
@@ -152,7 +163,10 @@ export function GameQteOverlay({ actions, timerSeconds, onSelect, onTimeout, onD
         {/* Bonus indicator */}
         {selected !== null && timeLeft > 0 && (
           <div className="mt-3 text-center">
-            <span className="text-xs font-semibold text-emerald-400">{localizeUi("ui.game.gameqteoverlay.quickReflexes")}{Math.ceil(timeLeft)} {localizeUi("ui.game.gameqteoverlay.bonus")}</span>
+            <span className="text-xs font-semibold text-emerald-400">
+              {localizeUi("ui.game.gameqteoverlay.quickReflexes")}
+              {Math.ceil(timeLeft)} {localizeUi("ui.game.gameqteoverlay.bonus")}
+            </span>
           </div>
         )}
       </div>

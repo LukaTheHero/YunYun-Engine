@@ -2,28 +2,42 @@
 // Routes: Admin (clear data, maintenance)
 // ──────────────────────────────────────────────
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { eq, ne } from "../db/file-query.js";
+import { eq, like, ne } from "../db/file-query.js";
 import { existsSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
-import { PROFESSOR_MARI_ID, TTS_SETTINGS_KEY } from "@marinara-engine/shared";
+import {
+  MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
+  PROFESSOR_MARI_ID,
+  SPEECH_TO_TEXT_SETTINGS_KEY,
+  TTS_SETTINGS_KEY,
+} from "@marinara-engine/shared";
 import { DATA_DIR } from "../utils/data-dir.js";
 import * as schema from "../db/schema/index.js";
 import { requirePrivilegedAccess } from "../middleware/privileged-gate.js";
 import {
+  ADMIN_RESTART_RATE_LIMIT,
+  AVATAR_STORAGE_RATE_LIMIT,
+  REQUEST_TIMEOUT_SETTINGS_RATE_LIMIT,
+  RUNTIME_DIAGNOSTICS_RATE_LIMIT,
+} from "../middleware/rate-limit.js";
+import { logger } from "../lib/logger.js";
+import { getRequestTimeoutSettings, saveRequestTimeoutSettings, isDockerRuntime } from "../config/runtime-config.js";
+import { noteSessionExitKind } from "../lib/session-postmortem.js";
+import { armShutdownDeadline } from "../lib/shutdown-deadline.js";
+import { collectRuntimeDiagnostics } from "../lib/runtime-diagnostics.js";
+import {
+  ABANDONED_AVATAR_MIN_AGE_MS,
   collectCharacterAvatarPaths,
   collectPersonaAvatarPaths,
+  deleteAbandonedAvatarFiles,
   mutateAvatarReferencesAndCleanup,
+  scanAbandonedAvatarFiles,
 } from "../services/image/avatar-file-lifecycle.js";
+import { removeAvatarOwnersOfType } from "../services/avatars/storage.js";
+import { TRIPO_API_KEY_SETTING } from "../services/avatars/generation/tripo-key.js";
 
 type ExpungeScope =
-  | "chats"
-  | "characters"
-  | "personas"
-  | "lorebooks"
-  | "presets"
-  | "connections"
-  | "automation"
-  | "media";
+  "chats" | "characters" | "personas" | "lorebooks" | "presets" | "connections" | "automation" | "media";
 
 const ALL_EXPUNGE_SCOPES: ExpungeScope[] = [
   "chats",
@@ -57,6 +71,85 @@ function isValidScope(scope: unknown): scope is ExpungeScope {
 }
 
 export async function adminRoutes(app: FastifyInstance) {
+  let restartScheduled = false;
+
+  app.get("/request-timeouts", () => getRequestTimeoutSettings());
+  app.put("/request-timeouts", { config: { rateLimit: REQUEST_TIMEOUT_SETTINGS_RATE_LIMIT } }, async (req, reply) => {
+    if (!requirePrivilegedAccess(req, reply, { feature: "Request timeout settings" })) return;
+    return saveRequestTimeoutSettings(req.body);
+  });
+
+  // Read-only runtime detail for support, beyond what /api/health serves:
+  // storage residency and whether each capability package runtime is live.
+  // Counts and states only, never row content or settings values.
+  app.get("/runtime-diagnostics", { config: { rateLimit: RUNTIME_DIAGNOSTICS_RATE_LIMIT } }, async (req, reply) => {
+    if (!requirePrivilegedAccess(req, reply, { feature: "Runtime diagnostics" })) return;
+    reply.header("Cache-Control", "no-store");
+    return collectRuntimeDiagnostics();
+  });
+
+  app.post<{ Body: { confirm?: boolean } }>(
+    "/restart",
+    { config: { rateLimit: ADMIN_RESTART_RATE_LIMIT } },
+    async (req, reply) => {
+      if (!requirePrivilegedAccess(req, reply, { feature: "Server restart" })) return;
+      if (req.body?.confirm !== true) {
+        return reply.status(400).send({ error: "Must send { confirm: true } to restart the server" });
+      }
+      if (restartScheduled) {
+        return reply.status(409).send({ error: "Server restart is already scheduled" });
+      }
+      const docker = isDockerRuntime();
+      if (!docker && process.env.MARINARA_RESTART_SUPERVISOR !== String(process.ppid)) {
+        return reply.status(409).send({
+          error:
+            "Restart is unavailable for an unmanaged server. Start YunYun with its platform launcher or pnpm start; restart a development watcher from its terminal.",
+        });
+      }
+      const exitCode = docker ? 0 : 75;
+
+      restartScheduled = true;
+      setTimeout(() => {
+        void (async () => {
+          armShutdownDeadline(app, "restart", { exitCode });
+          try {
+            // #5506 diagnostics: name this ending so the next startup reports
+            // an operator restart instead of an external kill.
+            noteSessionExitKind("restart");
+            await app.close();
+            logger.info("Server restart requested from Advanced Settings");
+            process.exit(exitCode);
+          } catch (error) {
+            logger.error(error, "Graceful server restart failed");
+            process.exit(1);
+          }
+        })();
+      }, 750);
+
+      return reply.status(202).send({ status: "restarting" });
+    },
+  );
+
+  app.get("/avatar-storage/abandoned", { config: { rateLimit: AVATAR_STORAGE_RATE_LIMIT } }, async (req, reply) => {
+    if (!requirePrivilegedAccess(req, reply, { feature: "Avatar storage scan" })) return;
+    const result = await scanAbandonedAvatarFiles({ db: app.db });
+    return { ...result, minimumAgeMinutes: ABANDONED_AVATAR_MIN_AGE_MS / 60_000 };
+  });
+
+  app.post<{ Body: { confirm: boolean } }>(
+    "/avatar-storage/cleanup",
+    { config: { rateLimit: AVATAR_STORAGE_RATE_LIMIT } },
+    async (req, reply) => {
+      if (!requirePrivilegedAccess(req, reply, { feature: "Avatar storage cleanup" })) return;
+      if (req.body?.confirm !== true) {
+        return reply.status(400).send({ error: "Must send { confirm: true } to proceed" });
+      }
+      const result = await deleteAbandonedAvatarFiles({ db: app.db });
+      logger.info("Removed %d abandoned avatar files (%d bytes)", result.files, result.bytes);
+      return { ...result, minimumAgeMinutes: ABANDONED_AVATAR_MIN_AGE_MS / 60_000 };
+    },
+  );
+
   const runExpunge = async (requestedScopes: ExpungeScope[], reply: FastifyReply) => {
     if (requestedScopes.length === 0) {
       return reply.status(400).send({ error: "At least one valid scope is required" });
@@ -72,6 +165,15 @@ export async function adminRoutes(app: FastifyInstance) {
         tablesCleared[name] = (tablesCleared[name] ?? 0) + ((result as { changes?: number } | undefined)?.changes ?? 0);
       } catch {
         tablesCleared[name] = tablesCleared[name] ?? 0;
+      }
+    };
+    // Avatar models belong to their character or persona, so they go with it (Media & Assets clears them all).
+    const removeAvatarModels = async (ownerType: "character" | "persona", keepOwnerIds: string[] = []) => {
+      try {
+        const removed = await removeAvatarOwnersOfType(ownerType, keepOwnerIds);
+        filesDeleted.avatarModels = (filesDeleted.avatarModels ?? 0) + removed;
+      } catch (err) {
+        logger.warn(err, "Failed to remove the %s avatar models", ownerType);
       }
     };
 
@@ -106,10 +208,7 @@ export async function adminRoutes(app: FastifyInstance) {
             db,
             deletedCharacters.map((row) => row.id),
           );
-          return [
-            ...characterAvatarPaths,
-            ...deletedGroups.flatMap((row) => (row.avatarPath ? [row.avatarPath] : [])),
-          ];
+          return [...characterAvatarPaths, ...deletedGroups.flatMap((row) => (row.avatarPath ? [row.avatarPath] : []))];
         },
         mutateReferences: async () => {
           await runDelete("character_groups", () => db.delete(schema.characterGroups).run());
@@ -120,6 +219,7 @@ export async function adminRoutes(app: FastifyInstance) {
         cleanupFiles: !requestedScopes.includes("media"),
       });
       filesDeleted.avatars = (filesDeleted.avatars ?? 0) + cleanup.filesDeleted;
+      await removeAvatarModels("character", [PROFESSOR_MARI_ID]);
     }
 
     if (requestedScopes.includes("personas")) {
@@ -139,6 +239,7 @@ export async function adminRoutes(app: FastifyInstance) {
         cleanupFiles: !requestedScopes.includes("media"),
       });
       filesDeleted.avatars = (filesDeleted.avatars ?? 0) + cleanup.filesDeleted;
+      await removeAvatarModels("persona");
     }
 
     if (requestedScopes.includes("lorebooks")) {
@@ -150,10 +251,47 @@ export async function adminRoutes(app: FastifyInstance) {
     }
 
     if (requestedScopes.includes("presets")) {
-      await runDelete("prompt_sections", () => db.delete(schema.promptSections).run());
-      await runDelete("prompt_groups", () => db.delete(schema.promptGroups).run());
-      await runDelete("choice_blocks", () => db.delete(schema.choiceBlocks).run());
-      await runDelete("prompt_presets", () => db.delete(schema.promptPresets).run());
+      const defaultPreset = (
+        await db
+          .select({ id: schema.promptPresets.id })
+          .from(schema.promptPresets)
+          .where(eq(schema.promptPresets.isDefault, "true"))
+      )[0];
+      const stockPreset = (
+        await db
+          .select({ id: schema.promptPresets.id })
+          .from(schema.promptPresets)
+          .where(eq(schema.promptPresets.systemKey, MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY))
+          .limit(1)
+      )[0];
+      const stockPresetId = stockPreset?.id;
+
+      await runDelete("prompt_sections", () =>
+        stockPresetId
+          ? db.delete(schema.promptSections).where(ne(schema.promptSections.presetId, stockPresetId)).run()
+          : db.delete(schema.promptSections).run(),
+      );
+      await runDelete("prompt_groups", () =>
+        stockPresetId
+          ? db.delete(schema.promptGroups).where(ne(schema.promptGroups.presetId, stockPresetId)).run()
+          : db.delete(schema.promptGroups).run(),
+      );
+      await runDelete("choice_blocks", () =>
+        stockPresetId
+          ? db.delete(schema.choiceBlocks).where(ne(schema.choiceBlocks.presetId, stockPresetId)).run()
+          : db.delete(schema.choiceBlocks).run(),
+      );
+      await runDelete("prompt_presets", () =>
+        stockPresetId
+          ? db.delete(schema.promptPresets).where(ne(schema.promptPresets.id, stockPresetId)).run()
+          : db.delete(schema.promptPresets).run(),
+      );
+      if (stockPresetId && defaultPreset && defaultPreset.id !== stockPresetId) {
+        await db
+          .update(schema.promptPresets)
+          .set({ isDefault: "true" })
+          .where(eq(schema.promptPresets.id, stockPresetId));
+      }
       await runDelete("library_folders:presets", () =>
         db.delete(schema.libraryFolders).where(eq(schema.libraryFolders.scope, "presets")).run(),
       );
@@ -164,12 +302,22 @@ export async function adminRoutes(app: FastifyInstance) {
       await runDelete("app_settings", () =>
         db.delete(schema.appSettings).where(eq(schema.appSettings.key, TTS_SETTINGS_KEY)).run(),
       );
+      await runDelete("app_settings", () =>
+        db.delete(schema.appSettings).where(eq(schema.appSettings.key, SPEECH_TO_TEXT_SETTINGS_KEY)).run(),
+      );
+      // The Tripo API key was a connection until it moved to the 3D Avatars page, so it is cleared here too.
+      await runDelete("app_settings", () =>
+        db.delete(schema.appSettings).where(eq(schema.appSettings.key, TRIPO_API_KEY_SETTING)).run(),
+      );
     }
 
     if (requestedScopes.includes("automation")) {
       await runDelete("agent_runs", () => db.delete(schema.agentRuns).run());
       await runDelete("agent_memory", () => db.delete(schema.agentMemory).run());
       await runDelete("agent_configs", () => db.delete(schema.agentConfigs).run());
+      await runDelete("app_settings:agent_home_widgets", () =>
+        db.delete(schema.appSettings).where(like(schema.appSettings.key, "agent_home_widget:%")).run(),
+      );
       await runDelete("custom_tools", () => db.delete(schema.customTools).run());
       await runDelete("regex_scripts", () => db.delete(schema.regexScripts).run());
       await runDelete("custom_themes", () => db.delete(schema.customThemes).run());
@@ -186,6 +334,7 @@ export async function adminRoutes(app: FastifyInstance) {
       filesDeleted.gameSceneVideos = clearDirectory(join(DATA_DIR, "game-scene-videos"));
       filesDeleted.avatars = clearDirectory(join(DATA_DIR, "avatars"));
       filesDeleted.sprites = clearDirectory(join(DATA_DIR, "sprites"));
+      filesDeleted.avatarModels = clearDirectory(join(DATA_DIR, "avatar-models"));
       filesDeleted.gallery = clearDirectory(join(DATA_DIR, "gallery"));
       filesDeleted.fonts = clearDirectory(join(DATA_DIR, "fonts"));
       filesDeleted.knowledgeSources = clearDirectory(join(DATA_DIR, "knowledge-sources"));

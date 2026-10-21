@@ -106,7 +106,10 @@ async function withSpotifyRefreshLock<T>(agentId: string, task: () => Promise<T>
   const current = new Promise<void>((resolve) => {
     releaseCurrent = resolve;
   });
-  const slot = previous.then(() => current, () => current);
+  const slot = previous.then(
+    () => current,
+    () => current,
+  );
   spotifyRefreshLocks.set(key, slot);
 
   await previous.catch(() => {
@@ -145,7 +148,9 @@ async function refreshSpotifyToken(args: {
 
   if (!tokenRes.ok) {
     const body = await tokenRes.text();
-    logger.warn("[spotify] refresh failed with status %d: %s", tokenRes.status, body.slice(0, 200));
+    // A token endpoint body can echo credentials, so it is only logged at debug.
+    logger.warn("[spotify] refresh failed with status %d", tokenRes.status);
+    logger.debug("[spotify] refresh failure body: %s", body.slice(0, 200));
     return null;
   }
 
