@@ -302,7 +302,8 @@ export const SETTINGS_SEARCHABLE_CONTROLS: readonly SettingsSearchableControlMet
     sectionId: "omnibar",
     labelKey: "settings.search.mariRuntime.label",
     label: "Professor YunYun runtime",
-    description: "How Professor YunYun works: Classic, or Pi (experimental), which lets her think more before she acts.",
+    description:
+      "How Professor YunYun works: Classic, or Pi (experimental), which lets her think more before she acts.",
     descriptionKey: "settings.search.mariRuntime.description",
     aliases: ["mari", "runtime", "pi", "classic", "experimental", "tool calls", "reasoning"],
     kind: "Select",

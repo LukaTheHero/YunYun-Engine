@@ -728,7 +728,10 @@ export function OmnibarSettingsSheet({
           </div>
         </Section>
 
-        <Section title={t("omnibar.settings.mariWindow.heading", "Professor YunYun window")} className="hidden sm:block">
+        <Section
+          title={t("omnibar.settings.mariWindow.heading", "Professor YunYun window")}
+          className="hidden sm:block"
+        >
           <div className="omnibar-settings-size-row" data-size-group="mari" {...sizingFocus("mari")}>
             <WindowSizeSlider
               anchor={anchorId("mari-window-height")}

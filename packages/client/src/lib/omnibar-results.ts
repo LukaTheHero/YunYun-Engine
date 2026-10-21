@@ -724,7 +724,8 @@ export function buildOmnibarSearchResults({
     ? t("omnibar.askMari.withQuery", "Ask Prof. YunYun: “{{query}}”", { query: trimmedQuery })
     : t("omnibar.askProfessorMari", "Ask Professor YunYun");
   const askPeek =
-    askPeeks[capability] ?? t("omnibar.askMari.peek.explain", "Professor YunYun explains this and suggests a next step.");
+    askPeeks[capability] ??
+    t("omnibar.askMari.peek.explain", "Professor YunYun explains this and suggests a next step.");
   // R40: with a query typed, a choice control's options join the searchable set,
   // so "gpt" reaches "Use GPT-4 for this chat" without finding the Model row and
   // drilling into it. They stay out of the idle deck, which would otherwise gain

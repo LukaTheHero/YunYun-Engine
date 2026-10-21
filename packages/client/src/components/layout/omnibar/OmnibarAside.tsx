@@ -196,7 +196,9 @@ export function OmnibarAside({
         data-component="GlobalOmnibar.Aside"
         className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted-foreground)]"
       >
-        <span>{t("omnibar.aside.needsModel", "Choose a model so Professor YunYun can answer searches like this.")}</span>
+        <span>
+          {t("omnibar.aside.needsModel", "Choose a model so Professor YunYun can answer searches like this.")}
+        </span>
         <button type="button" onClick={onChooseModel} className={textAction}>
           {t("omnibar.aside.chooseModel", "Choose a model")}
         </button>
