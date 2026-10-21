@@ -1,6 +1,6 @@
 # Personal Extension Architecture
 
-Personal Extensions are disabled-by-default, hash-approved code with two isolated runtimes. Professor Mari drafts are the only extension class available by default. All other sources are External Extensions and require two independent operator gates.
+Personal Extensions are disabled-by-default, hash-approved code with two isolated runtimes. Professor YunYun drafts are the only extension class available by default. All other sources are External Extensions and require two independent operator gates.
 
 ## Security invariants
 
@@ -11,17 +11,17 @@ Keep these properties true:
 3. Any executable change disables the extension and clears `approvedHash`.
 4. Rollback restores a disabled draft.
 5. Backup and profile import clear approval and enabled state.
-6. Professor Mari may create and update drafts but has no action that approves or enables them.
+6. Professor YunYun may create and update drafts but has no action that approves or enables them.
 7. Every source other than `professor_mari` is external, including `external`, `local`, `legacy`, `profile_import`, and unknown values normalized to `legacy`.
 8. External records are absent from management and runtime responses unless `ENABLE_EXTERNAL_EXTENSIONS=true` and the persisted Danger Zone opt-in is also true.
 9. Closing either gate disables stored external records and stops active server processes. Browser runtime polling removes active browser workers.
-10. Sandboxed Browser code never executes in the Marinara document. Only an external Browser Extension with exact-hash-approved `full_page_access` may use the separate page runtime. Server code never executes in the Marinara server process.
+10. Sandboxed Browser code never executes in the YunYun document. Only an external Browser Extension with exact-hash-approved `full_page_access` may use the separate page runtime. Server code never executes in the YunYun server process.
 11. There is no URL installer, remote catalog, or automatic updater.
-12. Host contributions are plain validated descriptors. Extension markup, styles, URLs, components, and callbacks never cross into Marinara's React tree.
+12. Host contributions are plain validated descriptors. Extension markup, styles, URLs, components, and callbacks never cross into YunYun's React tree.
 13. Contribution registration, activation, events, updates, and removal remain bound to the enabled extension's exact approved content hash.
 14. Browser context snapshots always contain only the active chat ID and Character IDs at baseline. Optional `read_active_characters` and `read_active_persona` permissions may add bounded, allowlisted fields from only records active in that chat; they never expose messages, full libraries, undeclared fields, metadata, or application access.
 15. Requested permissions are part of the executable hash. Any permission change disables the extension and requires fresh exact-hash approval.
-16. `full_page_access` is external-only, requires both External Extension gates, and is never available to Professor Mari drafts. It is an explicit trust mode, not a claim of sandboxing.
+16. `full_page_access` is external-only, requires both External Extension gates, and is never available to Professor YunYun drafts. It is an explicit trust mode, not a claim of sandboxing.
 
 The gates are enforced in routes and runtime services. Hiding controls is not a security boundary. A manually added, restored, legacy, or out-of-band external record must remain invisible and unexecutable while either gate is closed.
 
@@ -50,7 +50,7 @@ Approved Browser runtime metadata is read from `GET /runtime/client`. Sandboxed 
 
 ## Sandboxed Browser runtime
 
-`PersonalExtensionInjector.tsx` creates a hidden iframe with `sandbox="allow-scripts"` and no `allow-same-origin`. The iframe therefore has an opaque origin and cannot access Marinara's DOM, cookies, storage, or same-origin APIs.
+`PersonalExtensionInjector.tsx` creates a hidden iframe with `sandbox="allow-scripts"` and no `allow-same-origin`. The iframe therefore has an opaque origin and cannot access YunYun's DOM, cookies, storage, or same-origin APIs.
 
 The sandbox response replaces the normal page policy with a narrow CSP: no default resources, no connections, no forms, no objects, and no navigation authority. Extension CSS stays inside the hidden iframe. JavaScript runs in a dedicated Worker created by the trusted iframe bootstrap. Network and nested-worker globals are removed as defense in depth.
 
@@ -92,7 +92,7 @@ Capabilities are declared in the extension payload, persisted with every revisio
 
 - `button`: a compact top-bar action by default, or a host-rendered action on the `chats`, `bots`, `characters`, `personas`, `lorebooks`, `presets`, `connections`, `agents`, or `settings` surface;
 - `menu-item`: an action in the Extensions menu;
-- `panel`: an entry that opens Marinara's trusted Extensions side panel.
+- `panel`: an entry that opens YunYun's trusted Extensions side panel.
 - `command`: an entry in the Command Center that activates an existing `button`, `menu-item`, or `panel` from the same extension revision.
 
 Commands contain `targetContributionId` and have no `onActivate` or `onEvent` callback. The host resolves the target by extension ID, content hash, and contribution ID. A missing target or a target from another revision fails closed. For example:
@@ -106,13 +106,13 @@ marinara.ui.registerContribution({
 });
 ```
 
-Side-panel buttons accept `position: "header"`, `"before-content"`, or `"after-content"`. Top-bar buttons omit `position`. Icons are bounded kebab-case names from Marinara's Lucide icon catalog; unsupported names fall back to the puzzle icon.
+Side-panel buttons accept `position: "header"`, `"before-content"`, or `"after-content"`. Top-bar buttons omit `position`. Icons are bounded kebab-case names from YunYun's Lucide icon catalog; unsupported names fall back to the puzzle icon.
 
 Panel elements use the same declarative vocabulary as constrained windows: `heading`, `text`, `pre`, `button`, `input`, `select`, `toggle`, `slider`, `color`, and `spacer`. Interactive controls require unique IDs. A panel button posts `{ contributionId, elementId, values }` to `onEvent`; `values` contains the current string value of every control. `onActivate` runs inside the extension Worker when the user opens or invokes the contribution. The extension can call `handle.update(...)` to replace its label, description, icon, or panel elements after state changes.
 
 The client independently validates every descriptor before adding it to the runtime store. Contribution kinds, surfaces, positions, controls, IDs, option lists, icon-name syntax, text lengths, total panel text, element count, and per-extension contribution count are validated and capped. React renders extension text as text. No extension-controlled HTML, CSS, URL, React component, or host callback is accepted. The host removes all contributions when the worker is stopped, its hash changes, or it disappears from the approved runtime response. Events are dispatched only to the worker registered for the same extension ID and content hash.
 
-There is no DOM helper, Marinara API fetch, parent event access, or arbitrary network capability. The iframe validates and rate-limits messages. A heartbeat watchdog terminates an unresponsive or busy-looping worker. It waits while the page is hidden or the browser is holding back its timers (background tab, sleep, suspended mobile app), so those pauses never stop a healthy worker. When the sandbox does stop a worker, the host removes its contributions and offers the user a restart.
+There is no DOM helper, YunYun API fetch, parent event access, or arbitrary network capability. The iframe validates and rate-limits messages. A heartbeat watchdog terminates an unresponsive or busy-looping worker. It waits while the page is hidden or the browser is holding back its timers (background tab, sleep, suspended mobile app), so those pauses never stop a healthy worker. When the sandbox does stop a worker, the host removes its contributions and offers the user a restart.
 
 ## Full page compatibility runtime
 

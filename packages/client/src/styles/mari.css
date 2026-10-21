@@ -1,6 +1,6 @@
-/* Professor Mari: tokens, glow, cards, composer, timeline, sprites and her omnibar chrome. Imported by
+/* Professor YunYun: tokens, glow, cards, composer, timeline, sprites and her omnibar chrome. Imported by
    globals.css at its old place, so the cascade order is unchanged. */
-/* Professor Mari keeps one visual language across Home, floating chat, and chat mode composers. */
+/* Professor YunYun keeps one visual language across Home, floating chat, and chat mode composers. */
 .mari-professor-composer {
   border-color: color-mix(in srgb, var(--marinara-app-accent-solid) 24%, var(--border));
   background: color-mix(in srgb, var(--marinara-app-accent-solid) 4%, var(--marinara-chat-chrome-input-bg));
@@ -28,7 +28,7 @@
   }
 }
 
-/* No ring around the composer: while Mari works, her colors rise across the whole bottom of the window
+/* No ring around the composer: while YunYun works, her colors rise across the whole bottom of the window
    behind the bar as one low, wide glow that wavers, like Gemini and Apple Intelligence. At rest it is
    off. When she finishes it turns green and sinks slowly out of view; when something fails it turns red
    and stays, quieter and smaller, until you act. */
@@ -244,7 +244,7 @@ html[data-marinara-effects-paused="true"] .mari-workspace-glow-band::after {
   }
 }
 
-/* P2: while Mari works, or has a result you have not seen, the top bar's bottom edge carries a thin line in
+/* P2: while YunYun works, or has a result you have not seen, the top bar's bottom edge carries a thin line in
    her state colour: a ~1.5px core with a short soft fade, fading out at both ends. Working wavers slowly; the
    other states hold still. Opening her pane clears it (P3). */
 /* R8: one state colour for the edge line and the pull drop's rim (the TopBar hands the same state to both). */
@@ -527,7 +527,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
   color: var(--mari-panel-gradient-start, var(--muted-foreground));
 }
 
-/* R10 (cards v5, docs/development/mockups/mari-v5): every Mari card is a ROW - slot · title · one muted
+/* R10 (cards v5, docs/development/mockups/mari-v5): every YunYun card is a ROW - slot · title · one muted
    fact · one trailing thing - and rows that stack share ONE inset group: one hairline, one radius, inset
    dividers from the text edge. No box inside a box. Three radii: the group, the slot (concentric with
    the group corner) and capsules for buttons and badges. */
@@ -788,7 +788,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
   height: 0.875rem;
 }
 
-/* A gold ✦: picking the row asks Mari. The plain › opens the thing now. */
+/* A gold ✦: picking the row asks YunYun. The plain › opens the thing now. */
 .mari-row__trail > .mari-row__spark {
   color: color-mix(in srgb, var(--mari-workspace-gold, oklch(0.82 0.11 79)) 62%, var(--foreground));
 }
@@ -1072,7 +1072,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
   }
 }
 
-/* The omnibar is Mari's canonical workspace: velvet-dark, warm, and still one canvas. */
+/* The omnibar is YunYun's canonical workspace: velvet-dark, warm, and still one canvas. */
 .mari-workspace-shell {
   --mari-workspace-gold: oklch(0.82 0.11 79);
   --mari-workspace-hoodie: oklch(0.62 0.1 252);
@@ -1105,7 +1105,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
 }
 
 /* While she works, one soft glow in her logo colours turns behind her head, the same everywhere she
-   appears: the omnibar header and the Mari button in the omnibar's search bar. It sits on the element
+   appears: the omnibar header and the YunYun button in the omnibar's search bar. It sits on the element
    around her portrait, because the portrait crops its tall sprite and would cut it into a box. */
 [data-mari-glow] {
   position: relative;
@@ -1221,7 +1221,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
   color: var(--muted-foreground);
 }
 
-/* The omnibar and Professor Mari sit above every app overlay (the game setup wizard, lightboxes,
+/* The omnibar and Professor YunYun sit above every app overlay (the game setup wizard, lightboxes,
    dialogs, capability screens, help overlays). Their own portalled popovers use this layer + 1; a
    `Modal` opened while the omnibar is open, and every app dialog (alert, confirm, prompt, choice,
    so one a package opens shows above the package's own screen), uses this layer and wins by DOM
@@ -1563,7 +1563,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
   overflow-wrap: anywhere;
 }
 
-/* Mari's side panels (Chats, Skills, Memories): one hairline group of rows. */
+/* YunYun's side panels (Chats, Skills, Memories): one hairline group of rows. */
 .mari-edit {
   overflow: hidden;
   border: 1px solid var(--mari-hairline);
@@ -1923,7 +1923,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
 }
 
 /* M6: Chats, Skills, Memories and Aware of share one surface - the canvas, one hairline on the
-   left (a full opaque sheet with Back on a phone), this header, and Mari's own `.mari-edit` group rows. */
+   left (a full opaque sheet with Back on a phone), this header, and YunYun's own `.mari-edit` group rows. */
 .mari-side-head {
   display: flex;
   min-height: 3.25rem;
@@ -2214,7 +2214,7 @@ html[data-marinara-effects-paused="true"] .mari-pull-overlay[data-mari-edge] .ma
   background: color-mix(in srgb, var(--foreground) 7%, var(--card));
 }
 
-/* Mari's header is two lines and has no portrait (she is in the transcript): row 1 is Back, her name with
+/* YunYun's header is two lines and has no portrait (she is in the transcript): row 1 is Back, her name with
    her status, settings and Close; this row 2 holds the destinations, then Chats with New chat at its end. */
 .mari-omnibar-header-row {
   position: relative;
@@ -2692,7 +2692,7 @@ html[data-mari-pull-landing] .mari-arrival-content * {
   display: none;
 }
 
-/* Working Mari on the live line. The outer box keeps the row height; the sprite stands on
+/* Working YunYun on the live line. The outer box keeps the row height; the sprite stands on
    the row and rises above it, and bobs while she works. */
 .mari-live-work__sprite {
   position: relative;
@@ -2745,7 +2745,7 @@ html[data-mari-pull-landing] .mari-arrival-content * {
   }
 }
 
-/* A small gold puff each time working Mari changes scene. */
+/* A small gold puff each time working YunYun changes scene. */
 .mari-live-work__sprite[data-role="working"] > span::before {
   position: absolute;
   inset: -25%;
@@ -2827,7 +2827,7 @@ html[data-mari-pull-landing] .mari-arrival-content * {
   }
 }
 
-/* The live line: always last, working Mari leads it on the left. Tall enough for her sprite, so
+/* The live line: always last, working YunYun leads it on the left. Tall enough for her sprite, so
    nothing above or below can clip her. */
 .mari-work-timeline__live {
   display: flex;
@@ -3145,7 +3145,7 @@ details[open] > .mari-disclosure .mari-disclosure__chevron {
   color: var(--muted-foreground);
 }
 
-/* The live headline: what Mari does now, written in letter by letter under a soft light sweep. */
+/* The live headline: what YunYun does now, written in letter by letter under a soft light sweep. */
 .mari-work-timeline__phrase {
   position: relative;
   flex: 1;
@@ -4161,7 +4161,7 @@ details[open] > .mari-disclosure .mari-disclosure__chevron {
   padding: 0;
 }
 
-/* R11 (composer v5, docs/development/mockups/mari-v5 § Composer): Mari's composer is her own shell, not the
+/* R11 (composer v5, docs/development/mockups/mari-v5 § Composer): YunYun's composer is her own shell, not the
    regular chat input. Text first; the controls are quiet borderless 34px capsules (a 44px hit area on touch
    via ::after); one radius family: the shell, the shell minus its padding for anything square inside, and
    capsules. Neutral at rest; the primary colour is only the focus ring (and the semantic Plan mode/Fix chip).

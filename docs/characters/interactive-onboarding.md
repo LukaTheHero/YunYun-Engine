@@ -20,9 +20,9 @@ Onboarding uses the existing macro syntax. It runs no scripts.
 
 Turning the switch off hides the onboarding fields but keeps what you wrote.
 
-### Let Professor Mari write it
+### Let Professor YunYun write it
 
-You can also ask [Professor Mari](../home/professor-mari.md) to write the onboarding, for example: "Write a fun onboarding for Queen Ayrene, with a template persona." She writes the questions and the persona fields and turns onboarding on. The app checks her work before it is saved, so a misspelled name, a `{{name}}` without a question, or a condition missing its `#` is sent back to her to fix. For a character question, she also adds its `{{name}}` to one of the card's own fields. Her changes show up on a change card you can review or undo, like her other edits.
+You can also ask [Professor YunYun](../home/professor-mari.md) to write the onboarding, for example: "Write a fun onboarding for Queen Ayrene, with a template persona." She writes the questions and the persona fields and turns onboarding on. The app checks her work before it is saved, so a misspelled name, a `{{name}}` without a question, or a condition missing its `#` is sent back to her to fix. For a character question, she also adds its `{{name}}` to one of the card's own fields. Her changes show up on a change card you can review or undo, like her other edits.
 
 ### Add questions
 
@@ -100,7 +100,7 @@ Both paths also work after setup, from **Chat Settings**:
 
 ## Sharing cards with onboarding
 
-Onboarding is stored with the card. **Marinara Native** and **Compatible PNG Card** exports keep it, so a player who imports the card gets the questions too. **Compatible JSON** export leaves it out. A card imported with more than 100 questions keeps the first 100. See [Importing and Exporting Character Cards](import-export.md).
+Onboarding is stored with the card. **YunYun Native** and **Compatible PNG Card** exports keep it, so a player who imports the card gets the questions too. **Compatible JSON** export leaves it out. A card imported with more than 100 questions keeps the first 100. See [Importing and Exporting Character Cards](import-export.md).
 
 ## Related guides
 

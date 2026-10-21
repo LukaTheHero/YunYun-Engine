@@ -16,7 +16,7 @@ export function scrollProfessorMariTranscriptToBottom(container: ProfessorMariTr
 
 /**
  * While the reader follows the newest output, keep the transcript pinned to the bottom on every size
- * change of its content, not only when state changes. Content that grows smoothly (Mari's live reply
+ * change of its content, not only when state changes. Content that grows smoothly (YunYun's live reply
  * animates its height) then pushes the older lines up smoothly too, instead of sliding out of view.
  * `onGrown` reports whether newer output now sits below the fold of a reader who is not following.
  * Returns the cleanup.

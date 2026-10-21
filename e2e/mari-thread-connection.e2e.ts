@@ -8,8 +8,8 @@ const APP_VERSION = (
 ).version;
 
 /**
- * Slice 65/68: ⌘J from a chat on first load restores Mari's connection and then starts the chat's
- * thread in the same tick. The thread must keep Mari's connection, not the render's stale fallback
+ * Slice 65/68: ⌘J from a chat on first load restores YunYun's connection and then starts the chat's
+ * thread in the same tick. The thread must keep YunYun's connection, not the render's stale fallback
  * (the default connection, here the chat's small one).
  */
 test.beforeEach(async ({ request }) => {
@@ -28,7 +28,7 @@ test.afterEach(() => {
   releaseMariThreadLock();
 });
 
-test("a new Mari thread from a chat keeps Mari's connection", async ({ page, request }, testInfo) => {
+test("a new YunYun thread from a chat keeps YunYun's connection", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("desktop"), "The keyboard shortcut is covered on desktop.");
   const created: string[] = [];
   let chatId: string | null = null;
@@ -50,7 +50,7 @@ test("a new Mari thread from a chat keeps Mari's connection", async ({ page, req
     return id;
   };
   try {
-    const mariConnection = await connection(`Mari big ${Date.now().toString(36)}`, 131072, false);
+    const mariConnection = await connection(`YunYun big ${Date.now().toString(36)}`, 131072, false);
     // Created last, so it is also first in the list (updatedAt desc): the stale fallback either way.
     const chatConnection = await connection(`Chat 4k ${Date.now().toString(36)}`, 4096, true);
     const mari = await request.get(`/api/chats/internal/professor-mari?connectionId=${mariConnection}`);

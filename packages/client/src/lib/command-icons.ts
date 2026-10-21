@@ -59,7 +59,7 @@ export function chatResultType(mode: string | null | undefined): ResultType {
   return mode && Object.hasOwn(CHAT_MODE_ICON_COMPONENTS, mode) ? (mode as ChatMode) : "chat";
 }
 
-/** Mari's resource kinds (`lorebookEntry`, `setting`, `game`, ...) as the type they show. */
+/** YunYun's resource kinds (`lorebookEntry`, `setting`, `game`, ...) as the type they show. */
 export function resourceResultType(kind: string): ResultType {
   if (kind === "lorebookEntry") return "lorebook-entry";
   return Object.hasOwn(RESULT_TYPE_ICONS, kind) ? (kind as ResultType) : "command";
@@ -78,7 +78,7 @@ const RECORD_FACE_TYPE_BY_TABLE = {
   connections: "connection",
 } satisfies Record<string, ResultType>;
 
-/** A Mari edit-review record's own table (`characters`, `lorebook_entries`, ...) as its type. */
+/** A YunYun edit-review record's own table (`characters`, `lorebook_entries`, ...) as its type. */
 export function recordFaceResultType(table: string): ResultType {
   return Object.hasOwn(RECORD_FACE_TYPE_BY_TABLE, table)
     ? RECORD_FACE_TYPE_BY_TABLE[table as keyof typeof RECORD_FACE_TYPE_BY_TABLE]

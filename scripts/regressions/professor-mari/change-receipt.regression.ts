@@ -1,4 +1,4 @@
-// Slice 74: the change receipt. A change Mari applies leaves a small record on her message - excerpts per
+// Slice 74: the change receipt. A change YunYun applies leaves a small record on her message - excerpts per
 // field, list names, her reason, the undo deadline - so the card stays full after Keep / Undo / reload. This
 // pins record building, the size cap, the merge of one run's commands, the old-message fallback state and
 // the Keep / Undo outcome write-back.
@@ -575,7 +575,7 @@ try {
   };
   assert.equal((await extraOf(message.id)).mariWorkspaceActionResults[0]?.outcome, "undone");
   assert.equal((await extraOf(older.id)).mariWorkspaceActionResults[0]?.outcome, undefined);
-  // A review from no Mari chat (the CLI) has no message to mark; nothing throws.
+  // A review from no YunYun chat (the CLI) has no message to mark; nothing throws.
   await recordMariReceiptOutcome(app, "professor-mari-workspace", "rev-b", "kept");
 } finally {
   await closeDB();

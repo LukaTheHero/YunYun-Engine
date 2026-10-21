@@ -400,7 +400,7 @@ try {
     assert(!recalled.recalledScenes?.includes(hidden!));
     assert(recalled.chatSummary?.includes(own!));
     assert(!recalled.chatSummary?.includes(hidden!));
-    // Mari's rule (#7269): excerpts quote the messages this reader saw, whatever the recap's private
+    // YunYun's rule (#7269): excerpts quote the messages this reader saw, whatever the recap's private
     // sections say. Nothing in this scene is hidden from either POV, so both see both messages.
     assert.deepEqual(
       recalled.receipt.recalledMessageIds,

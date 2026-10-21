@@ -1,36 +1,36 @@
 # Personal Extensions
 
-Personal Extensions are private code drafts created for you by Professor Mari. Open **Settings** > **Addons** > **Personal Extensions**.
+Personal Extensions are private code drafts created for you by Professor YunYun. Open **Settings** > **Addons** > **Personal Extensions**.
 
 The default message is:
 
-> Ask Professor Mari to create an extension for you. Nothing runs until you enable it and approve the exact code hash.
+> Ask Professor YunYun to create an extension for you. Nothing runs until you enable it and approve the exact code hash.
 
-There is no New Draft action and there are no import controls in this section. Ask Professor Mari to create or revise a draft. She can save code, but she cannot approve or enable it.
+There is no New Draft action and there are no import controls in this section. Ask Professor YunYun to create or revise a draft. She can save code, but she cannot approve or enable it.
 
 To write and import your own package, use the [Personal Extension authoring guide](writing-personal-extensions.md). Self-authored packages use the separately gated External Extensions flow.
 
 ## Estimate text tokens
 
-Browser, Full page access, and Server Personal Extensions can use Marinara's built-in text token estimator:
+Browser, Full page access, and Server Personal Extensions can use YunYun's built-in text token estimator:
 
 ```js
 const tokens = marinara.estimateTextTokens(text);
 ```
 
-The signature is `estimateTextTokens(text: string): number`, also described by the exported `PersonalExtensionTokenApi` type in `@marinara-engine/shared`. The call is synchronous, needs no extra capability, and returns Marinara's model-agnostic estimated token count rather than an exact tokenizer result. On older Engines, check `typeof marinara.estimateTextTokens === "function"` before calling it.
+The signature is `estimateTextTokens(text: string): number`, also described by the exported `PersonalExtensionTokenApi` type in `@marinara-engine/shared`. The call is synchronous, needs no extra capability, and returns YunYun's model-agnostic estimated token count rather than an exact tokenizer result. On older Engines, check `typeof marinara.estimateTextTokens === "function"` before calling it.
 
 ## Review and enable
 
-Every draft starts disabled. Marinara fingerprints the exact executable code with SHA-256. Open the draft, inspect the code, compare the displayed hash, then choose **Review and Run** only if you accept that exact version. Any executable edit or restored revision disables the extension and requires a fresh approval.
+Every draft starts disabled. YunYun fingerprints the exact executable code with SHA-256. Open the draft, inspect the code, compare the displayed hash, then choose **Review and Run** only if you accept that exact version. Any executable edit or restored revision disables the extension and requires a fresh approval.
 
 Sandboxing reduces authority; it does not make arbitrary code trustworthy. A malicious extension can still waste CPU until the watchdog stops it, flood its own storage within enforced limits, or behave deceptively through logs. Full page extensions deliberately give up that isolation. Always review code before enabling it.
 
 ## Runtime isolation
 
-A Browser Extension runs in a dedicated Worker inside an opaque-origin sandboxed iframe. It cannot access Marinara's page, DOM, cookies, browser storage, origin APIs, or network. Its capabilities are private extension storage, logging, managed timers, cleanup registration, constrained windows, safe host contribution slots, and a read-only snapshot of the active chat and Character IDs. It can receive selected fields from the active Character cards or selected Persona only when the corresponding permissions are declared and approved.
+A Browser Extension runs in a dedicated Worker inside an opaque-origin sandboxed iframe. It cannot access YunYun's page, DOM, cookies, browser storage, origin APIs, or network. Its capabilities are private extension storage, logging, managed timers, cleanup registration, constrained windows, safe host contribution slots, and a read-only snapshot of the active chat and Character IDs. It can receive selected fields from the active Character cards or selected Persona only when the corresponding permissions are declared and approved.
 
-Extensions can add top-bar or side-panel actions, Extensions menu items, and persistent right-side panels with `marinara.ui.registerContribution(...)`. Marinara renders these surfaces using the active theme and a fixed set of controls: headings, text, preformatted output, buttons, text inputs, selects, toggles, sliders, color controls, and spacers. An extension supplies content and state, never HTML, CSS, URLs, React components, or host event handlers.
+Extensions can add top-bar or side-panel actions, Extensions menu items, and persistent right-side panels with `marinara.ui.registerContribution(...)`. YunYun renders these surfaces using the active theme and a fixed set of controls: headings, text, preformatted output, buttons, text inputs, selects, toggles, sliders, color controls, and spacers. An extension supplies content and state, never HTML, CSS, URLs, React components, or host event handlers.
 
 These UI capabilities and rules are identical for every sandboxed Browser Extension regardless of source. An imported third-party (External) Extension uses this safe runtime unless its package explicitly requests **Full page access** or uses the pre-sandbox `marinara.extension` format described below.
 
@@ -41,7 +41,7 @@ const panel = marinara.ui.registerContribution({
   id: "weather-settings",
   kind: "panel",
   label: "Weather controls",
-  description: "Tune a weather scene without leaving Marinara.",
+  description: "Tune a weather scene without leaving YunYun.",
   icon: "sparkles",
   elements: [
     { kind: "heading", text: "Atmosphere" },
@@ -85,7 +85,7 @@ marinara.ui.registerContribution({
 });
 ```
 
-The host resolves a command only when the target has the same extension ID and content hash. Missing, cross-extension, and stale-revision targets fail closed. Buttons default to `surface: "top-bar"`. They can instead target `chats`, `bots`, `characters`, `personas`, `lorebooks`, `presets`, `connections`, `agents`, or `settings`, with `position` set to `header`, `before-content`, or `after-content`. The `icon` accepts any kebab-case Lucide icon name supported by Marinara. Both action kinds invoke `onActivate`. A `panel` invokes `onActivate` when opened; its buttons invoke `onEvent` with the current values of every panel control. The returned handle supports kind-specific updates: `button` accepts `label`, `description`, `icon`, `surface`, and `position`; `menu-item` accepts `label`, `description`, and `icon`; `panel` accepts `label`, `description`, `icon`, and `elements`. All handles support `remove()`. IDs may contain letters, numbers, `.`, `_`, and `-`.
+The host resolves a command only when the target has the same extension ID and content hash. Missing, cross-extension, and stale-revision targets fail closed. Buttons default to `surface: "top-bar"`. They can instead target `chats`, `bots`, `characters`, `personas`, `lorebooks`, `presets`, `connections`, `agents`, or `settings`, with `position` set to `header`, `before-content`, or `after-content`. The `icon` accepts any kebab-case Lucide icon name supported by YunYun. Both action kinds invoke `onActivate`. A `panel` invokes `onActivate` when opened; its buttons invoke `onEvent` with the current values of every panel control. The returned handle supports kind-specific updates: `button` accepts `label`, `description`, `icon`, `surface`, and `position`; `menu-item` accepts `label`, `description`, and `icon`; `panel` accepts `label`, `description`, `icon`, and `elements`. All handles support `remove()`. IDs may contain letters, numbers, `.`, `_`, and `-`.
 
 For example, this places a native action above the Presets panel content:
 
@@ -108,7 +108,7 @@ Complex tools can build multi-step interfaces by updating the panel elements aft
 
 ### Use active chat context
 
-Browser Extension API version 5 exposes opaque identifiers for the chat currently displayed in Marinara:
+Browser Extension API version 5 exposes opaque identifiers for the chat currently displayed in YunYun:
 
 ```js
 const renderForContext = async ({ chatId, characterId, characterIds, personaId, characters, persona }) => {
@@ -148,17 +148,17 @@ Chat and Character IDs are always available and let an extension namespace its o
 - `read_active_characters` populates `characters` for cards participating in the active chat.
 - `read_active_persona` populates `persona` for the Persona selected by the active chat.
 
-Without a permission, its value remains `[]` or `null`. Marinara shows every requested permission in **Requested access** and again in the exact-hash approval dialog. Adding or removing a permission changes the executable hash, disables the extension, and requires fresh approval.
+Without a permission, its value remains `[]` or `null`. YunYun shows every requested permission in **Requested access** and again in the exact-hash approval dialog. Adding or removing a permission changes the executable hash, disables the extension, and requires fresh approval.
 
 Character snapshots contain only `id`, `name`, `description`, `personality`, `scenario`, `firstMessage`, `exampleDialogue`, `creator`, `characterVersion`, `tags`, `backstory`, `appearance`, `aboutMe`, and `conversationDisplayName`. Persona snapshots contain only `id`, `name`, `description`, `personality`, `scenario`, `backstory`, `appearance`, `tags`, `aboutMe`, and `conversationDisplayName`. Text is bounded before it crosses the sandbox bridge.
 
-Marinara never sends messages, creator notes, system prompts, post-history instructions, comments, avatar paths, full Character or Persona libraries, undeclared fields, chat metadata, database handles, network access, or mutation operations. Context updates remain bound to the approved code hash and are delivered when the active chat, its Character list, or its selected Persona changes.
+YunYun never sends messages, creator notes, system prompts, post-history instructions, comments, avatar paths, full Character or Persona libraries, undeclared fields, chat metadata, database handles, network access, or mutation operations. Context updates remain bound to the approved code hash and are delivered when the active chat, its Character list, or its selected Persona changes.
 
 ### Legacy and full page extensions
 
-Weather controllers, prompt editors, and other substantial workflows are valid contribution use cases. Their safe ports can use a menu or top-bar launcher plus progressively updated panels. Existing packages that inject DOM overlays, query Marinara CSS selectors, traverse React internals, or call same-origin `/api` routes cannot be imported unchanged into the safe runtime.
+Weather controllers, prompt editors, and other substantial workflows are valid contribution use cases. Their safe ports can use a menu or top-bar launcher plus progressively updated panels. Existing packages that inject DOM overlays, query YunYun CSS selectors, traverse React internals, or call same-origin `/api` routes cannot be imported unchanged into the safe runtime.
 
-UI contributions provide the interface, not ambient authority. The context API always exposes active chat and Character IDs and may expose only the declared, active-record fields listed above. Features that need messages, presets, lorebooks, undeclared Character or Persona data, or visual scene effects still need a separate, narrowly scoped broker capability exposed by Marinara. An extension must not simulate one through host DOM access or unrestricted network requests.
+UI contributions provide the interface, not ambient authority. The context API always exposes active chat and Character IDs and may expose only the declared, active-record fields listed above. Features that need messages, presets, lorebooks, undeclared Character or Persona data, or visual scene effects still need a separate, narrowly scoped broker capability exposed by YunYun. An extension must not simulate one through host DOM access or unrestricted network requests.
 
 If an External Extension genuinely depends on host DOM access, it may request:
 
@@ -169,21 +169,21 @@ If an External Extension genuinely depends on host DOM access, it may request:
 }
 ```
 
-**Full page access is not a sandbox capability.** The approved JavaScript and CSS run inside Marinara's page. The code can read or change anything visible to the current browser session, inspect chats and cards, use browser storage, make network requests, and call same-origin Marinara APIs. It has the same practical page authority as code pasted into the browser console. Professor Mari drafts cannot request it.
+**Full page access is not a sandbox capability.** The approved JavaScript and CSS run inside YunYun's page. The code can read or change anything visible to the current browser session, inspect chats and cards, use browser storage, make network requests, and call same-origin YunYun APIs. It has the same practical page authority as code pasted into the browser console. Professor YunYun drafts cannot request it.
 
 Full page extensions should use `marinara.fetch(...)` for network requests. It has the same signature and result as `window.fetch`, while allowing **Settings > Addons > External Extensions** to show that extension's session request count, transferred bytes reported by responses, recent request rate, and sustained high-traffic warning. Raw `window.fetch` remains available because full page access is trusted page code, but those requests cannot be attributed to the extension.
 
-Marinara recognizes the older `kind: "marinara.extension"` v1 envelope without an explicit `capabilities` field as a pre-sandbox package and assigns **Full page access** during import. This allows legacy packages such as WeatherTweaker to reach the correct review flow instead of silently failing in a Worker. A modern package that uses that envelope but wants the safe runtime must include `"capabilities": []`.
+YunYun recognizes the older `kind: "marinara.extension"` v1 envelope without an explicit `capabilities` field as a pre-sandbox package and assigns **Full page access** during import. This allows legacy packages such as WeatherTweaker to reach the correct review flow instead of silently failing in a Worker. A modern package that uses that envelope but wants the safe runtime must include `"capabilities": []`.
 
-The two External Extension gates and exact-hash approval still apply. A code, CSS, or permission change disables the extension and requires fresh approval. Disabling removes Marinara's script and stylesheet nodes, cancels timers created through the compatibility API, and runs callbacks registered through `marinara.onCleanup(...)`. Because page code can create unregistered listeners, timers, globals, or DOM changes, cleanup is best effort; reload the page after disabling an extension if anything remains.
+The two External Extension gates and exact-hash approval still apply. A code, CSS, or permission change disables the extension and requires fresh approval. Disabling removes YunYun's script and stylesheet nodes, cancels timers created through the compatibility API, and runs callbacks registered through `marinara.onCleanup(...)`. Because page code can create unregistered listeners, timers, globals, or DOM changes, cleanup is best effort; reload the page after disabling an extension if anything remains.
 
-The older `marinara.ui.showWindow(...)` API remains available for a temporary window inside the opaque-origin iframe. It uses the same fixed controls and returns `update(...)` and `close()` handles. Prefer contributions when the tool should be reachable through Marinara's normal navigation.
+The older `marinara.ui.showWindow(...)` API remains available for a temporary window inside the opaque-origin iframe. It uses the same fixed controls and returns `update(...)` and `close()` handles. Prefer contributions when the tool should be reachable through YunYun's normal navigation.
 
-A Server Extension runs in a separate permission-restricted Node process inside macOS Seatbelt or Linux Bubblewrap. It cannot access Marinara files, user files, inherited server secrets, the network, child processes, workers, or native addons. If Marinara cannot establish a supported OS sandbox, Server Extensions remain disabled.
+A Server Extension runs in a separate permission-restricted Node process inside macOS Seatbelt or Linux Bubblewrap. It cannot access YunYun files, user files, inherited server secrets, the network, child processes, workers, or native addons. If YunYun cannot establish a supported OS sandbox, Server Extensions remain disabled.
 
 ### Platform support
 
-Browser Extensions are sandboxed by the browser itself, so they work everywhere. Server Extensions need a supported OS sandbox; where none exists, they stay disabled and cannot be enabled — Marinara never falls back to running them unsandboxed.
+Browser Extensions are sandboxed by the browser itself, so they work everywhere. Server Extensions need a supported OS sandbox; where none exists, they stay disabled and cannot be enabled — YunYun never falls back to running them unsandboxed.
 
 | Platform                | Sandboxed Browser Extensions | Full page External Extensions | Server Extensions                     |
 | ----------------------- | ---------------------------- | ----------------------------- | ------------------------------------- |
@@ -194,15 +194,15 @@ Browser Extensions are sandboxed by the browser itself, so they work everywhere.
 | Windows                 | ✅ Sandboxed                 | ⚠️ Explicit trust required    | ⛔ Disabled — use a Browser Extension |
 | Android                 | ✅ Sandboxed                 | ⚠️ Explicit trust required    | ⛔ Disabled — use a Browser Extension |
 
-The official Docker image contains Bubblewrap, but its least-privileged default container cannot create the nested namespaces and mounts Bubblewrap needs. Marinara tests the sandbox at runtime and leaves Server Extensions disabled when the container denies them. See [Troubleshooting](../TROUBLESHOOTING.md#a-server-extension-says-no-supported-sandbox-is-available) for the explicit Docker permission override and its security tradeoff.
+The official Docker image contains Bubblewrap, but its least-privileged default container cannot create the nested namespaces and mounts Bubblewrap needs. YunYun tests the sandbox at runtime and leaves Server Extensions disabled when the container denies them. See [Troubleshooting](../TROUBLESHOOTING.md#a-server-extension-says-no-supported-sandbox-is-available) for the explicit Docker permission override and its security tradeoff.
 
-On Windows and Android there is no supported OS process sandbox, so Server Extensions are unavailable by design. Use a Browser Extension instead, or run the Marinara server on macOS or Linux (with `bwrap`) if you need a Server Extension.
+On Windows and Android there is no supported OS process sandbox, so Server Extensions are unavailable by design. Use a Browser Extension instead, or run the YunYun server on macOS or Linux (with `bwrap`) if you need a Server Extension.
 
 ## External Extensions
 
 Third-party imports are locked and hidden by default. Two steps are required:
 
-1. On the Marinara host, set `ENABLE_EXTERNAL_EXTENSIONS=true` in `.env`.
+1. On the YunYun host, set `ENABLE_EXTERNAL_EXTENSIONS=true` in `.env`.
 2. Open **Settings** > **Advanced** > **Danger Zone**, scroll below the data-deletion controls, read the warning, and enable **Allow third-party extension imports**.
 
 Only then does **Settings** > **Addons** show **External Extensions** with file and folder import controls. Supported formats are always expanded:
@@ -225,12 +225,12 @@ Third-party extensions may contain malicious or dangerous code. Always inspect e
 
 Use an extension's export action to download a portable package. Exported and restored packages remain disabled. Restoring a revision also returns it to a disabled draft.
 
-If an extension misbehaves, choose **Disable**. If the interface is unavailable, stop Marinara and set the relevant `installed_extensions` record's `enabled` value to `"false"`. Never set `approvedHash` by hand.
+If an extension misbehaves, choose **Disable**. If the interface is unavailable, stop YunYun and set the relevant `installed_extensions` record's `enabled` value to `"false"`. Never set `approvedHash` by hand.
 
 ## Related guides
 
 - [Writing Personal Extensions](writing-personal-extensions.md)
-- [Professor Mari](../home/professor-mari.md)
+- [Professor YunYun](../home/professor-mari.md)
 - [Server Configuration](../CONFIGURATION.md)
 - [Backup and Restore](../data/backup-and-restore.md)
 - [Remote Access](../REMOTE_ACCESS.md)

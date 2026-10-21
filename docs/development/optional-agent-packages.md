@@ -101,7 +101,7 @@ The namespace only grows: a new member comes with a capability API minor, and a 
 minor. Packages built for the namespace require the capability API version that added it, so an older Engine never
 installs them and keeps the version it has. When a member is missing anyway, the package never falls back to a bundled
 copy of a stateful Engine service: the `ui` and `chat` stores become read-only copies that never write, and every other
-member reports that the feature needs a newer Marinara Engine.
+member reports that the feature needs a newer YunYun Engine.
 
 **Host modules.** `modules[specifier]` is exactly what `import * as m from "<specifier>"` returns in the Engine's own
 build, including `default` where the library has one. The specifiers are `react`, `react/jsx-runtime`, `react-dom`,
@@ -1714,7 +1714,7 @@ servers take a few libraries from the Engine instead of bundling them. Every new
   shows, as Engine-generated images are. Both need `storage`.
 
 **Never a bundled copy.** When one of these members is missing, the package reports the feature as needing a newer
-Marinara Engine. It never falls back to a bundled copy of a stateful Engine service, such as the provider registry,
+YunYun Engine. It never falls back to a bundled copy of a stateful Engine service, such as the provider registry,
 the local sidecar, connection admission, haptics, Spotify, the logger, a registry or a storage queue, because a second
 copy splits state the Engine keeps in one place. Pure helpers and types may still be bundled.
 

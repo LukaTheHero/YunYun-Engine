@@ -4,7 +4,7 @@ This guide explains **Memory Recall** (search over past messages), opt-in **Adva
 
 ## The two memory systems
 
-Every AI model can only read a limited amount of text at one time. That limit is called the context window. When a chat gets long, the oldest messages fall out of that window and the AI forgets them. Marinara Engine (called Marinara after this) has two separate systems that fix this.
+Every AI model can only read a limited amount of text at one time. That limit is called the context window. When a chat gets long, the oldest messages fall out of that window and the AI forgets them. YunYun Engine (called YunYun after this) has two separate systems that fix this.
 
 - **Memory Recall** searches your older messages for the parts most related to what you just said, then quietly adds those parts back into the prompt. It works in every chat mode.
 - **Summaries** compress old messages into short recaps that replace the raw messages in the prompt. Roleplay chats use **Chat Summary**. Conversation chats use **Automatic Summarization**.
@@ -15,7 +15,7 @@ You can use both systems at the same time. They do different jobs and do not con
 
 ## Memory Recall setup
 
-**Memory Recall** finds relevant fragments from earlier in a chat and injects them into the prompt as memories. It uses an embedding: a numeric fingerprint of a message's meaning. Marinara compares the fingerprint of your new message against stored fingerprints of past messages, then adds the closest matches.
+**Memory Recall** finds relevant fragments from earlier in a chat and injects them into the prompt as memories. It uses an embedding: a numeric fingerprint of a message's meaning. YunYun compares the fingerprint of your new message against stored fingerprints of past messages, then adds the closest matches.
 
 ### Turning Memory Recall on
 
@@ -41,11 +41,11 @@ Memory Recall needs an embedding source to build those meaning fingerprints. You
 4. Optionally set an **Embedding Endpoint URL** to override the address.
 5. Optionally use the **Embedding Connection** dropdown to borrow another connection's key and address. Options include **Same as this connection** and **Local Model (sidecar)**.
 
-Some providers do not offer embeddings. In that case Marinara shows a note asking you to pick a dedicated embedding connection, such as an OpenAI-compatible one, Google, or the Local Model.
+Some providers do not offer embeddings. In that case YunYun shows a note asking you to pick a dedicated embedding connection, such as an OpenAI-compatible one, Google, or the Local Model.
 
 To use one embedding source everywhere, pick it under **Embeddings** in **Connections** > **Defaults**. Connections without an embedding model or **Embedding Connection** of their own then use it, while a connection's own setting still wins.
 
-If you set no embedding connection and no **Embeddings** default, Marinara falls back to a built-in local embedding model. It downloads this model one time and runs it on your own machine, with no API key needed. For more on the built-in model, see [Local Model Setup](../connections/local-model.md).
+If you set no embedding connection and no **Embeddings** default, YunYun falls back to a built-in local embedding model. It downloads this model one time and runs it on your own machine, with no API key needed. For more on the built-in model, see [Local Model Setup](../connections/local-model.md).
 
 This same **Semantic Search (Embeddings)** setting also powers Lorebook semantic search, so setting it up once helps both features.
 
@@ -70,14 +70,14 @@ The toolbar has icons to export memories, import memories, rebuild memories, and
 
 Keep these points in mind:
 
-- Marinara stores memory chunks in the background whenever an embedding source is available, even if **Enable Memory Recall** is off. The toggle only controls whether stored memories get injected. To stop storing memories, remove the embedding source or clear the memories from time to time.
+- YunYun stores memory chunks in the background whenever an embedding source is available, even if **Enable Memory Recall** is off. The toggle only controls whether stored memories get injected. To stop storing memories, remove the embedding source or clear the memories from time to time.
 - A chunk needs at least 5 new messages before it is created. Smaller batches wait for the next reply.
 - Recalled fragments must be closely related enough to pass a similarity check. Weak matches are skipped, so recall can return nothing even when memories exist.
 - Only a small budget of the prompt is used for recalled memories, so only the most relevant few are ever added.
 - If you change the embedding model after memories already exist, the old chunks no longer match. Use the rebuild icon to remake them.
 - Deleting a chat's messages also deletes its memory chunks.
 
-Some container builds of Marinara, known as Marinara Lite, turn Memory Recall off completely. On those builds the **Memory Recall** section does not appear at all.
+Some container builds of YunYun, known as YunYun Lite, turn Memory Recall off completely. On those builds the **Memory Recall** section does not appear at all.
 
 ## Advanced Memory Recall (Roleplay)
 
@@ -95,7 +95,7 @@ Open **Chat Settings → Memory Recall** and enable **Advanced Memory Recall**. 
 
 For an older Individual group chat, confirm missing character knowledge ranges once. A character's first spoken line is not evidence that they knew everything before it. Select an actual character as **Narrator** only when they should bypass participation limits. Character-specific hiding and confirmed knowledge ranges still restrict memory. Global **Hide from AI**, whether set manually or by automatic summaries, only removes a turn from the live transcript: Advanced Memory still scans it, determines scene participants, summarizes it, and indexes it for permitted recall. Start markers trim the live transcript. You can correct these ranges later; newly added characters need their own confirmation.
 
-For an existing chat, click **Prepare existing history** first. If recovered history changes the boundaries of a scene covered by a manual correction, disable that memory to keep its text for reference, or delete it, then prepare history again. **Fix** (see [Fixing memory problems](#fixing-memory-problems)) skips that scene and lists it instead of stopping. Saving the same correction cannot safely assign its text to a different source range. Preparation works through older history in batches and shows its current stage beside Professor Mari's hamster wheel. **Cancel** retains completed work; **Resume** continues after closing the drawer, restarting the server, or updating the app. A failed model call preserves previously valid memory and displays an error to retry. Do not reset memory to recover from a failed call: Resume reuses completed summaries and unchanged scene detection. The final ongoing scene stays open and is summarized when it closes, with bounded source excerpts used if its live messages exceed the context cap.
+For an existing chat, click **Prepare existing history** first. If recovered history changes the boundaries of a scene covered by a manual correction, disable that memory to keep its text for reference, or delete it, then prepare history again. **Fix** (see [Fixing memory problems](#fixing-memory-problems)) skips that scene and lists it instead of stopping. Saving the same correction cannot safely assign its text to a different source range. Preparation works through older history in batches and shows its current stage beside Professor YunYun's hamster wheel. **Cancel** retains completed work; **Resume** continues after closing the drawer, restarting the server, or updating the app. A failed model call preserves previously valid memory and displays an error to retry. Do not reset memory to recover from a failed call: Resume reuses completed summaries and unchanged scene detection. The final ongoing scene stays open and is summarized when it closes, with bounded source excerpts used if its live messages exceed the context cap.
 
 A branch you make from a prepared chat, for example with **Branch from here**, keeps its Advanced Memory, so you don't prepare it again. A branch made inside a scene opens that scene again: its old summary is dropped and a new one is written when the scene closes. Earlier scenes stay ready to recall. A chat imported as a new branch is prepared as usual.
 
@@ -293,7 +293,7 @@ Two settings in the **Automatic Summarization** section shape how days are split
 - **Day Rollover Hour**: the hour when a new day begins for summaries. The default is 4 AM, and you can pick any hour from 12 AM (midnight) through 11 AM. Messages sent before this hour count as part of the previous day. Pick a time when you are never chatting so a late-night session is not cut in half.
 - **Recent Message Tail**: how many of today's newest messages stay word-for-word even after they are summarized. The default is 10, and any non-negative whole number is accepted. Higher values increase prompt size and model cost.
 
-If you change **Day Rollover Hour** after summaries already exist, Marinara warns you that older summaries used the previous setting.
+If you change **Day Rollover Hour** after summaries already exist, YunYun warns you that older summaries used the previous setting.
 
 ### Filling in missing days
 
@@ -322,4 +322,4 @@ Changing the connection or model used for summaries does not rewrite day or week
 - [Connecting to an AI Provider](../connections/connecting-to-a-provider.md)
 - [Conversation Mode: Getting Started](../conversation/getting-started.md)
 - [Roleplay Mode: Getting Started](../roleplay/getting-started.md)
-- [Troubleshooting Marinara Engine](../TROUBLESHOOTING.md)
+- [Troubleshooting YunYun Engine](../TROUBLESHOOTING.md)

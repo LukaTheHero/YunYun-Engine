@@ -128,7 +128,7 @@ export function createOmnibarKeyHandlers({
       asideSettled &&
       (!activeResult || activeResult.id === "ask-professor-mari")
     ) {
-      // No real row selected (the generic Ask-Mari row doesn't count), and the
+      // No real row selected (the generic Ask-YunYun row doesn't count), and the
       // aside is answering: ⌘↵ escalates it instead of just asking again (R25).
       event.preventDefault();
       escalateAside();
@@ -140,11 +140,11 @@ export function createOmnibarKeyHandlers({
       activeResult &&
       activeResult.command.availability?.status !== "requires-admin"
     ) {
-      // Continue the selected result with Mari without opening the detail pane first.
+      // Continue the selected result with YunYun without opening the detail pane first.
       event.preventDefault();
       askMariAbout(resolveCurrentResult(activeResult));
     } else if (pane === "results" && event.key === "Enter" && !activeResult && mariEnabled && query.trim()) {
-      // Nothing ranked at all, so Enter still reaches Mari by the one door.
+      // Nothing ranked at all, so Enter still reaches YunYun by the one door.
       event.preventDefault();
       askMariAbout(null);
     } else if (

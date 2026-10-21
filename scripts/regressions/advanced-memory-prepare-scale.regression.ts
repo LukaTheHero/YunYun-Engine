@@ -36,7 +36,7 @@ const provider = createServer(async (request, response) => {
         {
           message: {
             role: "assistant",
-            content: JSON.stringify({ audience: "all", summary: "Mari and Kaito talked about work." }),
+            content: JSON.stringify({ audience: "all", summary: "YunYun and Kaito talked about work." }),
           },
           finish_reason: "stop",
         },
@@ -95,11 +95,11 @@ try {
     });
     await chats.createMessagesBatch(chat.id, [
       ...Array.from({ length: scenes }, (_, index) => [
-        { role: "user" as const, content: `SCENE_CHANGE Mari and Kaito meet at home on day ${index}.` },
-        { role: "assistant" as const, characterId: "kaito", content: `Kaito tells Mari about day ${index} at work.` },
-        { role: "user" as const, content: "Mari thanks Kaito, and they talk for a while." },
+        { role: "user" as const, content: `SCENE_CHANGE YunYun and Kaito meet at home on day ${index}.` },
+        { role: "assistant" as const, characterId: "kaito", content: `Kaito tells YunYun about day ${index} at work.` },
+        { role: "user" as const, content: "YunYun thanks Kaito, and they talk for a while." },
       ]).flat(),
-      { role: "user", content: "SCENE_CHANGE Mari comes home late.", extra: { isConversationStart: true } },
+      { role: "user", content: "SCENE_CHANGE YunYun comes home late.", extra: { isConversationStart: true } },
       { role: "assistant", characterId: "kaito", content: "Kaito waves from the kitchen." },
       { role: "user", content: "Kaito, what did you tell me about work?" },
     ]);

@@ -1,5 +1,5 @@
 /**
- * Slice 74: the change receipt. When Professor Mari applies a change, the server keeps a small record of
+ * Slice 74: the change receipt. When Professor YunYun applies a change, the server keeps a small record of
  * it on her message - per field a short before/after excerpt or the names a list gained and lost, her
  * reason, the undo deadline - so the card under her answer stays full after Keep, Undo or a reload. The
  * undo record holds the whole rows but is deleted on Keep / Undo; this record is what survives.

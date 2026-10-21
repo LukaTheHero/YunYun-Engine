@@ -21,7 +21,7 @@ export function FaqViewerModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t("omnibar.faqTitle", "Professor Mari's FAQ")} width="max-w-5xl">
+    <Modal open={open} onClose={onClose} title={t("omnibar.faqTitle", "Professor YunYun's FAQ")} width="max-w-5xl">
       <HomeFaq
         headerless
         faqOnly

@@ -2,7 +2,7 @@ import type { ProfessorMariNavigationTarget } from "./professor-mari-navigation"
 import type { OmnibarSettingsDestination } from "./omnibar-settings";
 import type { MariWorkspaceTraceItem } from "@marinara-engine/shared";
 
-// What Professor Mari looked at during a run, so her reply can show it as cards (a character's avatar
+// What Professor YunYun looked at during a run, so her reply can show it as cards (a character's avatar
 // and name, a lorebook, an agent and whether it is on, a chat, a lorebook entry, a setting) instead of
 // leaving you with "Reading character" steps only.
 

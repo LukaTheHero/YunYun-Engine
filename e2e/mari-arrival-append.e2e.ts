@@ -9,7 +9,7 @@ const APP_VERSION = (
 ).version;
 
 /**
- * D1: ⌘J / Ctrl+J ("Ask Prof. Mari about this") should still show the arrival when Mari's own chat
+ * D1: ⌘J / Ctrl+J ("Ask Prof. YunYun about this") should still show the arrival when YunYun's own chat
  * already has history, appended at the bottom of the transcript, not only on an empty chat —
  * otherwise a returning user just sees old history and the door's whole promise goes unmet.
  */
@@ -61,9 +61,9 @@ async function openChatThenAskMari(page: Page, chatId: string) {
   await page.keyboard.press("Control+j");
 }
 
-// F11: every test in this file reads "the most recent Mari thread" to route ⌘J, so another spec with a
-// Mari thread of its own (same file or not) mid-run can steal it. The lock keeps this file from running
-// at the same time as any other locked Mari-thread spec; the cleanup then starts from a clean slate.
+// F11: every test in this file reads "the most recent YunYun thread" to route ⌘J, so another spec with a
+// YunYun thread of its own (same file or not) mid-run can steal it. The lock keeps this file from running
+// at the same time as any other locked YunYun-thread spec; the cleanup then starts from a clean slate.
 test.beforeEach(async ({ request }) => {
   await acquireMariThreadLock();
   // The scripted model below returns Classic JSON frames.
@@ -84,7 +84,7 @@ test.afterEach(() => {
   releaseMariThreadLock();
 });
 
-test("Ctrl+J in a chat with existing Mari history appends the arrival instead of hiding it", async ({
+test("Ctrl+J in a chat with existing YunYun history appends the arrival instead of hiding it", async ({
   page,
   request,
 }, testInfo) => {
@@ -113,7 +113,7 @@ test("Ctrl+J in a chat with existing Mari history appends the arrival instead of
     mariChatId = ((await mariChat.json()) as { id: string }).id;
     // One real completed turn, so her own chat is non-empty before the arrival door opens.
     const prompted = await request.post("/api/professor-mari/workspace/prompt", {
-      data: { chatId: mariChatId, connectionId, message: "Hello Mari" },
+      data: { chatId: mariChatId, connectionId, message: "Hello YunYun" },
     });
     expect(prompted.ok(), await prompted.text()).toBeTruthy();
 
@@ -126,10 +126,10 @@ test("Ctrl+J in a chat with existing Mari history appends the arrival instead of
     await prepareClient(page, 1440);
     await openChatThenAskMari(page, chatId);
 
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     await expect(mariPane).toBeVisible();
     // Her existing history is still there, not replaced...
-    await expect(mariPane.getByText("Hello Mari")).toBeVisible();
+    await expect(mariPane.getByText("Hello YunYun")).toBeVisible();
     // ...and the arrival is appended at the bottom.
     const appended = mariPane.locator('[data-component="HomeProfessorMariChat.AppendedArrival"]');
     await expect(appended).toBeVisible();
@@ -169,7 +169,7 @@ test("Ctrl+J in a chat with existing Mari history appends the arrival instead of
   }
 });
 
-test("mobile: Ctrl+J in a chat with existing Mari history appends the arrival", async ({ page, request }, testInfo) => {
+test("mobile: Ctrl+J in a chat with existing YunYun history appends the arrival", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("mobile-chromium"), "One mobile capture is enough proof.");
 
   const fixture = await startFixtureProvider("Hi there! How can I help?");
@@ -193,7 +193,7 @@ test("mobile: Ctrl+J in a chat with existing Mari history appends the arrival", 
     const mariChat = await request.get(`/api/chats/internal/professor-mari?connectionId=${connectionId}`);
     mariChatId = ((await mariChat.json()) as { id: string }).id;
     const prompted = await request.post("/api/professor-mari/workspace/prompt", {
-      data: { chatId: mariChatId, connectionId, message: "Hello Mari" },
+      data: { chatId: mariChatId, connectionId, message: "Hello YunYun" },
     });
     expect(prompted.ok(), await prompted.text()).toBeTruthy();
 
@@ -205,7 +205,7 @@ test("mobile: Ctrl+J in a chat with existing Mari history appends the arrival", 
     await prepareClient(page, 390);
     await openChatThenAskMari(page, chatId);
 
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     await expect(mariPane).toBeVisible();
     const appended = mariPane.locator('[data-component="HomeProfessorMariChat.AppendedArrival"]');
     await expect(appended).toBeVisible();
@@ -227,7 +227,7 @@ test("mobile: Ctrl+J in a chat with existing Mari history appends the arrival", 
 
 /**
  * Slice 73: the phone's pull-down door (a real touch drag on the right half of the top bar) is an arrival
- * like ⌘J. From a chat, and from an editor, that has no Mari thread of its own while another thread has
+ * like ⌘J. From a chat, and from an editor, that has no YunYun thread of its own while another thread has
  * messages, she continues that thread and offers "Continue here" / "New about <context>".
  */
 for (const theme of ["dark", "light"] as const) {
@@ -262,7 +262,7 @@ for (const theme of ["dark", "light"] as const) {
       const mariChat = await request.get(`/api/chats/internal/professor-mari?connectionId=${connectionId}`);
       mariChatId = ((await mariChat.json()) as { id: string }).id;
       const prompted = await request.post("/api/professor-mari/workspace/prompt", {
-        data: { chatId: mariChatId, connectionId, message: "Hello Mari" },
+        data: { chatId: mariChatId, connectionId, message: "Hello YunYun" },
       });
       expect(prompted.ok(), await prompted.text()).toBeTruthy();
       const character = await request.post("/api/characters", {
@@ -295,7 +295,7 @@ for (const theme of ["dark", "light"] as const) {
       );
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
 
-      // A real touch drag (touch pointer events) down from the right half of the bar: Mari's side.
+      // A real touch drag (touch pointer events) down from the right half of the bar: YunYun's side.
       const cdp = await page.context().newCDPSession(page);
       const pullDown = async () => {
         await expect(page.locator(".mari-pull-overlay")).toHaveCount(0);
@@ -310,7 +310,7 @@ for (const theme of ["dark", "light"] as const) {
         await page.waitForTimeout(150);
         await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       };
-      const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+      const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
       const appended = mariPane.locator('[data-component="HomeProfessorMariChat.AppendedArrival"]');
       // "Visible" in Playwright ignores opacity; the offer must really be drawn, not held at its first frame.
       const drawnOpacity = () =>
@@ -369,12 +369,12 @@ for (const theme of ["dark", "light"] as const) {
 }
 
 /**
- * R13 (slice 62g): opening Mari from a chat (⌘J) while she is still working in another thread must not
+ * R13 (slice 62g): opening YunYun from a chat (⌘J) while she is still working in another thread must not
  * reroute the moment the run ends. Slice 62b switched threads as soon as isBusy cleared, so the finished
  * run's done marks and "Worked for" line vanished unseen. The finished run stays on screen first; only
  * then does the arrival land in that chat's own thread.
  * F11: merged into this file (was mari-arrival-during-run.e2e.ts) so it cannot run on a different
- * worker in parallel with the tests above — both read the same global "most recent Mari thread".
+ * worker in parallel with the tests above — both read the same global "most recent YunYun thread".
  */
 test("an arrival during a run waits until the finished run has been shown", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("desktop"), "The keyboard door is covered on desktop.");
@@ -473,7 +473,7 @@ test("an arrival during a run waits until the finished run has been shown", asyn
       .first()
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     await expect(mariPane).toBeVisible();
     await expect(mariPane.getByText("Hello from Home")).toBeVisible();
     await mariPane.locator("textarea:visible").fill("A slow question");

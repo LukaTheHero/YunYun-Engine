@@ -888,7 +888,7 @@ export function AgentEditor() {
     setEditorDirty(dirty);
   }, [dirty, setEditorDirty]);
   // Report the last focused field to the omnibar so "make this shorter" knows the target. The ids
-  // are the `agent.update` field names Mari writes.
+  // are the `agent.update` field names YunYun writes.
   const setActiveEditorField = useUIStore((s) => s.setActiveEditorField);
   useEffect(() => () => setActiveEditorField(null), [agentDetailId, setActiveEditorField]);
   const reportField = (id: string, label: string) => () => setActiveEditorField({ id, label });

@@ -1,10 +1,10 @@
 # Settings Overview
 
-This guide maps the Marinara Engine **Settings** panel: its six tabs and what each one controls. It covers the **General** tab in depth, the **Text Rules** that format your chat text, and how settings sync across your devices.
+This guide maps the YunYun Engine **Settings** panel: its six tabs and what each one controls. It covers the **General** tab in depth, the **Text Rules** that format your chat text, and how settings sync across your devices.
 
 ## The Settings panel and its six tabs
 
-Open **Settings** using the gear icon in the top bar. At the top of the panel is a **Search settings** box. Type any word (like `delete`, `streaming`, or `quotes`) and Marinara jumps you to the matching section. It finds a setting by its name in your interface language or in English.
+Open **Settings** using the gear icon in the top bar. At the top of the panel is a **Search settings** box. Type any word (like `delete`, `streaming`, or `quotes`) and YunYun jumps you to the matching section. It finds a setting by its name in your interface language or in English.
 
 The panel has six tabs. The table below shows what each tab controls.
 
@@ -13,7 +13,7 @@ The panel has six tabs. The table below shows what each tab controls.
 | **General** | App behavior, notifications, responses, input, text rules, and game playback. |
 | **Appearance** | Theme, colors, fonts, chat layout, motion, and backgrounds. |
 | **Generations** | Image and video defaults, and reusable prompt templates. |
-| **Addons** | Professor Mari's sandboxed Personal Extension drafts, optionally unlocked External Extensions, and custom themes. |
+| **Addons** | Professor YunYun's sandboxed Personal Extension drafts, optionally unlocked External Extensions, and custom themes. |
 | **Imports** | Restore full profiles and import from other apps. |
 | **Advanced** | Admin access, optional feature switches, updates, message tools, backups, and destructive resets. |
 
@@ -24,14 +24,14 @@ Here is where to read more about each tab:
 - **Generations**: see [Style Profiles](../media/style-profiles.md) and [Scene Video](../media/scene-video.md).
 - **Addons**: see [Personal Extensions](../extending/personal-extensions.md) and [Custom CSS Themes](../appearance/custom-css-themes.md).
 - **Imports**: see [Importing from SillyTavern](../data/importing-from-sillytavern.md) and [Backup and Restore](../data/backup-and-restore.md).
-- **Advanced**: see the **Message Tools** section below, [Feature Switches](../configuration/features.md), plus [Upgrading Marinara Engine](../UPGRADING.md), [Remote Access](../REMOTE_ACCESS.md), and [Clearing Your Data](../data/clearing-data.md).
+- **Advanced**: see the **Message Tools** section below, [Feature Switches](../configuration/features.md), plus [Upgrading YunYun Engine](../UPGRADING.md), [Remote Access](../REMOTE_ACCESS.md), and [Clearing Your Data](../data/clearing-data.md).
 
 ## Settings, General tab
 
 The **General** tab holds six sections. This page owns two of them in full: **App Behavior** and **Text Rules**. The others are summarized here and covered in detail in their own guides.
 
 - **App Behavior**: language, delete safety, and show/hide toggles. Covered below.
-- **Notifications**: notification sounds plus separate browser and Android app controls. Upload a **Custom sound** in MP3, WAV, OGG, M4A/MP4, or WebM format (up to 10 MB) to replace Marinara's built-in tone for every device connected to this server. You can preview, replace, or remove it at any time; an unreadable custom file falls back to the built-in tone, and the file is included in backups and profile exports. **Background Notifications** cover autonomous Conversation messages, while **Generation Completion Notifications** cover replies you start manually in Conversation, Roleplay, and Game modes. Both work while Marinara remains open but unfocused, and message contents stay hidden.
+- **Notifications**: notification sounds plus separate browser and Android app controls. Upload a **Custom sound** in MP3, WAV, OGG, M4A/MP4, or WebM format (up to 10 MB) to replace YunYun's built-in tone for every device connected to this server. You can preview, replace, or remove it at any time; an unreadable custom file falls back to the built-in tone, and the file is included in backups and profile exports. **Background Notifications** cover autonomous Conversation messages, while **Generation Completion Notifications** cover replies you start manually in Conversation, Roleplay, and Game modes. Both work while YunYun remains open but unfocused, and message contents stay hidden.
 - **Responses**: how replies stream, save, and paginate. See [Sending and Streaming Messages](../chats/sending-and-streaming.md).
 - **Input & Editing**: message input and fast edit controls. See [Message Actions](../chats/messages.md).
 - **Text Rules**: formatting applied to chat text. Covered below.
@@ -41,24 +41,24 @@ The **General** tab holds six sections. This page owns two of them in full: **Ap
 
 This section is at **Settings** > **General** > **App Behavior**. It controls daily app behavior and a few show/hide toggles.
 
-- **Language**: choose the app interface language. Marinara currently includes Arabic, Simplified Chinese, English,
+- **Language**: choose the app interface language. YunYun currently includes Arabic, Simplified Chinese, English,
   French, German, Hindi, Japanese, Korean, Polish, Brazilian Portuguese, Russian, and Spanish. Arabic uses a
   right-to-left layout. Interface text that has not been translated yet falls back to English. This setting changes
-  Marinara's controls and guidance, not model prompts or chat content. To improve a translation or contribute another
+  YunYun's controls and guidance, not model prompts or chat content. To improve a translation or contribute another
   language, see [UI Localization](../development/localization.md).
-- **Documentation Language**: choose the language for Marinara's built-in guides, separate from the interface language above. English is built in and never downloaded. Picking a language other than English shows **Download & Replace**, which downloads that language pack once and removes the previous pack, so only one downloaded language is kept. Guides that are not translated yet open in English with a small `EN` badge, and the docs search works in whichever language is active. Your choice survives updates, and the pack refreshes automatically after an update when its translations changed. If the downloaded guides ever go missing or get damaged, a **Fix documentation** button appears: it re-downloads the pack, and resets the guides to English when the download source cannot be reached.
-- **Confirm before deleting**: on by default. When on, Marinara asks before it permanently deletes a chat, a character, or another item. Keep it on to avoid accidental deletes.
+- **Documentation Language**: choose the language for YunYun's built-in guides, separate from the interface language above. English is built in and never downloaded. Picking a language other than English shows **Download & Replace**, which downloads that language pack once and removes the previous pack, so only one downloaded language is kept. Guides that are not translated yet open in English with a small `EN` badge, and the docs search works in whichever language is active. Your choice survives updates, and the pack refreshes automatically after an update when its translations changed. If the downloaded guides ever go missing or get damaged, a **Fix documentation** button appears: it re-downloads the pack, and resets the guides to English when the download source cannot be reached.
+- **Confirm before deleting**: on by default. When on, YunYun asks before it permanently deletes a chat, a character, or another item. Keep it on to avoid accidental deletes.
 - **Hide chat Help button**: off by default. When on, the **Help** button disappears from Conversation, Roleplay, and Game chats.
-- **Show Android status bar**: off by default, and works only in the Marinara Engine Android app. When on, the time, battery level, and notification icons stay visible above Marinara.
+- **Show Android status bar**: off by default, and works only in the YunYun Engine Android app. When on, the time, battery level, and notification icons stay visible above YunYun.
 - **Achievements**: on by default. When on, the Home screen shows the **Achievements** bookmark and unlock notices. The optional **Achievements** widget appears if you added it to your Home layout. When off, tracking stays silent. See [Achievements](../home/achievements.md).
 - **Music Player**: on by default. When on, the compact Music Player is shown. It needs the **Music DJ** agent from **Agents** > **Download Agents**, and the switch stays greyed out until you install it. See [Music](../media/music.md).
-- **Search and Professor Mari settings**: select **Open** to go to their settings page. Every Search and Professor Mari setting lives there, in these groups:
+- **Search and Professor YunYun settings**: select **Open** to go to their settings page. Every Search and Professor YunYun setting lives there, in these groups:
 
   - **Search**: offer to improve a field and search history.
   - **Quick answers**: **Quick answers in Search**, **Answer with** and **Wait after typing**.
-  - **Search window** and **Professor Mari window**: each window has **Height** and **Width** settings. These groups are not shown on phones.
-  - **Professor Mari**: Ask Professor Mari from Search, permissions mode, **Runtime**, reply chips, how change cards open and Enter sends to Professor Mari.
-  - **Around the app**: Mini Professor Mari visits.
+  - **Search window** and **Professor YunYun window**: each window has **Height** and **Width** settings. These groups are not shown on phones.
+  - **Professor YunYun**: Ask Professor YunYun from Search, permissions mode, **Runtime**, reply chips, how change cards open and Enter sends to Professor YunYun.
+  - **Around the app**: Mini Professor YunYun visits.
   - **Appearance**: her look. Each pack shows her portrait. The one in use says **In use**. A locked pack shows your play time toward unlocking it.
 
   The gear in Search opens the same page. Searching for any of these settings, by its new or old name, takes you straight to it.
@@ -90,7 +90,7 @@ Chooses how quotation marks are unified. Unlike the two rules above, this change
 
 ### Load images from other websites in messages
 
-Off by default. When off, an image from another website in a message, greeting or card preview shows the website's name and a **Load image** button instead, so a message cannot contact other sites on its own. Select **Load image** to show that image; Marinara remembers it on all your devices. Turn the setting on to show every image right away. Images stored in Marinara, such as gallery pictures, avatars and sprites, always show.
+Off by default. When off, an image from another website in a message, greeting or card preview shows the website's name and a **Load image** button instead, so a message cannot contact other sites on its own. Select **Load image** to show that image; YunYun remembers it on all your devices. Turn the setting on to show every image right away. Images stored in YunYun, such as gallery pictures, avatars and sprites, always show.
 
 ## Responses and Input & Editing
 
@@ -138,19 +138,19 @@ The **Message Tools** section is at **Settings** > **Advanced** > **Message Tool
 | **Include private notes in exports** | Adds your private message notes to JSONL and text chat exports. Keep it off when you share a transcript. | [Exporting and Importing Chats](../chats/export-import.md) |
 | **Debug mode** | Logs model payloads in the server console for support. | [Troubleshooting](../TROUBLESHOOTING.md) |
 
-The rest of the **Advanced** tab is covered elsewhere. See [Upgrading Marinara Engine](../UPGRADING.md) for **Updates**, [Remote Access](../REMOTE_ACCESS.md) for **Admin Access**, [Backup and Restore](../data/backup-and-restore.md) for **Backup & Export**, and [Clearing Your Data](../data/clearing-data.md) for **Danger Zone**.
+The rest of the **Advanced** tab is covered elsewhere. See [Upgrading YunYun Engine](../UPGRADING.md) for **Updates**, [Remote Access](../REMOTE_ACCESS.md) for **Admin Access**, [Backup and Restore](../data/backup-and-restore.md) for **Backup & Export**, and [Clearing Your Data](../data/clearing-data.md) for **Danger Zone**.
 
 ## How settings sync across devices
 
-Marinara stores most of your settings on the server, so they follow you between browsers and devices. This is the settings sync behavior.
+YunYun stores most of your settings on the server, so they follow you between browsers and devices. This is the settings sync behavior.
 
 Here is how it works:
 
 1. You change a setting anywhere in **Settings**.
-2. About one second later, Marinara saves the change to the server with a timestamp.
-3. When another browser opens the same Marinara server, it loads those saved settings.
+2. About one second later, YunYun saves the change to the server with a timestamp.
+3. When another browser opens the same YunYun server, it loads those saved settings.
 
-Each device keeps the newer copy. This is last-write-wins by timestamp. Watch out for one result of this rule. If you open Marinara on a second device, its copy can quietly overwrite a setting you just changed on the first device. Give the app a moment to sync before you switch devices.
+Each device keeps the newer copy. This is last-write-wins by timestamp. Watch out for one result of this rule. If you open YunYun on a second device, its copy can quietly overwrite a setting you just changed on the first device. Give the app a moment to sync before you switch devices.
 
 Two settings never sync. They stay per-browser on the device where you set them:
 
@@ -168,7 +168,7 @@ If the server is unreachable, the app keeps working from your local settings and
 - [Sending and Streaming Messages](../chats/sending-and-streaming.md)
 - [Exporting and Importing Chats](../chats/export-import.md)
 - [Where Your Data Is Stored](../data/where-data-is-stored.md)
-- [Upgrading Marinara Engine](../UPGRADING.md)
+- [Upgrading YunYun Engine](../UPGRADING.md)
 - [Troubleshooting](../TROUBLESHOOTING.md)
 - [Achievements](../home/achievements.md)
 - [Personal Extensions](../extending/personal-extensions.md)

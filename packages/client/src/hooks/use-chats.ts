@@ -453,7 +453,7 @@ export function useChatMessageSearchSource(chatId: string | null, enabled: boole
 }
 
 /**
- * Professor Mari's own conversations. They are ordinary chats behind an internal
+ * Professor YunYun's own conversations. They are ordinary chats behind an internal
  * marker, so they are absent from the normal chat list and need their own read.
  */
 export function useProfessorMariChats(enabled: boolean) {

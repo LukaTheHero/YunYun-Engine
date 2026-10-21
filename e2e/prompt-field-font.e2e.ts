@@ -60,8 +60,8 @@ test("prompt fields stay monospace by default and follow the app font once one i
     const sectionContent = presetEditor.getByPlaceholder("Prompt content… (supports", { exact: false });
     const presetFields = [
       sectionContent,
-      presetEditor.getByPlaceholder("Leave empty to use Marinara's built-in conversation prompt."),
-      presetEditor.getByPlaceholder("Leave empty to use Marinara's built-in game prompt."),
+      presetEditor.getByPlaceholder("Leave empty to use YunYun's built-in conversation prompt."),
+      presetEditor.getByPlaceholder("Leave empty to use YunYun's built-in game prompt."),
     ];
     for (const field of presetFields) await expectMonospace(field);
 

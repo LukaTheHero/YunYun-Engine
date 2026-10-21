@@ -587,7 +587,7 @@ const importedSpriteCard = structuredClone(compatibleSpriteCard) as unknown as R
 assert.deepEqual(
   takeEmbeddedMarinaraSprites(importedSpriteCard),
   portableSprites,
-  "Marinara must recover its embedded sprite set from a compatible PNG card",
+  "YunYun must recover its embedded sprite set from a compatible PNG card",
 );
 const importedSpriteExtensions = (importedSpriteCard.data as Record<string, unknown>).extensions as Record<
   string,
@@ -723,7 +723,7 @@ const copiedSupportDiagnostics = formatSupportDiagnostics({
   serverOs: "Linux 6.8.0 (x64)",
   serverMemory: { heapUsedMiB: 768, heapLimitMiB: 1536, rssMiB: 1024 },
   clientOs: "macOS 15.6",
-  browser: "Marinara test shell",
+  browser: "YunYun test shell",
   gpu: "Test GPU",
   connectionName: "Sol",
   connectionProvider: "openai",
@@ -738,7 +738,7 @@ for (const expectedLine of [
   "Background wake lock: not reported",
   "Last detected freeze: none detected",
   "Client OS: macOS 15.6",
-  "Browser / app shell: Marinara test shell",
+  "Browser / app shell: YunYun test shell",
   "GPU: Test GPU",
   "Active connection: Sol",
   "Connection provider: openai",
@@ -753,18 +753,18 @@ const professorMariWorkspaceSource = readFileSync(
 assert.match(
   professorMariWorkspaceSource,
   /description is a brief identity overview[\s\S]{0,220}backstory is[^\n]+history[\s\S]{0,180}appearance is physical features/u,
-  "Professor Mari's workspace prompt must teach smaller models the distinct character-card field meanings",
+  "Professor YunYun's workspace prompt must teach smaller models the distinct character-card field meanings",
 );
 assert.match(
   professorMariWorkspaceSource,
   /updates are patches[\s\S]{0,400}read the entity back[\s\S]{0,300}Claim completion only when every requested value matches/u,
-  "Professor Mari must preserve unrelated fields and verify requested character edits before claiming completion",
+  "Professor YunYun must preserve unrelated fields and verify requested character edits before claiming completion",
 );
 const professorMariSeedSource = readFileSync(join(REPOSITORY_ROOT, "packages/server/src/db/seed-mari.ts"), "utf8");
 assert.match(
   professorMariSeedSource,
   /Keep card fields distinct:[\s\S]{0,600}fetch the character again/u,
-  "The seeded Professor Mari command guide must retain the same targeted character-field safeguards",
+  "The seeded Professor YunYun command guide must retain the same targeted character-field safeguards",
 );
 
 const localizedPackageManifest = {
@@ -1694,7 +1694,7 @@ try {
   );
   const knownPersonaReferenceId = "PriorPersonaRef123456";
   const referencedPersona = await characterStorage.createPersona(
-    "Professor Mari",
+    "Professor YunYun",
     "A brilliant engineer who understands every machine in the laboratory.",
     undefined,
     {
@@ -1707,7 +1707,7 @@ try {
   assert.ok(referencedPersona);
   const hiddenPersonaLorebook = await lorebookStorage.create(
     createLorebookSchema.parse({
-      name: "Professor Mari's private notes",
+      name: "Professor YunYun's private notes",
       personaIds: [referencedPersona.id],
       hiddenFromLibrary: true,
     }),
@@ -1736,7 +1736,7 @@ try {
     activeCharacterIds: [],
     sources: [`{{${countOnlyReferencedCharacter.id}}}`],
     chatMessages: [],
-    macroCtx: { user: "Mari", char: "Character", characters: [], variables: {} },
+    macroCtx: { user: "YunYun", char: "Character", characters: [], variables: {} },
     wrapFormat: "xml",
     chatId: "count-only-character-reference",
     includeLorebooks: false,
@@ -1750,7 +1750,7 @@ try {
     db,
     sources: [`{{persona-${countOnlyReferencedPersona.id}}}`],
     chatMessages: [],
-    macroCtx: { user: "Mari", char: "Character", characters: [], variables: {} },
+    macroCtx: { user: "YunYun", char: "Character", characters: [], variables: {} },
     wrapFormat: "xml",
     chatId: "count-only-persona-reference",
     includeLorebooks: false,
@@ -1851,7 +1851,7 @@ try {
       },
     ],
     macroCtx: {
-      user: "Mari",
+      user: "YunYun",
       char: "Version snapshot fixture",
       characters: ["Version snapshot fixture"],
       variables: {},
@@ -1877,7 +1877,7 @@ try {
       },
     ],
     macroCtx: {
-      user: "Mari",
+      user: "YunYun",
       char: "Version snapshot fixture",
       characters: ["Version snapshot fixture"],
       variables: {},
@@ -1886,7 +1886,7 @@ try {
     wrapFormat: "xml",
     chatId: "persona-reference-regression",
   });
-  assert.equal(referencedPersonaContext.references[referencedPersona.id], "Professor Mari");
+  assert.equal(referencedPersonaContext.references[referencedPersona.id], "Professor YunYun");
   assert.match(referencedPersonaContext.content, /A brilliant engineer who understands every machine/u);
   assert.match(referencedPersonaContext.content, /Warm, incisive, and knowingly amused\./u);
   assert.match(referencedPersonaContext.content, /with Ada\./u);
@@ -1898,7 +1898,7 @@ try {
     sources: [],
     chatMessages: [{ role: "user", content: `I am {{persona-${referencedPersona.id}}}.` }],
     macroCtx: {
-      user: "Mari",
+      user: "YunYun",
       char: "Version snapshot fixture",
       characters: ["Version snapshot fixture"],
       variables: {},
@@ -1906,7 +1906,7 @@ try {
     wrapFormat: "xml",
     chatId: "persona-reference-regression-active",
   });
-  assert.equal(activePersonaReferenceContext.references[referencedPersona.id], "Mari");
+  assert.equal(activePersonaReferenceContext.references[referencedPersona.id], "YunYun");
   assert.equal(activePersonaReferenceContext.content, "");
 
   const knownPersonaIds = new Set(
@@ -2042,7 +2042,7 @@ try {
       chatChoices: {},
       chatId,
       characterIds: [storageTrimFixture.id],
-      personaName: "Mari",
+      personaName: "YunYun",
       personaDescription: "",
       chatMessages: [{ role: "user", content }],
     });
@@ -2054,7 +2054,7 @@ try {
   assert.match(assembledReferenceText, /The cafe companion is Susie\./u);
   assert.match(assembledReferenceText, /A trusted friend from the western district\./u);
   assert.match(assembledReferenceText, /REFERENCED_EXAMPLE_SHOULD_APPEAR/u);
-  assert.match(assembledReferenceText, /The cafe specialist is Professor Mari\./u);
+  assert.match(assembledReferenceText, /The cafe specialist is Professor YunYun\./u);
   assert.match(assembledReferenceText, /A brilliant engineer who understands every machine/u);
   assert.match(assembledReferenceText, /REFERENCED_PERSONA_LOREBOOK_MEMORY/u);
   assert.doesNotMatch(assembledReferenceText, /REFERENCED_GREETING_MUST_STAY_OUT/u);
@@ -2369,12 +2369,12 @@ try {
     action: "lorebook.create",
     lorebookId: professorMariLorebookId,
     data: {
-      name: "Professor Mari lorebook regression",
+      name: "Professor YunYun lorebook regression",
       entries: [{ name: "Verified entry", content: professorMariFullEntryContent, keys: ["verified"] }],
     },
     apply: true,
   });
-  assert.equal(professorMariLorebookResult.ok, true, "Professor Mari must create lorebooks after visibility was added");
+  assert.equal(professorMariLorebookResult.ok, true, "Professor YunYun must create lorebooks after visibility was added");
   const professorMariLorebook = await lorebookStorage.getById(professorMariLorebookId);
   assert.equal(professorMariLorebook?.hiddenFromLibrary, false);
   const professorMariEntries = await lorebookStorage.listEntries(professorMariLorebookId);
@@ -2399,7 +2399,7 @@ try {
   assert.equal(
     (professorMariFullEntry.output as { content?: string }).content,
     professorMariFullEntryContent,
-    "Professor Mari's full-entry reader must preserve the complete lorebook body",
+    "Professor YunYun's full-entry reader must preserve the complete lorebook body",
   );
   assert.ok(PROFESSOR_MARI_APP_DATA_ACTIONS.includes("lorebook.folder.create"));
   assert.ok(PROFESSOR_MARI_APP_DATA_ACTIONS.includes("lorebook.libraryFolder.create"));
@@ -2521,14 +2521,14 @@ try {
   assert.equal(await lorebookStorage.getById(professorMariLorebookId), null);
   assert.equal((await lorebookStorage.listEntries(professorMariLorebookId)).length, 0);
 
-  // #4791 — Professor Mari's lorebook.create + updateEntry now persist the keyword-matching and
+  // #4791 — Professor YunYun's lorebook.create + updateEntry now persist the keyword-matching and
   // selective fields that were previously hardcoded, so her authoring + fidelity pass can set them.
   const professorMariParamLorebookId = "professor-mari-param-lorebook-regression";
   const professorMariParamCreate = await mariDb.executeAction({
     action: "lorebook.create",
     lorebookId: professorMariParamLorebookId,
     data: {
-      name: "Professor Mari parameterized entries",
+      name: "Professor YunYun parameterized entries",
       entries: [
         {
           name: "Vlad",
@@ -2738,7 +2738,7 @@ try {
   );
   await lorebookStorage.remove(professorMariParamLorebookId);
 
-  // #4924: lorebook.deleteEntry removes exactly ONE entry (scoped), so Mari never needs a raw
+  // #4924: lorebook.deleteEntry removes exactly ONE entry (scoped), so YunYun never needs a raw
   // `mari db delete --where` that can mass-delete unrelated rows.
   const professorMariDeleteLorebookId = "professor-mari-delete-entry-regression";
   try {
@@ -2786,7 +2786,7 @@ try {
     await lorebookStorage.remove(professorMariDeleteLorebookId);
   }
 
-  // #4927: a Mari lorebook entry mutation resyncs an embedded character's data.character_book on
+  // #4927: a YunYun lorebook entry mutation resyncs an embedded character's data.character_book on
   // both apply and Restore. The generic mari-db mutation path used to skip
   // syncCharacterBookFromLorebook, so add/update/delete of an embedded lorebook's entries left the
   // character's derived copy stale.
@@ -2827,7 +2827,7 @@ try {
     assert.equal(embeddedSyncUpdate.ok, true);
     assert.ok(
       (await readEmbeddedBookContent()).includes("edited content"),
-      "applying a Mari entry edit resyncs the embedded character_book",
+      "applying a YunYun entry edit resyncs the embedded character_book",
     );
 
     const embeddedSyncApproval = mariDb.getPendingApprovals().find((approval) => !beforeEmbeddedSync.has(approval.id));
@@ -3405,7 +3405,7 @@ try {
   const rangedChatTimestamp = "2026-07-30T12:00:00.000Z";
   await db.insert(chats).values({
     id: rangedChatId,
-    name: "Professor Mari range regression",
+    name: "Professor YunYun range regression",
     mode: "roleplay",
     characterIds: "[]",
     metadata: "{}",
@@ -3437,7 +3437,7 @@ try {
       { postNumber: 5, content: "Message 5" },
       { postNumber: 6, content: "Message 6" },
     ],
-    "Professor Mari must be able to retrieve exactly the last requested messages",
+    "Professor YunYun must be able to retrieve exactly the last requested messages",
   );
   const afterPostResult = await mariDb.executeCli({
     argv: ["chats", "messages", rangedChatId, "--after-post", "2", "--limit", "2", "--offset", "1"],
@@ -3451,7 +3451,7 @@ try {
       { postNumber: 4, content: "Message 4" },
       { postNumber: 5, content: "Message 5" },
     ],
-    "Professor Mari must page inside the requested post-number range",
+    "Professor YunYun must page inside the requested post-number range",
   );
   const invalidRangeResult = await mariDb.executeCli({
     argv: ["chats", "messages", rangedChatId, "--last", "201"],
@@ -3823,7 +3823,7 @@ try {
   });
 
   const folderListResult = await mariDb.executeAction({ action: "character.folder.list" });
-  assert.equal(folderListResult.ok, true, "Professor Mari must be able to list character folders");
+  assert.equal(folderListResult.ok, true, "Professor YunYun must be able to list character folders");
   assert.deepEqual(
     (folderListResult.output as Array<{ id: string }>).map((folder) => folder.id),
     ["character-folder-source", "character-folder-target"],
@@ -3836,7 +3836,7 @@ try {
     reason: "Regression coverage for issue #4568",
     apply: true,
   });
-  assert.equal(folderMoveResult.ok, true, "Professor Mari must be able to move a character into a named folder");
+  assert.equal(folderMoveResult.ok, true, "Professor YunYun must be able to move a character into a named folder");
 
   const foldersAfterMove = await db.select().from(characterGroups);
   const sourceFolder = foldersAfterMove.find((folder) => folder.id === "character-folder-source");
@@ -3953,7 +3953,7 @@ try {
     apply: false,
   });
   assert.equal(widgetPreview.ok, true);
-  assert.equal(widgetPreview.mode, "dry-run", "Professor Mari must preview a custom widget before confirmation");
+  assert.equal(widgetPreview.mode, "dry-run", "Professor YunYun must preview a custom widget before confirmation");
   assert.deepEqual((await mariDb.executeAction({ action: "home_widget.list" })).output, []);
 
   const approvalsBeforeWidgetCreate = new Set(mariDb.getPendingApprovals().map((approval) => approval.id));
@@ -4001,8 +4001,8 @@ try {
     "A failed Home widget restore must remain available to retry or keep",
   );
 
-  // #4813 (PR 1): every Professor Mari `*.create` now applies through the same Keep/Restore
-  // review as edits and deletes — so a creation Mari made without being asked stays undoable in
+  // #4813 (PR 1): every Professor YunYun `*.create` now applies through the same Keep/Restore
+  // review as edits and deletes — so a creation YunYun made without being asked stays undoable in
   // chat — and a create may never overwrite an existing row.
   const pendingReviewIds = () => new Set(mariDb.getPendingApprovals().map((approval) => approval.id));
   const newestReviewSince = (baseline: Set<string>) =>
@@ -4035,7 +4035,7 @@ try {
   assert.equal(
     (await mariDb.executeAction({ action: "character.get", id: "mari-reviewable-character" })).ok,
     false,
-    "Restoring a create must delete the row Mari added",
+    "Restoring a create must delete the row YunYun added",
   );
   assert.equal(
     mariDb.getPendingApprovals().some((approval) => approval.id === reviewableApproval.id),
@@ -4242,7 +4242,7 @@ assert.equal(generatedLorebookEntry.selectiveLogic, "and");
 assert.equal(generatedLorebookEntry.matchWholeWords, "false");
 assert.equal(generatedLorebookEntry.caseSensitive, "false");
 assert.equal(generatedLorebookEntry.useRegex, "false");
-// #4791 — Professor Mari can now set them explicitly (previously hardcoded and ignored).
+// #4791 — Professor YunYun can now set them explicitly (previously hardcoded and ignored).
 const parameterizedLorebookEntry = buildLorebookEntryCreateRow(
   {
     name: "Vlad",
@@ -4636,7 +4636,7 @@ const completeProfessorMariPersona = buildPersonaCreateRow(
   {
     name: "Complete helper persona",
     phoneticName: "Professor Mah-ree",
-    convoDisplayName: "Prof. Mari",
+    convoDisplayName: "Prof. YunYun",
     aboutMe: "I help people build worlds.",
     convoBehavior: "Speak warmly and precisely.",
   },
@@ -4644,7 +4644,7 @@ const completeProfessorMariPersona = buildPersonaCreateRow(
   "2026-07-13T00:00:00.000Z",
 );
 assert.equal(completeProfessorMariPersona.phoneticName, "Professor Mah-ree");
-assert.equal(completeProfessorMariPersona.convoDisplayName, "Prof. Mari");
+assert.equal(completeProfessorMariPersona.convoDisplayName, "Prof. YunYun");
 assert.equal(completeProfessorMariPersona.aboutMe, "I help people build worlds.");
 assert.deepEqual(completeProfessorMariPersona.convoBehavior, {
   instruction: "Speak warmly and precisely.",
@@ -5489,7 +5489,7 @@ assert.equal(
     32_000,
   )?.usedTokens,
   8_192,
-  "legacy Professor Mari usage metadata should keep the context indicator available",
+  "legacy Professor YunYun usage metadata should keep the context indicator available",
 );
 assert.equal(resolveProfessorMariContextBudget([], 128_000), null);
 for (const tokensContext of [230, 0, null, undefined]) {
@@ -5611,18 +5611,18 @@ for (const [name, source] of [
   assert.match(source, /<ContextBudgetIndicator budget=\{contextBudget\}/u, `${name} must show usage in its popup`);
   assert.match(source, /relative flex h-\[1\.875rem\] w-\[1\.875rem\]/u, `${name} must use the larger context gauge`);
 }
-// Mari's context use moved out of the connection popups (69be7be17: it duplicated the status strip) into the
+// YunYun's context use moved out of the connection popups (69be7be17: it duplicated the status strip) into the
 // "how she works" connection row, behind the Show context usage setting.
 assert.match(
   mariSeesPanelSource,
   /showContextUsage && contextBudget\s*\?\s*localizeUi\("ui\.chat\.homeprofessormarichat\.awareOfContextUse"/u,
-  "Professor Mari's connection row must show context usage when the setting is on",
+  "Professor YunYun's connection row must show context usage when the setting is on",
 );
 assert.match(professorMariHomeSource, /chatHistorySelectionMode/u);
 assert.match(
   professorMariHomeSource,
   /enterToSendProfessorMari/u,
-  "Professor Mari must read her persisted Send on Enter preference",
+  "Professor YunYun must read her persisted Send on Enter preference",
 );
 // One composer since the floating-mode branch was removed (f27ce165b).
 assert.equal(
@@ -5630,26 +5630,26 @@ assert.equal(
     /event\.key === "Enter" &&\s*!event\.shiftKey &&\s*\(enterToSend \|\| event\.metaKey \|\| event\.ctrlKey\)/gu,
   )?.length,
   1,
-  "Professor Mari's composer must preserve Shift+Enter and require the configured send shortcut",
+  "Professor YunYun's composer must preserve Shift+Enter and require the configured send shortcut",
 );
 assert.match(professorMariHomeSource, /toggleProfessorChatSelection/u);
 assert.match(professorMariHomeSource, /handleBulkDeleteProfessorChats/u);
 assert.match(
   mariMessageActionsSource,
   /const handleEditMessage = useCallback\([\s\S]{0,180}if \(!chatId \|\| isBusy\) return;/u,
-  "Professor Mari's first edit after generation must not be rejected by a stale busy ref",
+  "Professor YunYun's first edit after generation must not be rejected by a stale busy ref",
 );
 // A failed send now keeps the message in the transcript with one Retry card (failRun) and never refills the
 // composer; Stop is not a failure, so failRun returns before it shows anything.
 assert.match(
   mariWorkspaceRunSource,
   /const failRun = useCallback\(\s*\([^)]*\) => \{\s*if \(isProfessorMariAbortError\(error\)\) return;/u,
-  "Stopping Professor Mari must not show a failure",
+  "Stopping Professor YunYun must not show a failure",
 );
 assert.doesNotMatch(
   mariChatAllSource,
   /catch \(error\) \{[^}]*setDraft\(/u,
-  "A failed or stopped Professor Mari send must not restore the submitted prompt to the composer",
+  "A failed or stopped Professor YunYun send must not restore the submitted prompt to the composer",
 );
 assert.match(
   lorebookHooksSource,
@@ -5659,7 +5659,7 @@ assert.match(
 assert.match(
   mariChatHistoryActionsSource,
   /handleDeleteProfessorChat[\s\S]{0,500}showConfirmDialog/u,
-  "Deleting one Professor Mari chat must use the app confirmation dialog",
+  "Deleting one Professor YunYun chat must use the app confirmation dialog",
 );
 // Every step row, failed ones included, opens to technical details with the tool's output (slice 72
 // moved the details into one `technicalDetails` helper that every step row renders).
@@ -5673,62 +5673,62 @@ scrollProfessorMariTranscriptToBottom(professorMariTranscript);
 assert.equal(
   professorMariTranscript.scrollTop,
   professorMariTranscript.scrollHeight,
-  "Professor Mari transcript scrolling must align a mounted pane with its newest message",
+  "Professor YunYun transcript scrolling must align a mounted pane with its newest message",
 );
 assert.equal(isProfessorMariTranscriptNearBottom(professorMariTranscript), true);
 professorMariTranscript.scrollTop = 200;
 assert.equal(
   isProfessorMariTranscriptNearBottom(professorMariTranscript),
   false,
-  "Professor Mari streaming must stop following output after the reader scrolls away from the bottom",
+  "Professor YunYun streaming must stop following output after the reader scrolls away from the bottom",
 );
 assert.match(
   mariTranscriptSource,
   /ref=\{setTranscriptScrollNode\}[\s\S]{0,100}data-component="HomeProfessorMariChat\.Transcript"/u,
-  "Professor Mari transcript panes must trigger scrolling from their mounted ref",
+  "Professor YunYun transcript panes must trigger scrolling from their mounted ref",
 );
 assert.match(
   professorMariHomeSource,
   /messageLoadAbortRef\.current !== controller[\s\S]{0,80}activeChatIdRef\.current !== id/u,
-  "Professor Mari message loads must discard stale requests and inactive chat results",
+  "Professor YunYun message loads must discard stale requests and inactive chat results",
 );
 assert.match(
   professorMariHomeSource,
   /options\.shouldApply\?\.\(\) === false[\s\S]{0,480}setMessages/u,
-  "Professor Mari message loads must recheck an operation guard before applying a response",
+  "Professor YunYun message loads must recheck an operation guard before applying a response",
 );
 assert.match(
   mariWorkspaceRunSource,
   /loadMessages\(completedChatId, \{[\s\S]{0,160}workspaceRunIdRef\.current === runId[\s\S]{0,100}activeChatIdRef\.current === completedChatId/u,
-  "Professor Mari background refreshes must not overwrite state after a newer operation starts",
+  "Professor YunYun background refreshes must not overwrite state after a newer operation starts",
 );
 assert.match(
   professorMariHomeSource,
   // #5725 strengthened this guard: it also rejects responses requested for a
   // previous chat and holds mode fields across pending mode writes.
   /const refreshWorkspaceStatus = useCallback\(\s*async \(shouldApply\?: \(\) => boolean\)[\s\S]{0,700}if \(shouldApply\?\.\(\) === false \|\| activeChatIdRef\.current !== chatIdAtStart\) return status;[\s\S]{0,900}setWorkspaceStatus\(/u,
-  "Professor Mari workspace status loads must recheck an operation guard before applying a response",
+  "Professor YunYun workspace status loads must recheck an operation guard before applying a response",
 );
 assert.match(
   mariWorkspaceRunSource,
   /refreshWorkspaceStatus\([\s\S]{0,140}workspaceRunIdRef\.current === runId[\s\S]{0,100}activeChatIdRef\.current === completedChatId/u,
-  "Professor Mari post-run status refreshes must not overwrite state after a newer operation starts",
+  "Professor YunYun post-run status refreshes must not overwrite state after a newer operation starts",
 );
 // The work-stage layout (1a61247d1) replaced the user-message separators with a right-aligned bubble.
 assert.match(
   compactMariMessageSource,
   /message\.role === "user"[\s\S]{0,180}<TranscriptRow[^>]*className="mari-user-request/u,
-  "Professor Mari user messages must render as the user-request row",
+  "Professor YunYun user messages must render as the user-request row",
 );
 assert.match(
   readFileSync(new URL("../../packages/client/src/styles/mari.css", import.meta.url), "utf8"),
   /\.mari-user-request__bubble \{[^}]*background: color-mix\(in srgb, var\(--foreground\) \d+%, var\(--card\)\)/u,
-  "Professor Mari user bubbles must take their colour from the theme",
+  "Professor YunYun user bubbles must take their colour from the theme",
 );
 assert.match(
   mariChatHistoryActionsSource,
   /Promise\.allSettled\([\s\S]*?api\.delete\(`\/chats\/internal\/professor-mari\/chats\/\$\{id\}`\)/u,
-  "Professor Mari chat history should delete all selected chats through the existing endpoint",
+  "Professor YunYun chat history should delete all selected chats through the existing endpoint",
 );
 const roleplaySurfaceSource = readFileSync(
   new URL("../../packages/client/src/components/chat/ChatRoleplaySurface.tsx", import.meta.url),
@@ -6148,7 +6148,7 @@ assert.match(
 assert.match(
   professorMariHomeSource,
   /const cap = Number\.parseFloat\(getComputedStyle\(textarea\)\.maxHeight\);\s*const to = Number\.isFinite\(cap\) \? Math\.min\(textarea\.scrollHeight, cap\)/u,
-  "Professor Mari's composer must stop growing at its max-height",
+  "Professor YunYun's composer must stop growing at its max-height",
 );
 assert.equal(
   themesRouteSource.match(/requirePrivilegedAccess\(req, reply, \{ feature: "Theme install\/update\/delete" \}\)/gu)
@@ -6235,7 +6235,7 @@ assert.equal(
   "Home effect pausing must keep one central visibility listener",
 );
 assert.match(appSource, /dispatchEvent\(new CustomEvent\("marinara:effects-paused"/u);
-// Slice 85: the navigator is gone; the Home widget's blink is the Mari frame that pauses with the page.
+// Slice 85: the navigator is gone; the Home widget's blink is the YunYun frame that pauses with the page.
 assert.match(
   globalStylesSource,
   /data-marinara-effects-paused="true"\] \.mari-home-professor-blink,[^}]+animation-play-state: paused !important;/u,
@@ -6840,7 +6840,7 @@ assert.match(
   "prompt macro contexts must only scan lorebook counts when a source uses lorebooksize",
 );
 const staleLorebookCountContext = {
-  user: "Mari",
+  user: "YunYun",
   char: "Character",
   characters: ["Character"],
   variables: {},
@@ -6899,13 +6899,13 @@ assert.match(
   "LinkAPI actions must share the available banner width instead of overflowing it",
 );
 assert.equal(
-  resolvePresetArtwork({ name: "Marinara's Universal Preset", author: "Marinara" }),
+  resolvePresetArtwork({ name: "Marinara's Universal Preset", author: "YunYun" }),
   MARINARA_UNIVERSAL_PRESET_ARTWORK,
 );
 assert.equal(
   resolvePresetArtwork({
     name: "Marinara's Universal Preset",
-    author: "Marinara",
+    author: "YunYun",
     imagePath: "/api/prompts/images/file/custom.png",
   }),
   "/api/prompts/images/file/custom.png",
@@ -6913,7 +6913,7 @@ assert.equal(
 assert.match(presetsPanelSource, /data-preset-image-action/u);
 assert.match(presetsPanelSource, /data-preset-open-action/u);
 assert.equal(
-  existsSync(join(REPOSITORY_ROOT, "packages/client/public/illustrations/marinara-universal-preset.webp")),
+  existsSync(join(REPOSITORY_ROOT, "packages/client/public/sprites/yunyun/chibi-yunyun.png")),
   true,
 );
 assert.match(
@@ -7112,10 +7112,10 @@ const annotatedPartiallyPrefixedReply = annotateContentWithReactions(
   partiallyPrefixedConversationReply,
   [{ emoji: "🔥", by: ["user"], segment: 0, segmentSpeaker: "Paige" }],
   new Map([["paige", "Paige"]]),
-  (reactorId) => (reactorId === "user" ? "Mari" : reactorId),
+  (reactorId) => (reactorId === "user" ? "YunYun" : reactorId),
   "Paige",
 );
-assert.equal(annotatedPartiallyPrefixedReply, `${partiallyPrefixedConversationReply}\n[Mari reacted with 🔥]`);
+assert.equal(annotatedPartiallyPrefixedReply, `${partiallyPrefixedConversationReply}\n[YunYun reacted with 🔥]`);
 
 assert.equal(resolveStandardEmojiShortcode("crying"), "😢");
 assert.equal(resolveStandardEmojiShortcode("test_tube"), "🧪");
@@ -7675,7 +7675,7 @@ assert.equal(
 assert.equal(
   pickSyncedSettings(projectionState).enterToSendProfessorMari,
   false,
-  "Professor Mari's Send on Enter preference must be server-synced",
+  "Professor YunYun's Send on Enter preference must be server-synced",
 );
 assert.deepEqual(
   pickSyncedSettings(projectionState).chatHelpSeenModes,
@@ -7942,7 +7942,7 @@ assert.throws(
 );
 assert.throws(
   () => parseGameSetupShareFileJson(JSON.stringify({ format: "other", version: 1 })),
-  /not a Marinara Game Mode setup file/u,
+  /not a YunYun Game Mode setup file/u,
 );
 assert.throws(
   () =>
@@ -8250,10 +8250,10 @@ assert.equal(Object.hasOwn(characterAssignedDuplicate, "characterId"), false);
 assert.deepEqual(characterAssignedDuplicate.characterIds, ["character-1"]);
 assert.equal(createLorebookSchema.safeParse(characterAssignedDuplicate).success, true);
 assert.equal(normalizeLorebookCategory("World"), "world");
-assert.equal(normalizeLorebookCategory("Professor Mari's Experimental Category"), "uncategorized");
+assert.equal(normalizeLorebookCategory("Professor YunYun's Experimental Category"), "uncategorized");
 assert.equal(
   updateLorebookSchema.safeParse({
-    category: normalizeLorebookCategory("Professor Mari's Experimental Category"),
+    category: normalizeLorebookCategory("Professor YunYun's Experimental Category"),
     isGlobal: false,
     enabled: true,
     scanDepth: 2,
@@ -9140,7 +9140,7 @@ const repositoryDefinition = {
   id: "continuity-helper",
   name: "Continuity Helper",
   description: "Checks recent turns for contradictions.",
-  author: "Mari",
+  author: "YunYun",
   phase: "post_processing" as const,
   enabledByDefault: false,
   defaultInjectAsSection: true,
@@ -10176,7 +10176,7 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
 {
   // #4704: the background-autonomous poller's server-side candidate filter
   // must mirror the legacy client filter exactly (conversation mode with
-  // autonomousMessages enabled, excluding the Professor Mari home assistant;
+  // autonomousMessages enabled, excluding the Professor YunYun home assistant;
   // bad or missing metadata disqualifies).
   const { isBackgroundAutonomousCandidate } =
     await import("../../packages/server/src/services/conversation/autonomous-candidates.js");
@@ -10195,7 +10195,7 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
   assert.equal(
     isBackgroundAutonomousCandidate({ mode: "conversation", metadata: meta({ internalAssistant: "professor-mari" }) }),
     false,
-    "Professor Mari home chat excluded",
+    "Professor YunYun home chat excluded",
   );
   assert.equal(
     isBackgroundAutonomousCandidate({ mode: "conversation", metadata: JSON.stringify({ autonomousMessages: false }) }),
@@ -10739,7 +10739,7 @@ assert.equal(({} as { tags?: string[] }).tags, undefined, "Background metadata m
   assert.doesNotMatch(
     appSource,
     /const paused = !\([\s\S]{0,220}!reduceAmbientEffects/u,
-    "Reduced ambient motion must not pause Desktop Mari's functional navigation callbacks",
+    "Reduced ambient motion must not pause Desktop YunYun's functional navigation callbacks",
   );
   assert.match(
     generateRouteSource,

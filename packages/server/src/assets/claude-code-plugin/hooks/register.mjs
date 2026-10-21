@@ -1,4 +1,4 @@
-// Claude Code puts messages of its own for a coding agent between Marinara's
+// Claude Code puts messages of its own for a coding agent between YunYun's
 // system prompt and the chat: the account email, an empty CLAUDE.md section,
 // the server's environment (working directory, OS, shell), the model name, a
 // token budget and the date. A chat needs none of them, and they can change how

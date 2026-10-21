@@ -1,7 +1,7 @@
-// #7760: Professor Mari's prompt must teach `character.onboarding.get|update`, and its worked
+// #7760: Professor YunYun's prompt must teach `character.onboarding.get|update`, and its worked
 // example must follow the rules it teaches. The example's block goes through the real server gate
 // (`buildOnboardingUpdate`) against the card text its own `character.update` writes: it must save
-// with no errors AND no "unused question" warnings, or Mari would learn a broken pattern.
+// with no errors AND no "unused question" warnings, or YunYun would learn a broken pattern.
 import assert from "node:assert/strict";
 import { buildOnboardingUpdate } from "../../packages/server/src/services/mari-db/character-onboarding.js";
 import { workspaceCommandProtocolPrompt } from "../../packages/server/src/services/professor-mari/workspace-agent.service.js";

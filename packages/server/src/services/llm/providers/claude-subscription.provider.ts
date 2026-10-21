@@ -61,14 +61,14 @@ const CHAT_CONTEXT_PLUGIN_FILES = [".claude-plugin/plugin.json", "hooks/hooks.js
 
 /**
  * Refuse to start a request without the chat-context mod. This runs before the
- * SDK: the CLI sends its request without waiting for Marinara to read `init`,
+ * SDK: the CLI sends its request without waiting for YunYun to read `init`,
  * so a load error reported there arrives too late to stop it.
  */
 export function assertChatContextPlugin(dir = CHAT_CONTEXT_PLUGIN_DIR): void {
   const missing = CHAT_CONTEXT_PLUGIN_FILES.filter((file) => !existsSync(join(dir, file)));
   if (missing.length > 0) {
     throw new Error(
-      `Claude (Subscription) needs Marinara's chat-context plugin, which keeps your account email and this computer's details out of the prompt. Missing from ${dir}: ${missing.join(", ")}. Reinstall or update Marinara, then try again.`,
+      `Claude (Subscription) needs YunYun's chat-context plugin, which keeps your account email and this computer's details out of the prompt. Missing from ${dir}: ${missing.join(", ")}. Reinstall or update YunYun, then try again.`,
     );
   }
 }
@@ -156,7 +156,7 @@ function formatClaudeSdkError(err: unknown): string {
 }
 
 /**
- * Hard stop for Claude Code's startup (`init`) message. Marinara runs Claude Code with no tools and
+ * Hard stop for Claude Code's startup (`init`) message. YunYun runs Claude Code with no tools and
  * permission checks off, so any MCP server or tool listed there (usually the account's claude.ai
  * connectors, which a Claude Code that ignores `ENABLE_CLAUDEAI_MCP_SERVERS=false` still loads) aborts
  * the request before the model turn is used.
@@ -181,9 +181,9 @@ export function stopIfClaudeCodeExposesMcp(
   const bundledFallback =
     process.platform === "android"
       ? ""
-      : ", or set CLAUDE_SUBSCRIPTION_USE_INSTALLED_CLI=false to use the copy bundled with Marinara";
+      : ", or set CLAUDE_SUBSCRIPTION_USE_INSTALLED_CLI=false to use the copy bundled with YunYun";
   throw new Error(
-    `Claude Code turned on claude.ai connectors (${names.join(", ")}). Marinara runs Claude Code with permission checks off, so it stopped the request. The installed Claude Code is likely too old to turn connectors off: update it${bundledFallback}.`,
+    `Claude Code turned on claude.ai connectors (${names.join(", ")}). YunYun runs Claude Code with permission checks off, so it stopped the request. The installed Claude Code is likely too old to turn connectors off: update it${bundledFallback}.`,
   );
 }
 

@@ -29,7 +29,7 @@ interface MariHoldFigureProps {
 }
 
 /**
- * Slice 85: the lifted Mari. One fixed element follows the pointer on a spring, swings from its grab
+ * Slice 85: the lifted YunYun. One fixed element follows the pointer on a spring, swings from its grab
  * point, and springs back to her slot on release. Positions go straight to the style each frame, so
  * React does not re-render while she is held.
  */

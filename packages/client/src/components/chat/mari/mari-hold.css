@@ -1,4 +1,4 @@
-/* Slice 85: holding Mari. The slot keeps its layout; only its art moves, and the lifted figure is one fixed element. */
+/* Slice 85: holding YunYun. The slot keeps its layout; only its art moves, and the lifted figure is one fixed element. */
 .mari-hold-slot > * {
   cursor: grab;
   touch-action: pan-y;
@@ -64,7 +64,7 @@
   position: fixed;
   left: 0;
   top: 0;
-  /* Above the omnibar, Mari's dialogs (layer + 1/+2) and modals; below the toaster. */
+  /* Above the omnibar, YunYun's dialogs (layer + 1/+2) and modals; below the toaster. */
   z-index: calc(var(--mari-layer-omnibar) + 10);
   width: calc(160px * 2 / 3);
   height: 160px;

@@ -538,16 +538,16 @@ try {
 
       assert.equal(windowsLocal(windowsStorage, "Fixed"), true, "a Fixed drive is machine-local");
       assert.deepEqual(driveProbes, ["C:\\"], "the probe is asked about the storage path's drive root");
-      assert.equal(windowsLocal("d:\\Marinara\\storage", "Fixed"), true, "a lower-case drive letter is a drive path");
-      assert.equal(windowsLocal("\\\\?\\C:\\Marinara\\storage", "Fixed"), true, "a long-path prefix keeps its drive");
+      assert.equal(windowsLocal("d:\\YunYun\\storage", "Fixed"), true, "a lower-case drive letter is a drive path");
+      assert.equal(windowsLocal("\\\\?\\C:\\YunYun\\storage", "Fixed"), true, "a long-path prefix keeps its drive");
       assert.deepEqual(driveProbes, ["C:\\", "D:\\", "C:\\"], "drive roots are passed upper-case");
       driveProbes = [];
       for (const notADrivePath of [
         "\\\\nas\\marinara\\storage",
         "\\\\?\\UNC\\nas\\marinara\\storage",
         "\\\\?\\Volume{0b7a2a1e-0000-0000-0000-100000000000}\\storage",
-        "\\\\.\\C:\\Marinara\\storage",
-        "Marinara\\storage",
+        "\\\\.\\C:\\YunYun\\storage",
+        "YunYun\\storage",
       ]) {
         assert.equal(windowsLocal(notADrivePath, "Fixed"), false, `${notADrivePath} is not machine-local`);
       }

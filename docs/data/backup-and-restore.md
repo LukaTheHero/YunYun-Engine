@@ -1,13 +1,13 @@
-# Backing Up and Restoring Marinara
+# Backing Up and Restoring YunYun
 
-This guide shows the two ways to save a copy of everything in Marinara Engine, and how to put that copy back later. Use it before you upgrade, move to a new device, or reset your data.
+This guide shows the two ways to save a copy of everything in YunYun Engine, and how to put that copy back later. Use it before you upgrade, move to a new device, or reset your data.
 
 ## Two ways to save your data
 
-Marinara gives you two save options. They live in different places and do different jobs.
+YunYun gives you two save options. They live in different places and do different jobs.
 
 - **Download Backup** makes a full **.zip** archive of everything on disk. A **.zip** is a single compressed file that holds many files inside it. This is the most complete copy, and the best guard against data loss.
-- **Export Profile** makes a lighter file that holds your account data (characters, personas, chats, lorebooks, presets, agents, themes, and Personal Extensions). A profile is Marinara's portable copy of your account. You can restore it later inside Marinara.
+- **Export Profile** makes a lighter file that holds your account data (characters, personas, chats, lorebooks, presets, agents, themes, and Personal Extensions). A profile is YunYun's portable copy of your account. You can restore it later inside YunYun.
 
 If you just want one safe copy of everything, use **Download Backup**. Use **Export Profile** when you want a smaller file or a version other roleplay tools can read.
 
@@ -15,7 +15,7 @@ Both save options live in **Settings** on the **Advanced** tab, in the **Backup 
 
 ## Access on the same device or another device
 
-On the computer that runs Marinara, these tools work right away. This is the loopback case, meaning you opened the app at `localhost` or `127.0.0.1` on the same machine.
+On the computer that runs YunYun, these tools work right away. This is the loopback case, meaning you opened the app at `localhost` or `127.0.0.1` on the same machine.
 
 From a phone, tablet, or any other device, backup and restore need the **Admin Access** secret. Set the secret on the server, then paste the same value into **Settings** on the **Advanced** tab under **Admin Access**. See the remote access guide linked at the end.
 
@@ -28,7 +28,7 @@ From a phone, tablet, or any other device, backup and restore need the **Admin A
 3. Find the **Backup & Export** section.
 4. Click **Download Backup**.
 5. The button shows **Creating backup…** while it works.
-6. When the archive is ready, Marinara streams it straight to your browser without holding the whole file in page memory.
+6. When the archive is ready, YunYun streams it straight to your browser without holding the whole file in page memory.
 7. Your browser either opens its normal **Save As** dialog or puts the file in your Downloads folder, depending on your download settings.
 
 This step matters most on Android and iOS. On those devices the app's own data folder is usually not reachable. That makes **Download Backup** the only easy way to get a copy off the device. Save it somewhere safe and private, like your own cloud storage.
@@ -37,20 +37,20 @@ The **.zip** also contains a plain text file named `RESTORE.txt`. It explains ho
 
 ## Automatic backups
 
-The **Backup & Export** section can also create a rotating automatic full backup on the device that runs Marinara.
+The **Backup & Export** section can also create a rotating automatic full backup on the device that runs YunYun.
 Turn on **Automatic Backups**, choose **Daily**, **Weekly**, or **Monthly**, and set **Automatic backups kept** from
-1 to 9999. Marinara creates the first backup shortly after you enable it. After each successful run, it keeps the
+1 to 9999. YunYun creates the first backup shortly after you enable it. After each successful run, it keeps the
 newest configured number of automatic archives and deletes the oldest excess automatic archive. This retention limit
 never deletes manual backups or backups saved with **Download Backup**.
 
-Automatic backups are stored inside `backups/` in Marinara's data folder. The newest archive is
+Automatic backups are stored inside `backups/` in YunYun's data folder. The newest archive is
 `marinara-automatic-backup.zip`; retained older automatic archives use timestamped filenames. They use the same
 restorable, streamed archive format as **Download Backup**, including uploaded media and the encryption-key file when
-one exists. Keep a separate copy outside Marinara's data folder if you need protection from a lost disk, erased app
+one exists. Keep a separate copy outside YunYun's data folder if you need protection from a lost disk, erased app
 storage, or a device reset.
 
 Each run needs free space for one more full archive on the disk that holds `backups/`, because the previous archive
-is kept until the new one is complete. If there is not enough room, Marinara skips that run and shows the reason next
+is kept until the new one is complete. If there is not enough room, YunYun skips that run and shows the reason next
 to the Automatic Backups control; it tries again on the next check once space is freed.
 
 ## Export Profile
@@ -67,18 +67,18 @@ to the Automatic Backups control; it tries again on the next check once space is
 
 The dialog offers two formats:
 
-| Format | What it is | Restorable in Marinara? |
+| Format | What it is | Restorable in YunYun? |
 | --- | --- | --- |
-| **Marinara Native** | Keeps Marinara fields, lorebook folders, character and persona data, presets, agents, themes, Personal Extension drafts, and inline media. | Yes |
+| **YunYun Native** | Keeps YunYun fields, lorebook folders, character and persona data, presets, agents, themes, Personal Extension drafts, and inline media. | Yes |
 | **Compatible JSON** | Plain character, persona, and lorebook files for other roleplay tools. | No |
 
-Choose **Marinara Native** to keep a copy you can restore in Marinara later. Smaller profiles download as
+Choose **YunYun Native** to keep a copy you can restore in YunYun later. Smaller profiles download as
 `marinara-profile.json`; larger profiles are offered as a streamed `marinara-profile.zip` whose data is split into
 bounded table files so a large library does not have to fit into one in-memory JSON string.
 
 Personal Extension code is preserved in a native profile, but its enabled state and execution approval are not. Every restored extension arrives disabled and must be reviewed again in **Settings** > **Addons**.
 
-Choose **Compatible JSON** only when you want to move characters or lorebooks to another tool. It downloads a **.zip** of plain files. You cannot restore this file back into Marinara with **Import Profile**.
+Choose **Compatible JSON** only when you want to move characters or lorebooks to another tool. It downloads a **.zip** of plain files. You cannot restore this file back into YunYun with **Import Profile**.
 
 ## Restoring with Import Profile
 
@@ -86,15 +86,15 @@ To put a saved profile or a **Download Backup** archive back, use **Import Profi
 
 1. Open **Settings**.
 2. Go to the **Imports** tab.
-3. Find the **Profile & Marinara** section.
+3. Find the **Profile & YunYun** section.
 4. Click **Import Profile (JSON/ZIP)**.
 5. Pick your file. It can be a `marinara-profile.json`, a `marinara-profile.zip`, or a full **Download Backup** **.zip**.
-6. Marinara scans the file first. The button shows **Scanning Profile...**.
+6. YunYun scans the file first. The button shows **Scanning Profile...**.
 7. A dialog titled **Import Profile** appears. It lists what it found, for example the number of characters and personas.
 8. The dialog warns that importing cannot be undone. Read it, then click **Import** to go on, or **Cancel** to stop.
 9. The import runs and shows **Importing Profile...** with a progress bar.
 
-A recent Marinara profile restores by matching each item's own identity, not its name. So if you import the same profile twice, it updates your existing items in place instead of making duplicates.
+A recent YunYun profile restores by matching each item's own identity, not its name. So if you import the same profile twice, it updates your existing items in place instead of making duplicates.
 
 Very old profile files (from much older versions) do not carry this behavior. Re-importing one of those can create duplicate characters, personas, and lorebooks. If you only ever restore recent exports, you will not hit this.
 
@@ -104,9 +104,9 @@ If a **.zip** is missing some media files, the import still finishes. It shows a
 
 ## After you restore: re-enter your keys
 
-**Export Profile** removes secret values from the profile file. Your saved API keys and webhook links are blank inside it. That makes the profile file safe to store and share. An API key is the password that connects Marinara to an AI provider.
+**Export Profile** removes secret values from the profile file. Your saved API keys and webhook links are blank inside it. That makes the profile file safe to store and share. An API key is the password that connects YunYun to an AI provider.
 
-A **Download Backup** archive is different. Marinara does not remove secrets from it. The backup **.zip** is a raw copy of your data. It holds your saved keys and the secret file that can unlock them. Never share a backup **.zip**. Store it somewhere private.
+A **Download Backup** archive is different. YunYun does not remove secrets from it. The backup **.zip** is a raw copy of your data. It holds your saved keys and the secret file that can unlock them. Never share a backup **.zip**. Store it somewhere private.
 
 **Import Profile** restores from the profile file, even when you pick a backup **.zip**. The archive holds a copy of the profile file inside, and the import reads that copy. So items created by the import come in with blank keys and webhook links.
 
@@ -120,7 +120,7 @@ If you use custom tools that call a webhook link, re-enter that link on each too
 
 A few addresses saved with a chat are also left out of the profile file: the Discord mirror webhook, the DeepLX address, the DeepL key and the Intiface address. This also applies to settings profiles and to the translation defaults for new chats. When you import a profile on another install, enter them again in each chat's **Chat Settings**.
 
-Importing does not erase keys you have already set. If you re-import an old profile, Marinara keeps the live keys and webhook links on items that still exist. A re-import will not blank them.
+Importing does not erase keys you have already set. If you re-import an old profile, YunYun keeps the live keys and webhook links on items that still exist. A re-import will not blank them.
 
 ## The Existing backups list
 
@@ -128,8 +128,8 @@ The **Backup & Export** section can show an **Existing backups** list with a del
 
 ## Related guides
 
-- [Where Marinara Stores Your Data](where-data-is-stored.md)
+- [Where YunYun Stores Your Data](where-data-is-stored.md)
 - [Clearing or Resetting Your Data](clearing-data.md)
-- [Upgrading Marinara Engine](../UPGRADING.md)
+- [Upgrading YunYun Engine](../UPGRADING.md)
 - [Connecting to an AI Provider](../connections/connecting-to-a-provider.md)
 - [Remote Access: Basic Auth and IP Allowlist](../REMOTE_ACCESS.md)

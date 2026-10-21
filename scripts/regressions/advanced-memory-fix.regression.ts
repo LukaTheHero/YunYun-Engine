@@ -150,7 +150,7 @@ try {
   });
   await chats.createMessagesBatch(chat.id, [
     ...MARKERS.flatMap((marker, index) => [
-      { role: "user", content: `${index ? "SCENE_CHANGE " : ""}${marker} Mari opens the ${marker} chapter.` },
+      { role: "user", content: `${index ? "SCENE_CHANGE " : ""}${marker} YunYun opens the ${marker} chapter.` },
       { role: "assistant", characterId: "maukie", content: `Maukie remembers the ${marker} chapter.` },
     ]),
     { role: "user", content: "SCENE_CHANGE The story goes on." },
@@ -321,10 +321,10 @@ try {
     },
   });
   await chats.createMessagesBatch(second.id, [
-    { role: "user", content: "GROWN Mari opens the GROWN chapter." },
+    { role: "user", content: "GROWN YunYun opens the GROWN chapter." },
     { role: "assistant", characterId: "maukie", content: "Maukie remembers the GROWN chapter." },
-    { role: "user", content: "GROWN Mari adds an aside.", extra: { hiddenFromAICharacterIds: ["narrator"] } },
-    { role: "user", content: "SCENE_CHANGE NARROWED Mari opens the NARROWED chapter." },
+    { role: "user", content: "GROWN YunYun adds an aside.", extra: { hiddenFromAICharacterIds: ["narrator"] } },
+    { role: "user", content: "SCENE_CHANGE NARROWED YunYun opens the NARROWED chapter." },
     { role: "assistant", characterId: "maukie", content: "Maukie remembers the NARROWED chapter." },
     { role: "user", content: "SCENE_CHANGE The story goes on." },
   ]);
@@ -371,7 +371,7 @@ try {
     summaryEntries: [createChatSummaryEntry({ content: "A long remembered journey. ".repeat(60), enabled: true })],
   });
   await chats.createMessagesBatch(compact.id, [
-    { role: "user", content: "Mari begins the COMPACT chapter." },
+    { role: "user", content: "YunYun begins the COMPACT chapter." },
     { role: "assistant", characterId: "maukie", content: "Maukie listens to the COMPACT chapter." },
     { role: "user", content: "SCENE_CHANGE The story goes on." },
   ]);

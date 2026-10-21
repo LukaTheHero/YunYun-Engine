@@ -146,7 +146,7 @@ async function createCapabilityRuntimeHost(
     persistence: createCapabilityPersistenceHost(app.db, permissions),
     resources: createCapabilityResourceHost(app.db),
     services: Object.freeze({
-      // Agent runtime hooks and Mari actions are read only by the Engine itself, so a package can't call
+      // Agent runtime hooks and YunYun actions are read only by the Engine itself, so a package can't call
       // another package's hooks through this lookup.
       get: <T>(key: string) =>
         HOST_ONLY_SERVICE_PREFIXES.some((prefix) => key.startsWith(prefix)) ? null : getCapabilityService<T>(key),

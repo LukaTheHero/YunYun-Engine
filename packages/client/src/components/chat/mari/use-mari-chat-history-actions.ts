@@ -97,7 +97,7 @@ export function useMariChatHistoryActions({
         await loadChatHistory();
         return true;
       } catch (error) {
-        console.error("[Professor Mari] Failed to open previous chat", error);
+        console.error("[Professor YunYun] Failed to open previous chat", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotOpenThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -141,7 +141,7 @@ export function useMariChatHistoryActions({
           qc.invalidateQueries({ queryKey: homeFeedKeys.all }),
         ]);
       } catch (error) {
-        console.error("[Professor Mari] Failed to rename chat", error);
+        console.error("[Professor YunYun] Failed to rename chat", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRenameThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -175,7 +175,7 @@ export function useMariChatHistoryActions({
         ]);
         toast.success(localizeUi("ui.chat.homeprofessormarichat.titleCommandRenamed", { name }));
       } catch (error) {
-        console.error("[Professor Mari] Failed to rename chat with /title", error);
+        console.error("[Professor YunYun] Failed to rename chat with /title", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRenameThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -208,7 +208,7 @@ export function useMariChatHistoryActions({
         }
         await loadChatHistory();
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete chat", error);
+        console.error("[Professor YunYun] Failed to delete chat", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatChat"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -268,7 +268,7 @@ export function useMariChatHistoryActions({
       await loadChatHistory();
       if (failedDeletion?.status === "rejected") throw failedDeletion.reason;
     } catch (error) {
-      console.error("[Professor Mari] Failed to delete selected chats", error);
+      console.error("[Professor YunYun] Failed to delete selected chats", error);
       await loadChatHistory().catch(() => undefined);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteSelectedChats"), {
         description: describeProfessorMariError(error),

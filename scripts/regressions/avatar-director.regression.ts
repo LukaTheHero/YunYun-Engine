@@ -1327,7 +1327,7 @@ assert.equal(
   "both agent-result paths keep the result's message",
 );
 
-// Both avatar agents' pages show the mood reader's download (Mari, 2026-10-13); whichever lane fills the setup
+// Both avatar agents' pages show the mood reader's download (YunYun, 2026-10-13); whichever lane fills the setup
 // page must keep this mount.
 const setupSource = readFileSync(
   new URL("../../packages/client/src/features/avatars/setup/AvatarAgentSetup.tsx", import.meta.url),

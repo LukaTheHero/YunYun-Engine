@@ -1,4 +1,4 @@
-// How one of Mari's tool calls reads in her timeline: its title, detail and tone, from the raw call.
+// How one of YunYun's tool calls reads in her timeline: its title, detail and tone, from the raw call.
 import {
   mergeMariActionResults,
   type MariWorkspaceActionResult,
@@ -711,8 +711,8 @@ function getSkillReadPresentation(tool: WorkspaceToolCall): ToolPresentation | n
   const professorMariSkill = normalized.includes("/.mari-workspace/skills/");
   const skillName = skillNameFromPath(path);
   return {
-    eyebrow: professorMariSkill ? "Prof. Mari skill" : "Skill",
-    title: professorMariSkill ? "Loading Professor Mari skill" : `Loading ${skillName}`,
+    eyebrow: professorMariSkill ? "Prof. YunYun skill" : "Skill",
+    title: professorMariSkill ? "Loading Professor YunYun skill" : `Loading ${skillName}`,
     detail: professorMariSkill ? skillName : null,
     tone: "skill",
   };

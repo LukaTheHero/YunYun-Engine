@@ -90,7 +90,7 @@ export function resolveProfessorMariPresentationState({
 }
 
 export function stripProfessorMariSpeakerPrefix(value: string): string {
-  return value.replace(/^\s*(?:Professor\s+Mari|Mari)\s*:\s*/iu, "");
+  return value.replace(/^\s*(?:Professor\s+YunYun|YunYun)\s*:\s*/iu, "");
 }
 
 export function isPersistentProfessorMariContext(context: ProfessorMariAskContext | null | undefined): boolean {
@@ -187,8 +187,8 @@ export function shouldShowProfessorMariConnectionHint({
 }
 
 /**
- * D1: an arrival door (⌘J, the pull, the drag, Home's "Ask Professor Mari") should still show the
- * arrival — appended at the bottom of the transcript — when Mari's own chat already has history,
+ * D1: an arrival door (⌘J, the pull, the drag, Home's "Ask Professor YunYun") should still show the
+ * arrival — appended at the bottom of the transcript — when YunYun's own chat already has history,
  * not only on an empty chat. Gated the same way the empty-state arrival already is: a real chat is
  * selected and its history has actually loaded (never mid-load, never for a different chat).
  */

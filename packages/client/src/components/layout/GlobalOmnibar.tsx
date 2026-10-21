@@ -173,7 +173,7 @@ const OmnibarAside = lazy(() => import("./omnibar/OmnibarAside").then((m) => ({ 
 const PROFESSOR_MARI_DRAFT_KEY = "__home_professor_mari__";
 
 /**
- * K5's last flip, kept past the dialog's unmount so Mari's arrival in Settings can offer the same Undo
+ * K5's last flip, kept past the dialog's unmount so YunYun's arrival in Settings can offer the same Undo
  * as the toast. ponytail: one slot, cleared by either Undo; a flip made in the Settings panel itself
  * is not tracked here.
  */
@@ -205,7 +205,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
   // Read before this dialog commits, so only another dialog (the wizard, a lightbox, a Modal) counts.
   const [overDialog] = useState(() => document.querySelector('[aria-modal="true"]') !== null);
   useLayoutEffect(() => takePullHandoff()?.(dialogRef.current), []);
-  // R33: how far the search field has to fall to land where Mari's composer sits.
+  // R33: how far the search field has to fall to land where YunYun's composer sits.
   // Measured while the list is still up, because by the time it leaves the field
   // is gone. 0 means "do not travel" - reduced motion, or a phone, where the
   // composer is already pinned above the keyboard and there is nowhere to fall.
@@ -213,18 +213,18 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
   const listRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   // The omnibar always reopens on search: closing persists `results` (see the
-  // unmount flush below), so the Mari conversation resumes only on explicit
+  // unmount flush below), so the YunYun conversation resumes only on explicit
   // re-entry. The normalizer deliberately preserves a persisted `mari` pane,
-  // because `GlobalOmnibarHost` hands off an "open Professor Mari" request by
+  // because `GlobalOmnibarHost` hands off an "open Professor YunYun" request by
   // writing that pane and then opening; resetting it on read would kill that.
   const [session, setSession] = useState<CommandCenterSessionState>(() => readCommandCenterSessionState());
   const initialQueryRef = useRef(session.query);
   const mariEnabled = useUIStore((state) => state.commandCenterMariEnabled);
   const { query, filter, activeResultId, mariReturnResultId, mariHandoff } = session;
-  // Mari can be switched off from the omnibar's settings menu, the Settings panel
+  // YunYun can be switched off from the omnibar's settings menu, the Settings panel
   // or a result row, and the first of those is reachable from inside her own pane.
   // Reading the pane through the flag strands nobody: the persisted `mari` pane
-  // resolves to the list until Mari is switched back on. Derived rather than an
+  // resolves to the list until YunYun is switched back on. Derived rather than an
   // effect, so there is no frame where the disabled pane is still on screen.
   const pane = !mariEnabled && session.pane === "mari" ? "results" : session.pane;
   const mariFinished = mariHandoff?.status === "finished";
@@ -261,9 +261,9 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
   // R9: which review the last request targeted, or null for "any" (the generic continue
   // row and the completion action's "Review changes" button, which have no one review in mind).
   const [mariPendingReviewId, setMariPendingReviewId] = useState<string | null>(null);
-  // D1: every arrival-door open (⌘J, the pull, the drag, Home's "Ask Professor Mari") bumps this,
+  // D1: every arrival-door open (⌘J, the pull, the drag, Home's "Ask Professor YunYun") bumps this,
   // so the chat can show the arrival at the bottom of her existing transcript when she already has
-  // history — the door's whole promise ("ask Mari about this") otherwise goes unmet on return visits.
+  // history — the door's whole promise ("ask YunYun about this") otherwise goes unmet on return visits.
   const [mariArrivalAppendRequest, setMariArrivalAppendRequest] = useState(0);
   useEffect(() => {
     const pendingDraft = session.mariHandoff?.draft;
@@ -276,7 +276,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
       current.mariHandoff?.draft ? { ...current, mariHandoff: { ...current.mariHandoff, draft: undefined } } : current,
     );
   }, [session.mariHandoff?.draft]);
-  // A cold "open Mari and send" request (fired while the omnibar itself was
+  // A cold "open YunYun and send" request (fired while the omnibar itself was
   // closed) has nobody around to bump `mariSubmitDraftRequest` directly:
   // `GlobalOmnibarHost` wrote the flag straight into the persisted session
   // before this dialog ever mounted. Pick it up once, then clear it.
@@ -295,7 +295,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
   // the row grows, so nothing above it moves and the list never goes away.
   const [expandedPreviewId, setExpandedPreviewId] = useState<string | null>(null);
   /**
-   * R33: the search field flies down to become Mari's composer, so the surface
+   * R33: the search field flies down to become YunYun's composer, so the surface
    * visibly turns into a conversation instead of being replaced by a different
    * screen.
    *
@@ -427,12 +427,12 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
   });
   const { messageResults, globalMessageScoped, globalMessageSearch, globalMessageResults, lorebookEntryResults } =
     useOmnibarMessageSearch({ activeChatId, deferredQuery, queryScope, lorebooks: lorebooks.data });
-  // F1: an exact message/entry hit should win over the Mari fallback promotion
+  // F1: an exact message/entry hit should win over the YunYun fallback promotion
   // even when nothing else scored well (slice 41). Docs hits are the same
   // kind of late-arriving direct answer (search results that land after their
-  // own debounce), so they count too — "Ask Prof. Mari" must not outrank a direct
+  // own debounce), so they count too — "Ask Prof. YunYun" must not outrank a direct
   // hit from any of these late sources (O4 item 2b / tasks 6 and 13).
-  // R6: a fresh install (no language connection, no local model) gets docs first, not "Ask Prof. Mari".
+  // R6: a fresh install (no language connection, no local model) gets docs first, not "Ask Prof. YunYun".
   // While connections load, keep the old behavior rather than reorder the list when they land.
   const localModelDownloaded = useSidecarStore((state) => state.modelDownloaded);
   const mariHasModel = !connections.data || languageConnections.length > 0 || localModelDownloaded;
@@ -473,7 +473,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
       t,
     ],
   );
-  // Professor Mari's conversations live behind an internal marker, so they are
+  // Professor YunYun's conversations live behind an internal marker, so they are
   // missing from the normal chat list. Searchable here by their auto-title.
   const [mariOpenChatId, setMariOpenChatId] = useState<string | null>(null);
   // Fetched on open rather than on the first keystroke, so the rows are ready
@@ -638,7 +638,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
   }, [allLocalResults, ranking.recent]);
   /**
    * What a bare "add" is answered with. The text search returns nothing for a
-   * verb on its own except the Ask-Mari row, so testing `searchResults.length`
+   * verb on its own except the Ask-YunYun row, so testing `searchResults.length`
    * was never false and the recents fallback never fired: recents lead, then any
    * other attachable, and the builder's own cap decides how many are shown.
    */
@@ -886,7 +886,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     () => expandChoiceRows(presentation.results, expandedChoiceId),
     [expandedChoiceId, presentation.results],
   );
-  // R10: the aside fires on exactly the queries the Ask-Mari row is promoted
+  // R10: the aside fires on exactly the queries the Ask-YunYun row is promoted
   // for. That predicate is already tuned, and its outcome is visible here - the
   // row lands in "professor-suggested" only when it fires - so there is no
   // second heuristic to keep in step.
@@ -901,16 +901,16 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     messageResults.length === 0 &&
     globalMessageResults.length === 0 &&
     lorebookEntryResults.length === 0;
-  // "Same as Mari" is the connection her window uses, so a change there is followed here.
+  // "Same as YunYun" is the connection her window uses, so a change there is followed here.
   const asideConnectionOffer = marisConnectionFor(languageConnections, mariConnectionId);
-  // "Same as Mari" follows her connection at the time of the question; no local model is needed for it.
+  // "Same as YunYun" follows her connection at the time of the question; no local model is needed for it.
   const asideAnswerConnectionId =
     asideConnectionId === MARI_QUICK_CONNECTION
       ? (asideConnectionOffer?.id ?? LOCAL_SIDECAR_CONNECTION_ID)
       : asideConnectionId;
   const asideConnectionName =
     languageConnections.find((connection) => connection.id === asideAnswerConnectionId)?.name ?? null;
-  // No local model: the aside offers Mari's own connection in one tap instead of failing on every question.
+  // No local model: the aside offers YunYun's own connection in one tap instead of failing on every question.
   // The real surface the user is on, not always "command-center": an open
   // editor or the active chat is a more honest (and more useful) context for
   // the aside's unasked call than the omnibar shell it happens to appear in.
@@ -956,11 +956,11 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     () => (asideState.status === "complete" ? matchOmnibarCapabilityAgentPackageIds(asideState.query) : []),
     [asideState.query, asideState.status],
   );
-  // Quick and Mari both own the whole dialog. Leaving the search input mounted
+  // Quick and YunYun both own the whole dialog. Leaving the search input mounted
   // under them let one keystroke re-enter `results` and abort a running answer.
   const mariSurface = pane === "mari";
   // K6: fire once per open, the first time the results pane actually paints
-  // (opening straight into Mari's pane has no results list to time).
+  // (opening straight into YunYun's pane has no results list to time).
   useLayoutEffect(() => {
     if (mariSurface || firstResultPaintMarked.current) return;
     firstResultPaintMarked.current = true;
@@ -1020,15 +1020,15 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
   // effect can flush it on close without losing the final edit.
   const sessionRef = useRef(session);
   sessionRef.current = session;
-  // Set when the typed text went to Mari; the next typed character clears it.
+  // Set when the typed text went to YunYun; the next typed character clears it.
   const handedOffQueryRef = useRef(false);
   useEffect(() => {
     const timer = window.setTimeout(() => writeCommandCenterSessionState(session), 250);
     return () => window.clearTimeout(timer);
   }, [session]);
-  // Closing always persists the list. Mari is a place you go, not a place you
+  // Closing always persists the list. YunYun is a place you go, not a place you
   // are returned to, and the pane is the one field that must not survive.
-  // A question handed to Mari is hers now, so closing after a hand-off clears it.
+  // A question handed to YunYun is hers now, so closing after a hand-off clears it.
   useEffect(
     () => () => {
       const { pane: closedPane, query: closedQuery } = sessionRef.current;
@@ -1065,10 +1065,10 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     reconciledQueryRef.current = deferredQuery;
     if (queryChanged) autoSelectionRef.current = true;
     // F1: late-arriving message/entry/docs hits reorder the list after their own
-    // debounce, demoting the promoted "Ask Prof. Mari" row below the real hit. If the
+    // debounce, demoting the promoted "Ask Prof. YunYun" row below the real hit. If the
     // user has not moved the selection since this query started, the selection
     // must follow that new top row too, not just on the keystroke that changed
-    // the query - otherwise Enter still lands on the no-longer-first Mari row.
+    // the query - otherwise Enter still lands on the no-longer-first YunYun row.
     const topCandidateId = firstCurrentWorkId ?? results[0]?.id ?? null;
     const next = reconcileActiveResultId(
       queryChanged
@@ -1106,9 +1106,9 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     return () => cancelAnimationFrame(frame);
   }, [activeResultId, expandedPreviewId, pane]);
 
-  // Returning from Mari puts focus back on the row that opened her, so the
+  // Returning from YunYun puts focus back on the row that opened her, so the
   // keyboard position survives the round trip; the input is the fallback.
-  // The search header comes back after the Mari header's exit animation, so wait (a few frames at
+  // The search header comes back after the YunYun header's exit animation, so wait (a few frames at
   // most) until the row or the search field is there again.
   const [mariReturnFocus, setMariReturnFocus] = useState(0);
   useEffect(() => {
@@ -1169,7 +1169,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     if (context) {
       setMariContext(context);
       // The handoff lives in session state, not component state, so a task that
-      // Mari finishes while the omnibar is shut is still waiting on reopen.
+      // YunYun finishes while the omnibar is shut is still waiting on reopen.
       setSessionValue("mariHandoff", {
         status: "pending",
         context,
@@ -1182,8 +1182,8 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     setPane("mari");
   };
   const enterRequestedMariPane = useEffectEvent((request: ProfessorMariOpenDetail) => {
-    // M9: a door that brings nothing (the pull, Home's "Ask Professor Mari", ⌘J) arrives with this
-    // screen's context, exactly like ⌘K's own Ask Mari with an empty query. A left-over query is not sent along.
+    // M9: a door that brings nothing (the pull, Home's "Ask Professor YunYun", ⌘J) arrives with this
+    // screen's context, exactly like ⌘K's own Ask YunYun with an empty query. A left-over query is not sent along.
     // The top-bar pill resumes her current thread like the omnibar's continue row: no routing, reviews in view.
     if (request.resume) {
       openProfessorMari(null, {
@@ -1196,12 +1196,12 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
       return;
     }
     // A scope prefix like "faq:" is omnibar search syntax, not part of the
-    // message text — strip it before it lands in Mari's composer.
+    // message text — strip it before it lands in YunYun's composer.
     const rawDraft = request.draft ?? request.context?.query ?? "";
     enterMariPane(request.context, request.submitDraft ?? false, parseOmnibarScope(rawDraft).query);
   });
   // A cold door (the omnibar was shut): the host left its request for this dialog to pick up. Read
-  // before anything renders, because the Mari chat below consumes open requests in its own (earlier,
+  // before anything renders, because the YunYun chat below consumes open requests in its own (earlier,
   // child-first) mount effect.
   const [coldMariRequest] = useState(() => {
     const pending = peekProfessorMariOpenRequest();
@@ -1247,7 +1247,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     const next = recordCommandUse(ranking, id);
     setRanking(next);
     writeCommandRankingState(next);
-    // O2: a no-op for Mari's row, enforced inside recordOmnibarFrecencyUse.
+    // O2: a no-op for YunYun's row, enforced inside recordOmnibarFrecencyUse.
     setFrecencyEntries(recordOmnibarFrecencyUse(id, omnibarContext.surface));
   };
   const runSystemAction = (result: OmnibarResult) => {
@@ -1318,7 +1318,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
         // The answer grew inside this row, so continuing carries it along (G3). A streaming answer is not carried.
         escalateAside();
       } else {
-        // The row reads "Ask Mari: <your query>", so it sends. Enter always did;
+        // The row reads "Ask YunYun: <your query>", so it sends. Enter always did;
         // click used to open with the text unsent, which no title promised.
         openProfessorMari(null, { submitDraft: true });
       }
@@ -1490,7 +1490,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   };
-  // M18: ⌘J asks Mari about this screen; with her already open it goes back to the search. The host
+  // M18: ⌘J asks YunYun about this screen; with her already open it goes back to the search. The host
   // opens the omnibar for it while it is shut; from here on this listener owns the shortcut.
   const toggleMariPane = useEffectEvent(() => {
     if (pane === "mari") leaveDetail();
@@ -1500,7 +1500,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || !isAskMariShortcut(event)) return;
       if (!useUIStore.getState().commandCenterMariEnabled) return;
-      // A dialog opened above the omnibar (a confirm from Mari, say) keeps the keyboard, as with ⌘K.
+      // A dialog opened above the omnibar (a confirm from YunYun, say) keeps the keyboard, as with ⌘K.
       const dialog = event.target instanceof Element ? event.target.closest('[aria-modal="true"]') : null;
       if (dialog && !dialog.closest('[data-component="GlobalOmnibar"]')) return;
       event.preventDefault();
@@ -1523,9 +1523,9 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
   const fixRowId = mariFixRowId(lastAppError);
-  /** Ranked rows and plain context rows both feed the Mari handoff. */
+  /** Ranked rows and plain context rows both feed the YunYun handoff. */
   type OmnibarAskFocus = Pick<OmnibarResult, "id" | "title" | "category"> | null;
-  /** Quick and full Mari hand over the same context, so they read the same surroundings. */
+  /** Quick and full YunYun hand over the same context, so they read the same surroundings. */
   const buildAskContext = (
     message: string,
     focusResult: OmnibarAskFocus,
@@ -1546,13 +1546,13 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
       field: gameSetupStep ?? activeEditorField?.label,
       fieldId: gameSetupStep ? undefined : activeEditorField?.id,
       // Only the deliberate "fix this" handoff actually needs lastAppError's text; every other
-      // Mari call (R22) must not carry it along just because an unrelated error happens to be live.
+      // YunYun call (R22) must not carry it along just because an unrelated error happens to be live.
       error: fix && lastAppError ? { message: lastAppError.message, code: lastAppError.code } : undefined,
       source,
       asideAnswer,
     });
   };
-  /** Both Mari routes remember the row they left, so returning restores focus. */
+  /** Both YunYun routes remember the row they left, so returning restores focus. */
   const rememberMariReturn = (focusResult: OmnibarAskFocus) => {
     const returnResultId = focusResult?.id ?? activeResultId;
     mariReturnResultIdRef.current = returnResultId;
@@ -1565,7 +1565,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     options: { reviewPending?: boolean | string; submitDraft?: boolean; arrival?: boolean } = {},
   ) => {
     // A scope prefix like "faq:" is omnibar search syntax, not part of the
-    // message text — strip it before it lands in Mari's composer. M9: an arrival
+    // message text — strip it before it lands in YunYun's composer. M9: an arrival
     // brings no text, and the open chat travels as its own facet, not also as a
     // "Current chat" resource.
     const draft = options.arrival ? "" : parseOmnibarScope(query.trim()).query;
@@ -1577,7 +1577,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     const focusResult =
       selectedResult ?? mariFallbackFocus(contextResults, options.arrival ? `chat:${activeChat?.id}` : null);
     rememberMariReturn(focusResult);
-    // The focused-field row is about the open editor, so Mari gets that resource beside the field.
+    // The focused-field row is about the open editor, so YunYun gets that resource beside the field.
     const askFocus =
       focusResult?.id === "suggestion:edit-focused-field"
         ? (contextResults.find((row) => row.id === omnibarContext.openResource?.resultId) ?? focusResult)
@@ -1591,8 +1591,8 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     if (options.arrival || (fix && !options.submitDraft)) setMariArrivalAppendRequest((current) => current + 1);
   };
   /**
-   * One rule for every "take this to Mari" door: typed text that asks for something is sent.
-   * The Ask-Mari row's title is the query itself, so it always sends; the continue row resumes
+   * One rule for every "take this to YunYun" door: typed text that asks for something is sent.
+   * The Ask-YunYun row's title is the query itself, so it always sends; the continue row resumes
    * work that is already running, so it never does.
    */
   const mariSends = (result: OmnibarResult | null) =>
@@ -1601,15 +1601,15 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     openProfessorMari(result, { submitDraft: mariSends(result) });
   /**
    * R25: `⌘↵` with the aside answering takes its query and answer into the full agent.
-   * From the follow-up line, the question typed there is what Mari is asked.
+   * From the follow-up line, the question typed there is what YunYun is asked.
    */
   const escalateAside = async (question?: string) => {
-    // A failed answer still hands its question over: "Continue with Prof. Mari" is the way forward from an error.
+    // A failed answer still hands its question over: "Continue with Prof. YunYun" is the way forward from an error.
     // A streaming answer is not handed over: it would send only the words so far.
     if (!asideState.query || asideState.status === "streaming" || asideState.status === "thinking") return;
     // Starting a new chat resets her workspace, which would stop a run in progress; her own "+" waits too.
     if (mariWorkspaceStatus.data?.active) {
-      toast.info(t("omnibar.aside.escalateBusy", "Professor Mari is still working. Continue when she finishes."));
+      toast.info(t("omnibar.aside.escalateBusy", "Professor YunYun is still working. Continue when she finishes."));
       return;
     }
     const draft = question ?? asideState.query;
@@ -1617,18 +1617,18 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
     markTry("mari");
     const focusResult = mariFallbackFocus(contextResults);
     rememberMariReturn(focusResult);
-    // The hand-off starts a new Mari chat named after the quick question, so the open chat is not mixed in.
+    // The hand-off starts a new YunYun chat named after the quick question, so the open chat is not mixed in.
     try {
       const chat = await api.post<{ id: string }>(
         `/chats/internal/professor-mari/restart?${new URLSearchParams({ name: asideState.query })}`,
       );
-      // UX-20: her pane opens it. The app's active chat is the page behind her; a Mari id there 404'd on
+      // UX-20: her pane opens it. The app's active chat is the page behind her; a YunYun id there 404'd on
       // /touch and moved the page off the chat the question came from.
       setMariOpenChatId(chat.id);
       queryClient.setQueryData(chatKeys.detail(chat.id), chat);
       await api.post("/professor-mari/workspace/reset", { clearHistory: true });
     } catch {
-      toast.error(t("omnibar.aside.escalateFailed", "Professor Mari could not start a new chat. Try again."));
+      toast.error(t("omnibar.aside.escalateFailed", "Professor YunYun could not start a new chat. Try again."));
       return;
     }
     enterMariPane(
@@ -1643,7 +1643,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
       true,
     );
   };
-  // A handed-off task is "finished" once Mari has been seen working and then
+  // A handed-off task is "finished" once YunYun has been seen working and then
   // stops. Advancing the persisted status rather than detecting the edge in a ref
   // means the transition still lands when it happens between two opens.
   const mariActive = mariWorkspaceStatus.data?.active ?? false;
@@ -1862,7 +1862,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
         onUseConnectionOffer={setAsideConnectionId}
         onRetry={asideState.retry}
         onAnswerAgain={asideState.answerAgain}
-        // One quick follow-up; the question after it goes to full Mari (G4).
+        // One quick follow-up; the question after it goes to full YunYun (G4).
         onFollowUp={(question) => escalateAside(question)}
         links={asideLinks.map((row) => {
           const visual = resolveOmnibarRowVisual(row, rowVisualContext);
@@ -1990,7 +1990,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
           className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-44 bg-[radial-gradient(120%_100%_at_12%_0%,oklch(0.72_0.16_255/0.12),transparent_60%),radial-gradient(120%_100%_at_88%_0%,oklch(0.73_0.21_345/0.11),transparent_60%)]"
         />
         <h2 id="global-omnibar-title" className="sr-only">
-          {mariSurface ? t("commandCenter.workTitle", "Professor Mari") : t("omnibar.title", "Search Marinara")}
+          {mariSurface ? t("commandCenter.workTitle", "Professor YunYun") : t("omnibar.title", "Search YunYun")}
         </h2>
         <header className="relative z-50 shrink-0 overflow-visible pt-[env(safe-area-inset-top)]">
           <div
@@ -2011,7 +2011,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
                     ? t("commandCenter.backToFind", "Back to search")
                     : t("commandCenter.backToResults", "Back to results")
                 }
-                // M18: ⌘J goes back to the search from Mari, so the button says so.
+                // M18: ⌘J goes back to the search from YunYun, so the button says so.
                 title={
                   mariSurface
                     ? t("commandCenter.keyboard.backToSearch", "Back to search ({{mod}}+J)", {
@@ -2045,7 +2045,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
                   {/* Row 1: her name and live status, no portrait (she is in the transcript). The status text
                       comes from her chat through `mariStatusSlot`; row 2 below holds the destinations. */}
                   <span className="truncate text-sm font-semibold leading-tight text-[var(--foreground)]">
-                    {t("omnibar.categories.professor", "Professor Mari")}
+                    {t("omnibar.categories.professor", "Professor YunYun")}
                   </span>
                   <span
                     ref={setMariStatusSlot}
@@ -2083,7 +2083,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    aria-label={t("omnibar.inputLabel", "Search Marinara")}
+                    aria-label={t("omnibar.inputLabel", "Search YunYun")}
                     // Focus stays in the field while the arrows move the selection,
                     // so point screen readers at the selected row.
                     aria-controls={listVisible ? "global-omnibar-results" : undefined}
@@ -2094,7 +2094,7 @@ export function GlobalOmnibarDialog({ onClose }: { onClose: () => void }) {
                         ? // Slice 78: the greeting is cut off at 390 px ("Type to search,"), so a phone gets the short form.
                           window.matchMedia("(min-width: 640px)").matches
                           ? idleGreeting
-                          : t("commandCenter.placeholderIdleShort", "Search or ask Prof. Mari")
+                          : t("commandCenter.placeholderIdleShort", "Search or ask Prof. YunYun")
                         : // ponytail: read once per open (the dialog remounts each time); a resize
                           // while open keeps the old text. Use a shared media hook if one lands.
                           window.matchMedia("(min-width: 640px)").matches

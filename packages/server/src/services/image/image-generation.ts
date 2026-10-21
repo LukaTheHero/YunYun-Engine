@@ -765,7 +765,7 @@ function imageFetch(url: string | URL, init?: RequestInit, options: ImageFetchOp
     // No `cause`: route error formatters append cause.message and would print the limit twice.
     if (err instanceof Error && err.message.startsWith("Outbound response exceeded")) {
       throw new Error(
-        `${err.message}. Raise IMAGE_GEN_MAX_RESPONSE_BYTES in .env and restart Marinara to accept larger images.`,
+        `${err.message}. Raise IMAGE_GEN_MAX_RESPONSE_BYTES in .env and restart YunYun to accept larger images.`,
       );
     }
     throw err;
@@ -2743,9 +2743,9 @@ export const PROVIDER_BUSY_RETRY_DELAYS_MS = [2_000, 4_000] as const;
 
 /**
  * NovelAI answers 429 while another generation on the account is still running
- * ("Concurrent generation is locked"), including ones started outside Marinara.
+ * ("Concurrent generation is locked"), including ones started outside YunYun.
  * Wait and retry a couple of times instead of failing the image; the caller
- * still holds its provider lane, so nothing else in Marinara jumps ahead.
+ * still holds its provider lane, so nothing else in YunYun jumps ahead.
  */
 export async function retryOnProviderBusy(
   send: () => Promise<Response>,

@@ -30,7 +30,7 @@ installCsrfFetchShim();
 // 404s after an update) instead of surfacing "Failed to fetch dynamically
 // imported module" to the user.
 registerPreloadErrorRecovery();
-// M16 tier 1: Home's first-paint Mari sprites start with the page instead of after the lazy Home
+// M16 tier 1: Home's first-paint YunYun sprites start with the page instead of after the lazy Home
 // chunk renders. Selected pack only. Kept referenced, so the <img> tags reuse these images instead of
 // fetching (or revalidating) them again.
 const firstPaintMariImages = mariAssetUrls(shownMariAppearancePack(useUIStore.getState()), 1).map((url) =>

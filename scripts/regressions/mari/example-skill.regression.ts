@@ -1,4 +1,4 @@
-// The example Professor Mari skill is seeded once, disabled, and never comes back after a delete.
+// The example Professor YunYun skill is seeded once, disabled, and never comes back after a delete.
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

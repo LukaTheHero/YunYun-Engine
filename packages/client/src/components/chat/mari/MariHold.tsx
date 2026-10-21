@@ -5,7 +5,7 @@ import { FIGURE_HEIGHT, MariHoldFigure } from "./MariHoldFigure";
 import "./mari-hold.css";
 
 /**
- * Slice 85: wraps one Mari art slot. A tap keeps the slot's own action; a press that holds lifts her
+ * Slice 85: wraps one YunYun art slot. A tap keeps the slot's own action; a press that holds lifts her
  * off the slot, and she springs back on release. The wrapper is `display: contents`, so the layout
  * stays as it was.
  */

@@ -1,4 +1,4 @@
-// Timing for Professor Mari's live work card. Kept out of the component so the arithmetic that
+// Timing for Professor YunYun's live work card. Kept out of the component so the arithmetic that
 // decides what the user reads as "how long this took" has one runnable check.
 
 /** The step timestamps the card can see. Live steps carry `startedAt`; replayed ones only a pair. */

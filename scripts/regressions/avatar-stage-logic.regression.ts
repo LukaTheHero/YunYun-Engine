@@ -286,7 +286,7 @@ const characterMap = new Map([
   ["c2", { name: "Bo" }],
 ]);
 assert.deepEqual(
-  chatAvatarParticipants(["c1", "missing", "c2"], characterMap, { id: "p1", name: "Mari" }).map((participant) => [
+  chatAvatarParticipants(["c1", "missing", "c2"], characterMap, { id: "p1", name: "YunYun" }).map((participant) => [
     participant.owner.ownerType,
     participant.owner.ownerId,
     participant.name,
@@ -294,7 +294,7 @@ assert.deepEqual(
   [
     ["character", "c1", "Ava"],
     ["character", "c2", "Bo"],
-    ["persona", "p1", "Mari"],
+    ["persona", "p1", "YunYun"],
   ],
 );
 assert.equal(

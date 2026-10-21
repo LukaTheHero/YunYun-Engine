@@ -446,7 +446,7 @@ test.describe("phone bubbles", () => {
                   expect(paint.innerClip).toBe(expected.innerClip);
                   expect(paint.border).toContain("linear-gradient");
                   expect(paint.background).toContain("linear-gradient");
-                  // Mari's and Dottore's thin inner ring survives custom border paint on every shape (#7244):
+                  // YunYun's and Dottore's thin inner ring survives custom border paint on every shape (#7244):
                   // a gap in the background's first stop, then a ring in the border's first stop.
                   expect(paint.ring).toBe(
                     preset === "default"

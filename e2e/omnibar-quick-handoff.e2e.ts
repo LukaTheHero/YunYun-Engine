@@ -9,8 +9,8 @@ const APP_VERSION = (
 ).version;
 
 /**
- * Slice 84: "Continue with Prof. Mari" on a quick answer starts a new Mari chat named after the question,
- * and the open Mari chat is left as it was.
+ * Slice 84: "Continue with Prof. YunYun" on a quick answer starts a new YunYun chat named after the question,
+ * and the open YunYun chat is left as it was.
  */
 
 const QUESTION = "why are my replies so short";
@@ -115,7 +115,7 @@ async function prepareClient(page: Page, connectionId: string) {
 
 test.beforeEach(async ({ request }) => {
   await acquireMariThreadLock();
-  // The fixture provider answers Professor Mari in the Classic JSON-frame protocol.
+  // The fixture provider answers Professor YunYun in the Classic JSON-frame protocol.
   expect((await request.put("/api/professor-mari/workspace/runtime", { data: { runtime: "classic" } })).ok()).toBe(
     true,
   );
@@ -181,7 +181,7 @@ test("quick answer streaming keeps omnibar updates within the browser frame budg
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+k");
     const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-    await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill(QUESTION);
+    await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill(QUESTION);
     const aside = omnibar.locator('[data-component="GlobalOmnibar.Aside"]');
     await expect(aside).toContainText("Raise", { timeout: 15_000 });
     const instrumentation = await page.evaluate(() => ({
@@ -243,9 +243,9 @@ test("quick answer streaming keeps omnibar updates within the browser frame budg
     console.log("Selected-row hover renders", afterHover - beforeHover);
     expect.soft(afterHover - beforeHover).toBeLessThanOrEqual(2);
     await askRow.click();
-    await expect(page.locator('[data-component="GlobalOmnibar.Mari"]')).toBeVisible();
-    await expect(page.locator('[data-component="GlobalOmnibar.Mari"]')).toContainText("Raise", { timeout: 20_000 });
-    await expect(page.locator('[data-component="GlobalOmnibar.Mari"]')).toContainText(
+    await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]')).toBeVisible();
+    await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]')).toContainText("Raise", { timeout: 20_000 });
+    await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]')).toContainText(
       "I can help with your reply length.",
     );
     for (const width of [390, 768, 1440]) {
@@ -253,12 +253,12 @@ test("quick answer streaming keeps omnibar updates within the browser frame budg
       await page.screenshot({ path: testInfo.outputPath(`quick-row-${width}.png`) });
     }
     await page.keyboard.press("Control+j");
-    await expect(omnibar.getByRole("searchbox", { name: "Search Marinara" })).toBeVisible();
+    await expect(omnibar.getByRole("searchbox", { name: "Search YunYun" })).toBeVisible();
     const cancelledBeforeRetry = fixture.cancelledStreams;
     await aside.getByRole("button", { name: "Answer again" }).click();
     await expect(aside).toContainText("Raise");
     await expect(aside.getByRole("button", { name: "Answer again", includeHidden: true })).toBeDisabled();
-    await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill("dark mode");
+    await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill("dark mode");
     await expect(aside).toHaveCount(0);
     await page.evaluate(
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
@@ -279,7 +279,7 @@ test.afterEach(async ({ request }) => {
   releaseMariThreadLock();
 });
 
-test("Continue with Mari on a quick answer opens a new Mari chat named after the question", async ({
+test("Continue with YunYun on a quick answer opens a new YunYun chat named after the question", async ({
   page,
   request,
 }, testInfo) => {
@@ -310,12 +310,12 @@ test("Continue with Mari on a quick answer opens a new Mari chat named after the
     await page.keyboard.press("Control+k");
 
     const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-    await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill(QUESTION);
+    await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill(QUESTION);
     const aside = omnibar.locator('[data-component="GlobalOmnibar.Aside"]');
     await expect(aside).toContainText("Raise", { timeout: 15_000 });
-    await aside.getByRole("button", { name: "Continue with Prof. Mari" }).click();
+    await aside.getByRole("button", { name: "Continue with Prof. YunYun" }).click();
 
-    await expect(page.locator('[data-component="GlobalOmnibar.Mari"]')).toBeVisible();
+    await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]')).toBeVisible();
     const chats = (await (await request.get("/api/chats/internal/professor-mari/chats")).json()) as Array<{
       name: string;
     }>;

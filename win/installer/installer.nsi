@@ -1,5 +1,5 @@
 ; ──────────────────────────────────────────────
-; Marinara Engine — Windows Installer
+; YunYun Engine — Windows Installer
 ; Built in CI via NSIS (makensis)
 ; ──────────────────────────────────────────────
 
@@ -14,7 +14,7 @@
 ${StrTrimNewLines}
 
 ; ── App metadata ──
-!define APP_NAME "Marinara Engine"
+!define APP_NAME "YunYun Engine"
 !define APP_VERSION "2.5.1"
 !define APP_PUBLISHER "Pasta-Devs"
 !define APP_URL "https://github.com/Pasta-Devs/Marinara-Engine"
@@ -76,7 +76,7 @@ Click Next to continue."
 ; ── Directory page ──
 !define MUI_DIRECTORYPAGE_TEXT_TOP "\
 Choose where to install ${APP_NAME}. About 2.5 GB of free space is recommended.$\r$\n$\r$\n\
-Upgrading? Choose the Marinara Engine folder that already has your data. Before reinstalling, back up packages\server\data, or the root data folder for older installs.$\r$\n$\r$\n\
+Upgrading? Choose the YunYun Engine folder that already has your data. Before reinstalling, back up packages\server\data, or the root data folder for older installs.$\r$\n$\r$\n\
 The installer will download app files and install dependencies."
 
 ; ── Finish page ──
@@ -192,7 +192,7 @@ Function WarnSameDirectoryReinstall
   MessageBox MB_YESNO|MB_ICONEXCLAMATION "\
 You are reinstalling ${APP_NAME} into the same folder:$\r$\n\
 $INSTDIR$\r$\n$\r$\n\
-Before continuing, copy the Marinara data folder(s) below to a backup location outside this install folder if you want to keep chats, characters, images, and settings:$\r$\n\
+Before continuing, copy the YunYun data folder(s) below to a backup location outside this install folder if you want to keep chats, characters, images, and settings:$\r$\n\
 $USER_DATA_PATHS$\r$\n$\r$\n\
 If a data folder contains marinara-engine.db, copy it together with marinara-engine.db-wal and marinara-engine.db-shm if present.$\r$\n$\r$\n\
 Continue anyway?" IDYES continueReinstallWarning

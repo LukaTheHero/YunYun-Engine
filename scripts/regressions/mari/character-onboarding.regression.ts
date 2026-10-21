@@ -1,4 +1,4 @@
-// #7760: Professor Mari reads and writes a card's interactive onboarding through
+// #7760: Professor YunYun reads and writes a card's interactive onboarding through
 // `character.onboarding.get|update`. Drives the REAL MariDbService against a file-native store:
 // a valid block is stored with ids and option values filled and other extensions untouched; a
 // partial update keeps omitted keys; broken blocks (reserved, unknown or bad names, unknown keys,
@@ -149,7 +149,7 @@ try {
     }
     assert.equal(JSON.stringify((await readData()).extensions?.onboarding), before, "refusals store nothing");
 
-    // An unused question saves, with a notice the review card and Mari both see.
+    // An unused question saves, with a notice the review card and YunYun both see.
     const unused = await update({
       variables: [...(data.extensions?.onboarding?.variables ?? []), { variableName: "hobby", question: "Hobby?" }],
       cardVariables: [{ variableName: "title", question: "Her title for you?" }],
@@ -162,10 +162,10 @@ try {
       /Character question "title".*character\.update/,
       "an unused card question says how to fix it",
     );
-    // What Mari reads: the compact result's message must point at the warnings, not just say "applied"
+    // What YunYun reads: the compact result's message must point at the warnings, not just say "applied"
     // (live run, ds4.1 flash: she reported done with an unused character question).
     const compact = compactMutationResult(unused) as { message?: string };
-    assert.match(compact.message ?? "", /saved with notices in validation\.notices/, "Mari is told about the warnings");
+    assert.match(compact.message ?? "", /saved with notices in validation\.notices/, "YunYun is told about the warnings");
     assert.doesNotMatch(
       (compactMutationResult(saved) as { message?: string }).message ?? "",
       /validation.notices/,
@@ -207,4 +207,4 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log("Mari character onboarding regression passed.");
+console.log("YunYun character onboarding regression passed.");

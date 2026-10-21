@@ -293,7 +293,7 @@ export function ConversationSoundSetting() {
         <span className="text-xs font-medium">{localize("Background Notifications")}</span>
         <HelpTooltip
           text={localize(
-            "Show a private operating-system notification when an autonomous Conversation message arrives while Marinara is not focused. Message content is hidden.",
+            "Show a private operating-system notification when an autonomous Conversation message arrives while YunYun is not focused. Message content is hidden.",
           )}
         />
       </div>
@@ -333,7 +333,7 @@ export function ConversationSoundSetting() {
         <span className="text-xs font-medium">{localize("Generation Completion Notifications")}</span>
         <HelpTooltip
           text={localize(
-            "Show a private operating-system notification when a reply you started manually finishes in Conversation, Roleplay, or Game mode while Marinara is not focused. Message content is hidden.",
+            "Show a private operating-system notification when a reply you started manually finishes in Conversation, Roleplay, or Game mode while YunYun is not focused. Message content is hidden.",
           )}
         />
       </div>

@@ -200,4 +200,4 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log("Mari chat.updateMessage regressions passed.");
+console.log("YunYun chat.updateMessage regressions passed.");

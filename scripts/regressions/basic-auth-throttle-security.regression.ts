@@ -61,7 +61,7 @@ app.addHook("onRequest", hostValidationHook);
 app.addHook("onRequest", ipAllowlistHook);
 app.addHook("onRequest", rateLimitHook);
 app.addHook("onRequest", basicAuthHook);
-app.get("/", async () => "<!doctype html><title>Marinara</title>");
+app.get("/", async () => "<!doctype html><title>YunYun</title>");
 app.get("/api/chats", async () => [{ id: "private-chat" }]);
 app.get("/api/health", async (request: FastifyRequest) => ({
   status: "ok",

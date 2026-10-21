@@ -68,7 +68,7 @@ test("Search still scrolls by touch after a tapped result opened a record", asyn
     await page.goto("/");
     const touch = touchInput(await page.context().newCDPSession(page));
     const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-    const search = omnibar.getByRole("searchbox", { name: "Search Marinara" });
+    const search = omnibar.getByRole("searchbox", { name: "Search YunYun" });
 
     await openByPull(page, touch);
     await search.fill("touch scroll");

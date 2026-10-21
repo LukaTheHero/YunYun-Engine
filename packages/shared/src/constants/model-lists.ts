@@ -60,7 +60,7 @@ export function capabilityModelId(model: string): string {
  * Proxy ids that make the proxy turn thinking on whatever the request says: new-api's `-thinking`,
  * `-thinking-<budget>`, effort tails (`-high`) and `@thinking:<on|budget>`, AiHubMix `-think`, CLIProxyAPI
  * `(<level|budget>)`. Treat them like a thinking request: no sampling and no forced tool choice, which Anthropic and
- * GPT-5 reject while reasoning runs. Thinking settings Marinara sends still apply where the proxy keeps them.
+ * GPT-5 reject while reasoning runs. Thinking settings YunYun sends still apply where the proxy keeps them.
  */
 export function impliesProxyThinking(model: string): boolean {
   let raw = model.trim().toLowerCase();

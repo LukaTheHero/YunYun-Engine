@@ -15,9 +15,9 @@ const APP_VERSION = (
  * while she is still working (slice 36 folded them away), and an answer without steps still ends on a
  * small done check.
  */
-// F11: like the mari-arrival specs, this reads "the most recent Mari thread", so a thread left over
+// F11: like the mari-arrival specs, this reads "the most recent YunYun thread", so a thread left over
 // from another spec changes which thread the run lands in. The lock keeps this file from running at
-// the same time as any other locked Mari-thread spec; the cleanup then starts from a clean slate.
+// the same time as any other locked YunYun-thread spec; the cleanup then starts from a clean slate.
 test.beforeEach(async ({ request }) => {
   await acquireMariThreadLock();
   const existing = (await (await request.get("/api/chats/internal/professor-mari/chats")).json()) as Array<{
@@ -34,7 +34,7 @@ test.afterEach(() => {
   releaseMariThreadLock();
 });
 
-test("done marks show on each step while Mari is still working", async ({ page, request }, testInfo) => {
+test("done marks show on each step while YunYun is still working", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("desktop"), "One live run on desktop is enough proof.");
   test.setTimeout(90_000);
 
@@ -110,7 +110,7 @@ test("done marks show on each step while Mari is still working", async ({ page, 
       .first()
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     await expect(mariPane).toBeVisible();
     await mariPane.locator("textarea:visible").fill("What do I have in my library?");
     await page.keyboard.press("Control+Enter");

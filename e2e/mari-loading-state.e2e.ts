@@ -9,7 +9,7 @@ const APP_VERSION = (
 const PROOF_DIR = fileURLToPath(new URL("../.tmp/omnibar-ux/round9/slice-83/", import.meta.url));
 
 /**
- * Slice 83 (item 7): while Professor Mari's chat loads she shows a calm skeleton: her sprite, soft rows,
+ * Slice 83 (item 7): while Professor YunYun's chat loads she shows a calm skeleton: her sprite, soft rows,
  * and nothing before ~150 ms. The probe holds her chat request open so the loading state stays on screen.
  */
 async function openMariWithSlowLoad(page: Page, theme: "dark" | "light", width: number, height: number) {
@@ -41,7 +41,7 @@ for (const [theme, width, height] of [
   ["dark", 390, 844],
   ["light", 390, 844],
 ] as const) {
-  test(`Mari's loading state is a calm skeleton after a short delay (${theme}, ${width})`, async ({ page }) => {
+  test(`YunYun's loading state is a calm skeleton after a short delay (${theme}, ${width})`, async ({ page }) => {
     await openMariWithSlowLoad(page, theme, width, height);
     const loading = page.locator(".mari-loading");
     await expect(loading).toBeVisible({ timeout: 5_000 });

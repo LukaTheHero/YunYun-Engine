@@ -5,7 +5,7 @@ import { ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "../../lib/utils";
 
 /**
- * Small layout primitives shared by Professor Mari's workspace. Turns use
+ * Small layout primitives shared by Professor YunYun's workspace. Turns use
  * `TranscriptRow`, controls use `.mari-chrome-control`, and a risky prompt
  * is a `MariCard`.
  *
@@ -126,7 +126,7 @@ export function MariList({
   );
 }
 
-/** What a tap on a row does: `open` opens the thing now (›), `ask` asks Mari (a gold ✦). */
+/** What a tap on a row does: `open` opens the thing now (›), `ask` asks YunYun (a gold ✦). */
 export type MariRowTrail = "open" | "ask";
 
 /**
@@ -153,7 +153,7 @@ export function MariRow({
   badge?: ReactNode;
   fact?: ReactNode;
   trail?: MariRowTrail | ReactNode;
-  /** Screen-reader and tooltip text for the trailing glyph ("Opens now", "Asks Mari"). */
+  /** Screen-reader and tooltip text for the trailing glyph ("Opens now", "Asks YunYun"). */
   trailLabel?: string;
   /** The row's tooltip (a reference's description). */
   hint?: string;

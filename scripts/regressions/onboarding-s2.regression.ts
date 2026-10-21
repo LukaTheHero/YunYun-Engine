@@ -188,8 +188,8 @@ const asked = onboarding({
   ],
 });
 assert.equal(
-  resolveOnboardingQuestions(asked, { player: { text: "Mari" } }, "Ana").get("looks"),
-  "What does Mari look like?",
+  resolveOnboardingQuestions(asked, { player: { text: "YunYun" } }, "Ana").get("looks"),
+  "What does YunYun look like?",
   "a question can use an earlier answer",
 );
 assert.equal(

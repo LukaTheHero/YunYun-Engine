@@ -3,7 +3,7 @@ import { SUPPORTED_MACROS } from "@marinara-engine/shared";
 /**
  * Ghost-text completion for macros in prompt fields: after `{{ch` the field
  * greys in `ar}}`, the same Tab-to-accept continuation the omnibar and the
- * Professor Mari composer use for names.
+ * Professor YunYun composer use for names.
  *
  * Candidates come from the macro registry, so a macro added there completes
  * here with no extra work. Each candidate is what follows `{{`:

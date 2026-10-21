@@ -179,12 +179,12 @@ try {
     const [narration] = buildTTSVoiceRequests("The wind howls.", config, "Narrator", null);
     assert.equal(narration?.characterId, undefined, "narration belongs to no character");
 
-    const characterIds: Record<string, string> = { Dottore: "dottore-id", Mari: "mari-id" };
+    const characterIds: Record<string, string> = { Dottore: "dottore-id", YunYun: "mari-id" };
     const extracted = buildExtractedRoleplayTTSVoiceRequests(
       [
         { kind: "narration", text: "Dottore sighs." },
         { kind: "dialogue", speaker: "Dottore", text: '"Enough of this."' },
-        { kind: "dialogue", speaker: "Mari", text: '"Skill issue."' },
+        { kind: "dialogue", speaker: "YunYun", text: '"Skill issue."' },
         { kind: "dialogue", speaker: "Fatui Guard", text: '"At once."' },
       ],
       config,
@@ -197,12 +197,12 @@ try {
       [
         ["Narrator", undefined],
         ["Dottore", "dottore-id"],
-        ["Mari", "mari-id"],
+        ["YunYun", "mari-id"],
         ["Fatui Guard", undefined],
       ],
       "each extracted speaker keeps the character the voice lookup found",
     );
-    const content = "Dottore sighs.\n\nMari laughs.";
+    const content = "Dottore sighs.\n\nYunYun laughs.";
     const paragraphs = withRoleplayTTSParagraphs(
       buildTTSVoiceRequests(content, config, "Dottore", "dottore-id"),
       content,
@@ -231,7 +231,7 @@ try {
       [
         { text: "dottore", speaker: "Dottore", characterId: "dottore-id" },
         { text: "narration", speaker: "Narrator" },
-        { text: "mari", speaker: "Mari", characterId: "mari-id" },
+        { text: "mari", speaker: "YunYun", characterId: "mari-id" },
       ],
       "message-1",
       { chatId: "chat-a" },
@@ -266,10 +266,10 @@ try {
 
     element.ended = true;
     element.onended?.();
-    await until(() => events.length === 3, "Mari's line starts");
+    await until(() => events.length === 3, "YunYun's line starts");
     const [mariOwner, mari] = events[2]!;
     assert.equal(mariOwner, "mari-id", "the next speaker gets the voice");
-    await until(() => mari?.isPlaying() === true, "Mari's clip decodes");
+    await until(() => mari?.isPlaying() === true, "YunYun's clip decodes");
     element.currentTime = 0.2;
     assert.ok(mari!.level() > 0.9);
     assert.equal(mari!.viseme?.(), "aa");
@@ -395,7 +395,7 @@ try {
     const { createAvatarDirector } =
       await import("../../packages/client/src/features/avatars/director/avatar-director.js");
     const mounted = createAvatarDirector({ chatId: "game-a", mode: "game", reducedMotion: false });
-    mounted.setParticipants([{ owner: { ownerType: "character", ownerId: "mari-id" }, name: "Mari" }]);
+    mounted.setParticipants([{ owner: { ownerType: "character", ownerId: "mari-id" }, name: "YunYun" }]);
     mounted.frame("mari-id", 120_000);
     assert.ok(
       mounted.frame("mari-id", 120_080).mouthOpen > 0.7,

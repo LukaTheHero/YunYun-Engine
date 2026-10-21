@@ -9,8 +9,8 @@ import "./mari-appearance.css";
  * One story, then a resting pose. The surrounding UI supplies the status text. With `settleTo`, the
  * story plays once and then that one takes over (a finished run: success, then idle).
  *
- * M17: she is also the present Mari the pull-to-open circle morphs into (`mari-current`). Exactly one
- * Mari sprite is on screen at a time, by construction: the live-line `MariSprite` while a run is live
+ * M17: she is also the present YunYun the pull-to-open circle morphs into (`mari-current`). Exactly one
+ * YunYun sprite is on screen at a time, by construction: the live-line `MariSprite` while a run is live
  * (the transcript's `latestTurnRestStory` is null then), else the one resting beside the newest reply
  * (only the latest turn gets a `restStory`), else the arrival/welcome one (only in an empty chat), else
  * (D1) an appended arrival at the bottom of an existing transcript — callers pass `pullTarget={false}`

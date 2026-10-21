@@ -16,7 +16,7 @@ import { facetIcon } from "../MariContextFacetChips";
 import { MARI_SIDE_ROW_CLASS, MariSidePanelHeader } from "../MariPanelControls";
 import { ProfessorMariConnectionOption, SEES_KICKER_CLASS } from "./mari-chat-helpers";
 
-/** M7: the "What Mari sees" side panel: what goes with the next message, what is always on, and how she works. */
+/** M7: the "What YunYun sees" side panel: what goes with the next message, what is always on, and how she works. */
 type MariSeesPanelProps = {
   attachedContext: MariWorkspaceContextItem[] | undefined;
   contextBudget: ProfessorMariContextBudget | null;

@@ -34,7 +34,7 @@ function resourceIdFromResult(result: Pick<OmnibarResult, "id" | "category">) {
   const kind = RESOURCE_KIND_BY_CATEGORY[result.category];
   if (!kind) return null;
   // L4: a lorebook-entry row's id is `lorebook-entry:<lorebookId>:<entryId>` - splitting on
-  // the first colon alone would hand Mari the two ids glued together, and the existing
+  // the first colon alone would hand YunYun the two ids glued together, and the existing
   // lorebook-attachment UI resolves `resource.id` as a lorebookId (it shows "no longer
   // available" otherwise). The entry's own name already travels as `resource.label`.
   if (result.id.startsWith("lorebook-entry:")) return result.id.split(":")[1] ?? null;

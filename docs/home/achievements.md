@@ -1,10 +1,10 @@
 # Achievements
 
-This guide explains the Achievements feature in Marinara Engine. Achievements are cosmetic badges that unlock as you use the app. This guide covers where to find them, the full list, the on/off setting, and how unlocking works.
+This guide explains the Achievements feature in YunYun Engine. Achievements are cosmetic badges that unlock as you use the app. This guide covers where to find them, the full list, the on/off setting, and how unlocking works.
 
 ## What achievements are
 
-Achievements are small collectible badges. Marinara Engine unlocks them in the background as you do normal things, like creating chats, characters, or personas, or visiting community links.
+Achievements are small collectible badges. YunYun Engine unlocks them in the background as you do normal things, like creating chats, characters, or personas, or visiting community links.
 
 Achievements are purely cosmetic. They do not unlock features and they do not change how the app behaves. They are just a fun way to track what you have done.
 
@@ -37,8 +37,8 @@ Some achievements are single unlocks. The **Creation** and **Collection** ones a
 | Achievement | Category | How you unlock it |
 |---|---|---|
 | **Diligent Student** | Milestone | Finish or skip the first-time tutorial. |
-| **Hello World** | Milestone | Send your first message to Professor Mari. |
-| **Please Handle With Care** | Milestone | Drag Professor Mari's picture around the screen. |
+| **Hello World** | Milestone | Send your first message to Professor YunYun. |
+| **Please Handle With Care** | Milestone | Drag Professor YunYun's picture around the screen. |
 | **One Of Us** | Community | Click the **Discord** bookmark or the **Discord** link in the **Community** widget on Home. |
 | **Based Backer** | Community | Click **Support** (it opens Ko-fi) in the Home bookmarks or the **Community** widget. |
 | **Backseat Appreciator** | Community | Click **Credits** in the Home bookmarks or the **Community** widget. |
@@ -52,7 +52,7 @@ Some achievements are single unlocks. The **Creation** and **Collection** ones a
 A few notes on the list:
 
 - A persona is the profile that represents you in a chat. A lorebook is a set of background notes the AI can pull in.
-- The **Collection** achievements count everything of that type in your library. Imported and downloaded items count too, not just ones you build yourself. For **Hoarder**, the built-in Professor Mari character is the one exception: it never counts.
+- The **Collection** achievements count everything of that type in your library. Imported and downloaded items count too, not just ones you build yourself. For **Hoarder**, the built-in Professor YunYun character is the one exception: it never counts.
 - For the community achievements, just visiting the link is enough. You do not need to sign up or finish anything on the other site.
 
 ## Achievements from agents
@@ -78,7 +78,7 @@ Because tracking continues while the setting is off, your progress is not lost. 
 
 ## How unlocking works
 
-Marinara checks the ranked achievements against your current live counts. This check runs when a tracked action happens, such as creating a chat or clicking a Home bookmark. It also runs when you open the Achievements panel.
+YunYun checks the ranked achievements against your current live counts. This check runs when a tracked action happens, such as creating a chat or clicking a Home bookmark. It also runs when you open the Achievements panel.
 
 When an action triggers an unlock and the setting is on, a small pop-up notice appears. Its title is **Achievement unlocked**, and it names the badge, for example **Hoarder II** or **One Of Us**.
 
@@ -92,7 +92,7 @@ There is no button anywhere in the app to reset or clear your achievements.
 
 ## Related guides
 
-- [Getting Started with Marinara Engine](welcome.md)
+- [Getting Started with YunYun Engine](welcome.md)
 - [The First-Time Tutorial](tutorial.md)
-- [Professor Mari, Your In-App Assistant](professor-mari.md)
+- [Professor YunYun, Your In-App Assistant](professor-mari.md)
 - [Connecting to an AI Provider](../connections/connecting-to-a-provider.md)

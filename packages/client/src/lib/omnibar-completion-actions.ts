@@ -5,7 +5,7 @@ import {
   type ProfessorMariCompletionKind,
 } from "@marinara-engine/shared";
 
-/** What the omnibar offers after Mari finishes a task. Mapped to real surfaces by the caller. */
+/** What the omnibar offers after YunYun finishes a task. Mapped to real surfaces by the caller. */
 export type OmnibarCompletionActionKind = "open-resource" | "open-field" | "review" | "return";
 
 export interface OmnibarCompletionAction {
@@ -16,7 +16,7 @@ export interface OmnibarCompletionAction {
 }
 
 /**
- * Bounded completion actions for a finished Mari task, derived deterministically
+ * Bounded completion actions for a finished YunYun task, derived deterministically
  * from the capability's completion kind plus the context the handoff already
  * carries. Only actions that are valid for the current state are returned, and
  * never more than three. "Return" is always available as the last option.

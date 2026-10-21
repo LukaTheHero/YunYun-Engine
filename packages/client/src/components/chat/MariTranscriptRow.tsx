@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
 
 /**
- * One row of Professor Mari's transcript: a fixed marker column and the content
+ * One row of Professor YunYun's transcript: a fixed marker column and the content
  * beside it. Shared by the transcript itself and by the approval cards, so it
  * lives outside both.
  */

@@ -30,7 +30,7 @@ The overworld and the towns are drawn from **tile packs**: a palette and every t
 - **Import a tile pack** from a `.tilepack.json` file someone shared;
 - **Export** a pack to share it, or **Remove** it, which sends any setting drawn with it back to its own tiles.
 
-A pack only needs the tiles it changes: anything it leaves out is drawn plain. A pack that names a tile Marinara Engine does not draw keeps the rest and says what it left out.
+A pack only needs the tiles it changes: anything it leaves out is drawn plain. A pack that names a tile YunYun Engine does not draw keeps the rest and says what it left out.
 
 ### The town
 

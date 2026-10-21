@@ -46,7 +46,7 @@ const EXAMPLE_SKILL = {
   description: "Example skill: ask a few short questions with quick-reply chips before creating or changing something.",
   content: `# Ask before building
 
-This is an example skill. Turn it on if you want Professor Mari to check with you before she builds. Edit it or delete it as you like.
+This is an example skill. Turn it on if you want Professor YunYun to check with you before she builds. Edit it or delete it as you like.
 
 While this skill is on, ask before you create or change something whenever a missing detail would change the result (a name, a tone, a genre, which item to edit). This replaces the default of building first with your best guess.
 

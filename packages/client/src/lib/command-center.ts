@@ -194,7 +194,7 @@ export const COMMAND_CENTER_SEARCH_GROUP_ORDER: readonly CommandCenterResultGrou
   "docs",
   "professor-fallback",
 ];
-// UX-07: for a question, Ask Mari comes before the message and docs groups, which a question matches loosely.
+// UX-07: for a question, Ask YunYun comes before the message and docs groups, which a question matches loosely.
 const COMMAND_CENTER_QUESTION_GROUP_ORDER = COMMAND_CENTER_SEARCH_GROUP_ORDER.flatMap((id) =>
   id === "messages" ? ["professor-fallback", id] : id === "professor-fallback" ? [] : [id],
 ) as readonly CommandCenterResultGroupId[];
@@ -231,7 +231,7 @@ const RECENCY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export type CommandCenterPane = "results" | "mari";
 
 /**
- * A task handed to Professor Mari, held in session state rather than component
+ * A task handed to Professor YunYun, held in session state rather than component
  * state because the omnibar dialog unmounts on close. `pending` means she has
  * not started, `working` that she has been seen active, and `finished` that she
  * stopped after working — the transition the omnibar offers actions for.
@@ -278,7 +278,7 @@ export function normalizeCommandCenterSessionState(value: unknown): CommandCente
     : "all";
   // A session persisted before the browse, detail and quick panes were removed
   // falls back to the list. `mari` is preserved on purpose: `GlobalOmnibarHost`
-  // requests Professor Mari by writing that pane and then opening the omnibar.
+  // requests Professor YunYun by writing that pane and then opening the omnibar.
   // The "always reopen on the list" rule is enforced where it belongs, by the
   // omnibar persisting `results` when it closes.
   const pane = source.pane === "mari" ? "mari" : "results";
@@ -295,7 +295,7 @@ export function normalizeCommandCenterSessionState(value: unknown): CommandCente
 }
 
 /**
- * Moves a handed-off task along as Mari's active flag changes. `pending` only
+ * Moves a handed-off task along as YunYun's active flag changes. `pending` only
  * becomes `finished` by way of `working`, so a handoff she never picked up does
  * not look finished on the next poll. Idempotent: the same flag twice is a
  * no-op, which is what makes the persisted status survive the omnibar closing.
@@ -626,7 +626,7 @@ function findTopHit<T extends CommandCenterPresentableResult>(
   const eligible = ranked.filter(
     (result) => !NEVER_TOP_HIT.has(groupOf(result)) && (result.score ?? 0) >= TOP_HIT_MIN_SCORE,
   );
-  // A row that names itself the Top hit (Open Mari for "mari") wins over a title-prefix guess.
+  // A row that names itself the Top hit (Open YunYun for "mari") wins over a title-prefix guess.
   const pinned = ranked.find((result) => groupOf(result) === "top-hit");
   if (pinned) return pinned;
   const name = (result: T) => normalizeTextForMatch(result.title);
@@ -756,7 +756,7 @@ export function isOmnibarShortcut(event: OmnibarShortcutEvent, apple = isApplePl
   return isModLetterShortcut(event, "k", apple);
 }
 
-/** M18: Cmd+J / Ctrl+J, "Ask Prof. Mari about this". Same rules as {@link isOmnibarShortcut}. */
+/** M18: Cmd+J / Ctrl+J, "Ask Prof. YunYun about this". Same rules as {@link isOmnibarShortcut}. */
 export function isAskMariShortcut(event: OmnibarShortcutEvent, apple = isApplePlatform()): boolean {
   return isModLetterShortcut(event, "j", apple);
 }

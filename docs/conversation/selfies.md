@@ -51,14 +51,14 @@ To learn more about styles, see [Image Style Profiles](../media/style-profiles.m
 
 **Send Avatar References** is a dropdown that is **Off** by default. It sits below the **Video messages** section, and each choice says what it applies to: **Images only**, **Videos only**, or **Images and videos**.
 
-- For images, Marinara sends the character's avatar or sprite to the image service as a reference picture. This helps the selfie look like the character. It only works when the image provider supports reference images.
+- For images, YunYun sends the character's avatar or sprite to the image service as a reference picture. This helps the selfie look like the character. It only works when the image provider supports reference images.
 - For videos, a video message whose **First frame** is **Prompt only** starts from the character's avatar or sprite instead of no picture. Video services take a single starting picture, so the other first frames, which already start from a picture of the character, are not affected.
 
 ### Attach Card Appearance
 
 **Attach Card Appearance** is a dropdown that is **Off** by default, with the same **Images only**, **Videos only** and **Images and videos** choices. It adds the card's appearance text of each character the prompt names to the selfie prompt, the video prompt, or both. This gives the model more detail about how the character looks.
 
-If the card or persona also has **Image Appearance Override** turned on, Marinara sends that override instead of the **Appearance** text. Turn it on under **Appearance** in the Character or Persona editor when the full **Appearance** description is written for the narrator rather than for an image model. The AI that writes the selfie description still reads the card's **Appearance** too. It keeps the override's words exactly as written and uses the **Appearance** text only to fill in other details.
+If the card or persona also has **Image Appearance Override** turned on, YunYun sends that override instead of the **Appearance** text. Turn it on under **Appearance** in the Character or Persona editor when the full **Appearance** description is written for the narrator rather than for an image model. The AI that writes the selfie description still reads the card's **Appearance** too. It keeps the override's words exactly as written and uses the **Appearance** text only to fill in other details.
 
 ### Resolution
 
@@ -77,7 +77,7 @@ The size options are:
 
 ## How a character sends a selfie
 
-Once selfies are set up, a character can decide to send one during the chat on their own. You do not type a command. The character chooses the moment, and Marinara generates the picture and posts it in the chat. Later replies see a short note with what the selfie showed, so the character remembers sending it.
+Once selfies are set up, a character can decide to send one during the chat on their own. You do not type a command. The character chooses the moment, and YunYun generates the picture and posts it in the chat. Later replies see a short note with what the selfie showed, so the character remembers sending it.
 
 The model's response uses `[selfie]`, optionally with context:
 

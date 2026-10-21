@@ -100,7 +100,7 @@ function vrm1(overrides: Record<string, unknown> = {}, vrmOverrides: Record<stri
         meta: {
           name: "  Test\u0000Model  ",
           version: "1.2",
-          authors: ["Mari", 42, "x".repeat(300)],
+          authors: ["YunYun", 42, "x".repeat(300)],
           avatarPermission: "everyone",
           commercialUsage: "personalNonProfit",
           modification: "prohibited",
@@ -218,7 +218,7 @@ assert.deepEqual(
 assert.equal(({} as Record<string, unknown>).polluted, undefined);
 assert.deepEqual(modern.meta, {
   title: "Test Model",
-  authors: ["Mari", "x".repeat(256)],
+  authors: ["YunYun", "x".repeat(256)],
   version: "1.2",
   avatarPermission: "everyone",
   commercialUsage: "personalNonProfit",

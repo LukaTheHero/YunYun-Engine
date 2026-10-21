@@ -17,7 +17,7 @@ function readBrowserSettings(page: Page) {
   });
 }
 
-test("the Quick answer model and Professor Mari's connection follow a fresh browser", async ({
+test("the Quick answer model and Professor YunYun's connection follow a fresh browser", async ({
   browser,
   request,
 }, testInfo) => {

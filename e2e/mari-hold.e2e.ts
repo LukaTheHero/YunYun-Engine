@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   await seedUIState(page, { hasCompletedOnboarding: true, sidebarOpen: false, rightPanelOpen: false });
 });
 
-// Slice 85: press and hold the Home Mari widget to lift her, drag her, and let her spring home.
+// Slice 85: press and hold the Home YunYun widget to lift her, drag her, and let her spring home.
 async function holdWidgetAndDrag(page: Page) {
   const art = page.locator("[data-home-professor-art]");
   await expect(art).toBeVisible({ timeout: 30_000 });
@@ -36,7 +36,7 @@ async function holdWidgetAndDrag(page: Page) {
   return { figure, art, startX, startY };
 }
 
-test("pressing and dragging the Home Mari widget lifts her, then she springs back to her slot", async ({
+test("pressing and dragging the Home YunYun widget lifts her, then she springs back to her slot", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -52,7 +52,7 @@ test("pressing and dragging the Home Mari widget lifts her, then she springs bac
   expect(Math.abs(back!.y + back!.height / 2 - startY)).toBeLessThan(260);
 });
 
-test("a tap on the Home Mari widget keeps the normal action and never lifts her", async ({ page }) => {
+test("a tap on the Home YunYun widget keeps the normal action and never lifts her", async ({ page }) => {
   await page.goto("/");
   const art = page.locator("[data-home-professor-art]");
   await expect(art).toBeVisible({ timeout: 30_000 });
@@ -60,7 +60,7 @@ test("a tap on the Home Mari widget keeps the normal action and never lifts her"
   await expect(page.locator(".mari-hold-figure")).toHaveCount(0);
 });
 
-test("a tap on the omnibar door opens Mari and never lifts her", async ({ page, isMobile }) => {
+test("a tap on the omnibar door opens YunYun and never lifts her", async ({ page, isMobile }) => {
   // The address row is desktop-only; a phone opens Search from the top bar.
   test.skip(isMobile, "desktop address row opens the omnibar");
   await page.goto("/");
@@ -83,10 +83,10 @@ test("with reduced motion a hold only bounces her in place and shows her line", 
   await expect(page.locator(".mari-hold-figure__line")).toHaveText("W-What are you doing? Put me down! (>_<)");
   await expect(page.locator(".mari-hold-figure__sprite")).toHaveCount(0);
   await page.mouse.up();
-  await expect(page.locator('[data-component="GlobalOmnibar.Mari"]')).toBeHidden();
+  await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]')).toBeHidden();
 });
 
-test("after a drag that ends away from her head, Enter on the door still opens Mari", async ({ page, isMobile }) => {
+test("after a drag that ends away from her head, Enter on the door still opens YunYun", async ({ page, isMobile }) => {
   test.skip(isMobile, "desktop address row opens the omnibar");
   await page.goto("/");
   await page.locator('[data-component="HomeBrowserHub.Address"]').click();
@@ -101,7 +101,7 @@ test("after a drag that ends away from her head, Enter on the door still opens M
   await expect(page.locator(".mari-hold-figure")).toBeHidden({ timeout: 3_000 });
   await door.focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator('[data-component="GlobalOmnibar.Mari"]')).toBeVisible();
+  await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]')).toBeVisible();
 });
 
 // Slice 85 full spin: circling the pointer while holding her swings her over the top; still, she settles.
@@ -258,7 +258,7 @@ test("two fast hits on opposite edges make her dizzy", async ({ page }) => {
 
 // The pose swap (69e6e5231) keeps both image boxes identical. Home's parent-card hover lift (#4780)
 // deliberately transforms the viewport box, so compare local layout and both layers in the same frame.
-test("hovering the Home Mari card swaps her pose without changing its layout or image box", async ({
+test("hovering the Home YunYun card swaps her pose without changing its layout or image box", async ({
   page,
   isMobile,
 }) => {
@@ -334,7 +334,7 @@ test("hovering her window sprite swaps to her hover pose", async ({ page, isMobi
   const door = page.locator('[data-component="GlobalOmnibar.ProfessorMariButton"]');
   await expect(door).toBeVisible({ timeout: 30_000 });
   await door.click();
-  const sprite = page.locator('[data-component="GlobalOmnibar.Mari"] .mari-story-sprite').first();
+  const sprite = page.locator('[data-component="GlobalOmnibar.YunYun"] .mari-story-sprite').first();
   await expect(sprite).toBeVisible({ timeout: 30_000 });
   const hoverPose = sprite.locator("img.mari-story-sprite__hover");
   await expect(hoverPose).toBeHidden();

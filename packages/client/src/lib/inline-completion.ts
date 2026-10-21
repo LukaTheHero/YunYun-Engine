@@ -1,10 +1,10 @@
 /**
- * Inline "ghost text" completion for the omnibar input and the Professor Mari
+ * Inline "ghost text" completion for the omnibar input and the Professor YunYun
  * composer: given what the user typed and a ranked list of candidate phrases,
  * return the text that would be appended if they press Tab.
  *
  * Continue the whole value first, then phrases at word boundaries (prose in
- * the Mari composer, "tell me about dc " -> "dc simulator"). Candidates are matched by
+ * the YunYun composer, "tell me about dc " -> "dc simulator"). Candidates are matched by
  * case-insensitive prefix; the suffix keeps the candidate's casing and the
  * text already typed stays unchanged.
  */

@@ -903,13 +903,13 @@ assert.deepEqual(splitAtSceneBreaks("A\r\n***\r\nB\r\n---\r\nC"), ["A", "***\r\n
 const statusPanel = "Cyno waits.\n\n<details>\n<summary>Status</summary>\nHP 10\n\n---\n\nMood tense\n</details>";
 assert.deepEqual(splitAtSceneBreaks(statusPanel), [statusPanel], "a break inside an open HTML element is its content");
 assert.deepEqual(
-  splitAtSceneBreaks(`${statusPanel}\n\n***\n\n<div class="x"/>Mari runs.<br>\n---\nOn.`),
-  [statusPanel, '***\n\n<div class="x"/>Mari runs.<br>', "---\nOn."],
+  splitAtSceneBreaks(`${statusPanel}\n\n***\n\n<div class="x"/>YunYun runs.<br>\n---\nOn.`),
+  [statusPanel, '***\n\n<div class="x"/>YunYun runs.<br>', "---\nOn."],
   "a closed element, a self-closing tag or a void element doesn't stop a split",
 );
 assert.deepEqual(
-  splitAtSceneBreaks("Cyno, <b>alone\n***\nMari asks <name>.\n---\nMaukie <i>thinks"),
-  ["Cyno, <b>alone", "***\nMari asks <name>.", "---\nMaukie <i>thinks"],
+  splitAtSceneBreaks("Cyno, <b>alone\n***\nYunYun asks <name>.\n---\nMaukie <i>thinks"),
+  ["Cyno, <b>alone", "***\nYunYun asks <name>.", "---\nMaukie <i>thinks"],
   "an unclosed inline tag or an angle-bracket placeholder doesn't stop later splits",
 );
 
@@ -925,7 +925,7 @@ assert.equal(placeAfterPrefix("Maukie reads.\nMaukie reads.", "Maukie Whiskers: 
     { content: "***\nMARI arrives.", start: 13 },
   ];
   const document = { command: { type: "document", title: "Map", content: "x" }, raw: "[document]" };
-  const lateWhisper = { command: { type: "whisper", character: "Mari", text: "here" }, raw: "[w1]", contentOffset: 30 };
+  const lateWhisper = { command: { type: "whisper", character: "YunYun", text: "here" }, raw: "[w1]", contentOffset: 30 };
   const gapWhisper = { command: { type: "whisper", character: "Cyno", text: "wait" }, raw: "[w2]", contentOffset: 12 };
   const interruption = { command: { type: "interrupt", part: "no" }, raw: "[interrupt]" };
   const unplaced = { command: { type: "combat" }, raw: "[combat]" };

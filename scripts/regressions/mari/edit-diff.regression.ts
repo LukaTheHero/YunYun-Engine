@@ -1,4 +1,4 @@
-// #4919 Professor Mari "Easy Viewer" diff-logic regression. Guards the two pure client utilities
+// #4919 Professor YunYun "Easy Viewer" diff-logic regression. Guards the two pure client utilities
 // that power the readable before/after view: the word-level diff must reconstruct both sides
 // exactly (so nothing is dropped or duplicated when highlighting), and field-change extraction must
 // find real edits (recursing into the nested `data` column) while skipping noise/unchanged keys.
@@ -147,4 +147,4 @@ assert.equal(fieldLabel("first_mes"), "First message");
 assert.equal(fieldLabel("first mes"), "First message", "a key typed with a space still gets its label, not 'First mes'");
 assert.equal(fieldLabel("mes_example"), "Example messages");
 
-console.log("Mari Easy Viewer diff regressions passed.");
+console.log("YunYun Easy Viewer diff regressions passed.");

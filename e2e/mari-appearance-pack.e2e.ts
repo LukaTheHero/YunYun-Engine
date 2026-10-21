@@ -10,7 +10,7 @@ async function openOmnibar(page: Page) {
   await page.keyboard.press(shortcut);
 }
 
-test("Golden (once unlocked) and Safari Prof. Mari are selectable and survive reload", async ({ page }, testInfo) => {
+test("Golden (once unlocked) and Safari Prof. YunYun are selectable and survive reload", async ({ page }, testInfo) => {
   // The mobile projects share a server; clear its prior settings before this browser seeds an unlocked pack.
   expect((await page.request.put("/api/app-settings/ui", { data: { value: "" } })).ok()).toBeTruthy();
   const version = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
@@ -44,14 +44,14 @@ test("Golden (once unlocked) and Safari Prof. Mari are selectable and survive re
     .click({ position: { x: 5, y: 5 } });
   await openOmnibar(page);
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  await omnibar.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
-  const packs = omnibar.getByRole("radiogroup", { name: "Professor Mari appearance" });
+  await omnibar.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
+  const packs = omnibar.getByRole("radiogroup", { name: "Professor YunYun appearance" });
   await expect(packs.getByRole("radio")).toHaveCount(4);
-  const golden = packs.getByRole("radio", { name: /^Golden Prof\. Mari/ });
+  const golden = packs.getByRole("radio", { name: /^Golden Prof\. YunYun/ });
   await expect(golden).toBeEnabled();
   await packs.locator('label[data-pack="golden"]').click();
   await expect(golden).toBeChecked();
-  const safari = packs.getByRole("radio", { name: /^Safari Prof\. Mari/ });
+  const safari = packs.getByRole("radio", { name: /^Safari Prof\. YunYun/ });
   await expect(safari).toBeEnabled();
   await packs.locator('label[data-pack="safari"]').click();
   await expect(safari).toBeChecked();
@@ -67,12 +67,12 @@ test("Golden (once unlocked) and Safari Prof. Mari are selectable and survive re
     .first()
     .click({ position: { x: 5, y: 5 } });
   await openOmnibar(page);
-  await expect(omnibar.locator('img[src^="/sprites/mari/safari/portrait-idle.webp?v="]').first()).toBeVisible();
-  await expect(omnibar.locator('img[src^="/sprites/mari/safari/portrait-idle.webp?v="]').first()).toHaveJSProperty(
+  await expect(omnibar.locator('img[src^="/sprites/yunyun/chibi-yunyun.png/portrait-idle.webp?v="]').first()).toBeVisible();
+  await expect(omnibar.locator('img[src^="/sprites/yunyun/chibi-yunyun.png/portrait-idle.webp?v="]').first()).toHaveJSProperty(
     "naturalWidth",
     512,
   );
-  await omnibar.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
+  await omnibar.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
   await expect(safari).toBeChecked();
   await packs.locator('label[data-pack="golden"]').click();
   // The fixed clock gives every edit the same timestamp, so let the server save this pick before reloading.
@@ -88,12 +88,12 @@ test("Golden (once unlocked) and Safari Prof. Mari are selectable and survive re
     .first()
     .click({ position: { x: 5, y: 5 } });
   await openOmnibar(page);
-  await expect(omnibar.locator('img[src^="/sprites/mari/golden/portrait-idle.webp?v="]').first()).toBeVisible();
-  await expect(omnibar.locator('img[src^="/sprites/mari/golden/portrait-idle.webp?v="]').first()).toHaveJSProperty(
+  await expect(omnibar.locator('img[src^="/sprites/yunyun/chibi-yunyun.png/portrait-idle.webp?v="]').first()).toBeVisible();
+  await expect(omnibar.locator('img[src^="/sprites/yunyun/chibi-yunyun.png/portrait-idle.webp?v="]').first()).toHaveJSProperty(
     "naturalWidth",
     512,
   );
-  await omnibar.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
+  await omnibar.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
   await expect(golden).toBeChecked();
   await packs.locator('label[data-pack="basic"]').click();
   await expect(packs.getByRole("radio", { name: /^Basic/ })).toBeChecked();
@@ -127,7 +127,7 @@ async function openSeasonalHome(page: Page, state: Parameters<typeof seedUIState
   return (pack: string) =>
     page
       .locator('[data-component="HomeBrowserHub.ProfessorWidget"]')
-      .locator(`img[src^="/sprites/mari/${pack}/portrait-idle.webp?v="]`);
+      .locator(`img[src^="/sprites/yunyun/${pack}/portrait-idle.webp?v="]`);
 }
 
 const storedUI = (page: Page) =>
@@ -167,17 +167,17 @@ test("a dated pack follows its seasonal theme and toggle, and another pick wins 
     .click({ position: { x: 5, y: 5 } });
   await openOmnibar(page);
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  await omnibar.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
-  const packs = omnibar.getByRole("radiogroup", { name: "Professor Mari appearance" });
+  await omnibar.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
+  const packs = omnibar.getByRole("radiogroup", { name: "Professor YunYun appearance" });
   await expect(packs.getByRole("radio")).toHaveCount(5);
-  await expect(packs.getByRole("radio", { name: /^Feral Raccoon Prof\. Mari/ })).toBeChecked();
+  await expect(packs.getByRole("radio", { name: /^Feral Raccoon Prof\. YunYun/ })).toBeChecked();
   await packs.locator('label[data-pack="safari"]').click();
-  await expect(packs.getByRole("radio", { name: /^Safari Prof\. Mari/ })).toBeChecked();
+  await expect(packs.getByRole("radio", { name: /^Safari Prof\. YunYun/ })).toBeChecked();
   await expect.poll(async () => (await storedUI(page)).mariSeasonOptOut).toBe("raccoon-2026");
   expect((await storedUI(page)).mariAppearancePackId).toBe("safari");
 });
 
-test("the Halloween greeting's Turn it off takes Professor Mari's costume off for this year", async ({ page }) => {
+test("the Halloween greeting's Turn it off takes Professor YunYun's costume off for this year", async ({ page }) => {
   await page.clock.setFixedTime(HALLOWEEN_NOON);
   const homePortrait = await openSeasonalHome(page, {});
   const greeting = page.getByRole("dialog", { name: "Happy Halloween!" });
@@ -196,7 +196,7 @@ test("the Halloween greeting's Turn it off takes Professor Mari's costume off fo
   await expect(greeting).toHaveCount(0);
 });
 
-test("the Halloween preview dresses Professor Mari up, and nothing done in it is saved", async ({ page }) => {
+test("the Halloween preview dresses Professor YunYun up, and nothing done in it is saved", async ({ page }) => {
   // A June day with seasonal looks switched off: only the preview can bring the costume.
   await page.clock.setFixedTime(new Date(2026, 5, 15, 12, 0));
   const homePortrait = await openSeasonalHome(page, { seasonalThemesDisabled: true }, "/?seasonalPreview=halloween");
@@ -213,12 +213,12 @@ test("the Halloween preview dresses Professor Mari up, and nothing done in it is
     .click({ position: { x: 5, y: 5 } });
   await openOmnibar(page);
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  await omnibar.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
-  const packs = omnibar.getByRole("radiogroup", { name: "Professor Mari appearance" });
+  await omnibar.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
+  const packs = omnibar.getByRole("radiogroup", { name: "Professor YunYun appearance" });
   await expect(packs.getByRole("radio")).toHaveCount(5);
-  await expect(packs.getByRole("radio", { name: /^Feral Raccoon Prof\. Mari/ })).toBeChecked();
+  await expect(packs.getByRole("radio", { name: /^Feral Raccoon Prof\. YunYun/ })).toBeChecked();
   await packs.locator('label[data-pack="safari"]').click();
-  await expect(packs.getByRole("radio", { name: /^Safari Prof\. Mari/ })).toBeChecked();
+  await expect(packs.getByRole("radio", { name: /^Safari Prof\. YunYun/ })).toBeChecked();
   await expect.poll(async () => (await storedUI(page)).mariAppearancePackId).toBe("safari");
   expect((await storedUI(page)).mariSeasonOptOut).toBe("");
 

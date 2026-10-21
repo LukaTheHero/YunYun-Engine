@@ -50,7 +50,7 @@ interface HomeFaqProps {
 const QUICK_FIXES = [
   "Raise max output tokens if agents, trackers, or Lorebook Keeper keep failing or returning broken JSON.",
   "Update before digging too deep. If you installed from Git, use the updater or the Advanced settings update check.",
-  "If the installer or startup scripts vanished, check antivirus quarantine first and whitelist the Marinara folder.",
+  "If the installer or startup scripts vanished, check antivirus quarantine first and whitelist the YunYun folder.",
   "If Game Mode setup keeps failing, switch to a stronger model before changing prompts or presets.",
 ];
 
@@ -58,13 +58,13 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
   {
     id: "connect-model",
     category: "Top Issue",
-    question: "How do I connect Marinara to a model?",
+    question: "How do I connect YunYun to a model?",
     answer: "Create a connection first, test it, then select it for the chat before you send a message.",
     bullets: [
       "Open Connections from the top bar, create a new connection, choose your provider, then fill in the API key, base URL if needed, and model name.",
       "Use Test Connection before saving. If the test fails, check the key, provider route, base URL, and model spelling before changing chat settings.",
       "After saving, pick that connection from the chains icon on the left side of the chat input, or set it in Chat Settings for that chat.",
-      "For local models, make sure the local server or Marinara Local Model sidecar is running first. The bundled Local Model is best for helpers and trackers, not main roleplay generation.",
+      "For local models, make sure the local server or YunYun Local Model sidecar is running first. The bundled Local Model is best for helpers and trackers, not main roleplay generation.",
     ],
   },
   {
@@ -96,7 +96,7 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     category: "Top Issue",
     question: "I saw '[sidecar] Startup with max GPU offload failed, retrying with CPU fallback'. Is that normal?",
     answer:
-      "Usually yes. Marinara's local sidecar is meant to live on CPU and RAM so your main RP model can keep the GPU and VRAM.",
+      "Usually yes. YunYun's local sidecar is meant to live on CPU and RAM so your main RP model can keep the GPU and VRAM.",
     bullets: [
       "A fallback message does not automatically mean anything is broken.",
       "The sidecar is there for helpers and utility tasks, not to compete with your main model for VRAM.",
@@ -108,7 +108,7 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     category: "Setup",
     question: "Where can I find documentation?",
     answer:
-      "Marinara ships full guides with every install: installation, configuration, troubleshooting, macros, Game Mode, and more. You can read them without leaving the app.",
+      "YunYun ships full guides with every install: installation, configuration, troubleshooting, macros, Game Mode, and more. You can read them without leaving the app.",
     bullets: [
       "Use the Open Documentation button below, or the Documentation button at the bottom of the home page, to browse every guide in-app.",
       "The same guides live on disk as regular markdown files, at the folder path shown below.",
@@ -118,10 +118,10 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
   {
     id: "antivirus-installer",
     category: "Setup",
-    question: "My antivirus flagged the installer or deleted files. Is Marinara safe?",
+    question: "My antivirus flagged the installer or deleted files. Is YunYun safe?",
     answer: "This is a very common false-positive path for installers and batch files that spawn local services.",
     bullets: [
-      "Add the Marinara folder to your antivirus exclusions before reinstalling or restoring files.",
+      "Add the YunYun folder to your antivirus exclusions before reinstalling or restoring files.",
       "Bitdefender and Windows Defender are the most common sources of quarantines here.",
       "Restoring the quarantined files and rerunning usually fixes the issue.",
       "If you want a second opinion, compare the release files against a VirusTotal report rather than trusting a single AV popup.",
@@ -154,9 +154,9 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     id: "android-apk-termux",
     category: "Setup",
     question: "Is the Android APK standalone?",
-    answer: "No. The APK is only a WebView shell for Marinara Engine running locally in Termux.",
+    answer: "No. The APK is only a WebView shell for YunYun Engine running locally in Termux.",
     bullets: [
-      "Use Install / Start Marinara in the APK, or follow the Android Termux guide so Termux creates the Marinara-Engine folder before running ./start-termux.sh.",
+      "Use Install / Start YunYun in the APK, or follow the Android Termux guide so Termux creates the Marinara-Engine folder before running ./start-termux.sh.",
       "The APK opens the same-device local server at 127.0.0.1, so it cannot work if Termux is closed.",
       "If it stays on the connection screen, go back to Termux and start the server.",
     ],
@@ -175,7 +175,7 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
   {
     id: "google-cloud-credit",
     category: "Connections",
-    question: "Can I use Google Cloud's free credit with Marinara?",
+    question: "Can I use Google Cloud's free credit with YunYun?",
     answer: "Usually yes, but not every Google route behaves the same.",
     bullets: [
       "Newer AI Studio API accounts have tighter limitations, so Vertex is the safer route.",
@@ -196,9 +196,9 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
   {
     id: "unknown-model-parameters",
     category: "Connections",
-    question: "My custom or self-hosted model is not listed. Which parameters will Marinara send?",
+    question: "My custom or self-hosted model is not listed. Which parameters will YunYun send?",
     answer:
-      "For unknown models, Marinara avoids guessing provider-specific parameters and only sends the custom parameters you define.",
+      "For unknown models, YunYun avoids guessing provider-specific parameters and only sends the custom parameters you define.",
     bullets: [
       "Use Custom Parameters on the connection when your runtime expects special flags.",
       "Known model profiles still get their supported defaults, but unknown model IDs stay conservative to avoid rejected requests.",
@@ -211,7 +211,7 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     answer: "Yes. Set the context and output overrides to match what your runtime actually supports.",
     bullets: [
       "Use the connection overrides or Chat Settings Advanced Parameters instead of relying on a hard built-in ceiling.",
-      "If the backend or model loader only exposes a smaller window, Marinara cannot make that runtime accept more context.",
+      "If the backend or model loader only exposes a smaller window, YunYun cannot make that runtime accept more context.",
     ],
   },
   {
@@ -384,7 +384,7 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     id: "comfyui-illustrator-setup",
     category: "Images",
     question: "How do I get ComfyUI or Illustrator working?",
-    answer: "The workflow template has to expose the placeholders Marinara expects.",
+    answer: "The workflow template has to expose the placeholders YunYun expects.",
     bullets: [
       "Use %prompt%, %width%, %height%, %negative_prompt%, and %seed% in the workflow or request template.",
       "Use %reference_image_01% through %reference_image_04% or %reference_image_name_01% through %reference_image_name_04% for multiple ComfyUI reference slots.",
@@ -450,7 +450,7 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     id: "game-party-members",
     category: "Game Mode",
     question: "Can I add new party members mid-game?",
-    answer: "Yes. Marinara can recruit party members during an active game now.",
+    answer: "Yes. YunYun can recruit party members during an active game now.",
     bullets: [
       "If some portraits or tracker details lag behind after recruiting someone new, refresh or regenerate the related asset rather than assuming the recruit failed.",
     ],
@@ -486,7 +486,7 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     category: "Misc",
     question: "Is there built-in content filtering?",
     answer:
-      "Not as a separate Marinara safety layer. Filtering behavior mostly depends on the model or provider you connect.",
+      "Not as a separate YunYun safety layer. Filtering behavior mostly depends on the model or provider you connect.",
   },
   {
     id: "shared-gpu",
@@ -502,12 +502,12 @@ export const HOME_FAQ_ITEMS: HomeFaqItem[] = [
     category: "Misc",
     question: "Is there a mobile app?",
     answer:
-      "Not as a standalone app yet. You can install Marinara as a PWA from the browser on phones and tablets while the server runs on your computer, Docker host, or Termux device.",
+      "Not as a standalone app yet. You can install YunYun as a PWA from the browser on phones and tablets while the server runs on your computer, Docker host, or Termux device.",
   },
   {
     id: "tts-support",
     category: "Misc",
-    question: "Does Marinara support TTS?",
+    question: "Does YunYun support TTS?",
     answer: "Yes. There is built-in support for OpenAI-compatible TTS providers now.",
     bullets: [
       "Set it up from the Connections area and the TTS settings card.",
@@ -579,7 +579,7 @@ function FaqDocsAccess({ compact }: { compact?: boolean }) {
       >
         <p className="text-[var(--muted-foreground)]/70">{localize("On disk at:")}</p>
         <code className="block break-all text-[var(--foreground)]/85">
-          {index ? index.root : localize("the docs folder inside your Marinara install folder")}
+          {index ? index.root : localize("the docs folder inside your YunYun install folder")}
         </code>
       </div>
       <button
@@ -834,7 +834,7 @@ export function HomeFaq({
             type="button"
             onClick={() => setMobileModalOpen(true)}
             className="flex w-full items-center gap-2 rounded-lg border border-[var(--border)]/60 bg-[var(--card)]/70 px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            aria-label={localize("Open Professor Mari's FAQ")}
+            aria-label={localize("Open Professor YunYun's FAQ")}
           >
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--primary)]/25 bg-[linear-gradient(135deg,rgba(235,137,81,0.18),rgba(77,229,221,0.14))] text-[var(--primary)]">
               <HelpCircle size="0.875rem" />
@@ -855,7 +855,7 @@ export function HomeFaq({
         <Modal
           open={mobileModalOpen}
           onClose={() => setMobileModalOpen(false)}
-          title={localize("Professor Mari's FAQ")}
+          title={localize("Professor YunYun's FAQ")}
           width="max-w-5xl"
         >
           <HomeFaq
@@ -893,7 +893,7 @@ export function HomeFaq({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold tracking-tight text-[var(--foreground)]">
-                  {localize("Professor Mari's FAQ")}
+                  {localize("Professor YunYun's FAQ")}
                 </p>
                 <span className="rounded-full border border-[var(--border)]/60 bg-black/5 px-2 py-0.5 text-[0.5625rem] uppercase tracking-[0.16em] text-[var(--muted-foreground)]/80 dark:bg-white/6">
                   {HOME_FAQ_ITEMS.length} {localize("answers")}

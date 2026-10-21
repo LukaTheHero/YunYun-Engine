@@ -111,7 +111,7 @@ export function useMariWorkspaceRun({
       runChatId: string | null = chatId,
     ) => {
       if (isProfessorMariAbortError(error)) return;
-      console.error("[Professor Mari] Run failed", error);
+      console.error("[Professor YunYun] Run failed", error);
       void refreshWorkspaceStatus().catch(() => undefined);
       setRecovery({ ...retry, kind: classifyProfessorMariFailure(error), detail: describeProfessorMariError(error) });
       // F15: the server already saved this failure on the message; without a reload the local copy
@@ -291,7 +291,7 @@ export function useMariWorkspaceRun({
             if (data?.narration === true) setWorkspaceTimeline(markNarrationTimeline);
             if (isMariWorkspaceActionResult(data?.actionResult)) {
               void invalidateActionResult(data.actionResult).catch((error) => {
-                console.error("[Professor Mari] Failed to refresh action result", error);
+                console.error("[Professor YunYun] Failed to refresh action result", error);
               });
             }
           } else if (event.type === "done") {
@@ -379,7 +379,7 @@ export function useMariWorkspaceRun({
         });
         messagesReloaded = true;
       } catch (error) {
-        console.error("[Professor Mari] Failed to reload messages after completed workspace run", error);
+        console.error("[Professor YunYun] Failed to reload messages after completed workspace run", error);
       }
       if (workspaceRunIdRef.current !== runId || activeChatIdRef.current !== completedChatId) return;
       if (messagesReloaded) {

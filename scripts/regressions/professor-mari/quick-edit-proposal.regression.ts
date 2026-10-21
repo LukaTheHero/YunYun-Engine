@@ -18,4 +18,4 @@ assert.equal(
   "expired",
 );
 
-console.log("Professor Mari quick-edit proposal regression checks passed.");
+console.log("Professor YunYun quick-edit proposal regression checks passed.");

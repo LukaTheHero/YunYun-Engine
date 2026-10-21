@@ -18,7 +18,7 @@ const FACE_POSITIONS: Record<number, string[]> = {
 };
 
 /**
- * Q6: what a row, card or chip is, at a glance. One component for the omnibar rows, Mari's
+ * Q6: what a row, card or chip is, at a glance. One component for the omnibar rows, YunYun's
  * reference, outcome and next-step cards, the "Aware of" chips and her Chats panel.
  *
  * - A portrait (`src`) keeps its picture and gets the type as a small corner badge.

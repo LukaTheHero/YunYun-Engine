@@ -224,14 +224,14 @@ assert.equal(
 assert.deepEqual(splitTTSChunks(detailedCue, filteredConfig), ["Stay close. Keep moving."]);
 assert.equal(cleanTTSInputText("[main] [happy] Hello. [side]", emotionalConfig), "[happy] Hello.");
 assert.equal(
-  cleanTTSInputText("[Mari][main][angry]: [Quietly, with controlled fear] Stay.", emotionalConfig),
+  cleanTTSInputText("[YunYun][main][angry]: [Quietly, with controlled fear] Stay.", emotionalConfig),
   "[Quietly, with controlled fear] Stay.",
   "speaker structure stays silent while descriptive delivery cues survive",
 );
 const detailedSource = '"Stay close. Keep moving."';
 const annotatedDialogue = '[Low, steady voice, restrained urgency] "Stay close. [Brief pause] Keep moving."';
 const detailedSegments = parseRoleplaySpeakerExtractorOutput(
-  JSON.stringify({ dialogue: [{ speaker: "Mari", text: detailedSource, speech: annotatedDialogue }] }),
+  JSON.stringify({ dialogue: [{ speaker: "YunYun", text: detailedSource, speech: annotatedDialogue }] }),
   detailedSource,
   true,
 ).segments;

@@ -52,7 +52,7 @@ try {
   assert.equal(split.sittings, 2, "a gap just over 30 minutes starts a new sitting");
   assert.equal(split.totalMs, 0);
 
-  // R12 (Golden Mari's play-time unlock): an overnight idle gap between two evenings adds no time.
+  // R12 (Golden YunYun's play-time unlock): an overnight idle gap between two evenings adds no time.
   const overnight = computeChatPlayTime([
     base,
     base + 20 * MINUTE,

@@ -108,7 +108,7 @@ export const characterExtensionsSchema = z
     /** Starting builds for Game Mode rulesets, keyed by ruleset id. Bounded, never shape-checked. */
     rulesetSheets: storedRulesetSheetsSchema.optional(),
     /**
-     * Marinara Engine: interactive onboarding carried by the card. Absent or
+     * YunYun Engine: interactive onboarding carried by the card. Absent or
      * disabled means no onboarding is offered and nothing is parsed.
      */
     onboarding: characterOnboardingSchema.optional(),

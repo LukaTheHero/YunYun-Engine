@@ -5,7 +5,7 @@ import { ChevronLeft, Search, X } from "lucide-react";
 import { type MariPanelSortMode } from "../../stores/ui.store";
 
 /**
- * Shared controls for Professor Mari's management panels (Skills, Memories, and
+ * Shared controls for Professor YunYun's management panels (Skills, Memories, and
  * the chat history list). The panels themselves are lazy, but the parent uses
  * the sort control too, so it stays in the eager chunk.
  */
@@ -78,7 +78,7 @@ export type MemoryDraftState = {
   content: string;
 };
 
-/** M6: one row of a side panel, on Mari's direction A `.mari-edit` group. */
+/** M6: one row of a side panel, on YunYun's direction A `.mari-edit` group. */
 export const MARI_SIDE_ROW_CLASS = "mari-edit__row flex min-h-12 items-center gap-3 px-3 py-2";
 
 /**

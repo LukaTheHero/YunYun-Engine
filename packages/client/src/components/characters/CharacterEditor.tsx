@@ -1053,7 +1053,7 @@ export function CharacterEditor() {
     );
   }
 
-  // Primary prose field for the current tab; drives the contextual Mari chip.
+  // Primary prose field for the current tab; drives the contextual YunYun chip.
   const mariChipField: { field: string; value: string } | null =
     activeTab === "card"
       ? { field: "description", value: formData.description ?? "" }

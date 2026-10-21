@@ -221,7 +221,7 @@ const permissionsModeSchema = z.object({
   chatId: z.string().min(1).optional(),
 });
 
-// Professor Mari's runtime ("classic" or "pi"): the same validated-route pattern, global only.
+// Professor YunYun's runtime ("classic" or "pi"): the same validated-route pattern, global only.
 const runtimeSchema = z.object({ runtime: z.enum(MARI_RUNTIMES) });
 
 /**
@@ -244,7 +244,7 @@ export function reviewActionFailure(err: unknown, action: "keep" | "restore"): s
 }
 
 /**
- * Slice 74: Keep / Undo writes its outcome onto the receipt of the Mari message that made the change, so
+ * Slice 74: Keep / Undo writes its outcome onto the receipt of the YunYun message that made the change, so
  * the card says "Kept" / "Undone" after a reload. Newest message first; never fails the answer.
  */
 export async function recordMariReceiptOutcome(

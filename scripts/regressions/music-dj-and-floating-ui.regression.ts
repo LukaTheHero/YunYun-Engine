@@ -29,12 +29,12 @@ assert.match(
   "The Music Player switch must remain off and unavailable until Music DJ is installed",
 );
 
-// 5bb03f918 replaced Professor Mari's floating window with the top-bar presence pill; she lives in
+// 5bb03f918 replaced Professor YunYun's floating window with the top-bar presence pill; she lives in
 // the omnibar and Home only, so no floating follow-up or floating window may come back.
 assert.doesNotMatch(
   appShellSource,
   /hasProfessorMariFloatingFollowup/u,
-  "Professor Mari has no floating window to follow chats",
+  "Professor YunYun has no floating window to follow chats",
 );
 // Slice 82: the chat's parts live in components/chat/mari/, so "nowhere" reads all of them.
 const professorMariPartsDir = new URL("../../packages/client/src/components/chat/mari/", import.meta.url);
@@ -45,9 +45,9 @@ const professorMariAllSource = [
 assert.doesNotMatch(
   professorMariAllSource,
   /floatingFollowupEligibleRef|rememberProfessorMariFloatingEnabled/u,
-  "Professor Mari's chat must not track a floating window",
+  "Professor YunYun's chat must not track a floating window",
 );
-// Slice 82: globals.css imports Mari's and the omnibar's rules from their own files; check all of them.
+// Slice 82: globals.css imports YunYun's and the omnibar's rules from their own files; check all of them.
 const allGlobalStyles = [
   globalsSource,
   ...["mari.css", "omnibar.css", "omnibar-settings.css"].map((name) => readFileSync(new URL(name, globalsUrl), "utf8")),

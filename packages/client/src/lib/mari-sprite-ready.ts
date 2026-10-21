@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from "react";
 
 /**
- * Slice 85: a Mari sheet is drawn only once the browser has decoded it. Until then her surface keeps
+ * Slice 85: a YunYun sheet is drawn only once the browser has decoded it. Until then her surface keeps
  * the last sheet that was decoded, so a hand-over (empty home → sending → live line, or a window
  * opening or closing) never leaves a frame without her. Module state, so it survives the unmount of
  * the sprite it was drawn by.
@@ -30,7 +30,7 @@ export function warmMariSprite(url: string): Promise<void> {
 }
 
 /**
- * The sheet a Mari sprite draws for `url`: `url` itself once decoded, else the last decoded sheet.
+ * The sheet a YunYun sprite draws for `url`: `url` itself once decoded, else the last decoded sheet.
  * `ready` is true when the drawn sheet is decoded, so the surface never shows an empty box.
  */
 export function useMariSpriteSource(url: string): { src: string; ready: boolean } {

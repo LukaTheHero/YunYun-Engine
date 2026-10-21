@@ -13,7 +13,7 @@ interface MariContextChipProps {
   /** Where the chip lives; also the handoff entry point. */
   entryPoint: Extract<ProfessorMariEntryPoint, "character-editor" | "character-chat">;
   surface: MariFieldInput["surface"];
-  /** The resource Mari is looking at (character being edited / chatted with). */
+  /** The resource YunYun is looking at (character being edited / chatted with). */
   resource?: ProfessorMariContextResource;
   /** Focused field id in the editor, if any. */
   field?: string;
@@ -24,7 +24,7 @@ interface MariContextChipProps {
 }
 
 /**
- * Context-aware Mari trigger. Runs the local (LLM-free) heuristic over `value`
+ * Context-aware YunYun trigger. Runs the local (LLM-free) heuristic over `value`
  * to advertise the most useful action, and hands off to the floating assistant
  * with a typed context on click.
  */
@@ -43,7 +43,7 @@ export function MariContextChip({
     [surface, field, value, subject],
   );
 
-  const genericLabel = t("mari.contextChip.generic", "Ask Professor Mari");
+  const genericLabel = t("mari.contextChip.generic", "Ask Professor YunYun");
   const effectiveLabel = suggestion ? t(suggestion.labelKey, suggestion.label, suggestion.labelValues) : genericLabel;
 
   const handleOpen = () => {

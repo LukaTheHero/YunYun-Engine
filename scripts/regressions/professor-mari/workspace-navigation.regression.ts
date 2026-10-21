@@ -9,4 +9,4 @@ assert.equal(resolveProfessorMariWorkspaceBackAction("chats", false), "destinati
 assert.equal(resolveProfessorMariWorkspaceBackAction("context", false), "destination");
 assert.equal(resolveProfessorMariWorkspaceBackAction("chat", false), "workspace");
 
-console.log("Professor Mari workspace-navigation regression checks passed.");
+console.log("Professor YunYun workspace-navigation regression checks passed.");

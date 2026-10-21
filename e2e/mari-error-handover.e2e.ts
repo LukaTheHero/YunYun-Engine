@@ -36,7 +36,7 @@ async function startProvider() {
         return;
       }
       const body = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { stream?: boolean };
-      // Professor Mari's workspace protocol: one JSON object, with the reply in `say` and `stop` set.
+      // Professor YunYun's workspace protocol: one JSON object, with the reply in `say` and `stop` set.
       const content = JSON.stringify({ say: REPLY, stop: true, commands: [] });
       if (body.stream) {
         res.writeHead(200, { "content-type": "text/event-stream" });
@@ -62,7 +62,7 @@ async function startProvider() {
   };
 }
 
-/** Records, on every animation frame, whether a Mari matching `selector` is on screen. */
+/** Records, on every animation frame, whether a YunYun matching `selector` is on screen. */
 async function startFrameSampler(page: Page, selector: string) {
   await page.evaluate((sel) => {
     const w = window as unknown as { __mariFrames: number[]; __mariRaf: number; __mariStart: number };
@@ -122,7 +122,7 @@ async function openMariWithProvider(
   const connectionId = ((await connection.json()) as { id: string }).id;
   await page.setViewportSize({ width, height });
   await page.addInitScript((v) => localStorage.setItem("marinara:whats-new:seen-version", v), APP_VERSION);
-  await page.route("**/sprites/mari/**", async (route) => {
+  await page.route("**/sprites/yunyun/**", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, SHEET_DELAY_MS));
     await route.continue();
   });
@@ -149,7 +149,7 @@ async function openWindowWithMari(page: Page) {
     return isApplePlatform() ? "Meta+j" : "Control+j";
   });
   await page.keyboard.press(mariShortcut);
-  const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+  const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
   await expect(mariPane.locator(SHEET_ONLY).first()).toBeVisible({ timeout: 30_000 });
   return mariPane;
 }
@@ -174,7 +174,7 @@ for (const [label, width, height] of [
   ["390", 390, 844],
   ["1440", 1440, 900],
 ] as const) {
-  test(`${label}: a failed run keeps Mari beside the error card, with no frame without her`, async ({
+  test(`${label}: a failed run keeps YunYun beside the error card, with no frame without her`, async ({
     page,
     request,
     browserName,
@@ -203,7 +203,7 @@ for (const [label, width, height] of [
       if (sampled) {
         console.log(`HANDOVER11 error ${label} frames=${sampled.frames} fps=${sampled.fps} blank=${sampled.blank}`);
         expect(sampled.frames, "enough frames were sampled to judge the error hand-over").toBeGreaterThan(5);
-        expect(sampled.blank, "no frame without Mari from her working line to the error card").toBe(0);
+        expect(sampled.blank, "no frame without YunYun from her working line to the error card").toBe(0);
       }
     } finally {
       await cleanUp(request, connectionId);
@@ -236,7 +236,7 @@ for (const [label, width, height] of [
         const sampled = await stopFrameSampler(page);
         console.log(`HANDOVER11 done ${label} frames=${sampled.frames} fps=${sampled.fps} blank=${sampled.blank}`);
         expect(sampled.frames, "enough frames were sampled to judge the done hand-over").toBeGreaterThan(5);
-        expect(sampled.blank, "no frame without Mari from her live line to her resting pose").toBe(0);
+        expect(sampled.blank, "no frame without YunYun from her live line to her resting pose").toBe(0);
       }
     } finally {
       await cleanUp(request, connectionId);

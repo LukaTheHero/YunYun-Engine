@@ -67,7 +67,7 @@ export function matchesOmnibarScope(result: Pick<OmnibarResult, "id" | "category
 }
 
 /**
- * Whether handing the typed text to Professor Mari should send it. Typing only
+ * Whether handing the typed text to Professor YunYun should send it. Typing only
  * the name of the row you found ("eliza" on Eliza) is a search, not a request,
  * so it opens her with the draft; anything more ("make eliza meaner") sends.
  */
@@ -81,7 +81,7 @@ const QUESTION_WORD =
   /^(why|how|what|when|where|who|whom|whose|which|can|could|should|would|will|is|are|am|was|were|do|does|did|has|have|had)\b/iu;
 
 /**
- * Whether typed text reads as a question. Ctrl/⌘+J carries only a question into Mari's composer; any other
+ * Whether typed text reads as a question. Ctrl/⌘+J carries only a question into YunYun's composer; any other
  * text leaves her window empty, so a half-typed search never lands there as a request.
  */
 export function isQuestionShaped(rawQuery: string): boolean {

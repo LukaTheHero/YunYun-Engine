@@ -1,4 +1,4 @@
-// The safety checks Professor Mari's loop runs after each model round, as plain functions of explicit
+// The safety checks Professor YunYun's loop runs after each model round, as plain functions of explicit
 // state: holding mutations for approval, the completion-claim audit with its repair budgets, and the
 // repeated-failure stop. The loop keeps its own control flow and event emission.
 import type { MariPermissionsMode } from "@marinara-engine/shared";
@@ -128,7 +128,7 @@ export function reviewRoundClaim(
   return {
     kind: "stop",
     content:
-      "Professor Mari could not verify the requested workspace change, so I stopped before showing an unsupported completion claim. Ask her to continue and she can use the saved workspace trace.",
+      "Professor YunYun could not verify the requested workspace change, so I stopped before showing an unsupported completion claim. Ask her to continue and she can use the saved workspace trace.",
   };
 }
 
@@ -147,5 +147,5 @@ export function reviewRepeatedFailures(
     })
     .find((entry) => entry.count >= MAX_REPEATED_COMMAND_FAILURES);
   if (!repeatedFailure) return null;
-  return `Professor Mari hit the same ${repeatedFailure.commandResult.name} error ${MAX_REPEATED_COMMAND_FAILURES} times, so I stopped the workspace loop before it spammed the chat. Error: ${repeatedFailure.commandResult.output}`;
+  return `Professor YunYun hit the same ${repeatedFailure.commandResult.name} error ${MAX_REPEATED_COMMAND_FAILURES} times, so I stopped the workspace loop before it spammed the chat. Error: ${repeatedFailure.commandResult.output}`;
 }

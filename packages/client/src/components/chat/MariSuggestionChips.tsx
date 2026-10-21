@@ -50,7 +50,7 @@ interface ChipFadeState {
   right: boolean;
 }
 
-// N4: how long a touch press on a Mari card waits before it drafts instead of sending.
+// N4: how long a touch press on a YunYun card waits before it drafts instead of sending.
 const CARD_LONG_PRESS_MS = 500;
 
 // Pointer travel before a press turns into a scroll drag. Small enough that flicking the row
@@ -296,7 +296,7 @@ const MAX_NEXT_STEPS = 4;
 
 /**
  * M5b / R10: what next, as rows of one group under the finished turn (type icon, label, one fact). The
- * trailing glyph says what a tap does: › runs the row's `action` at once, a gold ✦ asks Mari. N4: with
+ * trailing glyph says what a tap does: › runs the row's `action` at once, a gold ✦ asks YunYun. N4: with
  * Shift held, or after a long press on touch, `draft` is true and the caller puts the prompt in the
  * composer instead. `bare` returns the rows only, for a group the caller already draws (the arrival).
  */

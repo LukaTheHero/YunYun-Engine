@@ -1,6 +1,6 @@
 # Message Translation
 
-Marinara Engine can translate chat messages between languages. This guide covers the four translation providers, the automatic translation toggles, the per-message Translate button, and the limits of each provider.
+YunYun Engine can translate chat messages between languages. This guide covers the four translation providers, the automatic translation toggles, the per-message Translate button, and the limits of each provider.
 
 Translation is set up per chat. Each chat keeps its own provider, languages, and keys. To start new chats with the same settings, save them as [translator defaults](#translator-defaults-for-new-chats).
 
@@ -45,7 +45,7 @@ When you pick **DeepL API**, a **DeepL API Key** field appears. Paste your DeepL
 xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx
 ```
 
-A key that ends in `:fx` is a free-tier key. Marinara sends it to DeepL's free service. Any other key is treated as a paid key.
+A key that ends in `:fx` is a free-tier key. YunYun sends it to DeepL's free service. Any other key is treated as a paid key.
 
 ### DeepLX setup
 
@@ -55,7 +55,7 @@ DeepLX is a free, self-hosted translation server that you run yourself. When you
 http://localhost:1188
 ```
 
-If your DeepLX server runs on your own machine or your local network, the address is a local address. Marinara blocks requests to local addresses by default for safety. To allow them, set this line in your `.env` file and save the file:
+If your DeepLX server runs on your own machine or your local network, the address is a local address. YunYun blocks requests to local addresses by default for safety. To allow them, set this line in your `.env` file and save the file:
 
 ```
 DEEPLX_LOCAL_URLS_ENABLED=true
@@ -67,7 +67,7 @@ A DeepLX server at a public internet address does not need this setting. Only lo
 
 ### AI translation setup
 
-When you pick **AI (via connection)**, Marinara uses one of your AI providers to translate. Three extra fields appear.
+When you pick **AI (via connection)**, YunYun uses one of your AI providers to translate. Three extra fields appear.
 
 The **Connection** dropdown lets you choose which AI connection does the translating. This field is required. If you leave it unset, translation fails with the message "Connection ID is required for AI translation". A connection is a saved link to an AI provider. See the connections guide below to set one up.
 
@@ -81,9 +81,9 @@ You are a translator. Translate the given text accurately into {{targetLanguage}
 
 Below the provider settings are four toggles. All four are off by default.
 
-**Auto-Translate Responses** translates every AI response automatically, right after it is generated. In Game mode, Marinara removes game-master-only tags from the narration before translating it.
+**Auto-Translate Responses** translates every AI response automatically, right after it is generated. In Game mode, YunYun removes game-master-only tags from the narration before translating it.
 
-**Translate My Messages** translates your own message into **Model Language** just before it is sent to the AI. The translation replaces your typed text. If the translation fails, Marinara sends your original text instead and shows an error message.
+**Translate My Messages** translates your own message into **Model Language** just before it is sent to the AI. The translation replaces your typed text. If the translation fails, YunYun sends your original text instead and shows an error message.
 
 **Show Draft Translate Button** adds a **Translate draft** button next to the **Send** button. This lets you translate your message and review or edit the result before you send it. This is the manual alternative to **Translate My Messages**, which translates on send with no chance to review.
 
@@ -95,7 +95,7 @@ In **Conversation**, you can always translate an unsent draft from the composer'
 
 Below the toggles, **Save translator defaults** saves this chat's translation settings for new chats in every mode. Settings from the setup wizard and from a settings profile come first. Existing chats keep their own settings. **Forget saved defaults** clears them. [Noodle](../noodle/settings.md#translation) uses the same defaults.
 
-The DeepL API key and the DeepLX URL stay on this Marinara install. Chat exports, exported settings profiles and **Export Profile** files leave them out, and importing any of them never sets them. Enter them again after you move a chat to another install.
+The DeepL API key and the DeepLX URL stay on this YunYun install. Chat exports, exported settings profiles and **Export Profile** files leave them out, and importing any of them never sets them. Enter them again after you move a chat to another install.
 
 ## The per-message Translate button
 

@@ -92,7 +92,7 @@ export async function fetchOpenAIChatGPTPlanUsage(): Promise<PlanUsage> {
     logger.warn("[openai-chatgpt/usage] Plan usage request failed with %d", res.status);
     throw new Error(
       res.status === 401 || res.status === 403
-        ? "ChatGPT rejected the Codex login. Run `codex login` on the Marinara host, then try again."
+        ? "ChatGPT rejected the Codex login. Run `codex login` on the YunYun host, then try again."
         : `ChatGPT returned ${res.status} for the plan usage lookup`,
     );
   }

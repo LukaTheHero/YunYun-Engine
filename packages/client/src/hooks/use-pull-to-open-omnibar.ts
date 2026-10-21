@@ -32,7 +32,7 @@ const FOLLOW: SpringSpec = [130, 24]; // the circle trails the finger
 const BASE: SpringSpec = [90, 20]; // the sheet widens and narrows
 const GROW: SpringSpec = [180, 27]; // the circle grows
 const SHOW: SpringSpec = [220, 28]; // icon, portrait and small bar appear
-const SIDE: SpringSpec = [200, 26]; // search <-> Mari cross-fade
+const SIDE: SpringSpec = [200, 26]; // search <-> YunYun cross-fade
 const GLOW: SpringSpec = [120, 18];
 const POP: SpringSpec = [240, 13]; // the circle's flex on release
 const PINCH: SpringSpec = [85, 19]; // at the threshold the sheet thins and lets go (~0.45 s)
@@ -45,7 +45,7 @@ const OPEN: SpringSpec = [210, 21]; // the circle pops open into the view
 const DOCK: SpringSpec = [200, 27]; // the magnifier settles into the search field
 const DIP: SpringSpec = [300, 18]; // the arm dip: down about 4 px, a hair back up, still
 const TILT: SpringSpec = [160, 14]; // her head leans with a sideways drag and rocks back once
-const MORPH: SpringSpec = [190, 24]; // M17: the circle becomes the present Mari (~0.4 s, a hint of overshoot)
+const MORPH: SpringSpec = [190, 24]; // M17: the circle becomes the present YunYun (~0.4 s, a hint of overshoot)
 /** Soft light from within; a very faint accent around the circle once armed. */
 const GLOW_REST = 0.02;
 const GLOW_PULL = 0.07;
@@ -62,9 +62,9 @@ const TILT_MAX = 5;
 const POP_DELAY_MS = 130;
 /** If the dialog never mounts, the overlay still leaves. */
 const HANDOFF_TIMEOUT_MS = 1500;
-/** How long the morph waits for her sprite to mount in the (lazy) Mari pane before it gives up. */
+/** How long the morph waits for her sprite to mount in the (lazy) YunYun pane before it gives up. */
 const MORPH_WAIT_MS = 2500;
-/** Where the pull lands in the opened dialog: the magnifier, or the one Mari on screen now (M17). */
+/** Where the pull lands in the opened dialog: the magnifier, or the one YunYun on screen now (M17). */
 const PULL_LANDING_SELECTOR: Record<PullTarget, string> = {
   search: '[data-mari-pull-target="search"]',
   mari: '[data-mari-pull-target="mari-current"]',
@@ -168,7 +168,7 @@ export interface PullDropElements {
   tagSearch?: HTMLSpanElement | null;
   tagMari?: HTMLSpanElement | null;
   chip?: HTMLDivElement | null;
-  /** M17: her head in the circle, opening into her sprite where she is in the Mari pane. */
+  /** M17: her head in the circle, opening into her sprite where she is in the YunYun pane. */
   morph?: HTMLDivElement | null;
   morphPortrait?: HTMLSpanElement | null;
   morphSprite?: HTMLSpanElement | null;
@@ -186,7 +186,7 @@ export interface PullDropVisuals {
 
 /**
  * Pull down on the phone top bar to open the omnibar (left half) or Professor
- * Mari (right half). Spread `handlers` on the bar and the safe-area strip above
+ * YunYun (right half). Spread `handlers` on the bar and the safe-area strip above
  * it and render `visuals` with `OmnibarPullDrop`: a sheet of the bar's own
  * surface stretches down to a circle with a small bar under it, both above the
  * fingertip; past the threshold the sheet lets go of the circle, and on release
@@ -365,7 +365,7 @@ export function usePullToOpenOmnibar({
       shadow.style.opacity = String(px(grown * 100) / 100);
     }
 
-    // The magnifier or Mari's portrait materializes in the circle; switching sides cross-fades them.
+    // The magnifier or YunYun's portrait materializes in the circle; switching sides cross-fades them.
     const t = clamp01(mv.side.get());
     const show = clamp01(mv.show.get());
     const showTag = clamp01(mv.tag.get());
@@ -411,7 +411,7 @@ export function usePullToOpenOmnibar({
       panel.style.clipPath = `circle(${px(lerp(fr, reach, Math.max(0, open)))}px at ${px(fx - rect.left)}px ${px(fy - rect.top)}px)`;
     }
 
-    // M17: the circle opens into the present Mari's sprite box, read every frame so a pane still settling
+    // M17: the circle opens into the present YunYun's sprite box, read every frame so a pane still settling
     // (or a transcript that scrolled it into view) is followed. Transform, opacity and the clip only.
     const morph = g.morph;
     if (morph && els.morph) {
@@ -530,7 +530,7 @@ export function usePullToOpenOmnibar({
       };
       const landed = () => g.gesture === gesture && g.mode === "land";
       /**
-       * M17: the circle becomes the present Mari, wherever she is in the pane: the live-line sprite, the
+       * M17: the circle becomes the present YunYun, wherever she is in the pane: the live-line sprite, the
        * one resting beside her newest reply, or the arrival sprite (`mari-current`, only ever one). Her
        * head in the circle grows into her sprite box and cross-fades to the same sheet frame; then the
        * real sprite shows under the identical morph, which fades. False when she never appeared.

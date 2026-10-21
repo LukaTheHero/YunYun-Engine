@@ -19,7 +19,7 @@ import { WORLD_INTERIOR_USES } from "./furniture.js";
 
 /** 3 (map editor Phases 2 and 3): towns may hold placed buildings, the new ground kinds and decorations
  *  (`editsVersion` 3); 2 (W13c): hand edits may hold rooms drawn by hand (`editsVersion` 2). Older snapshots
- *  read as they are. An older Engine refuses a newer snapshot as made by a newer Marinara Engine. */
+ *  read as they are. An older Engine refuses a newer snapshot as made by a newer YunYun Engine. */
 export const WORLD_SNAPSHOT_VERSION = 3;
 
 /** A town as the snapshot keeps it: everything but its people, who are its places' casts. */
@@ -307,7 +307,7 @@ export function readWorldSnapshot(
   if (!value || typeof value !== "object") return { ok: false, issues: ["The world's snapshot is not an object."] };
   const version = (value as { snapshotVersion?: unknown }).snapshotVersion;
   if (typeof version === "number" && version > WORLD_SNAPSHOT_VERSION) {
-    return { ok: false, issues: ["The world's snapshot was made by a newer version of Marinara Engine."] };
+    return { ok: false, issues: ["The world's snapshot was made by a newer version of YunYun Engine."] };
   }
   const parsed = snapshotShape.safeParse(value);
   if (!parsed.success) {

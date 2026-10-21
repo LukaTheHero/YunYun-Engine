@@ -13,7 +13,7 @@
  * offer these choices.
  */
 export const OMNIBAR_ASIDE_DELAY_MS = 3_000;
-/** The aside setting that follows Mari's connection, so a change there is picked up without touching the setting. */
+/** The aside setting that follows YunYun's connection, so a change there is picked up without touching the setting. */
 export const MARI_QUICK_CONNECTION = "mari";
 export const OMNIBAR_ASIDE_DELAY_CHOICES_MS = [1_000, 2_000, 3_000, 5_000] as const;
 
@@ -85,7 +85,7 @@ export function stripStrayMarkdown(text: string): string {
     .replace(/^\s*\d+\.\s+/gm, "");
 }
 
-/** Browser key Mari's connection was saved under before it moved into the UI store. Read once, by the v103 migration. */
+/** Browser key YunYun's connection was saved under before it moved into the UI store. Read once, by the v103 migration. */
 const LEGACY_MARI_CONNECTION_STORAGE_KEY = "marinara:home-professor-mari-connection-id";
 
 export function readLegacyMariConnectionId(): string | null {
@@ -97,8 +97,8 @@ export function readLegacyMariConnectionId(): string | null {
 }
 
 /**
- * The connection Mari answers with: the one her window uses (`chosenId`, when it still exists), else the
- * agents default, then the default, then the first, the order the server uses for a new Mari chat.
+ * The connection YunYun answers with: the one her window uses (`chosenId`, when it still exists), else the
+ * agents default, then the default, then the first, the order the server uses for a new YunYun chat.
  */
 export function marisConnectionFor<T extends { id: string; isDefault: boolean; defaultForAgents: boolean }>(
   connections: readonly T[],

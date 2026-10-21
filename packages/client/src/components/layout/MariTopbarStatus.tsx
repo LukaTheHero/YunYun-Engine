@@ -16,7 +16,7 @@ const STATE_GAZE: Record<Exclude<MariEdgeGlow, null>, string> = {
 };
 
 /**
- * Mari's state as one small pill in the top bar while her window is not showing it. It reads the same
+ * YunYun's state as one small pill in the top bar while her window is not showing it. It reads the same
  * edge state as the line under the bar. "Done" and "Failed" stay until she has shown that run in her window
  * (the seen marker on the server), "Needs you" until it is answered, and "Working" while she runs.
  */

@@ -24,9 +24,9 @@ On a computer, click the **X** beside the layout tips (**Hide these tips for thi
 
 ## Changing how chat windows look
 
-Open **Settings > Appearance > App** and scroll to **Chat widget style** at the bottom of **App Style**. **Default** keeps the familiar Marinara look. **Dottore** combines icy blues and pale metal with technical lettering and cut corners; **Prof. Mari** pairs gemstone blues and warm gold with storybook lettering and arched frames. Both adapt to light and dark mode and style the movable buttons, windows and expandable sections in all three chat modes.
+Open **Settings > Appearance > App** and scroll to **Chat widget style** at the bottom of **App Style**. **Default** keeps the familiar YunYun look. **Dottore** combines icy blues and pale metal with technical lettering and cut corners; **Prof. YunYun** pairs gemstone blues and warm gold with storybook lettering and arched frames. Both adapt to light and dark mode and style the movable buttons, windows and expandable sections in all three chat modes.
 
-Use **Font**, **Shape** and the three color pickers below the presets to mix things up. Fonts you have installed in Marinara appear in the font list too. Choosing a preset again resets the font, shape and custom colors. These choices do not move your windows or change your saved chat layouts. They are saved with your app preferences and sync to browsers connected to the same server.
+Use **Font**, **Shape** and the three color pickers below the presets to mix things up. Fonts you have installed in YunYun appear in the font list too. Choosing a preset again resets the font, shape and custom colors. These choices do not move your windows or change your saved chat layouts. They are saved with your app preferences and sync to browsers connected to the same server.
 
 **Button size (px)** changes movable chat buttons and their icons without changing Display Size. Enter a size from 32 to 96 pixels. Leave the field empty, or use its reset button, to keep the current default. The size is saved with your appearance preferences and stays the same when you choose another preset.
 
@@ -122,7 +122,7 @@ The **Chat Name** section holds the name shown in your chat list. This name is o
 
 ## Connection
 
-The **Connection** section picks which AI provider and model answers in this chat. A connection is a saved link to an AI provider, including its API key and chosen model. An API key is a secret code that lets Marinara Engine use your account with that provider.
+The **Connection** section picks which AI provider and model answers in this chat. A connection is a saved link to an AI provider, including its API key and chosen model. An API key is a secret code that lets YunYun Engine use your account with that provider.
 
 Pick a saved connection from the dropdown. You can also pick **Random**. It chooses a different connection each time from the connections you marked for your random pool.
 
@@ -145,13 +145,13 @@ The bar has a row of small icon buttons with no text labels. Each button shows i
 - The up-arrow icon (**Export settings profile (.json)**) saves the selected profile to a `.json` file.
 - The trash icon (**Delete profile**) removes the selected profile.
 
-Next to the dropdown is a star button. Click it to make a profile the default for new chats in this mode. When you create a new chat in that mode, Marinara applies the starred profile for you. Only one profile per mode can be the default.
+Next to the dropdown is a star button. Click it to make a profile the default for new chats in this mode. When you create a new chat in that mode, YunYun applies the starred profile for you. Only one profile per mode can be the default.
 
 Each mode that supports this feature has a built-in **Default** profile. You cannot rename, save into, or delete the **Default** profile. Applying it resets the profile-controlled settings to the app defaults.
 
 The profile controls do not appear in Game mode.
 
-Marinara reserves **preset** for prompt presets. A prompt preset shapes the system prompt structure and generation parameters; a settings profile bundles the reusable chat configuration listed above. For the full rules, see [Settings Profiles](settings-profiles.md).
+YunYun reserves **preset** for prompt presets. A prompt preset shapes the system prompt structure and generation parameters; a settings profile bundles the reusable chat configuration listed above. For the full rules, see [Settings Profiles](settings-profiles.md).
 
 ## Chat Variables
 

@@ -1,4 +1,4 @@
-// Slice 74 / 87: what Professor Mari changed, as a card under her answer. Built only from the record on her
+// Slice 74 / 87: what Professor YunYun changed, as a card under her answer. Built only from the record on her
 // message (`mariWorkspaceActionResults`), so it reads the same live, after Undo and after a reload: face and
 // name, what changed in words, the changed fields (folded: one key field; opened: every field), her reason,
 // and Undo while the undo copy lasts. No Keep: an applied change is already saved, and Undo is the way back.

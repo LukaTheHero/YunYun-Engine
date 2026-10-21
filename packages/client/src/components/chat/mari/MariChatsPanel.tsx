@@ -205,7 +205,7 @@ export function MariChatsPanel({
                             aria-pressed={chatHistorySelectionMode ? selected : undefined}
                             className="mari-row__toggle disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {/* Q6 / R10: the slot says it is a Mari chat; the fact says what it is about. */}
+                            {/* Q6 / R10: the slot says it is a YunYun chat; the fact says what it is about. */}
                             <span className="mari-row__slot" aria-hidden="true">
                               <ResultTypeIcon type="mari-chat" glyph />
                             </span>

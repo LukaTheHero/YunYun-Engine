@@ -39,7 +39,7 @@ The mirror is now on for that chat. To turn it off, clear the input box so it is
 
 If the URL is not a valid Discord webhook, you see the red text "Invalid webhook URL format" below the box. Fix the URL, and the mirror will save. YunYun also checks the URL again on the server when you save.
 
-The webhook URL stays on this Marinara install. Chat exports, exported settings profiles and **Export Profile** files leave it out, and importing any of them never turns on a mirror. To mirror a chat you moved to another install, paste the URL again there. A settings profile you saved on this install still sets your mirror when you apply it.
+The webhook URL stays on this YunYun install. Chat exports, exported settings profiles and **Export Profile** files leave it out, and importing any of them never turns on a mirror. To mirror a chat you moved to another install, paste the URL again there. A settings profile you saved on this install still sets your mirror when you apply it.
 
 ## What gets sent
 

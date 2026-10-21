@@ -132,7 +132,7 @@ try {
     ["Alice", "Bob"].map((name) => characters.create(characterDataSchema.parse({ name }))),
   );
   assert(alice && bob);
-  const persona = await characters.createPersona("Mari", "The player.");
+  const persona = await characters.createPersona("YunYun", "The player.");
   assert(persona);
   const presets = createPromptsStorage(db);
   const preset = await presets.create({
@@ -210,7 +210,7 @@ try {
 
   // The reply being generated: a post-generation agent reads its whispers in place, labeled with each recipient.
   await generate(
-    'Before. [whisper: character="Bob" text="REPLY_SECRET"] After. [whisper: character="Mari" text="PERSONA_SECRET"]',
+    'Before. [whisper: character="Bob" text="REPLY_SECRET"] After. [whisper: character="YunYun" text="PERSONA_SECRET"]',
     alice.id,
   );
   const replyPost = latest("POST_AGENT_FIXTURE");
@@ -220,7 +220,7 @@ try {
       "Before.",
       "[Private whisper to Bob: REPLY_SECRET]",
       "After.",
-      "[Private whisper to Mari: PERSONA_SECRET]",
+      "[Private whisper to YunYun: PERSONA_SECRET]",
     ),
     replyPost,
   );
@@ -360,7 +360,7 @@ try {
       "Before.",
       "[Private whisper to Bob: REPLY_SECRET]",
       "After.",
-      "[Private whisper to Mari: PERSONA_SECRET]",
+      "[Private whisper to YunYun: PERSONA_SECRET]",
     ),
     packageReply,
   );
@@ -631,7 +631,7 @@ try {
       { id: bob.id, name: "Bob", role: "character" },
     ],
     participants: [
-      { id: "host_12345", displayName: "Mari", persona: { name: "Mari", description: "The host." }, isHost: true },
+      { id: "host_12345", displayName: "YunYun", persona: { name: "YunYun", description: "The host." }, isHost: true },
     ],
   };
   await chats.patchMetadata(roomChat.id, {

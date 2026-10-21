@@ -774,7 +774,7 @@ async function buildNativeCharacterExport(
 
 /**
  * `keepOnboarding` is for the Compatible PNG route only. The PNG is the file
- * authors hand around, so a Marinara user importing it should still get the
+ * authors hand around, so a YunYun user importing it should still get the
  * card's onboarding; other front-ends ignore the unknown extension key. The
  * Compatible JSON export deliberately omits it, so that stays a clean V2 card.
  */

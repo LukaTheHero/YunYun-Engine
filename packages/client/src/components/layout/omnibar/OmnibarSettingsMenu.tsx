@@ -1,9 +1,9 @@
 // The omnibar's own settings, in the omnibar, and since Q2 the home of every omnibar and
-// Professor Mari setting. The app's Settings panel keeps one row that opens this view, and
+// Professor YunYun setting. The app's Settings panel keeps one row that opens this view, and
 // `settings-registry.ts` lists these controls under the `omnibar` section so search, the Settings
-// panel's own search and Mari's links all land here, at the control (`omnibar-setting-<id>`).
+// panel's own search and YunYun's links all land here, at the control (`omnibar-setting-<id>`).
 //
-// A view inside the omnibar card, like Mari's: it covers the list with its own back arrow, and
+// A view inside the omnibar card, like YunYun's: it covers the list with its own back arrow, and
 // Escape or the arrow returns to where you were. It is not a separate `Modal`, so the omnibar's
 // dialog, focus and Escape handling stay in one place. Open/closed lives in `ui.store`
 // (`omnibarSettings`) so the Settings panel and navigation targets can open it too.
@@ -53,7 +53,7 @@ import { MARI_QUICK_CONNECTION, OMNIBAR_ASIDE_DELAY_CHOICES_MS } from "../../../
 import { useLocalizedUiText } from "../../../localization/use-localized-ui-text";
 import { cn } from "../../../lib/utils";
 
-/** The anchor a search row, the Settings panel or one of Mari's links scrolls to. */
+/** The anchor a search row, the Settings panel or one of YunYun's links scrolls to. */
 function anchorId(controlId: string) {
   return `omnibar-setting-${controlId}`;
 }
@@ -164,16 +164,16 @@ function SettingRow({
   );
 }
 
-// #5725: Professor Mari's server-authoritative Permissions Mode, moved here from the Settings
+// #5725: Professor YunYun's server-authoritative Permissions Mode, moved here from the Settings
 // panel (Q2). Fetched on mount and written through the dedicated validated PUT; a change applies
-// to Mari's next run (an in-flight turn is never aborted by a mode switch).
+// to YunYun's next run (an in-flight turn is never aborted by a mode switch).
 function PermissionsModeRow() {
   const { t } = useTranslation();
   const localize = useLocalizedUiText();
   const selectId = useId();
   const [mode, setMode] = useState<MariPermissionsMode | null>(null);
   // Sequence local writes so a stale GET (or a stale failure rollback) can never clobber a newer
-  // selection. Mari's composer writes the same server setting, but this view mounts fresh on every
+  // selection. YunYun's composer writes the same server setting, but this view mounts fresh on every
   // open, so the one read on mount is current.
   const writeSeqRef = useRef(0);
   useEffect(() => {
@@ -197,7 +197,7 @@ function PermissionsModeRow() {
     const writeSeq = ++writeSeqRef.current;
     setMode(next);
     try {
-      // The shared chain serializes this against the Mari panel's per-chat writes AND against
+      // The shared chain serializes this against the YunYun panel's per-chat writes AND against
       // runs, so a default change here can never race a prompt on an un-overridden chat.
       await enqueueMariPermissionsModeWrite(() =>
         api.put("/professor-mari/workspace/permissions-mode", { mode: next }),
@@ -242,7 +242,7 @@ const MARI_RUNTIME_LABEL_KEYS: Record<MariRuntime, string> = {
 
 type MariRuntimeStatus = Pick<MariWorkspaceStatus, "runtimeSelected" | "runtimeActive">;
 
-// Professor Mari's runtime ("classic" or "pi"), the same server-authoritative pattern as the
+// Professor YunYun's runtime ("classic" or "pi"), the same server-authoritative pattern as the
 // Permissions Mode row above. The workspace status answers for her connection, so it also says
 // when "pi" is selected but the next run falls back to "classic" there.
 function RuntimeRow() {
@@ -443,8 +443,8 @@ export function OmnibarSettingsButton({ open, onOpen }: { open: boolean; onOpen:
       type="button"
       onClick={onOpen}
       aria-expanded={open}
-      aria-label={t("omnibar.settings.label", "Search and Professor Mari settings")}
-      title={t("omnibar.settings.label", "Search and Professor Mari settings")}
+      aria-label={t("omnibar.settings.label", "Search and Professor YunYun settings")}
+      title={t("omnibar.settings.label", "Search and Professor YunYun settings")}
       className={cn("omnibar-settings-menu__trigger", open && "omnibar-settings-menu__trigger--open")}
     >
       <Settings2 size={14} />
@@ -461,11 +461,11 @@ export function OmnibarSettingsSheet({
   onSetUpLocalModel,
 }: {
   onClose: () => void;
-  /** Scrolls to and focuses this setting on open (a search row, the Settings panel, Mari's link). */
+  /** Scrolls to and focuses this setting on open (a search row, the Settings panel, YunYun's link). */
   focusControlId: string | null;
   /** Language connections that can answer a quick question. */
   connections: readonly { id: string; name: string }[];
-  /** The connection Mari uses, which "Same as Mari" follows. Absent when she has none. */
+  /** The connection YunYun uses, which "Same as YunYun" follows. Absent when she has none. */
   marisConnectionName?: string | null;
   /** O2: forgets the local frecency history (which results you run most, per surface). */
   onClearSearchHistory: () => void;
@@ -555,7 +555,7 @@ export function OmnibarSettingsSheet({
           >
             <ChevronLeft size={16} />
           </button>
-          <h2 id="omnibar-settings-title">{t("omnibar.settings.label", "Search and Professor Mari settings")}</h2>
+          <h2 id="omnibar-settings-title">{t("omnibar.settings.label", "Search and Professor YunYun settings")}</h2>
         </header>
 
         <Section title={t("omnibar.settings.search.heading", "Search")}>
@@ -564,7 +564,7 @@ export function OmnibarSettingsSheet({
             label={t("omnibar.settings.suggestions.label", "Offer to improve a field")}
             description={t(
               "omnibar.settings.suggestions.description",
-              "While you edit a field, Search offers to have Professor Mari improve it.",
+              "While you edit a field, Search offers to have Professor YunYun improve it.",
             )}
             checked={suggestionsEnabled}
             onChange={setSuggestionsEnabled}
@@ -594,7 +594,7 @@ export function OmnibarSettingsSheet({
             label={t("omnibar.settings.aside.label", "Quick answers in Search")}
             description={t(
               "omnibar.settings.aside.description",
-              "When you type a question, Professor Mari answers in up to three sentences from the docs. She sees only what you typed and changes nothing.",
+              "When you type a question, Professor YunYun answers in up to three sentences from the docs. She sees only what you typed and changes nothing.",
             )}
             checked={asideEnabled}
             onChange={setAsideEnabled}
@@ -623,7 +623,7 @@ export function OmnibarSettingsSheet({
             >
               {marisConnectionName ? (
                 <option value={MARI_QUICK_CONNECTION}>
-                  {t("omnibar.settings.aside.connection.mari", "Same as Prof. Mari ({{name}})", {
+                  {t("omnibar.settings.aside.connection.mari", "Same as Prof. YunYun ({{name}})", {
                     name: marisConnectionName,
                   })}
                 </option>
@@ -675,7 +675,7 @@ export function OmnibarSettingsSheet({
               label={t("omnibar.settings.aside.delay.label", "Wait after typing")}
               description={t(
                 "omnibar.settings.aside.delay.description",
-                "How long Search waits before Professor Mari writes a quick answer.",
+                "How long Search waits before Professor YunYun writes a quick answer.",
               )}
             />
             <span className="omnibar-settings-menu__segmented">
@@ -728,11 +728,11 @@ export function OmnibarSettingsSheet({
           </div>
         </Section>
 
-        <Section title={t("omnibar.settings.mariWindow.heading", "Professor Mari window")} className="hidden sm:block">
+        <Section title={t("omnibar.settings.mariWindow.heading", "Professor YunYun window")} className="hidden sm:block">
           <div className="omnibar-settings-size-row" data-size-group="mari" {...sizingFocus("mari")}>
             <WindowSizeSlider
               anchor={anchorId("mari-window-height")}
-              label={t("omnibar.settings.windowHeight.label", "Professor Mari window height")}
+              label={t("omnibar.settings.windowHeight.label", "Professor YunYun window height")}
               visibleLabel={t("omnibar.settings.windowSize.height", "Height")}
               min={MARI_WINDOW_HEIGHT_MIN_REM}
               max={MARI_WINDOW_HEIGHT_MAX_REM}
@@ -741,7 +741,7 @@ export function OmnibarSettingsSheet({
             />
             <WindowSizeSlider
               anchor={anchorId("mari-window-width")}
-              label={t("omnibar.settings.windowWidth.label", "Professor Mari window width")}
+              label={t("omnibar.settings.windowWidth.label", "Professor YunYun window width")}
               visibleLabel={t("omnibar.settings.windowSize.width", "Width")}
               min={MARI_WINDOW_WIDTH_MIN_REM}
               max={MARI_WINDOW_WIDTH_MAX_REM}
@@ -751,10 +751,10 @@ export function OmnibarSettingsSheet({
           </div>
         </Section>
 
-        <Section title={t("omnibar.settings.mari.heading", "Professor Mari")}>
+        <Section title={t("omnibar.settings.mari.heading", "Professor YunYun")}>
           <SettingRow
             controlId="ask-mari"
-            label={t("omnibar.settings.mari.label", "Ask Professor Mari from Search")}
+            label={t("omnibar.settings.mari.label", "Ask Professor YunYun from Search")}
             description={t(
               "omnibar.settings.mari.description",
               "Open her from the Search field, the pull-down or Ctrl/Command+J.",
@@ -793,7 +793,7 @@ export function OmnibarSettingsSheet({
           </div>
           <SettingRow
             controlId="mari-send-on-enter"
-            label={t("omnibar.settings.sendOnEnter.label", "Enter sends to Professor Mari")}
+            label={t("omnibar.settings.sendOnEnter.label", "Enter sends to Professor YunYun")}
             description={t(
               "omnibar.settings.sendOnEnter.description",
               "When off, Enter adds a new line and Ctrl/Command+Enter sends.",
@@ -818,7 +818,7 @@ export function OmnibarSettingsSheet({
           title={t("omnibar.settings.appearance.heading", "Appearance")}
           description={t(
             "omnibar.settings.appearance.description",
-            "How Professor Mari looks in her chat, Search, Home and the top bar.",
+            "How Professor YunYun looks in her chat, Search, Home and the top bar.",
           )}
         >
           <AppearancePacks />

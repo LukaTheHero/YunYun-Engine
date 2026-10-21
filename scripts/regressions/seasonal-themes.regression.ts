@@ -124,7 +124,7 @@ try {
   assert.equal(saved?.seasonalThemesDisabled, false);
   assert.deepEqual(saved?.seasonalGreetingYears, { halloween: 2026 });
 
-  // A `?seasonalPreview=` page keeps its greeting, its "Turn it off" and Professor Mari's outfit opt-out in the store
+  // A `?seasonalPreview=` page keeps its greeting, its "Turn it off" and Professor YunYun's outfit opt-out in the store
   // for that page load only: none of it is saved or synced, so trying the preview never changes the real Halloween.
   assert.equal(initial.seasonalPreview, null, "no preview without ?seasonalPreview=");
   useUIStore.setState({
@@ -135,7 +135,7 @@ try {
   const thisYear = new Date().getFullYear();
   const previewDay = local(3, 5, 10, 0, thisYear);
   assert.deepEqual(seasonalThemeFor(useUIStore.getState(), previewDay), ON, "the preview wears Halloween in March");
-  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "raccoon", "and so does Mari");
+  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "raccoon", "and so does YunYun");
   useUIStore.getState().markSeasonalGreetingShown("halloween", thisYear);
   assert.deepEqual(seasonalThemeFor(useUIStore.getState(), previewDay), { themeId: "halloween", showGreeting: false });
   useUIStore.getState().setMariAppearancePack("safari");
@@ -145,7 +145,7 @@ try {
   useUIStore.getState().setMariAppearancePack("safari");
   useUIStore.getState().turnOffSeasonalTheme("halloween", thisYear);
   assert.deepEqual(seasonalThemeFor(useUIStore.getState(), previewDay), OFF, "the preview's Turn it off");
-  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "safari", "takes Mari's off too");
+  assert.equal(shownMariAppearancePack(useUIStore.getState(), null, previewDay).id, "safari", "takes YunYun's off too");
   const previewed = useUIStore.getState();
   assert.deepEqual(previewed.seasonalGreetingYears, {}, "the real greeting record is untouched");
   assert.deepEqual(previewed.seasonalThemeOffYears, {}, "the real Turn it off record is untouched");

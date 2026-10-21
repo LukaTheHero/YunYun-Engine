@@ -1,4 +1,4 @@
-// Pins the per-round safety checks Professor Mari's loop runs after each command batch (completion-claim
+// Pins the per-round safety checks Professor YunYun's loop runs after each command batch (completion-claim
 // audit, read-back mismatch, repair budgets, repeated-failure stop, mutation deferral) as pure functions
 // of explicit state. Recorded inputs only: no model, no network.
 import assert from "node:assert/strict";
@@ -190,4 +190,4 @@ const mutationOutput = (sentinel: string) =>
   assert.equal(decide("manual", frame("Looking now.", [{ name: "read", arguments: { path: "a.md" } }], false)), false);
 }
 
-console.log("Professor Mari round-review regression passed.");
+console.log("Professor YunYun round-review regression passed.");

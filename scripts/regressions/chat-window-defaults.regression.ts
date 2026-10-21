@@ -21,7 +21,7 @@ const { default: Fastify } = await import("../../packages/server/node_modules/fa
 const { getDB, closeDB } = await import("../../packages/server/src/db/connection.js");
 const { chatsRoutes, withoutPromptOnlyExtra } = await import("../../packages/server/src/routes/chats.routes.js");
 
-// Slice 70: the message list leaves out Mari's prompt-only continuity, string or object extra; nothing else changes.
+// Slice 70: the message list leaves out YunYun's prompt-only continuity, string or object extra; nothing else changes.
 {
   const [asObject, asString, plain] = withoutPromptOnlyExtra([
     { id: "a", extra: { mariWorkspaceContinuity: "long prompt-only text", thinking: "kept" } },

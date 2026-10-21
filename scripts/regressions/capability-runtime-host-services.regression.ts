@@ -141,7 +141,7 @@ try {
     "another package sees the very object the first one registered",
   );
   assert.equal(reader.services?.get("host-services-missing"), null);
-  // Agent runtime hooks and Mari actions stay host-only: no package reads them, not even the one that owns them.
+  // Agent runtime hooks and YunYun actions stay host-only: no package reads them, not even the one that owns them.
   for (const key of ["agent-runtime:host-services-full", "mari-actions:host-services-full"]) {
     const release = registerCapabilityService(key, { hook: "host only" });
     try {

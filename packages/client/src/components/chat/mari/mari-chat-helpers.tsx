@@ -1,4 +1,4 @@
-// Professor Mari's chat: constants, stored connection, attachments, message extras and failure kinds.
+// Professor YunYun's chat: constants, stored connection, attachments, message extras and failure kinds.
 import { type ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles, ClipboardList, FastForward, Hand, ShieldOff, type LucideIcon } from "lucide-react";
@@ -93,15 +93,15 @@ export const MARI_PERMISSIONS_MODE_FACT_KEYS: Record<MariPermissionsMode, string
 };
 
 export const MARI_WELCOME =
-  "Howdy, welcome to Marinara Engine!\n\nFeeling a little lost? It is not a skill issue yet, I am here to help! Ask me about the app, your setup, or what to do next.\n\nNeed something made or changed? I can create character cards, personas, lorebooks, chats, and presets, and I can make reversible local workspace changes with a Keep/Restore review. Select a connection via the link icon beside the paperclip first and then ask away!";
-export const NEW_SKILL_CONTENT = `# Custom Professor Mari Skill
+  "Howdy, welcome to YunYun Engine!\n\nFeeling a little lost? It is not a skill issue yet, I am here to help! Ask me about the app, your setup, or what to do next.\n\nNeed something made or changed? I can create character cards, personas, lorebooks, chats, and presets, and I can make reversible local workspace changes with a Keep/Restore review. Select a connection via the link icon beside the paperclip first and then ask away!";
+export const NEW_SKILL_CONTENT = `# Custom Professor YunYun Skill
 
-Use this skill when the request matches a workflow you want Professor Mari to follow.
+Use this skill when the request matches a workflow you want Professor YunYun to follow.
 
 ## Workflow
 
 - Add the trigger conditions.
-- Add the steps Professor Mari should follow.
+- Add the steps Professor YunYun should follow.
 - Add any checks or evidence she should collect before saying the work is done.
 `;
 
@@ -272,14 +272,14 @@ export function getProfessorMariAttachments(message: Message): ProfessorMariAtta
   });
 }
 
-/** The name every Mari chat is created with, before it earns a real one. */
-export const PROFESSOR_MARI_DEFAULT_CHAT_NAME = "Professor Mari";
+/** The name every YunYun chat is created with, before it earns a real one. */
+export const PROFESSOR_MARI_DEFAULT_CHAT_NAME = "Professor YunYun";
 const PROFESSOR_MARI_AUTO_TITLE_MAX = 48;
 
 /**
  * A title taken from the first thing the user asked. No second model call: the
  * opening question is already the best short summary of the conversation, and a
- * history of ten chats all called "Professor Mari" cannot be searched at all.
+ * history of ten chats all called "Professor YunYun" cannot be searched at all.
  */
 export function buildProfessorMariAutoTitle(text: string): string {
   const line = text.replace(/\s+/gu, " ").trim();

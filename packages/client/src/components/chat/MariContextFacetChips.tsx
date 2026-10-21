@@ -27,7 +27,7 @@ export function facetIcon(facet: ProfessorMariContextFacet) {
  * The facets a handoff context carries (resource, chat, field, settings
  * location, error, aside answer), each as its own small pill. Used both in
  * the composer before sending and, unchanged, on the sent message (C2) so
- * the user can see exactly what Mari received. With `onRemove` they are the
+ * the user can see exactly what YunYun received. With `onRemove` they are the
  * composer's (M7): an "Aware of" label, an X per facet, and a facet whose
  * content only leaves on Send is outlined.
  */

@@ -74,7 +74,7 @@ function multipartBody(fields: Record<string, string>, file: { name: string; byt
 
 try {
   const character = await characters.create(characterDataSchema.parse({ name: "Ava" }));
-  const persona = await characters.createPersona("Mari", "The player.");
+  const persona = await characters.createPersona("YunYun", "The player.");
   assert(character && persona);
   const owner = { ownerType: "character", ownerId: character.id } as const;
   const personaOwner = { ownerType: "persona", ownerId: persona.id } as const;
@@ -420,7 +420,7 @@ try {
   assert.equal((await app.inject({ method: "DELETE", url: `/api/characters/personas/${persona.id}` })).statusCode, 204);
   assert.equal(existsSync(personaDir), false, "a deleted persona's avatar folder is removed");
 
-  // ── Expunging every character or persona removes their avatars; Professor Mari's stays ──
+  // ── Expunging every character or persona removes their avatars; Professor YunYun's stays ──
   const swept = await characters.create(characterDataSchema.parse({ name: "Swept" }));
   const sweptPersona = await characters.createPersona("Swept", "The player.");
   assert(swept && sweptPersona);

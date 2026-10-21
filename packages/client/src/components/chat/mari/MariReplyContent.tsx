@@ -1,4 +1,4 @@
-// The body of one of Mari's replies: streamed words, linked names, compact markdown, files and reasoning.
+// The body of one of YunYun's replies: streamed words, linked names, compact markdown, files and reasoning.
 import { type CSSProperties, type ReactNode, Children, isValidElement, memo, useMemo, useState } from "react";
 import { ChevronRight, FileText, Loader2, Sparkles, X } from "lucide-react";
 import { type MariWorkspaceActionResult } from "@marinara-engine/shared";
@@ -23,7 +23,7 @@ import { useTranslation as useUiTranslation } from "react-i18next";
 import { ProfessorMariAttachment, isProfessorMariImageAttachment } from "./mari-chat-helpers";
 import { WorkspaceToolCall } from "./mari-tool-presentation";
 
-/** While Mari streams, each new word mounts in its own span and blurs in; words already shown keep their key. */
+/** While YunYun streams, each new word mounts in its own span and blurs in; words already shown keep their key. */
 function renderStreamingInline(text: string, keyPrefix: string): ReactNode[] {
   return renderCompactInline(text, keyPrefix).map((node, nodeIndex) =>
     typeof node === "string"

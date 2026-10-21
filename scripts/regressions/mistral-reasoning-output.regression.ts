@@ -81,7 +81,7 @@ try {
   };
   const user: ChatMessage[] = [{ role: "user", content: "Continue." }];
 
-  // Which models take reasoning_effort, and what Marinara's levels become.
+  // Which models take reasoning_effort, and what YunYun's levels become.
   for (const model of [
     "mistral-large-4-0",
     "mistral-large-4",

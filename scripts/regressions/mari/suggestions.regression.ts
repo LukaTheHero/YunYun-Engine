@@ -41,9 +41,9 @@ const shouldShowMariSuggestions = (characterIds: string[], enabled: boolean) =>
 assert.equal(
   shouldShowMariSuggestions([PROFESSOR_MARI_ID], true),
   true,
-  "Mari suggestions use the built-in character gate",
+  "YunYun suggestions use the built-in character gate",
 );
-assert.equal(shouldShowMariSuggestions(["ordinary-character"], true), false, "non-Mari chats stay isolated");
+assert.equal(shouldShowMariSuggestions(["ordinary-character"], true), false, "non-YunYun chats stay isolated");
 assert.equal(shouldShowMariSuggestions([PROFESSOR_MARI_ID], false), false, "disabled suggestions stay gated");
 
-console.log("Professor Mari suggestion and plan regressions passed.");
+console.log("Professor YunYun suggestion and plan regressions passed.");

@@ -158,7 +158,7 @@ try {
   assert.ok(chatIds.includes(unrelated.id));
   assert.ok(chatResult.scannedMessages >= 1);
 
-  // L4: the Mari-facing `lorebook.testScan` app_data action wraps the same scanner for a
+  // L4: the YunYun-facing `lorebook.testScan` app_data action wraps the same scanner for a
   // secondary-key block and a "no key matched" absent entry, and never carries chat text.
   const { MariDbService } = await import("../../packages/server/src/services/mari-db/mari-db.service.js");
   const mariDb = new MariDbService(db);
@@ -179,7 +179,7 @@ try {
   assert.equal(blockedScan.ok, true);
   assert.equal((blockedScan.output as any).status, "blocked");
   assert.equal((blockedScan.output as any).reason, "secondary_keys");
-  assert.match((blockedScan.output as any).fix, /secondaryKeys/u, "a blocked entry carries its fix for Mari");
+  assert.match((blockedScan.output as any).fix, /secondaryKeys/u, "a blocked entry carries its fix for YunYun");
   assert.deepEqual((blockedScan.output as any).matchedKeys, ["harbor"]);
   assert.ok(
     !JSON.stringify(blockedScan.output).includes("We rode to Valdenmoor"),
@@ -209,7 +209,7 @@ try {
 
   // F2: an entry the real scanner would activate, but the last real generation's token budget
   // actually left out, must be reported as blocked (reason "budget"), not activated — otherwise
-  // Mari tells the user an entry fired when it never reached the prompt.
+  // YunYun tells the user an entry fired when it never reached the prompt.
   const nightBell = await entry("Night bell", { keys: ["bell"], content: "A bell that tolls at midnight." });
   const saltmarsh = await entry("Saltmarsh Pact", { keys: ["pact"], content: "An old treaty." });
   const budgetChat = await chats.create({ name: "Harbor intrigue", mode: "roleplay", characterIds: [] } as never);

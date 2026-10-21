@@ -5,7 +5,7 @@ const mariCss = readFileSync(new URL("../packages/client/src/styles/mari.css", i
 
 // Exercise only the confirmed delete review action and its Trash icon, using production CSS.
 for (const theme of ["light", "dark"] as const) {
-  test(`${theme}: Mari delete actions follow the held accent`, async ({ page }) => {
+  test(`${theme}: YunYun delete actions follow the held accent`, async ({ page }) => {
     await page.setContent(`
       <!doctype html><html data-theme="${theme}" data-marinara-accent-animation="pulse"><head>
         <meta name="viewport" content="width=device-width, initial-scale=1">

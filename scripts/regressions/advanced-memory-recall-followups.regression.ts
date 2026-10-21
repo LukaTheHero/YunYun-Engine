@@ -62,14 +62,14 @@ const provider = createServer(async (request, response) => {
               ? { audience: ["A stranger"] }
               : { audience: "all" };
     const summary = text.includes("AUD_FIRSTNAME")
-      ? "HARBOR: Mari and Kaito talked about the lighthouse key at the harbor."
+      ? "HARBOR: YunYun and Kaito talked about the lighthouse key at the harbor."
       : text.includes("AUD_MISSING")
-        ? "CURRY: Mari and Kaito cooked curry."
+        ? "CURRY: YunYun and Kaito cooked curry."
         : text.includes("AUD_STRANGER")
           ? "STRANGER: A stranger passed the shop."
           : text.includes("FESTIVAL")
-            ? "FESTIVAL: Mari and Kaito released paper lanterns at the festival."
-            : "EVENING: Mari and Kaito said good night.";
+            ? "FESTIVAL: YunYun and Kaito released paper lanterns at the festival."
+            : "EVENING: YunYun and Kaito said good night.";
     content =
       checkOnly && failNextParticipantCheck
         ? "I cannot tell who was there."
@@ -153,7 +153,7 @@ try {
   assert(nulled);
   await memory.updateSettings(nulled.id, settings);
   await chats.createMessagesBatch(nulled.id, [
-    { role: "user", content: "SCENE_CHANGE AUD_NULL Mari and Kaito fix the roof." },
+    { role: "user", content: "SCENE_CHANGE AUD_NULL YunYun and Kaito fix the roof." },
     { role: "assistant", characterId: "kaito", content: "Kaito hammers the last nail." },
     { role: "user", content: "SCENE_CHANGE Later that week.", extra: { isConversationStart: true } },
   ]);
@@ -170,13 +170,13 @@ try {
   assert(chat);
   await memory.updateSettings(chat.id, settings);
   await chats.createMessagesBatch(chat.id, [
-    { role: "user", content: "SCENE_CHANGE AUD_FIRSTNAME Mari and Kaito walk along the harbor." },
+    { role: "user", content: "SCENE_CHANGE AUD_FIRSTNAME YunYun and Kaito walk along the harbor." },
     { role: "assistant", characterId: "kaito", content: "Kaito turns the lighthouse key over in his hand." },
-    { role: "user", content: "SCENE_CHANGE AUD_MISSING Mari and Kaito cook dinner." },
+    { role: "user", content: "SCENE_CHANGE AUD_MISSING YunYun and Kaito cook dinner." },
     { role: "assistant", characterId: "kaito", content: "Kaito stirs the curry." },
     { role: "user", content: "SCENE_CHANGE AUD_STRANGER A stranger walks past the shop." },
     { role: "assistant", characterId: "kaito", content: "Kaito watches the stranger leave." },
-    { role: "user", content: "SCENE_CHANGE FESTIVAL Mari and Kaito go to the summer festival." },
+    { role: "user", content: "SCENE_CHANGE FESTIVAL YunYun and Kaito go to the summer festival." },
     { role: "assistant", characterId: "kaito", content: "Kaito lets a paper lantern drift away." },
     {
       role: "user",
@@ -300,22 +300,22 @@ try {
   // (2) Looser names never give a scene to the wrong person: the user's persona, a shared first name,
   // a description or an annotation leaves the scene narrator-only and flagged instead.
   for (const [id, name] of [
-    ["rossi", "Mari Rossi"],
+    ["rossi", "YunYun Rossi"],
     ["tanaka", "Kaito Tanaka"],
   ])
     await db
       .insert(characters)
       .values({ id, data: JSON.stringify({ name }), createdAt: "2026-01-01", updatedAt: "2026-01-01" });
   for (const [answer, characterIds, expected, flagged, label, hiddenFrom = []] of [
-    [["Mari", "Kaito"], ["kaito", "rossi"], ["kaito"], true, "the persona Mari could be Mari Rossi"],
-    [["Mari Rossi", "Mari"], ["kaito", "rossi"], ["rossi"], true, "a full name still counts"],
-    [["Mari", "User"], ["kaito"], [], false, "the user alone is a user-only scene, not a mistake"],
+    [["YunYun", "Kaito"], ["kaito", "rossi"], ["kaito"], true, "the persona YunYun could be YunYun Rossi"],
+    [["YunYun Rossi", "YunYun"], ["kaito", "rossi"], ["rossi"], true, "a full name still counts"],
+    [["YunYun", "User"], ["kaito"], [], false, "the user alone is a user-only scene, not a mistake"],
     [["Kaito"], ["kaito", "tanaka"], [], true, "two characters share the first name"],
     [["Kaito Nakamura (mentioned only)"], ["kaito"], [], true, "an annotated name is not a plain name"],
     [["sister of Kaito Nakamura"], ["kaito"], [], true, "a description naming a character"],
     [[{ name: "Kaito Nakamura" }], ["kaito"], [], true, "an object is not a name"],
     [{ Kaito: false }, ["kaito"], [], true, "an unreadable answer is not a missing one"],
-    // Mari decided on 2026-10-07 (#7184): a group scene with no listed participants goes to every
+    // YunYun decided on 2026-10-07 (#7184): a group scene with no listed participants goes to every
     // character and is flagged, so the user removes anyone who wasn't there. It was narrator-only before.
     [undefined, ["kaito", "tanaka"], ["kaito", "tanaka"], true, "a group's missing audience goes to everyone"],
     [null, ["kaito", "tanaka"], ["kaito", "tanaka"], true, "a group's null audience goes to everyone"],
@@ -333,10 +333,10 @@ try {
       ...settings,
       knowledgeStarts: Object.fromEntries(characterIds.map((id) => [id, null])),
     });
-    const persona = { personaSnapshot: { name: "Mari" } };
+    const persona = { personaSnapshot: { name: "YunYun" } };
     const hidden = hiddenFrom.length ? { hiddenFromAICharacterIds: hiddenFrom } : {};
     await chats.createMessagesBatch(matrix.id, [
-      { role: "user", content: "SCENE_CHANGE AUD_MATRIX Mari waits at the pier.", extra: { ...persona, ...hidden } },
+      { role: "user", content: "SCENE_CHANGE AUD_MATRIX YunYun waits at the pier.", extra: { ...persona, ...hidden } },
       { role: "assistant", characterId: characterIds.at(-1), content: "The boats come in.", extra: hidden },
       { role: "user", content: "SCENE_CHANGE Later.", extra: { ...persona, isConversationStart: true } },
     ]);
@@ -381,7 +381,7 @@ try {
   assert(walk);
   await memory.updateSettings(walk.id, { ...settings, sceneCheckInterval: 2 });
   await chats.createMessagesBatch(walk.id, [
-    { role: "user", content: "SCENE_CHANGE FESTIVAL Mari and Kaito go to the summer festival." },
+    { role: "user", content: "SCENE_CHANGE FESTIVAL YunYun and Kaito go to the summer festival." },
     { role: "assistant", characterId: "kaito", content: "Kaito lets a paper lantern drift away." },
     {
       role: "user",

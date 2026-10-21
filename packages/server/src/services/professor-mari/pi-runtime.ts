@@ -1,5 +1,5 @@
-// Professor Mari's optional second runtime, built on the pi SDK: native tool calls instead of the JSON frame.
-// It calls Marinara's own provider layer for the model, runs every tool through WorkspaceCommands, and applies
+// Professor YunYun's optional second runtime, built on the pi SDK: native tool calls instead of the JSON frame.
+// It calls YunYun's own provider layer for the model, runs every tool through WorkspaceCommands, and applies
 // the same Permissions Mode, claim audit and repeated-failure rules as the classic loop. The sandbox is closed
 // on purpose: no pi built-in tools, no resources read from disk, no pi auth/model files, in-memory session.
 import { randomUUID } from "node:crypto";
@@ -97,7 +97,7 @@ export type PiRunInput = {
   /** Every command result of the run; the claim audit reads it. */
   commandResults: WorkspaceCommandResult[];
   onEvent: PromptEventSink;
-  /** One provider call through Marinara's provider layer. */
+  /** One provider call through YunYun's provider layer. */
   complete: (
     messages: ChatMessage[],
     tools: LLMToolDefinition[],
@@ -135,7 +135,7 @@ type Round = {
 
 /**
  * Fail closed: pi keeps its built-in tools registered under an allowlist, so check that every ACTIVE tool is one of
- * Marinara's own definitions (same object, same executor) before the model can call anything.
+ * YunYun's own definitions (same object, same executor) before the model can call anything.
  */
 export function assertClosedToolSet(
   session: Pick<AgentSession, "getActiveToolNames" | "getToolDefinition">,
@@ -145,7 +145,7 @@ export function assertClosedToolSet(
     const mine = tools.find((tool) => tool.name === name);
     const registered = session.getToolDefinition(name);
     if (!mine || !registered || registered.execute !== mine.execute) {
-      throw new Error(`The pi runtime stopped: tool "${name}" is not one of Professor Mari's own tools.`);
+      throw new Error(`The pi runtime stopped: tool "${name}" is not one of Professor YunYun's own tools.`);
     }
   }
 }
@@ -181,7 +181,7 @@ function textualToolPrompt(tools: readonly ToolDefinition[]) {
     .map((tool) => `- ${tool.name}: ${tool.description}\n  JSON arguments: ${JSON.stringify(tool.parameters)}`)
     .join("\n");
   return `<text_tool_calls>
-This connection has no native tool calls. Wherever the rules above say to call a tool, write the call as text instead: one \`<tool_call>{"name":"TOOL","arguments":{...}}</tool_call>\` tag per call, with valid JSON inside. You may write several tags in one reply, after your words. Marinara runs them and answers in the next user message with the results. Never write a tag you do not want to run.
+This connection has no native tool calls. Wherever the rules above say to call a tool, write the call as text instead: one \`<tool_call>{"name":"TOOL","arguments":{...}}</tool_call>\` tag per call, with valid JSON inside. You may write several tags in one reply, after your words. YunYun runs them and answers in the next user message with the results. Never write a tag you do not want to run.
 Example: ${textCall("ls", { path: "." })}
 Tools:
 ${docs}
@@ -490,7 +490,7 @@ export async function runPiLoop(input: PiRunInput & { commands: WorkspaceCommand
         };
       }
       addNote(
-        "Professor Mari kept returning an empty response. Please try again; the request and any completed workspace steps remain in this chat.",
+        "Professor YunYun kept returning an empty response. Please try again; the request and any completed workspace steps remain in this chat.",
         "retry",
         "warning",
       );
@@ -601,7 +601,7 @@ export async function runPiLoop(input: PiRunInput & { commands: WorkspaceCommand
         });
       }
       addNote(
-        "Professor Mari hit the model output limit. Ask her to continue and she can pick up from here.",
+        "Professor YunYun hit the model output limit. Ask her to continue and she can pick up from here.",
         "output_limit",
         "warning",
       );
@@ -663,7 +663,7 @@ export async function runPiLoop(input: PiRunInput & { commands: WorkspaceCommand
     }).issue;
     if (issue) {
       addNote(
-        "Professor Mari reached the tool round limit without verification, so I stopped before showing an unsupported completion claim. Ask her to continue from the saved trace.",
+        "Professor YunYun reached the tool round limit without verification, so I stopped before showing an unsupported completion claim. Ask her to continue from the saved trace.",
         "retry",
         "warning",
       );
@@ -672,13 +672,13 @@ export async function runPiLoop(input: PiRunInput & { commands: WorkspaceCommand
       emitRoundText(trace, text, onEvent);
     } else if (tried) {
       addNote(
-        "Professor Mari tried to call more tools after the round limit, so I stopped the loop. Ask her to continue if you want her to keep working from the saved trace.",
+        "Professor YunYun tried to call more tools after the round limit, so I stopped the loop. Ask her to continue if you want her to keep working from the saved trace.",
         "info",
         "warning",
       );
     }
     addNote(
-      "Tool round limit reached for this run. Ask Professor Mari to continue and she can pick up from here.",
+      "Tool round limit reached for this run. Ask Professor YunYun to continue and she can pick up from here.",
       "info",
       "warning",
     );
@@ -851,7 +851,7 @@ export async function runPiLoop(input: PiRunInput & { commands: WorkspaceCommand
     ],
   });
   const model = modelRuntime.getModel(PI_PROVIDER, modelId);
-  if (!model) throw new Error("The pi runtime could not register the Marinara model.");
+  if (!model) throw new Error("The pi runtime could not register the YunYun model.");
 
   // Nothing is discovered or loaded from disk: no extensions, skills, prompt templates, themes or context files.
   const resourceLoader: ResourceLoader = {
@@ -905,9 +905,9 @@ export async function runPiLoop(input: PiRunInput & { commands: WorkspaceCommand
     modelRuntime,
     resourceLoader,
     sessionManager,
-    // Marinara's own rate-limit layer retries; pi compacts long runs.
+    // YunYun's own rate-limit layer retries; pi compacts long runs.
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: true }, retry: { enabled: false } }),
-    // Security boundary: no pi built-in tools, only the allowlisted Marinara tools below.
+    // Security boundary: no pi built-in tools, only the allowlisted YunYun tools below.
     noTools: "builtin",
     tools: tools.map((tool) => tool.name),
     customTools: tools,

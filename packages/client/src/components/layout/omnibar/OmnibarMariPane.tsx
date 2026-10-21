@@ -29,7 +29,7 @@ export interface OmnibarMariPaneProps {
   omnibarStatusSlot: HTMLElement | null;
   omnibarMenuSlot: HTMLElement | null;
   arrival: MariArrival | null;
-  /** Increments on every arrival-door open (⌘J, the pull, the drag, Home's "Ask Professor Mari"). */
+  /** Increments on every arrival-door open (⌘J, the pull, the drag, Home's "Ask Professor YunYun"). */
   arrivalAppendRequest: number;
   /** R7: the context of the screen she opens over; arrivals go to its thread. */
   arrivalThread: MariThreadContext;
@@ -71,7 +71,7 @@ export function OmnibarMariPane({
   return (
     <motion.div
       key="omnibar-mari-pane"
-      data-component="GlobalOmnibar.Mari"
+      data-component="GlobalOmnibar.YunYun"
       initial={active ? { opacity: 0, y: -14, scale: 0.985 } : false}
       animate={active ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: -12, scale: 0.995 }}
       transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 360, damping: 30, mass: 0.75 }}

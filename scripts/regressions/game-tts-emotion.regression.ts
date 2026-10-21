@@ -192,14 +192,14 @@ for (const [segment, plain] of [
   assert.equal(request.tone, game.request(segment, config)?.tone);
 }
 
-const options = { playerSpeakerNames: game.playerNames("Mari") };
+const options = { playerSpeakerNames: game.playerNames("YunYun") };
 for (const segment of [
   { ...main, sourceRole: "user" },
   { ...main, sourceRole: "system" },
   { ...main, partyType: "thought" },
-  { ...main, speaker: "Mari" },
+  { ...main, speaker: "YunYun" },
   { ...main, speaker: "You" },
-  { ...main, type: "narration", content: "[Mari][main]: This is the player's line." },
+  { ...main, type: "narration", content: "[YunYun][main]: This is the player's line." },
 ] satisfies NarrationSegment[]) {
   assert.equal(game.request(segment, config, [], options), null, "Game voice exclusions still apply");
 }

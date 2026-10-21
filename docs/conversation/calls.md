@@ -84,12 +84,12 @@ If Local Whisper struggles with your language or your accent, you can send your 
 3. Enter an **API key** if your server or provider needs one. It is saved encrypted, and the card only shows it masked.
 4. Enter the **Model** name your server uses. Leave it empty to send `whisper-1`.
 5. Optional: enter a **Language** code, such as `pl` or `de`. Telling the model your language usually improves accuracy. Leave it empty to let the server detect it.
-6. Click **Test**. Marinara sends a one-second silent clip and tells you whether the server answered.
+6. Click **Test**. YunYun sends a one-second silent clip and tells you whether the server answered.
 7. Turn the card's switch on.
 
 While the switch is on, **Mic recording + Local Whisper** sends your speech to this server instead of Local Whisper. You do not need to download Local Whisper for it. Turn the switch off to go back to Local Whisper. Your audio goes to the server you entered, so use a server you trust.
 
-A server on the same machine as Marinara works as is. A server on another machine in your home network is refused unless you set `STT_LOCAL_URLS_ENABLED=true` in the server `.env` file. See [Server Configuration Reference](../CONFIGURATION.md).
+A server on the same machine as YunYun works as is. A server on another machine in your home network is refused unless you set `STT_LOCAL_URLS_ENABLED=true` in the server `.env` file. See [Server Configuration Reference](../CONFIGURATION.md).
 
 This needs a Calls version that supports it. If calls still use Local Whisper after you turn the switch on, update Calls from **Agents → Download Agents**.
 

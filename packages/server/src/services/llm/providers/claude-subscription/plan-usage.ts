@@ -9,7 +9,7 @@
 // model runs, so a reading spends nothing from the plan.
 //
 // The windows count everything on the account (Claude Code, claude.ai and
-// Marinara together), and they are percentages only — the plan reports no token
+// YunYun together), and they are percentages only — the plan reports no token
 // counts.
 //
 // ponytail: the SDK marks this call experimental and says its name will change.
@@ -89,7 +89,7 @@ async function readClaudePlanUsage(): Promise<PlanUsage> {
     const usage = normalizeClaudePlanUsage(raw);
     if (!usage) {
       throw new Error(
-        "Claude reported no plan limits for this login. Run `claude login` with a Pro or Max account as the same OS user as the Marinara server.",
+        "Claude reported no plan limits for this login. Run `claude login` with a Pro or Max account as the same OS user as the YunYun server.",
       );
     }
     logger.debug({ plan: usage.plan, windows: usage.windows }, "[claude-subscription] plan usage");

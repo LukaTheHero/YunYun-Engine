@@ -1,10 +1,10 @@
 # The First-Time Tutorial
 
-This guide explains the guided tour that appears the first time you open Marinara Engine. It covers every tour step in order, how to skip the tour, how to replay it later, and what changes on a phone.
+This guide explains the guided tour that appears the first time you open YunYun Engine. It covers every tour step in order, how to skip the tour, how to replay it later, and what changes on a phone.
 
 ## What the tutorial is
 
-The first time you open Marinara Engine, a guided tour starts on its own. People also call it the onboarding tour or the onboarding tutorial. Professor Mari, the built-in assistant, walks you around the main parts of the app.
+The first time you open YunYun Engine, a guided tour starts on its own. People also call it the onboarding tour or the onboarding tutorial. Professor YunYun, the built-in assistant, walks you around the main parts of the app.
 
 The tour shows one card at a time. On a normal desktop screen, a pulsing ring highlights the button the card is talking about. Each card has a short title, a short explanation, and a row of small progress dots that show how far along you are.
 
@@ -14,7 +14,7 @@ The tour also does more than talk. As you move forward, some steps open the matc
 
 The tour has 18 steps. Here they are in order, with the exact title of each card and what it points at.
 
-1. **Welcome to Marinara Engine!** A centered welcome card. Professor Mari waves and offers to show you around.
+1. **Welcome to YunYun Engine!** A centered welcome card. Professor YunYun waves and offers to show you around.
 2. **Characters** Highlights the **Characters** panel button, where your characters live.
 3. **Personas** Highlights the **Personas** panel button, where you define who you are in a chat.
 4. **Lorebooks** Highlights the **Lorebooks** panel button, which holds extra world and character details.
@@ -51,5 +51,5 @@ The steps still work the same way underneath. Moving forward still opens the mat
 
 ## Related guides
 
-- [Getting Started with Marinara Engine](welcome.md)
-- [Professor Mari, Your In-App Assistant](professor-mari.md)
+- [Getting Started with YunYun Engine](welcome.md)
+- [Professor YunYun, Your In-App Assistant](professor-mari.md)

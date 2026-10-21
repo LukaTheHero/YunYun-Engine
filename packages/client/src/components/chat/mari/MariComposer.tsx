@@ -313,7 +313,7 @@ export function MariComposer({
           event.target.value = "";
         }}
       />
-      {/* R11 (composer v5): Mari's own shell, not the regular chat input's: neutral at rest, a primary
+      {/* R11 (composer v5): YunYun's own shell, not the regular chat input's: neutral at rest, a primary
                               ring only on focus, quiet controls and one neutral filled Send. */}
       <div
         className="mari-workspace-composer outline-none"

@@ -1,24 +1,24 @@
 # Remote Access: Basic Auth and IP Allowlist
 
-This guide explains how to reach Marinara Engine from another device, such as your phone, a laptop, or a Docker container. It covers the two main options: Basic Auth and the IP allowlist. It also covers the private-network bypass, HTTPS, Admin Access, and the "save blocked" CSRF message. Almost every setting here lives in the server `.env` file, not in the app.
+This guide explains how to reach YunYun Engine from another device, such as your phone, a laptop, or a Docker container. It covers the two main options: Basic Auth and the IP allowlist. It also covers the private-network bypass, HTTPS, Admin Access, and the "save blocked" CSRF message. Almost every setting here lives in the server `.env` file, not in the app.
 
 A quick word list used throughout this guide:
 
-- `.env` file: a plain text settings file in the Marinara Engine folder, next to `package.json`.
+- `.env` file: a plain text settings file in the YunYun Engine folder, next to `package.json`.
 - Loopback: the machine that is actually running the server. Its address is `127.0.0.1` or `localhost`.
-- Remote access: opening Marinara from any device that is NOT the machine running the server.
+- Remote access: opening YunYun from any device that is NOT the machine running the server.
 
-## What Marinara blocks by default
+## What YunYun blocks by default
 
-To protect your data, a fresh Marinara install refuses connections from other devices until you set up access control. By default, only three kinds of client are trusted:
+To protect your data, a fresh YunYun install refuses connections from other devices until you set up access control. By default, only three kinds of client are trusted:
 
 1. Loopback (`127.0.0.1` or `::1`), the machine running the server itself. Visitors that a reverse proxy or tunnel on the same machine passes along do not count; see [Reverse proxies and tunnels on the same computer](#reverse-proxies-and-tunnels-on-the-same-computer).
 2. Tailscale devices in your tailnet. Tailscale is a private network tool, and its addresses use the `100.64.0.0/10` range.
-3. Docker clients on the same host. Marinara recognizes the usual `172.16.0.0/12` bridge range and the container's exact default gateway, which also covers Docker Desktop and custom address pools.
+3. Docker clients on the same host. YunYun recognizes the usual `172.16.0.0/12` bridge range and the container's exact default gateway, which also covers Docker Desktop and custom address pools.
 
-Everything else, such as your phone on the same Wi-Fi or a public-internet client, is blocked until you pick an option below. A blocked device that opens Marinara in a browser sees a dark setup page. Its title reads **This Marinara Engine install needs access control before remote devices can connect.** The page shows your device's own IP and two copy-paste `.env` snippets.
+Everything else, such as your phone on the same Wi-Fi or a public-internet client, is blocked until you pick an option below. A blocked device that opens YunYun in a browser sees a dark setup page. Its title reads **This YunYun Engine install needs access control before remote devices can connect.** The page shows your device's own IP and two copy-paste `.env` snippets.
 
-If you do nothing and never set a password, Marinara stays locked to those three trusted sources. That is the safe default.
+If you do nothing and never set a password, YunYun stays locked to those three trusted sources. That is the safe default.
 
 ## Where the .env file lives
 
@@ -43,8 +43,8 @@ The shell launchers (`start.bat`, `start.sh`) set `HOST=0.0.0.0` for you. Runnin
 Read these in order and stop at the first one that matches you.
 
 1. You only connect over Tailscale, or only from Docker containers on the same host. You do not need to do anything. It already works.
-2. You want to reach Marinara from a phone, tablet, or laptop on your home Wi-Fi. Use Basic Auth (Option 1 below).
-3. You are exposing Marinara to the public internet. Use Basic Auth plus HTTPS.
+2. You want to reach YunYun from a phone, tablet, or laptop on your home Wi-Fi. Use Basic Auth (Option 1 below).
+3. You are exposing YunYun to the public internet. Use Basic Auth plus HTTPS.
 4. Your client devices have fixed IP addresses and you would rather not type a password. Use the IP allowlist (Option 2 below).
 5. Your whole network is trusted and you never want a password. Use the private-network bypass (Option 3 below). Read the warning there first.
 
@@ -67,13 +67,13 @@ openssl rand -base64 24
 
 Save `.env`. The change applies within a couple of seconds, with no restart. Then follow these steps from the remote device.
 
-1. Open Marinara in your browser using the server's address, for example `http://192.168.1.50:7860`.
+1. Open YunYun in your browser using the server's address, for example `http://192.168.1.50:7860`.
 2. Enter the username and password you set when the browser prompts you.
 3. You should see the app load. The browser remembers the login for the rest of the session.
 
-After 10 different wrong passwords within 15 minutes, Marinara refuses sign-ins from that address with **429 Too Many Requests** until the 15 minutes are up. A correct password before then clears the count. Visitors that a reverse proxy or tunnel on the host passes along share one count, and one of them signing in does not clear it. Restarting the server also clears it. A browser that has signed in before still gets in with the correct password, so other people's wrong passwords cannot lock you out of a device you already use.
+After 10 different wrong passwords within 15 minutes, YunYun refuses sign-ins from that address with **429 Too Many Requests** until the 15 minutes are up. A correct password before then clears the count. Visitors that a reverse proxy or tunnel on the host passes along share one count, and one of them signing in does not clear it. Restarting the server also clears it. A browser that has signed in before still gets in with the correct password, so other people's wrong passwords cannot lock you out of a device you already use.
 
-By default, the browser prompt says **Marinara Engine**. You can change that text with `BASIC_AUTH_REALM`.
+By default, the browser prompt says **YunYun Engine**. You can change that text with `BASIC_AUTH_REALM`.
 
 Some clients skip the password even when Basic Auth is on:
 
@@ -83,7 +83,7 @@ Some clients skip the password even when Basic Auth is on:
 - Docker bridge/gateway traffic, only when you set `BYPASS_AUTH_DOCKER=true`. With Basic Auth on, automatic Docker trust is off (see [Tailscale and Docker bypass](#tailscale-and-docker-bypass)).
 - The `/api/health` address, so uptime monitors keep working. Without a password it reports only basic status, not your local models or graphics card.
 
-Important: Basic Auth only encodes the password. It does not encrypt it. Anyone watching an unencrypted connection can read it. If you expose Marinara to the public internet, pair Basic Auth with HTTPS (see below).
+Important: Basic Auth only encodes the password. It does not encrypt it. Anyone watching an unencrypted connection can read it. If you expose YunYun to the public internet, pair Basic Auth with HTTPS (see below).
 
 ## Option 2: IP allowlist
 
@@ -122,7 +122,7 @@ ALLOW_UNAUTHENTICATED_PRIVATE_NETWORK=true
 
 This restores the older "open on the LAN, blocked from the public internet" behavior. It applies only to standard private-network ranges, for example `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16`. The CGNAT range `100.64.0.0/10` also counts. CGNAT is a shared address system used by some internet providers, and Tailscale uses the same range. Public-internet addresses are still blocked with a 403.
 
-Warning: anyone on the same network can then reach Marinara with no password. That is fine on a network you control. It is not fine on shared Wi-Fi at a coffee shop, airport, or dorm. When in doubt, use Basic Auth instead.
+Warning: anyone on the same network can then reach YunYun with no password. That is fine on a network you control. It is not fine on shared Wi-Fi at a coffee shop, airport, or dorm. When in doubt, use Basic Auth instead.
 
 There is also a broader flag, `ALLOW_UNAUTHENTICATED_REMOTE=true`, which allows passwordless access from ANY address, including the public internet. Do not turn this on. If you truly need public access, use Basic Auth plus HTTPS, or put a reverse proxy in front that handles the login.
 
@@ -135,9 +135,9 @@ BYPASS_AUTH_TAILSCALE=
 BYPASS_AUTH_DOCKER=
 ```
 
-Automatic mode trusts a Tailscale peer only when both ends of its direct socket use Tailnet addresses. It trusts Docker traffic only when Marinara is running in a container and the source matches a detected container interface or its exact gateway. This keeps the usual private Tailscale and same-host Docker setup working without treating unrelated CGNAT, LAN, host-network, or proxy traffic as authenticated.
+Automatic mode trusts a Tailscale peer only when both ends of its direct socket use Tailnet addresses. It trusts Docker traffic only when YunYun is running in a container and the source matches a detected container interface or its exact gateway. This keeps the usual private Tailscale and same-host Docker setup working without treating unrelated CGNAT, LAN, host-network, or proxy traffic as authenticated.
 
-Automatic Docker trust applies only while neither Basic Auth nor `IP_ALLOWLIST` is set. Docker Desktop, OrbStack, and rootless Docker pass every device that opens a published port through the container's gateway, so Marinara cannot tell your own browser from a phone or a stranger on the network. Once you set a password or an allowlist, every Docker client must pass it, including the browser on the host. Set `BYPASS_AUTH_DOCKER=true` only if you trust every device that can reach the published port.
+Automatic Docker trust applies only while neither Basic Auth nor `IP_ALLOWLIST` is set. Docker Desktop, OrbStack, and rootless Docker pass every device that opens a published port through the container's gateway, so YunYun cannot tell your own browser from a phone or a stranger on the network. Once you set a password or an allowlist, every Docker client must pass it, including the browser on the host. Set `BYPASS_AUTH_DOCKER=true` only if you trust every device that can reach the published port.
 
 Set a flag to `false` if you want normal Basic Auth and IP allowlist checks for those clients. Set it to `true` to retain the older broad bypass when automatic detection is unavailable: Tailscale then trusts all of `100.64.0.0/10`, while Docker also trusts its detected interfaces/gateway and the legacy `172.16.0.0/12` range. Use that compatibility mode only when every matching peer is trusted.
 
@@ -153,7 +153,7 @@ If you do not want detected Docker peers to bypass authentication, turn the Dock
 BYPASS_AUTH_DOCKER=false
 ```
 
-Marinara may also sit behind a reverse proxy or tunnel container on the Docker bridge or detected gateway. Forwarding headers, such as `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Host`, or `X-Forwarded-Proto`, indicate that the Docker peer represents another client, so Marinara applies its normal Basic Auth and IP allowlist checks by default:
+YunYun may also sit behind a reverse proxy or tunnel container on the Docker bridge or detected gateway. Forwarding headers, such as `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Host`, or `X-Forwarded-Proto`, indicate that the Docker peer represents another client, so YunYun applies its normal Basic Auth and IP allowlist checks by default:
 
 ```env
 REQUIRE_AUTH_FOR_DOCKER_PROXY=true
@@ -165,7 +165,7 @@ The server logs an `[auth-bypass]` warning the first time one of these bypasses 
 
 ## Reverse proxies and tunnels on the same computer
 
-A reverse proxy or tunnel on the machine running Marinara, such as nginx, Caddy, Traefik, Cloudflare Tunnel, Tailscale Serve or Funnel, or ngrok, connects to Marinara from loopback. Marinara recognizes this from the forwarding headers the proxy adds: `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `CF-Connecting-IP`, `True-Client-IP`, the Tailscale identity headers, or `Via`. It then treats each request as the remote visitor it is:
+A reverse proxy or tunnel on the machine running YunYun, such as nginx, Caddy, Traefik, Cloudflare Tunnel, Tailscale Serve or Funnel, or ngrok, connects to YunYun from loopback. YunYun recognizes this from the forwarding headers the proxy adds: `Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `CF-Connecting-IP`, `True-Client-IP`, the Tailscale identity headers, or `Via`. It then treats each request as the remote visitor it is:
 
 - Basic Auth applies, so set `BASIC_AUTH_USER` and `BASIC_AUTH_PASS`. Without them, visitors see the setup page.
 - `IP_ALLOWLIST` blocks the forwarded visitors, because the proxy hides their real addresses.
@@ -179,9 +179,9 @@ Caddy, Traefik, Cloudflare Tunnel, Tailscale, and ngrok add forwarding headers b
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 ```
 
-Tools that forward raw connections, such as `socat` or `ssh -R`, add no headers, so their traffic looks local. Do not use them to publish Marinara.
+Tools that forward raw connections, such as `socat` or `ssh -R`, add no headers, so their traffic looks local. Do not use them to publish YunYun.
 
-If your proxy already makes every visitor log in before it forwards anything, you can skip Marinara's own checks for its traffic:
+If your proxy already makes every visitor log in before it forwards anything, you can skip YunYun's own checks for its traffic:
 
 ```env
 REQUIRE_AUTH_FOR_LOOPBACK_PROXY=false
@@ -202,7 +202,7 @@ SSL_CERT=/path/to/cert.pem
 SSL_KEY=/path/to/key.pem
 ```
 
-2. Reverse proxy. Put Marinara behind nginx, Caddy, Traefik, or a Cloudflare Tunnel. The proxy handles the HTTPS part and forwards to Marinara over plain HTTP on the same machine. Read [Reverse proxies and tunnels on the same computer](#reverse-proxies-and-tunnels-on-the-same-computer) first.
+2. Reverse proxy. Put YunYun behind nginx, Caddy, Traefik, or a Cloudflare Tunnel. The proxy handles the HTTPS part and forwards to YunYun over plain HTTP on the same machine. Read [Reverse proxies and tunnels on the same computer](#reverse-proxies-and-tunnels-on-the-same-computer) first.
 
 You need a certificate and key before setting `SSL_CERT` and `SSL_KEY`. You can create one with a tool like `mkcert` for local use, or `certbot` for a public domain. If the files are missing or unreadable, the server stops on startup and names the exact paths it tried.
 
@@ -218,7 +218,7 @@ On the loopback machine, these actions usually work with no admin secret. From a
 ADMIN_SECRET=some-long-random-string
 ```
 
-2. On the remote device, open Marinara and go to **Settings**, then the **Advanced** tab, then the **Admin Access** section.
+2. On the remote device, open YunYun and go to **Settings**, then the **Advanced** tab, then the **Admin Access** section.
 3. Paste the same value into the box (its placeholder reads **ADMIN_SECRET**), then click **Save**.
 4. You should see the message **Admin secret saved for this browser**.
 
@@ -229,13 +229,13 @@ A few things to know about the admin secret:
 - If the server operator sets `MARINARA_REQUIRE_ADMIN_SECRET_ON_LOOPBACK=true`, even the loopback machine needs the secret.
 - This is separate from Basic Auth. You can use both. Basic Auth gates the whole app, and the admin secret gates the dangerous actions.
 
-If a privileged action fails on a remote device, Marinara shows an error message with two fixes. One fix is to open the app through localhost. The other is to set `ADMIN_SECRET` in the server `.env`, then paste the same value in **Settings** > **Advanced** > **Admin Access**.
+If a privileged action fails on a remote device, YunYun shows an error message with two fixes. One fix is to open the app through localhost. The other is to set `ADMIN_SECRET` in the server `.env`, then paste the same value in **Settings** > **Advanced** > **Admin Access**.
 
 ## Why is my save blocked (CSRF)
 
-CSRF stands for cross-site request forgery. It is a protection that stops another website you have open from quietly making changes in Marinara without your permission. It runs automatically. There is no setting to turn it on.
+CSRF stands for cross-site request forgery. It is a protection that stops another website you have open from quietly making changes in YunYun without your permission. It runs automatically. There is no setting to turn it on.
 
-Sometimes CSRF blocks your own saves. This usually happens when you reach Marinara through a public domain name or an unusual port that the server does not yet trust. Two things tell you when this happens.
+Sometimes CSRF blocks your own saves. This usually happens when you reach YunYun through a public domain name or an unusual port that the server does not yet trust. Two things tell you when this happens.
 
 - A red banner at the top of the app warns that **Saves will silently fail** because this origin is not trusted. The banner shows the exact `.env` line to add and has a **Copy** button.
 - If a save is actually rejected, a small pop-up message appears. Its title is **Save blocked: missing CSRF header**, **Save blocked: cross-site request rejected**, or **Save blocked: origin not trusted**.
@@ -258,11 +258,11 @@ Loopback, normal LAN addresses, Tailscale (`100.64.0.0/10`), and Docker bridge (
 
 ## A note on blocked local providers
 
-Say you connect Marinara to a local AI provider, for example one running on your own machine. The request may be refused with a message about a "private, loopback, metadata, or reserved IP range". That is a different safety check called SSRF protection. SSRF stands for server-side request forgery. It stops the server from calling private addresses unless you allow it. The error names the exact `.env` variable to set, such as `PROVIDER_LOCAL_URLS_ENABLED`. See [Server Configuration Reference](CONFIGURATION.md) for the full list.
+Say you connect YunYun to a local AI provider, for example one running on your own machine. The request may be refused with a message about a "private, loopback, metadata, or reserved IP range". That is a different safety check called SSRF protection. SSRF stands for server-side request forgery. It stops the server from calling private addresses unless you allow it. The error names the exact `.env` variable to set, such as `PROVIDER_LOCAL_URLS_ENABLED`. See [Server Configuration Reference](CONFIGURATION.md) for the full list.
 
 ## Access from a phone or tablet
 
-To open Marinara from a phone or tablet on the same network:
+To open YunYun from a phone or tablet on the same network:
 
 1. Make sure the server listens on all interfaces with `HOST=0.0.0.0` in `.env`.
 2. Pick an access option above. Basic Auth is the simplest for a phone on your home Wi-Fi.
@@ -275,5 +275,5 @@ If the page does not load at all, the server may not be reachable. Check `HOST=0
 ## Related guides
 
 - [Server Configuration Reference](CONFIGURATION.md) for the full list of `.env` settings and edge cases.
-- [Troubleshooting Marinara Engine](TROUBLESHOOTING.md) for connection errors, mobile access, and more.
-- [Frequently Asked Questions](FAQ.md) for a quick walkthrough of reaching Marinara from another device.
+- [Troubleshooting YunYun Engine](TROUBLESHOOTING.md) for connection errors, mobile access, and more.
+- [Frequently Asked Questions](FAQ.md) for a quick walkthrough of reaching YunYun from another device.

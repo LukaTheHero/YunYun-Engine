@@ -1,5 +1,5 @@
 /**
- * #7760: Professor Mari reads and writes a card's interactive onboarding
+ * #7760: Professor YunYun reads and writes a card's interactive onboarding
  * (`data.extensions.onboarding`) through `character.onboarding.get|update`.
  * The server does the parts a model is bad at (ids, option values, list
  * merging) and refuses a block the editor couldn't read or that wouldn't work,

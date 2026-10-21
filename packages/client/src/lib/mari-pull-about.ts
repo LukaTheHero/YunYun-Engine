@@ -1,4 +1,4 @@
-// 45b: what Mari looks down at during the pull. Loaded with a dynamic import when a pull starts, so the
+// 45b: what YunYun looks down at during the pull. Loaded with a dynamic import when a pull starts, so the
 // arrival builder stays out of the top bar's eager chunk.
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { agentKeys } from "../hooks/use-agents";
@@ -27,8 +27,8 @@ function cachedRow(queryClient: QueryClient, queryKey: QueryKey, id: string) {
 }
 
 /**
- * 45b: what Mari looks down at, read once when the pull starts: the same screen detection and arrival
- * builder as the Mari pane (M9), fed names from the cache only (R22). Null on Home with nothing open.
+ * 45b: what YunYun looks down at, read once when the pull starts: the same screen detection and arrival
+ * builder as the YunYun pane (M9), fed names from the cache only (R22). Null on Home with nothing open.
  */
 export function readMariPullAbout(queryClient: QueryClient, t: OmnibarTranslate) {
   const ui = useUIStore.getState();

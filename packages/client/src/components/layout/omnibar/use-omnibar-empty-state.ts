@@ -215,7 +215,7 @@ export function useOmnibarEmptyState({
     queryScope,
     setupRow,
   ]);
-  // Slice 78: where you left off - the last chat, Mari's last conversation, the record edited last.
+  // Slice 78: where you left off - the last chat, YunYun's last conversation, the record edited last.
   const continueResults = useMemo<OmnibarResult[]>(() => {
     if (deferredQuery.trim() || queryScope) return [];
     const rows: OmnibarResult[] = [];
@@ -228,8 +228,8 @@ export function useOmnibarEmptyState({
       rows.push({
         id: `mari-chat:${lastMari.id}`,
         action: { kind: "open-mari-chat", chatId: lastMari.id },
-        title: lastMari.name || t("omnibar.categories.professor", "Professor Mari"),
-        description: t("commandCenter.mariChat", "Professor Mari conversation"),
+        title: lastMari.name || t("omnibar.categories.professor", "Professor YunYun"),
+        description: t("commandCenter.mariChat", "Professor YunYun conversation"),
         category: "chat",
         group: "continue",
         score: 0,

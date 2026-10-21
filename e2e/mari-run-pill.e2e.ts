@@ -9,7 +9,7 @@ const APP_VERSION = (
 ).version;
 
 /**
- * Slice 83 (item 6): Mari's top-bar pill ("Done", "Failed") and the run timer live on the server, so a
+ * Slice 83 (item 6): YunYun's top-bar pill ("Done", "Failed") and the run timer live on the server, so a
  * reload keeps them. The pill clears only when her window shows that run (the seen marker). A scripted
  * fake model runs the real workspace loop; each round can hold its answer, or fail with an HTTP error.
  */
@@ -99,7 +99,7 @@ async function bootAndOpenMari(page: Page) {
     .first()
     .click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Control+j");
-  await expect(page.locator('[data-component="GlobalOmnibar.Mari"]').locator("textarea:visible")).toBeVisible();
+  await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]').locator("textarea:visible")).toBeVisible();
 }
 
 async function closeMari(page: Page) {
@@ -113,7 +113,7 @@ async function closeMari(page: Page) {
 
 const pill = (page: Page) => page.locator('[data-component="TopBar.MariStatus"]');
 
-test("Done stays across a reload until Mari opens that run", async ({ page, request }, testInfo) => {
+test("Done stays across a reload until YunYun opens that run", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("desktop"), "One pill run on desktop is enough proof.");
   test.setTimeout(120_000);
   const { provider, url } = await startFixtureProvider([
@@ -123,7 +123,7 @@ test("Done stays across a reload until Mari opens that run", async ({ page, requ
   try {
     connectionId = await openMari(page, request, url);
     await bootAndOpenMari(page);
-    await page.locator('[data-component="GlobalOmnibar.Mari"]').locator("textarea:visible").fill("Say hello");
+    await page.locator('[data-component="GlobalOmnibar.YunYun"]').locator("textarea:visible").fill("Say hello");
     await page.keyboard.press("Control+Enter");
     // Close her window while the run is still going, so the result is one nobody has seen.
     await expect(page.locator('.mari-work-timeline[data-active="true"]')).toBeVisible();
@@ -135,7 +135,7 @@ test("Done stays across a reload until Mari opens that run", async ({ page, requ
 
     // Opening her window on the run marks it seen; the pill clears and stays clear after a reload.
     await page.locator('[data-component="TopBar.MariStatus"]').click();
-    await expect(page.locator('[data-component="GlobalOmnibar.Mari"]').locator("textarea:visible")).toBeVisible();
+    await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]').locator("textarea:visible")).toBeVisible();
     await expect(page.getByText("Here is your answer.")).toBeVisible();
     await closeMari(page);
     await expect(pill(page)).toHaveCount(0);
@@ -147,7 +147,7 @@ test("Done stays across a reload until Mari opens that run", async ({ page, requ
   }
 });
 
-test("Failed stays across a reload until Mari opens that run", async ({ page, request }, testInfo) => {
+test("Failed stays across a reload until YunYun opens that run", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("desktop"), "One pill run on desktop is enough proof.");
   test.setTimeout(120_000);
   const { provider, url } = await startFixtureProvider([{ delayMs: 3_000, status: 400 }]);
@@ -155,7 +155,7 @@ test("Failed stays across a reload until Mari opens that run", async ({ page, re
   try {
     connectionId = await openMari(page, request, url);
     await bootAndOpenMari(page);
-    await page.locator('[data-component="GlobalOmnibar.Mari"]').locator("textarea:visible").fill("Fail please");
+    await page.locator('[data-component="GlobalOmnibar.YunYun"]').locator("textarea:visible").fill("Fail please");
     await page.keyboard.press("Control+Enter");
     await closeMari(page);
     await expect(pill(page)).toHaveAttribute("data-state", "error", { timeout: 60_000 });
@@ -164,7 +164,7 @@ test("Failed stays across a reload until Mari opens that run", async ({ page, re
     await expect(pill(page)).toHaveAttribute("data-state", "error", { timeout: 30_000 });
 
     await pill(page).click();
-    await expect(page.locator('[data-component="GlobalOmnibar.Mari"]').locator("textarea:visible")).toBeVisible();
+    await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]').locator("textarea:visible")).toBeVisible();
     await closeMari(page);
     await expect(pill(page)).toHaveCount(0);
     await page.reload();
@@ -185,7 +185,7 @@ test("the live timer resumes from the run's start after a reload", async ({ page
   try {
     connectionId = await openMari(page, request, url);
     await bootAndOpenMari(page);
-    await page.locator('[data-component="GlobalOmnibar.Mari"]').locator("textarea:visible").fill("Take your time");
+    await page.locator('[data-component="GlobalOmnibar.YunYun"]').locator("textarea:visible").fill("Take your time");
     await page.keyboard.press("Control+Enter");
     await expect(page.locator('.mari-work-timeline[data-active="true"]')).toBeVisible();
     // Let the run age for a few seconds before the reload, so a restarted timer would read near zero.

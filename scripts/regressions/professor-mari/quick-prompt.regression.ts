@@ -25,8 +25,8 @@ const quickMethod = serviceSource.slice(
   serviceSource.indexOf("async quickPrompt("),
   serviceSource.indexOf("async prompt("),
 );
-assert.equal(quickMethod.match(/provider\.chatComplete\(/gu)?.length, 1, "Quick Mari has one provider request site");
-assert.equal(quickMethod.includes("executeWorkspaceCommandBatch"), false, "Quick Mari has no tool loop");
-assert.equal(quickMethod.includes("createChatsStorage"), false, "Quick Mari has no chat history");
+assert.equal(quickMethod.match(/provider\.chatComplete\(/gu)?.length, 1, "Quick YunYun has one provider request site");
+assert.equal(quickMethod.includes("executeWorkspaceCommandBatch"), false, "Quick YunYun has no tool loop");
+assert.equal(quickMethod.includes("createChatsStorage"), false, "Quick YunYun has no chat history");
 
-console.log("Professor Mari quick-prompt regression checks passed.");
+console.log("Professor YunYun quick-prompt regression checks passed.");

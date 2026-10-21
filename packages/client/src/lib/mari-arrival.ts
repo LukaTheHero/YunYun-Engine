@@ -1,4 +1,4 @@
-// M9: Mari arrives with context. What the empty Mari pane says before anything
+// M9: YunYun arrives with context. What the empty YunYun pane says before anything
 // is sent: one line about where you are, the things in it, and 2-4 cards. Built
 // on the client from data the omnibar already has; no model call (R22). The
 // input types carry names, counts and times only, never message text, so
@@ -19,7 +19,7 @@ export type MariArrivalCard = Omit<MariSuggestionChip, "action"> & {
 };
 
 /**
- * R7: the context a Mari thread belongs to. The key is `chat:<id>` from inside a chat, the open
+ * R7: the context a YunYun thread belongs to. The key is `chat:<id>` from inside a chat, the open
  * editor's own result id (`character:<id>`, `lorebook:<id>`, `agent:<type>`, ...) from an editor, or
  * "general" for Home and every other screen. The label is the name the arrival already shows.
  */
@@ -37,7 +37,7 @@ export function mariThreadContextFor(context: OmnibarContext, arrival: MariArriv
   return { key: MARI_GENERAL_CONTEXT };
 }
 
-/** A Mari thread as the routing reads it: its stored context, if any, and when it was last used. */
+/** A YunYun thread as the routing reads it: its stored context, if any, and when it was last used. */
 export interface MariThread {
   id: string;
   contextKey: string;
@@ -110,12 +110,12 @@ export function mariFixRowId(
 }
 
 /**
- * N6 (R22): the row Mari is handed when nothing was picked. It may be the same row the Fix door
+ * N6 (R22): the row YunYun is handed when nothing was picked. It may be the same row the Fix door
  * points at (a built-in agent's editor row shares its id with its Fix row) — that's fine, the row
  * still carries the right resource; only a deliberate pick of the Fix row attaches the error text
  * (see `buildAskContext`'s explicit `fix` flag at the call site). On an arrival, never the open
  * chat either (it is its own facet). Never a chat tool row (`chat-tool:…`, e.g. "Fix: Check the last
- * reply") either: it is an action, not a subject, and handing it over made Mari read any question
+ * reply") either: it is an action, not a subject, and handing it over made YunYun read any question
  * asked in that chat as a request to repair the last reply (slice 66).
  */
 export function mariFallbackFocus<Row extends { id: string }>(
@@ -127,7 +127,7 @@ export function mariFallbackFocus<Row extends { id: string }>(
 }
 
 /**
- * N4: what a next-step card does. An action card acts at once; a Mari card sends its prompt at once,
+ * N4: what a next-step card does. An action card acts at once; a YunYun card sends its prompt at once,
  * or drafts it into the composer when Shift is held (desktop) or the card is long-pressed (touch).
  */
 export function mariCardIntent(

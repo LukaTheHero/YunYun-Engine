@@ -445,7 +445,7 @@ export function scoreSubsequence(query: string, value: string) {
   for (const character of value) {
     if (character === query[index] && ++index === query.length) {
       // Prefer the shortest title that contains the run: "PM" should find
-      // "Professor Mari" before "Preset Manager Settings".
+      // "Professor YunYun" before "Preset Manager Settings".
       return Math.max(1, 60 - value.length);
     }
   }
@@ -770,7 +770,7 @@ export function searchOmnibar(query: string, data: OmnibarSearchData): OmnibarRe
     )
     .concat({
       id: "ask-professor-mari",
-      title: data.askProfessorTitle ?? "Ask Professor Mari",
+      title: data.askProfessorTitle ?? "Ask Professor YunYun",
       category: "professor",
       score: -1,
     });

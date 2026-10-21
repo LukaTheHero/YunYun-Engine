@@ -90,7 +90,7 @@ export async function professorMariQuickRoutes(app: FastifyInstance) {
     "/proposals/:id/apply",
     { config: { rateLimit: PROFESSOR_MARI_QUICK_RATE_LIMIT } },
     async (request, reply) => {
-      if (!requirePrivilegedAccess(request, reply, { feature: "Professor Mari Quick" })) return;
+      if (!requirePrivilegedAccess(request, reply, { feature: "Professor YunYun Quick" })) return;
       try {
         return await getProfessorMariWorkspaceService(app).applyQuickEditProposal(request.params.id);
       } catch (error) {
@@ -102,7 +102,7 @@ export async function professorMariQuickRoutes(app: FastifyInstance) {
   );
 
   app.post("/prompt", { config: { rateLimit: PROFESSOR_MARI_QUICK_RATE_LIMIT } }, async (request, reply) => {
-    if (!requirePrivilegedAccess(request, reply, { feature: "Professor Mari Quick" })) return;
+    if (!requirePrivilegedAccess(request, reply, { feature: "Professor YunYun Quick" })) return;
     const body = professorMariQuickPromptSchema.parse(request.body);
     const controller = new AbortController();
     const onClose = () => controller.abort();
@@ -128,7 +128,7 @@ export async function professorMariQuickRoutes(app: FastifyInstance) {
       });
       // A quick answer with no words is a failed answer, never a finished one.
       if (body.unasked && words === 0 && !controller.signal.aborted)
-        throw new Error("Professor Mari sent no words for this quick answer.");
+        throw new Error("Professor YunYun sent no words for this quick answer.");
       send({ type: "complete", data: { ok: true } });
     } catch (error) {
       if (!controller.signal.aborted) {

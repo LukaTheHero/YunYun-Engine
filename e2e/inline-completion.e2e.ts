@@ -19,7 +19,7 @@ test("name completion continues through spaces and accepts the complete name", a
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+k");
     const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-    const input = omnibar.getByRole("searchbox", { name: "Search Marinara" });
+    const input = omnibar.getByRole("searchbox", { name: "Search YunYun" });
     const suffix = omnibar.locator('[data-component="InlineGhostText"] > span').first();
     await input.fill("DC");
     await expect(suffix).toHaveText(" simulator completion proof");

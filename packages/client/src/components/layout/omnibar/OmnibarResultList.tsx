@@ -317,14 +317,14 @@ export function OmnibarResultList({
                 ? mariEnabled
                   ? t(
                       "commandCenter.empty.hintDesktop",
-                      "Type a name, a setting or a question. Enter opens the top row; {{mod}}+Enter asks Professor Mari.",
+                      "Type a name, a setting or a question. Enter opens the top row; {{mod}}+Enter asks Professor YunYun.",
                       { mod: formatShortcutKey("Mod") },
                     )
                   : t("commandCenter.empty.hintDesktopNoMari", "Type a name or a setting. Enter opens the top row.")
                 : mariEnabled
                   ? t(
                       "commandCenter.empty.hintPhone",
-                      "Type a name, a setting or a question. Tap a row to open it; a question goes to Professor Mari.",
+                      "Type a name, a setting or a question. Tap a row to open it; a question goes to Professor YunYun.",
                     )
                   : t("commandCenter.empty.hintPhoneNoMari", "Type a name or a setting, then tap a row.")}
             </span>

@@ -110,7 +110,7 @@ try {
     chatId: room.chatId,
     publicOrigin: `https://127.0.0.1:${await unusedPort()}`,
     password,
-    displayName: "Mari",
+    displayName: "YunYun",
     persona: { name: "Captain", description: "" },
   });
   const characters = createCharactersStorage(hostDb);

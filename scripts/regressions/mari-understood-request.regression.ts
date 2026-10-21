@@ -1,4 +1,4 @@
-// #5740: the "understood request" triage tool - Mari reports the phrase she
+// #5740: the "understood request" triage tool - YunYun reports the phrase she
 // treated as the request/permission for mutating commands; it is persisted as
 // ONE latest-round in-memory record (maintainer call: no growing history),
 // shown under the matching reply (truncated, expandable), and included in
@@ -106,7 +106,7 @@ assert.match(workspaceAgent, /label\.replace\(\/\\s\+\/gu, " "\)\.trim\(\)\.slic
 assert.match(workspaceAgent, /runUnderstoodRequest = \{ \.\.\.runUnderstoodRequest, messageId: message\.id \};/u);
 // Status carries it.
 assert.match(workspaceAgent, /latestUnderstoodRequest: this\.latestUnderstoodRequest,/u);
-// Read-back (maintainer call): the chat's record is shown to Mari herself so
+// Read-back (maintainer call): the chat's record is shown to YunYun herself so
 // "why did you treat that as permission?" is answered from the actual record,
 // framed as a record - never an instruction.
 assert.match(workspaceAgent, /<mari_understood_request_record>/u);
@@ -132,7 +132,7 @@ assert.deepEqual(
     "if (runUnderstoodRequest === null || this.latestUnderstoodRequest !== runUnderstoodRequest",
     // persistAssistantMessage: bind the run's OWN record to its message.
     "if ( runUnderstoodRequest !== null && this.latestUnderstoodRequest === runUnderstoodRequest && runUnderstoodRequest.messageId === null",
-    // prompt build: read the chat's record back to Mari as context so she can
+    // prompt build: read the chat's record back to YunYun as context so she can
     // explain her own interpretation when asked - inclusion-only, never a gate.
     "if (understoodRequestRecord !== null && understoodRequestRecord.chatId === chatId",
   ],
@@ -203,13 +203,13 @@ for (const key of [
 }
 assert.match(
   enJson["ui.panels.advancedsettings.supportDiagnosticsDescription"] ?? "",
-  /Professor Mari/u,
-  "the Support Diagnostics description discloses that the copy can carry the Mari phrase",
+  /Professor YunYun/u,
+  "the Support Diagnostics description discloses that the copy can carry the YunYun phrase",
 );
 
 // ── Diagnostics: the triage line distinguishes unreachable / none / recorded ─
 const diagnostics = readSource("packages/client/src/lib/support-diagnostics.ts");
-assert.match(diagnostics, /Professor Mari last acted on:/u);
+assert.match(diagnostics, /Professor YunYun last acted on:/u);
 assert.match(diagnostics, /Unavailable \(workspace status not reachable\)/u);
 assert.match(diagnostics, /none recorded this session/u);
 // The phrase is flattened and capped for the line-oriented report (a
@@ -238,4 +238,4 @@ assert.match(
   "the status fetch carries a deadline - a frozen host must not leave the copy button disabled (#5657)",
 );
 
-console.log("Mari understood-request regression passed.");
+console.log("YunYun understood-request regression passed.");

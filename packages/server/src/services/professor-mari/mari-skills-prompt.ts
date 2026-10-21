@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari: custom-skill prompt injection.
+// Professor YunYun: custom-skill prompt injection.
 //
 // Mirrors the memory injection (#4851): only a title + one-liner index is always in
 // context; a skill body (up to 200k chars each) is pulled on relevance with

@@ -50,7 +50,7 @@ interface TourStep {
   settingsTab?: string;
   /** Render the documentation-language picker inside this step's card */
   docsLanguagePicker?: boolean;
-  /** Professor Mari sprite to display */
+  /** Professor YunYun sprite to display */
   sprite?: { pose: MariPose; flip?: boolean };
   /** Body used instead of bodyKey on a phone-width screen, where this step's control is not on screen */
   phoneBodyKey?: string;
@@ -63,8 +63,8 @@ function resolveTourStepTitle(step: TourStep, localizeUi: (key: string) => strin
 const STEPS: TourStep[] = [
   {
     target: null,
-    title: "Welcome to Marinara Engine!",
-    body: "Hi! I'm Professor Mari, your assistant and guide! First time around? Allow me to show you around. This is a quick orientation tour, so you can skip it if you already know your way around, but skipping will make me sad a little.",
+    title: "Welcome to YunYun Engine!",
+    body: "Hi! I'm Professor YunYun, your assistant and guide! First time around? Allow me to show you around. This is a quick orientation tour, so you can skip it if you already know your way around, but skipping will make me sad a little.",
     sprite: { pose: "wave" },
   },
   {
@@ -202,7 +202,7 @@ const STEPS: TourStep[] = [
   {
     target: "home-documentation",
     title: "One Last Thing: Guide Language",
-    body: "The highlighted Documentation button on Home opens Marinara's built-in guides. Pick a language below, and I'll use it whenever you open them. You can change this anytime in Settings under General. Guides that are not translated yet will show in English.",
+    body: "The highlighted Documentation button on Home opens YunYun's built-in guides. Pick a language below, and I'll use it whenever you open them. You can change this anytime in Settings under General. Guides that are not translated yet will show in English.",
     side: "top",
     openHome: true,
     docsLanguagePicker: true,
@@ -471,7 +471,7 @@ function TourCardContent({
   const localizedTitle = resolveTourStepTitle(currentStep, localizeUi, localize);
   return (
     <>
-      {/* Professor Mari sprite */}
+      {/* Professor YunYun sprite */}
       {currentStep.sprite && (
         <div className="mb-2 flex justify-center">
           <img

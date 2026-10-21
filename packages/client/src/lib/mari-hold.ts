@@ -1,5 +1,5 @@
 /**
- * Slice 85: holding Mari. The gesture thresholds and the physics steps live here, pure, so the
+ * Slice 85: holding YunYun. The gesture thresholds and the physics steps live here, pure, so the
  * regression can pin them without a DOM. The hook and the figure only read them.
  */
 

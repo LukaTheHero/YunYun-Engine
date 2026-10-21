@@ -7,10 +7,10 @@ const APP_VERSION = (
 ).version;
 
 /**
- * Slice 83 (item 4): Mari's destination row is a tablist. Arrow keys, Home and End move and select a tab, and
+ * Slice 83 (item 4): YunYun's destination row is a tablist. Arrow keys, Home and End move and select a tab, and
  * only one tab is in the tab order. The look changed, the geometry did not, so this spec checks roles and keys.
  */
-test("Mari's destinations are a tablist with roving tab stops and arrow-key selection", async ({ page }) => {
+test("YunYun's destinations are a tablist with roving tab stops and arrow-key selection", async ({ page }) => {
   await page.addInitScript((v) => localStorage.setItem("marinara:whats-new:seen-version", v), APP_VERSION);
   await seedUIState(page, {
     hasCompletedOnboarding: true,

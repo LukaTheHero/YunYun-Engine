@@ -10,10 +10,10 @@ test.beforeEach(async ({ request }) => {
 
 // R3 (slice 62): proves the prompt wiring, not just that `chat.diagnose` exists in isolation.
 // A scripted fake model exercises the real workspace loop and real storage: a chat is seeded with
-// a genuinely cut-off reply, Mari is asked why it got worse, and the test checks the SERVER really
+// a genuinely cut-off reply, YunYun is asked why it got worse, and the test checks the SERVER really
 // executed `chat.diagnose` against that seeded data (the real 512-token limit shows up in the tool
 // result fed back to the model) before the mocked final answer names that same number.
-test("Mari calls chat.diagnose first and names the real limit from the findings", async ({ request }) => {
+test("YunYun calls chat.diagnose first and names the real limit from the findings", async ({ request }) => {
   const suffix = Date.now().toString(36);
   const tool = (action: string, args: Record<string, unknown> = {}) => ({
     name: "app_data",

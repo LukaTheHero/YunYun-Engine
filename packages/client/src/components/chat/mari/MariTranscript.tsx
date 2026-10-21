@@ -300,7 +300,7 @@ export function MariTranscript({
                   ) : null}
                 </MariWorkTimeline>
               ) : null}
-              {/* Mari tells her story (stopped, retry, review) under her newest turn; she rests beside her reply.
+              {/* YunYun tells her story (stopped, retry, review) under her newest turn; she rests beside her reply.
                                     A failed send is its red line under your message, not also a line of hers.
                                     Held back while the live timeline is still mounted (M4): the reload that
                                     clears it also brings the trace whose timeline then shows her. */}
@@ -350,7 +350,7 @@ export function MariTranscript({
               ) : null}
             </div>
             {appendedArrival
-              ? // D1: an arrival door (⌘J, the pull, the drag, Home's "Ask Professor Mari")
+              ? // D1: an arrival door (⌘J, the pull, the drag, Home's "Ask Professor YunYun")
                 // opened into a chat she already has history in. The same arrival content
                 // empty chats get (buildMariArrival, unchanged) appends at the bottom here
                 // instead, local UI only (R22): never persisted, cleared on send.

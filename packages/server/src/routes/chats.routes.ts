@@ -859,8 +859,8 @@ function resolveEntryStateOverrides(value: unknown): EntryStateOverrides | undef
   return overrides;
 }
 
-/** Slice 70: Mari's continuity snapshot is prompt-only (her run reads it from storage; the client never does). It was
- *  ~30 % of a long Mari thread's bytes on every load, so the message list leaves it out. Storage is unchanged. */
+/** Slice 70: YunYun's continuity snapshot is prompt-only (her run reads it from storage; the client never does). It was
+ *  ~30 % of a long YunYun thread's bytes on every load, so the message list leaves it out. Storage is unchanged. */
 export function withoutPromptOnlyExtra<T extends { extra?: unknown }>(rows: T[]): T[] {
   return rows.map((row) => {
     const raw = row.extra;
@@ -1163,7 +1163,7 @@ export async function chatsRoutes(app: FastifyInstance) {
     }
 
     const created = await storage.create({
-      name: "Professor Mari",
+      name: "Professor YunYun",
       mode: "conversation",
       characterIds: [PROFESSOR_MARI_ID],
       groupId: null,
@@ -1218,7 +1218,7 @@ export async function chatsRoutes(app: FastifyInstance) {
     if (active && activeMessageCount > 0) {
       const metadata = parseChatMetadata(active.metadata);
       const currentName = typeof active.name === "string" && active.name.trim() ? active.name.trim() : "";
-      const shouldRename = currentName === "Professor Mari";
+      const shouldRename = currentName === "Professor YunYun";
       await storage.update(active.id, {
         name: shouldRename ? formatProfessorMariStashName() : active.name,
         characterIds: [PROFESSOR_MARI_ID],
@@ -1245,7 +1245,7 @@ export async function chatsRoutes(app: FastifyInstance) {
     }
 
     const created = await storage.create({
-      name: name || "Professor Mari",
+      name: name || "Professor YunYun",
       mode: "conversation",
       characterIds: [PROFESSOR_MARI_ID],
       groupId: null,
@@ -1271,7 +1271,7 @@ export async function chatsRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>("/internal/professor-mari/chats/:id/activate", async (req, reply) => {
     const professorChats = (await storage.list()).filter(isHomeProfessorMariChat);
     const target = professorChats.find((chat) => chat.id === req.params.id);
-    if (!target) return reply.status(404).send({ error: "Professor Mari chat not found" });
+    if (!target) return reply.status(404).send({ error: "Professor YunYun chat not found" });
 
     for (const chat of professorChats) {
       await storage.patchMetadata(chat.id, {
@@ -1295,7 +1295,7 @@ export async function chatsRoutes(app: FastifyInstance) {
     "/internal/professor-mari/chats/:id",
     async (req, reply) => {
       const target = (await storage.list()).find((chat) => chat.id === req.params.id && isHomeProfessorMariChat(chat));
-      if (!target) return reply.status(404).send({ error: "Professor Mari chat not found" });
+      if (!target) return reply.status(404).send({ error: "Professor YunYun chat not found" });
       const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
       if (!name) return reply.status(400).send({ error: "Name is required" });
       const updated = await storage.update(target.id, { name });
@@ -1306,7 +1306,7 @@ export async function chatsRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>("/internal/professor-mari/chats/:id", async (req, reply) => {
     const professorChats = (await storage.list()).filter(isHomeProfessorMariChat);
     const target = professorChats.find((chat) => chat.id === req.params.id);
-    if (!target) return reply.status(404).send({ error: "Professor Mari chat not found" });
+    if (!target) return reply.status(404).send({ error: "Professor YunYun chat not found" });
     const wasActive = isActiveHomeProfessorMariChat(target);
     await storage.remove(target.id);
     // #6842: the chat's Keep/Restore cards go with it. Its changes stay applied.
@@ -1356,7 +1356,7 @@ export async function chatsRoutes(app: FastifyInstance) {
   app.post("/", async (req, reply) => {
     const input = createChatSchema.parse(req.body);
     if (input.characterIds.includes(PROFESSOR_MARI_ID)) {
-      return reply.status(400).send({ error: "Professor Mari is only available from the Home screen." });
+      return reply.status(400).send({ error: "Professor YunYun is only available from the Home screen." });
     }
     if (input.mode === "game" && input.personaCharacterId) {
       return reply.status(400).send({ error: "Character identities are not available in Game chats." });
@@ -1404,7 +1404,7 @@ export async function chatsRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Chat not found" });
     }
     if (data.characterIds?.includes(PROFESSOR_MARI_ID) && !hasProfessorMariCharacter(existing)) {
-      return reply.status(400).send({ error: "Professor Mari is only available from the Home screen." });
+      return reply.status(400).send({ error: "Professor YunYun is only available from the Home screen." });
     }
     if (data.characterIds !== undefined) {
       // A hosted room's AI roster lives in the room. Changing it here would leave the room's

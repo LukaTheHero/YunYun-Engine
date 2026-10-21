@@ -6,8 +6,8 @@ import { requestProfessorMariOpen } from "./professor-mari-open";
 import type { ProfessorMariNavigationTarget } from "./professor-mari-navigation";
 import { isOmnibarSettingsTarget } from "./settings-registry";
 
-const DISCORD_INVITE_URL = "https://discord.com/invite/KdAkTg94ME";
-const SUPPORT_URL = "https://ko-fi.com/marinara_spaghetti";
+const DISCORD_INVITE_URL = "https://discord.gg/canalpa";
+const SUPPORT_URL = "https://ko-fi.com/lukathehero";
 
 /** The same achievement events Home's own Discord, Ko-fi and Credits links fire. */
 function trackWindow(event: AchievementEvent) {

@@ -87,7 +87,7 @@ export function countOmnibarTryOpen(storage: TryStorage | null = browserStorage(
   return next;
 }
 
-/** The Try kinds still to show, in their fixed order: search, command, Mari. */
+/** The Try kinds still to show, in their fixed order: search, command, YunYun. */
 export function visibleOmnibarTryKinds(
   state: OmnibarTryState,
   { enabled, mariEnabled }: { enabled: boolean; mariEnabled: boolean },
@@ -111,7 +111,7 @@ export function buildOmnibarTryResults(
   const titles: Record<OmnibarTryKind, string> = {
     search: t("commandCenter.try.search", "Search by name"),
     command: t("commandCenter.try.command", "Change a setting"),
-    mari: t("commandCenter.try.mari", "Ask Prof. Mari a question"),
+    mari: t("commandCenter.try.mari", "Ask Prof. YunYun a question"),
   };
   return kinds.map((kind) => ({
     id: `try:${kind}`,
@@ -127,8 +127,8 @@ export function buildOmnibarTryResults(
 }
 
 /**
- * The one row that needs the user now, first match wins: Mari waiting on a review, a
- * failed request, a cut-off reply, Mari working, Mari finished, then no model at all.
+ * The one row that needs the user now, first match wins: YunYun waiting on a review, a
+ * failed request, a cut-off reply, YunYun working, YunYun finished, then no model at all.
  * Every candidate is a row the omnibar already builds, so picking it runs the same thing.
  */
 export function pickOmnibarNowResult({
@@ -140,7 +140,7 @@ export function pickOmnibarNowResult({
   checkupRow,
   setupRow,
 }: {
-  /** The existing "continue with Mari" row; it already reads approvals, working and finished. */
+  /** The existing "continue with YunYun" row; it already reads approvals, working and finished. */
   mariRow: OmnibarResult | null;
   pendingApprovals: number;
   mariActive: boolean;

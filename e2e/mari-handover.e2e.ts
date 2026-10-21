@@ -39,7 +39,7 @@ async function startSilentProvider() {
   };
 }
 
-/** Records, on every animation frame, whether a Mari matching `selector` is on screen. */
+/** Records, on every animation frame, whether a YunYun matching `selector` is on screen. */
 async function startFrameSampler(page: Page, selector: string) {
   await page.evaluate((sel) => {
     const w = window as unknown as { __mariFrames: number[]; __mariRaf: number };
@@ -101,7 +101,7 @@ async function openMariWithFixture(
   const connectionId = ((await connection.json()) as { id: string }).id;
   await page.setViewportSize({ width, height });
   await page.addInitScript((v) => localStorage.setItem("marinara:whats-new:seen-version", v), APP_VERSION);
-  await page.route("**/sprites/mari/**", async (route) => {
+  await page.route("**/sprites/yunyun/**", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, SHEET_DELAY_MS));
     await route.continue();
   });
@@ -134,7 +134,7 @@ for (const [label, width, height] of [
   ["390", 390, 844],
   ["1440", 1440, 900],
 ] as const) {
-  test(`${label}: Mari stays on screen in every frame from her empty home, through Enter, to her working line`, async ({
+  test(`${label}: YunYun stays on screen in every frame from her empty home, through Enter, to her working line`, async ({
     page,
     request,
     browserName,
@@ -150,7 +150,7 @@ for (const [label, width, height] of [
         return isApplePlatform() ? "Meta+j" : "Control+j";
       });
       await page.keyboard.press(mariShortcut);
-      const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+      const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
       const composer = mariPane.locator("textarea:visible");
       await expect(composer).toBeVisible();
       // Her empty home is up once her sheet is decoded; the frames before that are the page loading.
@@ -165,7 +165,7 @@ for (const [label, width, height] of [
         const sampled = await stopFrameSampler(page);
         console.log(`HANDOVER ${label} frames=${sampled.frames} fps=${sampled.fps} blank=${sampled.blank}`);
         expect(sampled.frames, "enough frames were sampled to judge the hand-over").toBeGreaterThan(5);
-        expect(sampled.blank, "no frame without Mari from her empty home to her working line").toBe(0);
+        expect(sampled.blank, "no frame without YunYun from her empty home to her working line").toBe(0);
       }
     } finally {
       await cleanUp(request, connectionId);
@@ -174,7 +174,7 @@ for (const [label, width, height] of [
   });
 }
 
-test("desktop: opening and closing Mari's window never shows a frame without Mari", async ({
+test("desktop: opening and closing YunYun's window never shows a frame without YunYun", async ({
   page,
   request,
 }, testInfo) => {
@@ -182,7 +182,7 @@ test("desktop: opening and closing Mari's window never shows a frame without Mar
   const provider = await startSilentProvider();
   const connectionId = await openMariWithFixture(page, request, provider.baseUrl, 1440, 900);
   try {
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     const homePortrait = page.locator('[data-home-professor-art] img[data-part="sprite"]');
     await expect(homePortrait).toBeVisible({ timeout: 30_000 });
     // A visible <img> box can still be loading. Start the hand-over only once its source is drawn;
@@ -203,7 +203,7 @@ test("desktop: opening and closing Mari's window never shows a frame without Mar
     const sampled = await stopFrameSampler(page);
     console.log(`HANDOVER open-close frames=${sampled.frames} fps=${sampled.fps} blank=${sampled.blank}`);
     expect(sampled.frames, "enough frames were sampled to judge the open and close").toBeGreaterThan(5);
-    expect(sampled.blank, "Mari is on screen through the open and the close").toBe(0);
+    expect(sampled.blank, "YunYun is on screen through the open and the close").toBe(0);
   } finally {
     await cleanUp(request, connectionId);
     await provider.close();

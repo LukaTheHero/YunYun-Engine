@@ -8,7 +8,7 @@ const APP_VERSION = (
 ).version;
 
 /**
- * Round 9 UX-02: after Mari's pane opens, keyboard focus sits in her window. Before, the search pane hid the
+ * Round 9 UX-02: after YunYun's pane opens, keyboard focus sits in her window. Before, the search pane hid the
  * focused field and focus fell to <body>, so Escape never reached the omnibar and nothing closed.
  */
 test.beforeEach(async () => {
@@ -19,7 +19,7 @@ test.afterEach(() => {
   releaseMariThreadLock();
 });
 
-test("desktop: opening Mari focuses her window, and Escape from the page goes back", async ({
+test("desktop: opening YunYun focuses her window, and Escape from the page goes back", async ({
   page,
   request,
 }, testInfo) => {
@@ -52,10 +52,10 @@ test("desktop: opening Mari focuses her window, and Escape from the page goes ba
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
 
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     await expect(mariPane).toHaveAttribute("aria-hidden", "false");
     const focusInMari = () =>
-      page.evaluate(() => !!document.activeElement?.closest('[data-component="GlobalOmnibar.Mari"]'));
+      page.evaluate(() => !!document.activeElement?.closest('[data-component="GlobalOmnibar.YunYun"]'));
     await expect.poll(focusInMari).toBe(true);
 
     // Focus lost to the page (as after a card action removes its button): Escape still leaves her window.

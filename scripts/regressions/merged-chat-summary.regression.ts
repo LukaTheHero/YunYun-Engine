@@ -4,7 +4,7 @@
  * knows it, as Advanced Memory does since #7239. Narrator-only sections stay out. Text outside every
  * condition keeps its usual reading, {{char}} included. A chosen responder does not pin a merged reply
  * to one speaker, so it still marks. Individual mode, impersonation and single-character chats read the
- * summary as on staging, except that a section for someone else leaves no empty line (Mari, 2026-10-14).
+ * summary as on staging, except that a section for someone else leaves no empty line (YunYun, 2026-10-14).
  */
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -99,7 +99,7 @@ try {
         chatId: "merged-summary",
         characterIds,
         groupCharacterIds: all,
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "",
         localVariables: { ready: "yes" },
         chatMessages: [{ role: "user", content: "Where are we?" }],
@@ -113,7 +113,7 @@ try {
   const merged =
     MAIN +
     "<chat_summary>\n" +
-    "    Mari and Narrator reached the harbor.\n" +
+    "    YunYun and Narrator reached the harbor.\n" +
     "    [Known only to Maukie: Maukie hid the compass.]\n" +
     "    The travelers kept the compass promise.\n" +
     "    [Known only to Pantalone: Pantalone owes Cara a debt.]\n" +
@@ -132,7 +132,7 @@ try {
   assert.equal(
     await summaryBlock([narrator.id, maukie.id], true, { chatSummaryReaders: [profiles.get(maukie.id)!] }),
     MAIN +
-      "<chat_summary>\n    Mari and Narrator reached the harbor.\n    Maukie hid the compass.\n" +
+      "<chat_summary>\n    YunYun and Narrator reached the harbor.\n    Maukie hid the compass.\n" +
       "    The travelers kept the compass promise.\n    Nobody mentions the debt.\n</chat_summary>",
     "the narrator-and-Maukie summary is read as Maukie",
   );
@@ -141,7 +141,7 @@ try {
   const mergedCtx = await buildPromptMacroContext({
     db,
     characterIds: all,
-    personaName: "Mari",
+    personaName: "YunYun",
     localVariables: { ready: "yes" },
   });
   assert.equal(
@@ -162,7 +162,7 @@ try {
   // section that fills its own line takes the line break before it along, so a hidden one leaves no empty line.
   const individual =
     MAIN +
-    "<chat_summary>\n    Mari and \u001eMARINARA_DEFERRED_CHARACTER_CHAR\u001f reached the harbor." +
+    "<chat_summary>\n    YunYun and \u001eMARINARA_DEFERRED_CHARACTER_CHAR\u001f reached the harbor." +
     "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Maukie%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5Cn%7B%7Bchar%7D%7D%20hid%20the%20compass.%22%7D%5D%7D\u001f" +
     "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Maukie%5C%22%20%7C%7C%20char%20%3D%3D%20%5C%22Pantalone%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnThe%20travelers%20kept%20the%20compass%20promise.%22%7D%5D%7D\u001f" +
     "\u001eMARINARA_DEFERRED_CHARACTER_IF:%7B%22branches%22%3A%5B%7B%22condition%22%3A%22char%20%3D%3D%20%5C%22Narrator%5C%22%22%2C%22content%22%3A%22%7B%7Bnoop%7D%7D%5CnNARRATOR_ONLY%20The%20storm%20was%20planned.%22%7D%5D%7D\u001f" +
@@ -171,10 +171,10 @@ try {
     "</chat_summary>";
   const pinned =
     MAIN +
-    "<chat_summary>\n    Mari and Pantalone reached the harbor.\n    The travelers kept the compass promise.\n" +
+    "<chat_summary>\n    YunYun and Pantalone reached the harbor.\n    The travelers kept the compass promise.\n" +
     "    Pantalone owes Cara a debt.\n    MIXED_SECRET\n</chat_summary>";
   const single =
-    "<chat_summary>\n    Mari and Maukie reached the harbor.\n    Maukie hid the compass.\n" +
+    "<chat_summary>\n    YunYun and Maukie reached the harbor.\n    Maukie hid the compass.\n" +
     "    The travelers kept the compass promise.\n    Nobody mentions the debt.\n</chat_summary>";
   for (const marker of [true, false]) {
     assert.equal(await summaryBlock(all, marker, { deferCharacterMacros: true }), individual, "Individual mode");
@@ -197,7 +197,7 @@ try {
   const soloCtx = await buildPromptMacroContext({
     db,
     characterIds: [maukie.id],
-    personaName: "Mari",
+    personaName: "YunYun",
     localVariables: { ready: "yes" },
   });
   assert.equal(appendFallbackChatSummaryToSystemPrompt([], SUMMARY, "xml", soloCtx)[0]!.content, single);

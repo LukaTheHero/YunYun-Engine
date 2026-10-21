@@ -13,7 +13,7 @@ import { useUIStore } from "../stores/ui.store";
 import { useProfessorMariWorkspaceStatus } from "./use-professor-mari-workspace-status";
 
 /**
- * Heartbeat for Professor Mari's presence outside the omnibar dialog.
+ * Heartbeat for Professor YunYun's presence outside the omnibar dialog.
  *
  * Her state used to live inside the dialog, which is unmounted on close, so a
  * task that finished while the omnibar was shut was simply lost. This reads the
@@ -63,7 +63,7 @@ export function useMariRunSeenId(chatId: string | null | undefined): string | nu
 export function useMarkMariRunSeen(chatId: string | null, latestRun: MariWorkspaceLatestRun | null, working: boolean) {
   const queryClient = useQueryClient();
   const seenRunId = useMariRunSeenId(chatId);
-  // Her chat stays mounted behind the search list (Mari, then Search); only her pane on screen counts as seen.
+  // Her chat stays mounted behind the search list (YunYun, then Search); only her pane on screen counts as seen.
   const viewing = useUIStore((state) => state.mariPaneVisible);
   const markSeen = useMutation({
     mutationFn: (runId: string) =>

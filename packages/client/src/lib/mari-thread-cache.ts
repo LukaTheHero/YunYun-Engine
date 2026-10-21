@@ -1,4 +1,4 @@
-// Professor Mari's pane unmounts with the omnibar, so every open started from nothing: a skeleton, three
+// Professor YunYun's pane unmounts with the omnibar, so every open started from nothing: a skeleton, three
 // requests in a row and a full render of the thread. This keeps the last thread she showed, and the Chats
 // list the arrival routing read, for the page session. A reopen into the same thread draws at once and the
 // fetch only refreshes it.

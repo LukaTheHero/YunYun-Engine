@@ -32,17 +32,17 @@ If you already set up an **Audio** connection (see [Supported AI Providers](../c
 1. Open the **Source** dropdown and pick the connection.
 2. Choose its voices and the other settings below as usual.
 
-Marinara then speaks with that connection's base URL, API key, model, and **Request timeout (seconds)**, so the card hides those fields. The key stays in the connection: it is not copied into the card's settings or sent to your browser. Changes you make to the connection, such as a new key, take effect right away.
+YunYun then speaks with that connection's base URL, API key, model, and **Request timeout (seconds)**, so the card hides those fields. The key stays in the connection: it is not copied into the card's settings or sent to your browser. Changes you make to the connection, such as a new key, take effect right away.
 
 Voices, speed, and the other speech settings are saved separately for each connection. Two connections of the same type, such as two OpenAI-compatible servers, never share them. Your settings for the four regular Sources stay as they were, so you can switch back at any time. The switch in the card header still turns Text to Speech on and off, and a game's own audio connection still makes that game's sound effects and music.
 
-If the chosen connection is deleted or can't be used, the card shows **Missing Audio connection** and nothing is spoken until you choose another Source. Marinara never switches to a different connection on its own.
+If the chosen connection is deleted or can't be used, the card shows **Missing Audio connection** and nothing is spoken until you choose another Source. YunYun never switches to a different connection on its own.
 
 When the connection lists its voices, the card names any saved voice that is not on the list, so you can pick one the connection offers.
 
 ## Step 2: Enter the Base URL, API Key, and Model
 
-Skip this step if you chose an Audio connection as the Source: Marinara uses the connection's own settings.
+Skip this step if you chose an Audio connection as the Source: YunYun uses the connection's own settings.
 
 Each Source needs a web address and, for most sources, an API key. An API key is a secret code from your provider that proves the request is yours.
 
@@ -69,11 +69,11 @@ The official server uses `http://localhost:8000` by default. Leave the **Base UR
 
 ### Request timeout
 
-By default, Marinara waits up to 60 seconds for each spoken line. A voice server on your own computer, especially a laptop, can need longer for a long line. To wait longer, raise **Request timeout (seconds)** below **Model** in the card. You can set 10 to 3,600 seconds.
+By default, YunYun waits up to 60 seconds for each spoken line. A voice server on your own computer, especially a laptop, can need longer for a long line. To wait longer, raise **Request timeout (seconds)** below **Model** in the card. You can set 10 to 3,600 seconds.
 
 An audio connection has its own **Request timeout (seconds)** field, below **Default Voice** in the connection editor. When chats speak through an audio connection, including one chosen as the card's **Source**, they use that connection's limit. The card's limit covers speech from the card's own settings, including its **Preview** button.
 
-If a line takes too long, the error says how many seconds Marinara waited and which setting to raise.
+If a line takes too long, the error says how many seconds YunYun waited and which setting to raise.
 
 ## Step 3: Choose a voice (Voice Option)
 

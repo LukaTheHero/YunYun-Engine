@@ -4,7 +4,7 @@
 
 /** Movement before the gesture decides whether it is a pull at all. */
 export const PULL_LOCK_DISTANCE = 10;
-/** Down must beat sideways by this much; 1 (45°) lets a pull aim diagonally at Mari. */
+/** Down must beat sideways by this much; 1 (45°) lets a pull aim diagonally at YunYun. */
 const PULL_LOCK_RATIO = 1;
 /** A flick opens early, but only after this much travel. */
 export const PULL_FLICK_MIN_DISTANCE = 40;
@@ -84,8 +84,8 @@ export const PULL_SIDE_FROM = 0.35;
 
 /**
  * The target for a finger at `x` on a bar `width` wide: left half search, right
- * half Mari, with a dead zone around the middle so it cannot flicker. Without
- * Mari the whole bar is search.
+ * half YunYun, with a dead zone around the middle so it cannot flicker. Without
+ * YunYun the whole bar is search.
  */
 export function pullTarget(current: PullTarget | null, x: number, width: number, mariEnabled: boolean): PullTarget {
   if (!mariEnabled) return "search";
@@ -168,7 +168,7 @@ export type PullGazeFrame = (typeof PULL_GAZE_FRAMES)[number];
 export const PULL_GAZE_HOLD_MS = 150;
 
 /**
- * Where Mari looks while she is pulled down: at the screen's middle, where the
+ * Where YunYun looks while she is pulled down: at the screen's middle, where the
  * chat or the open editor is. Near the middle third she looks straight down; out
  * to one side she looks back across the screen (down-left from the right side).
  */
@@ -289,7 +289,7 @@ export function pullRemnantPath(x: number, halfWidth: number, depth: number, ori
   );
 }
 
-// ── The morph into the present Mari (M17) ──────────────────────────────────
+// ── The morph into the present YunYun (M17) ──────────────────────────────────
 // Box coordinates: the morph element has the target sprite's size and is moved
 // with `translate(x, y) scale(scale)` from its top-left corner; the clip is in
 // its own (unscaled) pixels.

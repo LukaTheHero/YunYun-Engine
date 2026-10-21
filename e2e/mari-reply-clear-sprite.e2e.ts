@@ -40,7 +40,7 @@ async function startReplyProvider() {
     req.on("data", (chunk: Buffer) => chunks.push(chunk));
     req.on("end", () => {
       const body = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { stream?: boolean };
-      // Professor Mari's workspace protocol: one JSON object, with the reply in `say` and `stop` set.
+      // Professor YunYun's workspace protocol: one JSON object, with the reply in `say` and `stop` set.
       const content = JSON.stringify({ say: state.reply, stop: true, commands: [] });
       if (body.stream) {
         res.writeHead(200, { "content-type": "text/event-stream" });
@@ -113,7 +113,7 @@ for (const [label, width, height] of [
     ["sentence then numbered list", SENTENCE_THEN_LIST, true],
     ["numbered list first", LIST_FIRST, false],
   ] as const) {
-    test(`${label}: ${name}: only the first paragraph sits beside Mari, the list starts below her`, async ({
+    test(`${label}: ${name}: only the first paragraph sits beside YunYun, the list starts below her`, async ({
       page,
       request,
     }, testInfo) => {
@@ -126,7 +126,7 @@ for (const [label, width, height] of [
       const connectionId = await openMariWithProvider(page, request, provider.baseUrl, width, height);
       try {
         await page.keyboard.press("Control+j");
-        const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+        const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
         const composer = mariPane.locator("textarea:visible");
         await expect(composer).toBeVisible();
         await composer.fill("Plan three characters");
@@ -179,10 +179,10 @@ for (const [label, width, height] of [
         for (const child of rest) {
           const below = child.top >= geometry.sprite.bottom - 1;
           const clearOfHer = child.left >= geometry.sprite.right - 1;
-          expect(below || clearOfHer, `${child.tag} does not sit beside Mari`).toBeTruthy();
+          expect(below || clearOfHer, `${child.tag} does not sit beside YunYun`).toBeTruthy();
         }
         if (paragraphFirst && label === "390") {
-          expect(first!.lineLeft, "the first paragraph sits beside Mari").toBeGreaterThanOrEqual(
+          expect(first!.lineLeft, "the first paragraph sits beside YunYun").toBeGreaterThanOrEqual(
             geometry.sprite.right - 1,
           );
         }

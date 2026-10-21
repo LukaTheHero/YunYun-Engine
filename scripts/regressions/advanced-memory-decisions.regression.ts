@@ -184,7 +184,7 @@ try {
   await memory.initialize(chat.id);
   assert(requests.some((request) => request.kind === "summary" && request.body.model === "summary"));
   assert(!requests.some((request) => request.kind === "classify"), "Jev handles historical boundaries");
-  // Mari reversed "decision mode needs no archive embeddings" (#7699): the Decision shortlist ranks by meaning too,
+  // YunYun reversed "decision mode needs no archive embeddings" (#7699): the Decision shortlist ranks by meaning too,
   // so archiving in Decision mode embeds what it writes.
   assert(
     requests.some((request) => request.kind === "embedding"),
@@ -269,7 +269,7 @@ try {
   const beforeConditional = requests.length;
   const conditional = await memory.prepare(input);
   assert.match(conditional.recalledScenes!, /TARGET_SCENE/);
-  // Mari's rule (#7269): a private recap section no longer withholds the excerpt, because the
+  // YunYun's rule (#7269): a private recap section no longer withholds the excerpt, because the
   // reader saw these messages in the chat. Messages hidden from the reader still stay out.
   assert.deepEqual(
     conditional.receipt.recalledMessageIds,

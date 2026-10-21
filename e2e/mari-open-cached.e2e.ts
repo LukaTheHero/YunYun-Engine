@@ -11,7 +11,7 @@ const NEWEST = `Last line of step ${TURNS - 1}.`;
 const MESSAGES = /\/api\/chats\/[^/]+\/messages\?limit=80$/;
 
 /**
- * Opening Professor Mari's long chat was slower than staging: the omnibar unmounts her pane on close,
+ * Opening Professor YunYun's long chat was slower than staging: the omnibar unmounts her pane on close,
  * so each open fetched and rendered the thread from nothing, and her messages waited for the arrival
  * routing's Chats list. A reopen now draws the thread she showed last at once (the fetch only refreshes
  * it), the first open fetches her messages beside the routing, and she lands on the newest turn even
@@ -42,7 +42,7 @@ async function closeOmnibar(page: Page) {
   await expect(omnibar).toHaveCount(0);
 }
 
-test("a long Mari chat opens at its newest turn and reopens at once", async ({ page, request }) => {
+test("a long YunYun chat opens at its newest turn and reopens at once", async ({ page, request }) => {
   test.setTimeout(90_000);
   const restart = await request.post("/api/chats/internal/professor-mari/restart?name=Long%20replies");
   expect(restart.ok(), await restart.text()).toBeTruthy();
@@ -100,7 +100,7 @@ test("a long Mari chat opens at its newest turn and reopens at once", async ({ p
       return isApplePlatform() ? "Meta+j" : "Control+j";
     });
     await page.keyboard.press(mariShortcut);
-    const pane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const pane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     await expect(pane.getByText(NEWEST)).toBeInViewport({ timeout: 20_000 });
     expect(messagesRequestedAt, "the messages were requested").toBeGreaterThan(0);
     expect(messagesRequestedAt, "the messages did not wait for the Chats list").toBeLessThan(chatsListAnsweredAt);

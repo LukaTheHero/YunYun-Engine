@@ -1,6 +1,6 @@
 # Creating and Editing Characters
 
-This guide shows you how to make a character in Marinara Engine. It also shows how to use the Character Editor to write, save, and manage card versions. It covers the Metadata, Card, Voice, and Advanced tabs, avatars, and saved version history.
+This guide shows you how to make a character in YunYun Engine. It also shows how to use the Character Editor to write, save, and manage card versions. It covers the Metadata, Card, Voice, and Advanced tabs, avatars, and saved version history.
 
 ## What a character card is
 
@@ -67,7 +67,7 @@ The **Card** tab is the main writing workspace. It holds the fields the AI reads
 - **Description**. The character's general identity and role. This is sent in every prompt.
 - **Personality**. A short summary of temperament, speech habits, and behavior patterns.
 - **Backstory**. History, origin, and important relationships.
-- **Appearance**. Physical description, clothing, and visual details. Marinara also uses this text to seed an AI avatar prompt.
+- **Appearance**. Physical description, clothing, and visual details. YunYun also uses this text to seed an AI avatar prompt.
 - **Image Appearance Override**. An optional switch under **Appearance**, off by default. Turn it on to reveal a second box for short image tags that describe the character, such as a LoRA trigger word. While it is on and the box is filled, image prompts use those tags exactly as written, with **Appearance** kept as background, and an AI avatar prompt is seeded from it too. The narrator always sees the full **Appearance** text. Leave it off to keep the usual behavior.
 - **Scenario**. The default setting for new chats with this character.
 
@@ -107,7 +107,7 @@ The AI avatar option appears only when you have at least one image-generation co
 1. Hover the avatar tile and click the small **Generate avatar** wand button.
 2. The **Generate Character Avatar** window opens.
 3. Pick an **Image Generation Connection**.
-4. Review or edit the **Avatar Prompt**. If **Image Appearance Override** is on and filled, its text is used as the starting prompt. Otherwise, Marinara uses **Appearance**, then **Description**, then **Personality**, taking the first field that contains text.
+4. Review or edit the **Avatar Prompt**. If **Image Appearance Override** is on and filled, its text is used as the starting prompt. Otherwise, YunYun uses **Appearance**, then **Description**, then **Personality**, taking the first field that contains text.
 5. If the card already has an avatar, you can check **Use current avatar as a reference**.
 6. Click **Generate**. To try again, click **Regenerate**.
 7. When you like the result, click **Use Avatar**.
@@ -155,7 +155,7 @@ To go back to an older version:
 
 Restoring replaces your current card with that snapshot. It does not add a new history entry. Use the pencil icon to correct a saved snapshot's card-version label without restoring it. You can also delete a saved snapshot from the list; deleting one does not change your current card.
 
-Use **Reset** in the **Version history** header when you want to restart the card's versioning. After confirmation, Marinara deletes every saved snapshot and sets the current card version to `0.0`. This cannot be undone.
+Use **Reset** in the **Version history** header when you want to restart the card's versioning. After confirmation, YunYun deletes every saved snapshot and sets the current card version to `0.0`. This cannot be undone.
 
 ## Reviewing agent-proposed card updates
 
@@ -169,9 +169,9 @@ For each proposed edit you can:
 
 If the underlying text changed since the proposal was made, the app warns you before it lets you force the edit. To learn how to turn these agents on or off, see [Agents: AI Helpers for Your Chats](../agents/agents-overview.md).
 
-## A note on Professor Mari
+## A note on Professor YunYun
 
-**Professor Mari** is a built-in assistant character that ships with Marinara. You cannot delete her. If you try, the app blocks it and tells you she is a built-in character. To learn what she does, see [Professor Mari, Your In-App Assistant](../home/professor-mari.md).
+**Professor YunYun** is a built-in assistant character that ships with YunYun. You cannot delete her. If you try, the app blocks it and tells you she is a built-in character. To learn what she does, see [Professor YunYun, Your In-App Assistant](../home/professor-mari.md).
 
 ## Related guides
 

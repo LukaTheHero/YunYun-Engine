@@ -1,4 +1,4 @@
-// Pins Professor Mari's optional pi runtime with a scripted fake provider: no network, no real model.
+// Pins Professor YunYun's optional pi runtime with a scripted fake provider: no network, no real model.
 // Covers the tool-call round trip through WorkspaceCommands, the Permissions Mode floors, abort, the classic
 // default and fallback, the closed tool set, replay metadata, the per-turn review and the real prompt builder.
 import assert from "node:assert/strict";
@@ -95,7 +95,7 @@ try {
         if (!stubPromptBuilder) return originalBuild(...args);
         return {
           messages: [
-            { role: "system", content: "You are Professor Mari (regression).", contextKind: "prompt" },
+            { role: "system", content: "You are Professor YunYun (regression).", contextKind: "prompt" },
             { role: "user", content: userText, contextKind: "history" },
           ],
           manualApprovalArmed: armed,
@@ -169,7 +169,7 @@ try {
       );
 
   // (a) + (f): a read tool call runs through WorkspaceCommands and its result reaches the next model request,
-  // and the model is offered only Marinara's tools (their descriptions, never pi's built-ins).
+  // and the model is offered only YunYun's tools (their descriptions, never pi's built-ins).
   {
     mode = "auto";
     const { chat, done } = await start("pi read", [
@@ -199,8 +199,8 @@ try {
     assert.match(toolMessage?.content ?? "", /workspace_command_result name="read" success="true"/u);
     assert.match(toolMessage?.content ?? "", /hi from the workspace file/u);
     assert.equal((await lastAssistant(chat.id))?.content, "The file says hi.");
-    // The real boundary: every ACTIVE tool of the session is one of Marinara's own definitions (pi keeps its
-    // built-ins registered under the allowlist, but each Marinara tool replaces its namesake).
+    // The real boundary: every ACTIVE tool of the session is one of YunYun's own definitions (pi keeps its
+    // built-ins registered under the allowlist, but each YunYun tool replaces its namesake).
     assert.ok(sessionSeen, "the session inspection hook must run");
     const seen = sessionSeen as { active: string[]; closed: boolean };
     assert.deepEqual([...seen.active].sort(), [...allowed.keys()].sort());
@@ -230,7 +230,7 @@ try {
   }
 
   // #7879 investigation proof: real Pi tool execution against the real store,
-  // including a key added outside Mari between two runs. The provider is scripted;
+  // including a key added outside YunYun between two runs. The provider is scripted;
   // this proves persistence when the calls are made, not the reporter's model behavior.
   {
     const { createLorebooksStorage } =
@@ -386,7 +386,7 @@ try {
     }
   }
 
-  // The boundary check fails closed when an active tool is not Marinara's.
+  // The boundary check fails closed when an active tool is not YunYun's.
   {
     const mine = { name: "read", execute: async () => ({}) };
     const piBuiltIn = { name: "read", execute: async () => ({}) };
@@ -396,7 +396,7 @@ try {
           { getActiveToolNames: () => ["read"], getToolDefinition: () => piBuiltIn } as never,
           [mine] as never,
         ),
-      /not one of Professor Mari's own tools/u,
+      /not one of Professor YunYun's own tools/u,
     );
     assert.throws(
       () =>
@@ -404,7 +404,7 @@ try {
           { getActiveToolNames: () => ["grep"], getToolDefinition: () => undefined } as never,
           [mine] as never,
         ),
-      /not one of Professor Mari's own tools/u,
+      /not one of Professor YunYun's own tools/u,
     );
   }
 
@@ -1293,7 +1293,7 @@ try {
     assert.deepEqual(runtimeSeen, ["pi"]);
   }
 
-  console.log("Professor Mari pi runtime regression passed.");
+  console.log("Professor YunYun pi runtime regression passed.");
 } finally {
   await closeDB();
   if (previousStorageDir === undefined) delete process.env.FILE_STORAGE_DIR;

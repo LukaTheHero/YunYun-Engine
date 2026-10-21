@@ -1,4 +1,4 @@
 {
-  "description": "Marinara Engine chat-context hooks",
+  "description": "YunYun Engine chat-context hooks",
   "modules": ["./register.mjs"]
 }

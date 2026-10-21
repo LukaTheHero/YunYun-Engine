@@ -40,7 +40,7 @@ const HOP_MS = 420;
 const BOUNCE_MS = 320;
 const LINE_MS = 1_400;
 
-/** Slice 85: a press-and-hold on Mari's art. Tap keeps its normal action; a hold lifts her off her slot. */
+/** Slice 85: a press-and-hold on YunYun's art. Tap keeps its normal action; a hold lifts her off her slot. */
 export function useMariHold({ wrapperRef, onTap, hopOnTap = false }: MariHoldOptions) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();

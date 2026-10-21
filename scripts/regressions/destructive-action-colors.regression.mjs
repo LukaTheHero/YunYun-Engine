@@ -7,7 +7,7 @@ import ts from "typescript";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const sourceRoot = process.argv[2] ? resolve(process.argv[2]) : join(repositoryRoot, "packages/client/src");
 
-// Mari's scope: destructive/error action controls, while assigned section, portrait and chat palettes stay intact.
+// YunYun's scope: destructive/error action controls, while assigned section, portrait and chat palettes stay intact.
 function hueIsRed(hue) {
   const degrees = ((hue % 360) + 360) % 360;
   return degrees <= 30 || degrees >= 330;

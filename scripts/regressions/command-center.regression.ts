@@ -293,7 +293,7 @@ assert.deepEqual(
   ],
 );
 // Slice 78: the empty list reads Now, Try, Continue, then this screen's work, then Recent. A row
-// marked `now` leads whatever group it came from, so the Mari row keeps its "continue" group
+// marked `now` leads whatever group it came from, so the YunYun row keeps its "continue" group
 // (her resume-not-send rules key on it) and still renders first.
 const contextualPresentation = presentCommandCenterResults(
   [
@@ -319,7 +319,7 @@ assert.deepEqual(
 );
 assert.equal(contextualPresentation.results[0]?.id, contextualPresentation.groups[0]?.results[0]?.id);
 
-// UX-07: a question puts Ask Mari above the docs group; a bare search keeps Ask Mari last.
+// UX-07: a question puts Ask YunYun above the docs group; a bare search keeps Ask YunYun last.
 const questionPresentation = presentCommandCenterResults(
   [
     { id: "docs:lorebooks", category: "docs", group: "docs" },
@@ -330,7 +330,7 @@ const questionPresentation = presentCommandCenterResults(
 assert.deepEqual(
   questionPresentation.groups.map((group) => group.id),
   ["professor-fallback", "docs"],
-  "a question presents Ask Mari above docs",
+  "a question presents Ask YunYun above docs",
 );
 const bareSearchPresentation = presentCommandCenterResults(
   [
@@ -342,7 +342,7 @@ const bareSearchPresentation = presentCommandCenterResults(
 assert.deepEqual(
   bareSearchPresentation.groups.map((group) => group.id),
   ["docs", "professor-fallback"],
-  "a bare search keeps the docs group above Ask Mari",
+  "a bare search keeps the docs group above Ask YunYun",
 );
 assert.equal(
   reconcileActiveResultId(
@@ -1053,7 +1053,7 @@ assert.deepEqual(
     category: "chat",
   }).resource,
   { kind: "chat", id: "chat-one", label: "Fix: Check the last reply" },
-  "slice 65: a chat tool row hands Mari its chat id, not `<tool>:<chatId>`",
+  "slice 65: a chat tool row hands YunYun its chat id, not `<tool>:<chatId>`",
 );
 assert.equal(buildProfessorMariCommandCenterContext("explain this", undefined)?.commandCenterResultId, undefined);
 assert.deepEqual(
@@ -1071,14 +1071,14 @@ assert.deepEqual(
     settingsLocation: { tab: "appearance", controlId: "theme-mode" },
   },
 );
-// C1: escalating a live omnibar aside answer into Mari carries it along.
+// C1: escalating a live omnibar aside answer into YunYun carries it along.
 assert.deepEqual(
   buildProfessorMariCommandCenterContext("what does temperature do", undefined, [], undefined, {
     asideAnswer: { query: "what does temperature do", answer: "It controls randomness.", tier: "local" },
   }).asideAnswer,
   { query: "what does temperature do", answer: "It controls randomness.", tier: "local" },
 );
-// C1b: the docs pages the quick answer used travel with it, so Mari's card can name them.
+// C1b: the docs pages the quick answer used travel with it, so YunYun's card can name them.
 assert.deepEqual(
   buildProfessorMariCommandCenterContext("what does temperature do", undefined, [], undefined, {
     asideAnswer: {
@@ -1130,7 +1130,7 @@ assert.equal(resourceResultType("lorebookEntry"), "lorebook-entry");
 assert.equal(resourceResultType("setting"), "setting");
 assert.equal(resourceResultType("mystery"), "command");
 assert.equal(RESULT_TYPE_ICONS.persona, COMMAND_ICONS.persona);
-// Q6: Mari's edit-review faces share the same type map, so an edited lorebook entry or agent gets
+// Q6: YunYun's edit-review faces share the same type map, so an edited lorebook entry or agent gets
 // its own type icon instead of a letter monogram.
 assert.equal(recordFaceResultType("characters"), "character");
 assert.equal(recordFaceResultType("lorebook_entries"), "lorebook-entry");
@@ -1206,19 +1206,19 @@ assert.equal(
 }
 
 // A5: a typed scope prefix like "faq:" is omnibar search syntax, not message text
-// — every door into Mari (including the Ask-Mari row's own query) must strip it
+// — every door into YunYun (including the Ask-YunYun row's own query) must strip it
 // with the same helper before it reaches the composer.
 assert.equal(parseOmnibarScope("faq: import").query, "import");
 assert.equal(parseOmnibarScope("plain question").query, "plain question");
 
-// The list and Mari are the only panes. A session persisted with a removed one
+// The list and YunYun are the only panes. A session persisted with a removed one
 // falls back to the list rather than resurrecting a surface that no longer exists.
 assert.equal(normalizeCommandCenterSessionState({ pane: "mari" }).pane, "mari");
 assert.equal(normalizeCommandCenterSessionState({ pane: "browse" }).pane, "results");
 assert.equal(normalizeCommandCenterSessionState({ pane: "quick" }).pane, "results");
 assert.equal(normalizeCommandCenterSessionState({ pane: "detail" }).pane, "results");
 // `returnStack`, `mariDestination` and `mariDetailId` were persisted and
-// normalized but never read: Escape steps back one level and the Mari pane owns
+// normalized but never read: Escape steps back one level and the YunYun pane owns
 // its own destination. Unknown fields are dropped rather than carried forward.
 const mariSession = normalizeCommandCenterSessionState({
   pane: "mari",
@@ -1252,7 +1252,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(isOmnibarShortcut(key({ ctrlKey: true, key: "л" }), false), true);
   // A Latin layout with a different letter on the K position does not.
   assert.equal(isOmnibarShortcut(key({ ctrlKey: true, key: "t" }), false), false);
-  // M18: ⌘J / Ctrl+J asks Mari, by the same rules; it is not ⌘K.
+  // M18: ⌘J / Ctrl+J asks YunYun, by the same rules; it is not ⌘K.
   const j = (overrides: Partial<Parameters<typeof isAskMariShortcut>[0]>) =>
     key({ key: "j", code: "KeyJ", ...overrides });
   assert.equal(isAskMariShortcut(j({ ctrlKey: true }), false), true);
@@ -1261,7 +1261,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(isAskMariShortcut(j({ ctrlKey: true, shiftKey: true }), false), false);
   assert.equal(isAskMariShortcut(j({ ctrlKey: true, repeat: true }), false), false);
   assert.equal(isAskMariShortcut(j({ ctrlKey: true, key: "о" }), false), true, "physical J on a non-Latin layout");
-  assert.equal(isAskMariShortcut(key({ ctrlKey: true }), false), false, "Ctrl+K is not Ask Mari");
+  assert.equal(isAskMariShortcut(key({ ctrlKey: true }), false), false, "Ctrl+K is not Ask YunYun");
   assert.equal(isOmnibarShortcut(j({ ctrlKey: true }), false), false, "Ctrl+J is not the omnibar");
 }
 
@@ -1290,7 +1290,7 @@ assert.ok(!("mariDetailId" in mariSession));
 }
 
 {
-  // Handing typed text to Professor Mari sends it only when it asks for something.
+  // Handing typed text to Professor YunYun sends it only when it asks for something.
   assert.equal(isMariInstruction("", "Eliza"), false, "nothing typed opens her with nothing to send");
   assert.equal(isMariInstruction("eliza", "Eliza"), false, "the row's own name is a search, not a request");
   assert.equal(isMariInstruction("char: Eli", "Eliza"), false, "a scope prefix is not part of the request");
@@ -1419,7 +1419,7 @@ assert.ok(!("mariDetailId" in mariSession));
 }
 
 {
-  // Without a local model the aside offers Mari's own connection: the agents default, then the default, then the first.
+  // Without a local model the aside offers YunYun's own connection: the agents default, then the default, then the first.
   const plain = { isDefault: false, defaultForAgents: false };
   assert.equal(marisConnectionFor([]), null, "no connection, nothing to offer");
   assert.equal(marisConnectionFor([{ id: "a", ...plain }])?.id, "a", "a lone connection is the one offered");
@@ -1541,7 +1541,7 @@ assert.ok(!("mariDetailId" in mariSession));
   // K4: a capability word in the typed query grounds the unasked aside with
   // real catalog lines, and the same shared detector is what the client reads
   // to decide whether to show the Download Agents chip - no extra data sent.
-  assert.deepEqual(matchOmnibarCapabilityAgentPackageIds("can Marinara make images?"), ["illustrator"]);
+  assert.deepEqual(matchOmnibarCapabilityAgentPackageIds("can YunYun make images?"), ["illustrator"]);
   assert.deepEqual(matchOmnibarCapabilityAgentPackageIds("does it play music"), ["spotify"]);
   assert.deepEqual(matchOmnibarCapabilityAgentPackageIds("world maps"), ["hierarchical-maps"]);
   assert.deepEqual(
@@ -1641,7 +1641,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.match(en["onboarding.finish.body"], /On a phone, pull down from the top bar\./u);
 }
 
-// Search lists none of Professor Mari's changes (applied, held, delete, install or file write) in any mode;
+// Search lists none of Professor YunYun's changes (applied, held, delete, install or file write) in any mode;
 // her window shows and undoes them. The Continue row stays the way in, and it still names a waiting review.
 {
   const t = ((_key: string, fallback?: string) => fallback ?? _key) as never;
@@ -1700,23 +1700,23 @@ assert.ok(!("mariDetailId" in mariSession));
     assert.equal(
       buildOmnibarSearchResults(searchInput(word))[0]?.id,
       "open-professor-mari",
-      `UX-01: "${word}" opens Mari first`,
+      `UX-01: "${word}" opens YunYun first`,
     );
   }
-  // The presenter must not pick a title-prefix Top hit over her ("Mari changed Shrek", "Ask Professor Mari from Search").
+  // The presenter must not pick a title-prefix Top hit over her ("YunYun changed Shrek", "Ask Professor YunYun from Search").
   const presented = presentCommandCenterResults(
     [
-      { id: "approval:1", title: "Mari changed Shrek", category: "professor", score: 900 },
+      { id: "approval:1", title: "YunYun changed Shrek", category: "professor", score: 900 },
       ...buildOmnibarSearchResults(searchInput("mari")),
     ],
     { query: "mari" },
   );
   assert.equal(presented.groups[0]?.id, "top-hit");
-  assert.equal(presented.results[0]?.id, "open-professor-mari", "UX-01: Open Mari is the Top hit");
+  assert.equal(presented.results[0]?.id, "open-professor-mari", "UX-01: Open YunYun is the Top hit");
   assert.equal(
     buildOmnibarSearchResults(searchInput("mari", false)).some((result) => result.id === "open-professor-mari"),
     false,
-    "UX-01: no Open Mari row while Mari is off",
+    "UX-01: no Open YunYun row while YunYun is off",
   );
   assert.notEqual(
     buildOmnibarSearchResults(searchInput("mari appearance"))[0]?.id,
@@ -1725,7 +1725,7 @@ assert.ok(!("mariDetailId" in mariSession));
   );
 }
 
-// Slice 41 (F1): a direct message/entry hit must outrank the Mari fallback promotion.
+// Slice 41 (F1): a direct message/entry hit must outrank the YunYun fallback promotion.
 {
   const identity = (text: string) => text;
   const baseSearchInput = {
@@ -1753,18 +1753,18 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(
     mariRow?.group,
     "professor-suggested",
-    "with nothing scoring well and no direct hit, Mari is still promoted",
+    "with nothing scoring well and no direct hit, YunYun is still promoted",
   );
   const withDirectHit = buildOmnibarSearchResults({ ...baseSearchInput, directHitCount: 1 });
   const mariRowWithHit = withDirectHit.find((result) => result.id === "ask-professor-mari");
   assert.notEqual(
     mariRowWithHit?.group,
     "professor-suggested",
-    "a direct hit elsewhere (the message row) keeps Mari out of the suggested group",
+    "a direct hit elsewhere (the message row) keeps YunYun out of the suggested group",
   );
 }
 
-// Slice 65 (R6): with no model, a question no longer lifts "Ask Prof. Mari" above docs/FAQ rows; a dead end still does.
+// Slice 65 (R6): with no model, a question no longer lifts "Ask Prof. YunYun" above docs/FAQ rows; a dead end still does.
 {
   const identity = (text: string) => text;
   const input = {
@@ -1792,14 +1792,14 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(
     mariGroup(buildOmnibarSearchResults({ ...input, docsResults: [doc as never], directHitCount: 1 })),
     "professor-suggested",
-    "with a model, a question still promotes Mari",
+    "with a model, a question still promotes YunYun",
   );
   assert.notEqual(
     mariGroup(
       buildOmnibarSearchResults({ ...input, docsResults: [doc as never], directHitCount: 1, mariHasModel: false }),
     ),
     "professor-suggested",
-    "with no model, docs rows lead and Mari is not promoted",
+    "with no model, docs rows lead and YunYun is not promoted",
   );
   assert.notEqual(
     mariGroup(
@@ -2222,7 +2222,7 @@ assert.ok(!("mariDetailId" in mariSession));
   ]);
 }
 
-// Slices 10 and 15: pull down on the phone top bar to open the omnibar or Mari.
+// Slices 10 and 15: pull down on the phone top bar to open the omnibar or YunYun.
 {
   assert.equal(pullOpenThreshold(844), 253.2, "30% of a phone's height");
   assert.equal(pullOpenThreshold(1200), 280, "capped at 280 px");
@@ -2235,7 +2235,7 @@ assert.ok(!("mariDetailId" in mariSession));
     return { steps, opens: recognizer.release(releaseAt) };
   };
 
-  // Direction lock after 10 px; 45° down is enough, so a pull can aim diagonally at Mari.
+  // Direction lock after 10 px; 45° down is enough, so a pull can aim diagonally at YunYun.
   assert.deepEqual(pull(20, [103, 26, 10]).steps, ["pending"], "under 10 px nothing is decided");
   assert.deepEqual(pull(40, [112, 30, 20]).steps, ["rejected"], "a sideways swipe is never a pull");
   assert.deepEqual(pull(40, [100, 8, 20]).steps, ["rejected"], "an upward swipe is never a pull");
@@ -2263,14 +2263,14 @@ assert.ok(!("mariDetailId" in mariSession));
   const again = pull(900, [100, 60, 200], [100, 230, 500], [100, 180, 700], [100, 300, 800]);
   assert.equal(again.opens, false, "a cancelled pull stays cancelled");
 
-  // Target: left half search, right half Mari, a 28 px dead zone around the middle.
+  // Target: left half search, right half YunYun, a 28 px dead zone around the middle.
   assert.equal(pullTarget(null, 100, 390, true), "search");
   assert.equal(pullTarget(null, 300, 390, true), "mari");
   assert.equal(pullTarget("search", 215, 390, true), "search", "inside the dead zone the side holds");
   assert.equal(pullTarget("search", 224, 390, true), "mari", "past it the side switches");
   assert.equal(pullTarget("mari", 175, 390, true), "mari");
   assert.equal(pullTarget("mari", 166, 390, true), "search");
-  assert.equal(pullTarget(null, 300, 390, false), "search", "without Mari the whole bar is search");
+  assert.equal(pullTarget(null, 300, 390, false), "search", "without YunYun the whole bar is search");
 
   // The circle sits above the fingertip and never above the bar edge.
   const early = pullCircleTarget(20, 0.1);
@@ -2404,7 +2404,7 @@ assert.ok(!("mariDetailId" in mariSession));
 
 {
   // K1: a failed generate reply feeds the same "fix this" context row as a
-  // failed connection test, so ⌘K surfaces it and ⌘↵ can hand it to Mari.
+  // failed connection test, so ⌘K surfaces it and ⌘↵ can hand it to YunYun.
   const t = ((key: string, fallback: string, values?: Record<string, unknown>) =>
     fallback.replace(/\{\{(\w+)\}\}/g, (_, name) => String(values?.[name] ?? ""))) as never;
   const baseInput = {
@@ -2672,7 +2672,7 @@ assert.ok(!("mariDetailId" in mariSession));
 }
 
 {
-  // Q2: the omnibar's settings view is the home of every search and Professor Mari setting. Jumps
+  // Q2: the omnibar's settings view is the home of every search and Professor YunYun setting. Jumps
   // to its section or its controls route there; every control it lists has an anchor in the view.
   const omnibarControls = SETTINGS_SEARCHABLE_CONTROLS.filter(
     (control) => control.sectionId === OMNIBAR_SETTINGS_SECTION_ID,
@@ -2790,7 +2790,7 @@ assert.ok(!("mariDetailId" in mariSession));
     assert.ok(!(id in OMNIBAR_SETTINGS_TOGGLE_BINDINGS), `"${id}" must not be bound (risky per K5)`);
   }
 
-  // F6: "Ask Professor Mari from Search" and "Context suggestions" must show up as exactly one row (the
+  // F6: "Ask Professor YunYun from Search" and "Context suggestions" must show up as exactly one row (the
   // registry row, flipped in place), not also as the old hand-built duplicate.
   assert.ok("ask-mari" in OMNIBAR_SETTINGS_TOGGLE_BINDINGS, "ask-mari should be bound so its row flips in place");
   assert.ok(
@@ -2799,7 +2799,7 @@ assert.ok(!("mariDetailId" in mariSession));
   );
   assert.ok(
     !controlResults.some((row) => row.id === "control:commandCenterMariEnabled"),
-    "the hand-built Ask Mari row must be gone now that the registry row is bound",
+    "the hand-built Ask YunYun row must be gone now that the registry row is bound",
   );
   assert.ok(
     !controlResults.some((row) => row.id === "control:omnibarSuggestionsEnabled"),
@@ -2910,7 +2910,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(unmodifiedRow.promptOverridden, false, "a prompt matching the package default is not overridden");
 }
 
-// L3: the agent editor is Mari context. The "Editing" row leads the Improve row, so an unpinned
+// L3: the agent editor is YunYun context. The "Editing" row leads the Improve row, so an unpinned
 // handoff carries the agent with the field; a custom agent (opened by config id) and a built-in
 // (opened by type) both get the row.
 {
@@ -2951,7 +2951,7 @@ assert.ok(!("mariDetailId" in mariSession));
     "the open custom agent leads, then the focused-field row",
   );
   assert.equal(customRows[0]?.title, "Editing Scene Critic");
-  assert.equal(customRows[1]?.title, "Improve Prompt Template with Prof. Mari");
+  assert.equal(customRows[1]?.title, "Improve Prompt Template with Prof. YunYun");
   const builtInRows = buildOmnibarContextResults({ ...input, openAgentId: "illustrator" });
   assert.equal(builtInRows[0]?.id, "agent:illustrator", "a built-in opened by type gets its Editing row");
 
@@ -3022,7 +3022,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.throws(() => resolveTransformTables("messages"), /chat\.updateMessage/);
 }
 
-// L8 (slice 28b): the omnibar and Mari sit above every app overlay through ONE layer,
+// L8 (slice 28b): the omnibar and YunYun sit above every app overlay through ONE layer,
 // `--mari-layer-omnibar`. No other numeric z-index in the client may reach it, except a few
 // deliberate, known exceptions above it: user extension windows/menus (they sit near 2^31 and
 // above the sonner toaster too, so outranking them would need the toaster moved as well) and the
@@ -3031,7 +3031,7 @@ assert.ok(!("mariDetailId" in mariSession));
 {
   const clientSource = (relativePath: string) =>
     readFileSync(new URL(`../../packages/client/src/${relativePath}`, import.meta.url), "utf8");
-  // Slice 82: Mari's rules (the layer token and the sprite ghost) moved from globals.css to mari.css.
+  // Slice 82: YunYun's rules (the layer token and the sprite ghost) moved from globals.css to mari.css.
   const layer = Number(/--mari-layer-omnibar:\s*(\d+);/u.exec(clientSource("styles/mari.css"))?.[1]);
   assert.ok(layer > 10_050, "the omnibar layer must clear the highest app overlay (the chat help overlay)");
   assert.ok(layer < 999_999_999, "the sonner toaster (999999999) must stay above the omnibar layer");
@@ -3153,7 +3153,7 @@ assert.ok(!("mariDetailId" in mariSession));
     { label: "Run it", prompt: "Run it.", action: { kind: "resource", resource: "chat", id: "x" } },
   ]);
   assert.equal(summary.detail, "38 messages since your last summary", "a valid fact line is kept on one line");
-  assert.equal(summary.action, undefined, "a card without an action asks Mari");
+  assert.equal(summary.action, undefined, "a card without an action asks YunYun");
   assert.equal(open.detail, "Greeting is 14 words now", "the fact alias is accepted");
   assert.deepEqual(open.action, { kind: "resource", resource: "character", id: "char-zylo" });
   assert.equal(generic.detail, undefined, "a suggestion without a fact keeps no detail, not an empty line");
@@ -3210,7 +3210,7 @@ assert.ok(!("mariDetailId" in mariSession));
   );
 }
 
-// M9: Mari's arrival, per surface, built from names/counts/times only. No model call is made to build it,
+// M9: YunYun's arrival, per surface, built from names/counts/times only. No model call is made to build it,
 // and it can never carry message text: the data types have no content, and a smuggled one is not read.
 {
   const t: MariArrivalData["t"] = (_key, fallback, options) =>
@@ -3250,7 +3250,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(chat.cards.at(-1)?.detail, "What Zylo gets next turn");
   assert.ok(
     chat.cards.slice(0, 3).every((card) => !card.action),
-    "the others ask Mari",
+    "the others ask YunYun",
   );
   assert.ok(
     chat.meta.some((fact) => fact.includes("214")),
@@ -3301,7 +3301,7 @@ assert.ok(!("mariDetailId" in mariSession));
   const empty = buildMariArrival(chatContext, chatData({ messageCount: 0, lastReply: null, lorebooks: [] }))!;
   assert.ok(empty.cards.length >= 2 && empty.cards.length <= 4, "an empty chat still gets 2-4 cards");
 
-  // N6/A5 (R22): the arrival may say a reply failed, but the error text reaches Mari only through
+  // N6/A5 (R22): the arrival may say a reply failed, but the error text reaches YunYun only through
   // a deliberate Fix pick (an explicit `fix` flag at the GlobalOmnibar `buildAskContext` call site)
   // — never merely because the fallback focus happens to land on the same id as the Fix row. A
   // built-in agent's editor row and Fix row share an id ("agent:<type>"), so the old implicit
@@ -3334,7 +3334,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(
     mariFallbackFocus(arrivalRows)?.id,
     "connection:conn-1",
-    "nor does any other unpicked door (Ask Mari row, aside) drop the resource",
+    "nor does any other unpicked door (Ask YunYun row, aside) drop the resource",
   );
   assert.equal(mariFallbackFocus(arrivalRows.slice(1))?.id, "chat:chat-1", "without a Fix row the first row stays");
   // Slice 66: a chat tool row is an action, not a subject - the fallback skips it.
@@ -3346,7 +3346,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(
     mariFallbackFocus([checkupRow, ...arrivalRows.slice(1)], "chat:chat-1"),
     null,
-    "an arrival over a cut-off reply hands Mari the chat only",
+    "an arrival over a cut-off reply hands YunYun the chat only",
   );
   assert.equal(
     mariFallbackFocus([checkupRow, ...arrivalRows.slice(1)])?.id,
@@ -3359,7 +3359,7 @@ assert.ok(!("mariDetailId" in mariSession));
     "an unrelated typed question carries no error text even though it keeps the Fix row as its resource",
   );
   assert.equal(typedAfterArrival.source, "command-center");
-  assert.equal(typedAfterArrival.resource?.id, "conn-1", "the resource still reaches Mari");
+  assert.equal(typedAfterArrival.resource?.id, "conn-1", "the resource still reaches YunYun");
   const pickedFix = askPayload("", arrivalRows[0]!, true);
   assert.equal(pickedFix.source, "chat-error", "a deliberate Fix pick opens through the chat-error door");
   assert.equal(pickedFix.error?.message, liveError.message, "and only then carries the error text");
@@ -3393,17 +3393,17 @@ assert.ok(!("mariDetailId" in mariSession));
     "the arrival itself holds names only, never the error text",
   );
 
-  // N4: a Mari card sends at once; Shift (desktop) or a long press (touch) drafts it; an action card acts.
+  // N4: a YunYun card sends at once; Shift (desktop) or a long press (touch) drafts it; an action card acts.
   const sparkCard = failed.cards.find((card) => !card.action)!;
   const actionCard = failed.cards.find((card) => card.action)!;
-  assert.equal(mariCardIntent(sparkCard), "send", "a Mari card sends its prompt at once");
+  assert.equal(mariCardIntent(sparkCard), "send", "a YunYun card sends its prompt at once");
   assert.equal(mariCardIntent(sparkCard, { shiftKey: true }), "draft", "Shift-click drafts instead");
   assert.equal(mariCardIntent(sparkCard, { longPress: true }), "draft", "a long press drafts instead");
   assert.equal(mariCardIntent(actionCard), "action", "an action card still acts at once");
   assert.equal(mariCardIntent(actionCard, { shiftKey: true }), "action", "Shift never turns an action into a draft");
 
   // D1: an arrival door should still show the arrival (appended at the transcript's bottom) when her
-  // chat already has messages, not only when it is empty — otherwise ⌘J's "ask Mari about this" on a
+  // chat already has messages, not only when it is empty — otherwise ⌘J's "ask YunYun about this" on a
   // return visit shows nothing but old history.
   assert.equal(
     shouldAppendMariArrival({
@@ -3511,7 +3511,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.deepEqual(
     settings.cards.map((card) => card.action?.kind ?? "mari"),
     ["mari", "find-setting", "undo-setting"],
-    "explain (Mari), find (search), undo (K5)",
+    "explain (YunYun), find (search), undo (K5)",
   );
   const noUndo = buildMariArrival(settingsContext, { t, now, settings: { section: "General" } })!;
   assert.ok(!noUndo.cards.some((card) => card.action?.kind === "undo-setting"), "no Undo without a flip to undo");
@@ -3521,7 +3521,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.equal(buildMariArrival(createOmnibarContext({ surface: "home" }), { t, now }), null, "Home keeps the welcome");
 }
 
-// M17: the pull circle morphs into the present Mari's sprite box.
+// M17: the pull circle morphs into the present YunYun's sprite box.
 {
   const from = { x: 200, y: 120, r: 30 };
   const to = { left: 40, top: 500, width: 48, height: 72 };
@@ -3548,7 +3548,7 @@ assert.ok(!("mariDetailId" in mariSession));
   );
 }
 
-// 45b: Mari looks down at the screen's middle while pulled; a new gaze holds 150 ms, so jitter cannot flicker it.
+// 45b: YunYun looks down at the screen's middle while pulled; a new gaze holds 150 ms, so jitter cannot flicker it.
 {
   assert.deepEqual(
     [...PULL_GAZE_FRAMES],
@@ -3582,7 +3582,7 @@ assert.ok(!("mariDetailId" in mariSession));
   assert.ok(changes <= 1500 / PULL_GAZE_HOLD_MS, `jitter changed the gaze ${changes} times`);
 }
 
-// 45b: the armed pull's label names what she will look at, from the same arrival as the Mari pane:
+// 45b: the armed pull's label names what she will look at, from the same arrival as the YunYun pane:
 // a name or a fixed phrase, never content (R22).
 {
   const t: MariArrivalData["t"] = (_key, fallback, options) =>
@@ -3664,7 +3664,7 @@ assert.ok(!("mariDetailId" in mariSession));
 
 // O2: local frecency ranking (slice 48) — recency decay, the entry cap, and
 // the hard guarantee that the boost can never outrank an exact name match or
-// touch Mari's row.
+// touch YunYun's row.
 {
   const now = Date.parse("2026-10-04T12:00:00Z");
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -3727,7 +3727,7 @@ assert.ok(!("mariDetailId" in mariSession));
     "even the maximum frecency boost must never lift a weak match above an exact match",
   );
 
-  // Mari's row is a fixed rule, not a ranking outcome: never scored, never
+  // YunYun's row is a fixed rule, not a ranking outcome: never scored, never
   // boosted, never surfaced as a top-frecent id, even if it somehow appears
   // in the stored entries (e.g. data written by an older build).
   assert.ok(FRECENCY_EXCLUDED_RESULT_IDS.has("ask-professor-mari"));
@@ -4091,7 +4091,7 @@ assert.ok(!("mariDetailId" in mariSession));
     "UX-03: an arrival waits for the run to end",
   );
   // Slice 71: the header counts the "Needs you" cards (waiting reviews, a turn's deletes as one, a held change).
-  // Slice 82: the header's Mari parts live in their own component.
+  // Slice 82: the header's YunYun parts live in their own component.
   const headerChromeSource = readFileSync(
     new URL("../../packages/client/src/components/chat/mari/MariOmnibarHeaderChrome.tsx", import.meta.url),
     "utf8",
@@ -4239,7 +4239,7 @@ console.info("Command Center regression checks passed.");
       ["chat-tool:reply-checkup:c1", "check"],
       ["ask-professor-mari", "working"],
     ],
-    "Now priority: Mari's review, a failure, a cut-off reply, Mari working",
+    "Now priority: YunYun's review, a failure, a cut-off reply, YunYun working",
   );
   assert.equal(pick({ fixRow: null, checkupRow: null, mariFinished: true })?.now, "finished");
   assert.equal(pick({ fixRow: null, checkupRow: null })?.now, "setup", "no model is the last resort");
@@ -4396,7 +4396,7 @@ console.info("Command Center regression checks passed.");
   const context = {
     recordById: new Map(records.map((record) => [record.id, record] as const)),
     chatModeById: new Map([["chat:tavern", "roleplay"]]),
-    mariPortrait: "/sprites/mari/idle.webp",
+    mariPortrait: "/sprites/yunyun/chibi-yunyun.png",
   };
   const visualOf = (row: OmnibarResult, query = "") =>
     resolveOmnibarRowVisual(row, { ...context, matchQueries: query ? [query] : undefined });
@@ -4478,8 +4478,8 @@ console.info("Command Center regression checks passed.");
   assert.equal(message.faces?.length, 2, "message row: the chat's faces");
   assert.equal(message.type, "message", "message row: badged as a message");
   assert.equal(visualOf(find("lorebook-entry:")).src, "/l/grove.png", "entry row: its lorebook's image");
-  assert.equal(visualOf(find("mari-chat:")).src, "/sprites/mari/idle.webp", "Mari's conversation: her face");
-  assert.equal(visualOf(find("ask-professor-mari")).src, "/sprites/mari/idle.webp", "Mari's row: her face");
+  assert.equal(visualOf(find("mari-chat:")).src, "/sprites/yunyun/chibi-yunyun.png", "YunYun's conversation: her face");
+  assert.equal(visualOf(find("ask-professor-mari")).src, "/sprites/yunyun/chibi-yunyun.png", "YunYun's row: her face");
   assert.equal(visualOf(find("character:kai")).src, undefined, "no picture: the type icon only");
   assert.equal(visualOf(find("slash:")).src, undefined, "a command shows its icon");
   // The Fix row keeps its own text preview but still shows the connection's picture.
@@ -4491,7 +4491,7 @@ console.info("Command Center regression checks passed.");
   // Highlights: rows the search never built are matched too; a quoted query and an existing range are kept as is.
   assert.deepEqual(visualOf(find("docs:faq.md"), "import").titleMatch, [0, 6], "docs rows are highlighted");
   assert.deepEqual(visualOf(find("action:add-to-chat:character:eliza"), "eliza").titleMatch, [4, 9]);
-  assert.equal(visualOf({ ...find("ask-professor-mari"), title: "Ask Prof. Mari: “eliza”" }, "eliza").titleMatch, null);
+  assert.equal(visualOf({ ...find("ask-professor-mari"), title: "Ask Prof. YunYun: “eliza”" }, "eliza").titleMatch, null);
   assert.equal(visualOf(find("shortcut:create-character"), "bob").titleMatch, null, "a quoted name is not bolded");
   assert.equal(visualOf({ ...records[0]!, titleMatch: null }, "eliza").titleMatch, null, "the search's null stays");
 }

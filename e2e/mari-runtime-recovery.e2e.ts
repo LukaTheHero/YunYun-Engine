@@ -53,9 +53,9 @@ for (const width of [390, 768, 1440]) {
       await page.addInitScript((v) => localStorage.setItem("marinara:whats-new:seen-version", v), version);
       await page.goto("/");
       await page.getByRole("button", { name: "Home", exact: true }).first().click();
-      await page.getByRole("button", { name: "Ask Professor Mari", exact: true }).click();
-      const window = page.locator('[data-component="GlobalOmnibar.Mari"]');
-      const composer = window.getByPlaceholder("Ask Professor Mari to check or change something");
+      await page.getByRole("button", { name: "Ask Professor YunYun", exact: true }).click();
+      const window = page.locator('[data-component="GlobalOmnibar.YunYun"]');
+      const composer = window.getByPlaceholder("Ask Professor YunYun to check or change something");
       const classic = window.getByRole("button", { name: "Switch to Classic", exact: true });
       for (let n = 1; n <= 3; n++) {
         await composer.fill(`Hello ${n}`);

@@ -101,12 +101,12 @@ const LIGHTHOUSE_SCENE = 12;
 const chores = ["paint", "bread", "letters", "lamps", "boots", "tea", "nets", "a kettle", "soap"];
 const summaries = Array.from({ length: 30 }, (_, index) =>
   index === LOCKET_SCENE
-    ? "Kaito gave Mari a silver locket by the harbor."
+    ? "Kaito gave YunYun a silver locket by the harbor."
     : index === LIGHTHOUSE_SCENE
-      ? "Mari found a lighthouse key in the sand."
+      ? "YunYun found a lighthouse key in the sand."
       : index === LIGHTHOUSE_SCENE + 1
         ? "They walked back at sunrise and slept until noon."
-        : `Mari and Kaito bought rope${" and more rope".repeat(index % 3)} with ${chores[index % chores.length]} at the market.`,
+        : `YunYun and Kaito bought rope${" and more rope".repeat(index % 3)} with ${chores[index % chores.length]} at the market.`,
 );
 let sceneSummaries = summaries;
 
@@ -161,12 +161,12 @@ try {
     retrieveMaxMessages: 1,
   };
   const sceneMessages = (index: number) => [
-    { role: "user" as const, content: `SCENE_CHANGE [scene ${index}] Mari and Kaito meet.` },
+    { role: "user" as const, content: `SCENE_CHANGE [scene ${index}] YunYun and Kaito meet.` },
     { role: "assistant" as const, characterId: "kaito", content: "Kaito nods." },
     { role: "user" as const, content: "They talk for a while." },
   ];
   const liveMessages = [
-    { role: "user" as const, content: "SCENE_CHANGE Mari comes home late.", extra: { isConversationStart: true } },
+    { role: "user" as const, content: "SCENE_CHANGE YunYun comes home late.", extra: { isConversationStart: true } },
     { role: "assistant" as const, characterId: "kaito", content: "Kaito waves from the kitchen." },
     { role: "user" as const, content: "Hello." },
   ];
@@ -431,7 +431,7 @@ try {
         message.role === "assistant" ? { ...message, characterId: "pantalone" } : message,
       ),
     ),
-    { role: "user", content: "SCENE_CHANGE Mari comes home late.", extra: { isConversationStart: true } },
+    { role: "user", content: "SCENE_CHANGE YunYun comes home late.", extra: { isConversationStart: true } },
     { role: "assistant", characterId: "maukie", content: "Maukie waves from the kitchen." },
     { role: "user", content: cue },
     { role: "assistant", characterId: "pantalone", content: "Pantalone shrugs." },
@@ -455,7 +455,7 @@ try {
       continueMessageId,
     });
   };
-  // Mari's case: the question was the first of three user messages to Pantalone, and Maukie replies.
+  // YunYun's case: the question was the first of three user messages to Pantalone, and Maukie replies.
   const maukie = await replyAs("maukie");
   assert.deepEqual(embeddingInputs, [[cue, ...smallTalk]], "each user message since Maukie spoke, one request");
   assert(

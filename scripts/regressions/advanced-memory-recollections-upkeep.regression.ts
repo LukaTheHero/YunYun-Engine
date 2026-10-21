@@ -103,7 +103,7 @@ const { characters } = await import("../../packages/server/src/db/schema/charact
 const db = await createFileNativeDB();
 const chats = createChatsStorage(db);
 const memory = createAdvancedMemoryService(db);
-const persona = { personaSnapshot: { name: "Mari", description: "a keeper of lamps" } };
+const persona = { personaSnapshot: { name: "YunYun", description: "a keeper of lamps" } };
 const since = (start: number, kind?: Call["kind"]) => calls.slice(start).filter((call) => !kind || call.kind === kind);
 const recollections = async (chatId: string) =>
   (await memory.status(chatId)).records.filter((record) => record.kind === "recollection");
@@ -193,7 +193,7 @@ try {
       advancedMemory: { ...settings, knowledgeStarts: { ada: null, [bram]: null } },
     });
     const lines: Array<[string | null, string]> = [
-      [null, "SCENE_ONE Mari, Ada and Bram climb up to repair the lighthouse lamp."],
+      [null, "SCENE_ONE YunYun, Ada and Bram climb up to repair the lighthouse lamp."],
       ["ada", "Ada calibrates the lens with careful fingers."],
       [bram, SECRET],
       [null, "The lamp finally shines again over the bay."],
@@ -340,7 +340,7 @@ try {
     {
       role: "assistant",
       characterId: "bram",
-      content: "I really want to tell Mari about the lens.",
+      content: "I really want to tell YunYun about the lens.",
       extra: { hiddenFromAICharacterIds: ["ada"] },
     },
     { role: "user", content: "SCENE_CHANGE SCENE_TWO Back on the gallery.", extra: persona },

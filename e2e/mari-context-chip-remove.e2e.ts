@@ -104,7 +104,7 @@ test("the Context chip's X sends the next message without the chat", async ({ pa
         .click({ position: { x: 5, y: 5 } });
       await page.keyboard.press("Control+j");
     };
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     const chip = mariPane.locator('.mari-workspace-composer__context [data-facet="chat"]');
     const sendAndWait = async (text: string) => {
       const before = bodies.length;

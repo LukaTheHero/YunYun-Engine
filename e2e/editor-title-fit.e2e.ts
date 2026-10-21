@@ -39,7 +39,7 @@ test("character editor shows the whole name when it fits beside the byline", asy
 
     if (testInfo.project.name.includes("mobile")) {
       await expectFullName();
-      // The Onboarding section (#7308) and Ask Professor Mari (#7312) pushed the actions onto a row of their own.
+      // The Onboarding section (#7308) and Ask Professor YunYun (#7312) pushed the actions onto a row of their own.
       const header = page.locator(".mari-editor-shell .mari-editor-header");
       await expect(header.getByRole("button", { name: "Editor sections", exact: true })).toBeVisible();
       const row = await header.evaluate((element) => {

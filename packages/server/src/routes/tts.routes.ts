@@ -396,10 +396,10 @@ Return JSON only in this exact shape:
 Example input:
 Dottore sighs and stands up. "I've had enough of your shenanigans," he drawls. "You're wasting my time, subject. This is your last chance to change my mind before I send you to Lab Thirteen."
 A pregnant pause settles in the room.
-"Skill issue," Mari chuckles, crossing her arms.
+"Skill issue," YunYun chuckles, crossing her arms.
 
 Example output:
-{"dialogue":[{"speaker":"Dottore","text":"\\\"I've had enough of your shenanigans,\\\""${input.includeEmotions ? ',"speech":"[Low, steady voice, restrained irritation] \\\"I\'ve had enough of your shenanigans,\\\""' : ""}},{"speaker":"Dottore","text":"\\\"You're wasting my time, subject. This is your last chance to change my mind before I send you to Lab Thirteen.\\\""${input.includeEmotions ? ',"speech":"[Firm, controlled impatience] \\\"You\'re wasting my time, subject. [sigh] This is your last chance to change my mind before I send you to Lab Thirteen.\\\""' : ""}},{"speaker":"Mari","text":"\\\"Skill issue,\\\""${input.includeEmotions ? ',"speech":"[Dry chuckle, faint amusement] \\\"Skill issue,\\\""' : ""}}]}`;
+{"dialogue":[{"speaker":"Dottore","text":"\\\"I've had enough of your shenanigans,\\\""${input.includeEmotions ? ',"speech":"[Low, steady voice, restrained irritation] \\\"I\'ve had enough of your shenanigans,\\\""' : ""}},{"speaker":"Dottore","text":"\\\"You're wasting my time, subject. This is your last chance to change my mind before I send you to Lab Thirteen.\\\""${input.includeEmotions ? ',"speech":"[Firm, controlled impatience] \\\"You\'re wasting my time, subject. [sigh] This is your last chance to change my mind before I send you to Lab Thirteen.\\\""' : ""}},{"speaker":"YunYun","text":"\\\"Skill issue,\\\""${input.includeEmotions ? ',"speech":"[Dry chuckle, faint amusement] \\\"Skill issue,\\\""' : ""}}]}`;
 }
 
 export function buildRoleplaySpeakerExtractorUserPrompt(message: string): string {

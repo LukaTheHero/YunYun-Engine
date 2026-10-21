@@ -1,4 +1,4 @@
-// Mari's work timeline: the live headline and sprite, her steps by phase, and the done marks.
+// YunYun's work timeline: the live headline and sprite, her steps by phase, and the done marks.
 import { useMariAppearancePack } from "../../../hooks/use-mari-appearance-pack";
 import { useMariSpriteSource } from "../../../lib/mari-sprite-ready";
 import { MariStorySprite } from "../MariStorySprite";
@@ -85,7 +85,7 @@ const MARI_PHRASE_GROUPS = { start: 8, review: 8, reviewSubject: 4, long: 8, ver
 const MARI_LONG_WAIT_SECONDS = 15;
 const MARI_VERY_LONG_WAIT_SECONDS = 45;
 
-/** A little pixel Mari. The inner span is keyed by scene, so a new scene pops in instead of cutting. */
+/** A little pixel YunYun. The inner span is keyed by scene, so a new scene pops in instead of cutting. */
 function MariSprite({
   scene,
   role,
@@ -120,7 +120,7 @@ function MariSprite({
 }
 
 /**
- * What Mari is doing right now, as one line. A new phrase writes itself in letter by letter while
+ * What YunYun is doing right now, as one line. A new phrase writes itself in letter by letter while
  * the old one lifts away; screen readers get the plain text once.
  */
 function MariLiveHeadline({ text, subject }: { text: string; subject?: string | null }) {
@@ -352,7 +352,7 @@ export function MariWorkTimeline({
   pullTarget?: boolean;
   /** M5a: the request she reported acting on, as one muted line above the run. */
   goal?: ReactNode;
-  /** On the newest finished turn, Mari stands on the "Worked for" line in this story. */
+  /** On the newest finished turn, YunYun stands on the "Worked for" line in this story. */
   restStory?: MariStoryState | null;
   /** UX-25: the turn holds a change for you, so it does not end on "Done". */
   held?: boolean;
@@ -412,7 +412,7 @@ export function MariWorkTimeline({
         )
       : undefined;
   const runningTool = active ? [...toolItems].reverse().find(({ tool }) => tool.status === "running") : undefined;
-  // One scene per step, so the Mari who worked a step is the one left beside it when it is done.
+  // One scene per step, so the YunYun who worked a step is the one left beside it when it is done.
   const stepAnimation = ({ tool }: WorkspaceToolItem) =>
     selectMariWorkAnimation({
       activity: inferToolPresentation(tool).title,
@@ -709,7 +709,7 @@ export function MariWorkTimeline({
 
         {active && draftChatId ? <MariDraftLine chatId={draftChatId} /> : null}
         {active ? (
-          // The live line is always the last line, and working Mari leads it on the left: new work lands above
+          // The live line is always the last line, and working YunYun leads it on the left: new work lands above
           // it and pushes the older lines up, so she is never left behind on an old step or clipped.
           <div className="mari-work-timeline__live">
             {liveScene ? <MariSprite scene={liveScene} role="working" pullTarget={pullTarget} /> : null}

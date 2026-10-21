@@ -8,7 +8,7 @@ const APP_VERSION = (
 ).version;
 
 /**
- * A long Professor Mari chat opened slowly: every 2 Hz accent tick restarted the color fades of each
+ * A long Professor YunYun chat opened slowly: every 2 Hz accent tick restarted the color fades of each
  * copy / edit / delete button in her transcript (~600 transitions per tick), and every older turn was
  * styled and laid out even off screen. With the RGB accent on, her idle transcript now starts no
  * transitions on those buttons, and older turns off screen are skipped by the browser.
@@ -29,7 +29,7 @@ test.afterEach(() => {
   releaseMariThreadLock();
 });
 
-test("a long Mari chat stays light under the RGB accent", async ({ page, request }, testInfo) => {
+test("a long YunYun chat stays light under the RGB accent", async ({ page, request }, testInfo) => {
   test.skip(!testInfo.project.name.includes("desktop"), "The browser work is the same on mobile.");
   test.setTimeout(90_000);
 
@@ -102,7 +102,7 @@ test("a long Mari chat stays light under the RGB accent", async ({ page, request
       .first()
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     await expect(mariPane.getByText(`Done with step ${turns - 1}.`).last()).toBeVisible({ timeout: 20_000 });
 
     // The accent pauses while you type in her composer; reading the chat (focus elsewhere) resumes it,

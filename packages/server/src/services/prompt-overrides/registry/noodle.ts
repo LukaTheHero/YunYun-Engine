@@ -18,7 +18,7 @@ export const NOODLE_IMAGE_POST: PromptOverrideKeyDef<NoodleImagePostCtx> = {
   key: "noodle.imagePost",
   label: "Noodle Post Image",
   description:
-    "Template that assembles the base image-generation prompt. When the selected image connection has image instructions, Marinara first tries to have an agent text model apply them; if rewriting is unavailable, the prompt is sent without them. The default sends the visual idea and appearance notes, without the post text, your Noodle image instructions (those are also given to the timeline model), or the character's personality and image habits (those are given to the agent text model).",
+    "Template that assembles the base image-generation prompt. When the selected image connection has image instructions, YunYun first tries to have an agent text model apply them; if rewriting is unavailable, the prompt is sent without them. The default sends the visual idea and appearance notes, without the post text, your Noodle image instructions (those are also given to the timeline model), or the character's personality and image habits (those are given to the agent text model).",
   variables: [
     { name: "authorName", description: "Display name of the Noodle account posting.", example: "Dottore" },
     {

@@ -159,7 +159,7 @@ function createPrefixEchoFilter(prefix: string | undefined): { push(text: string
 const ROLE_ALTERNATION_ERROR =
   /\b(?:roles?|messages?|turns?)\b[^\n]{0,80}?\bmust\s+(?:strictly\s+)?alternate\b|\bcannot have 2 or more assistant messages\b/i;
 const ROLE_ALTERNATION_HINT =
-  " This model's chat template needs user and assistant messages to take turns, and Marinara could not make this request fit. Set Post-Processing Messages to Single User Message, or serve the model with a less strict chat template.";
+  " This model's chat template needs user and assistant messages to take turns, and YunYun could not make this request fit. Set Post-Processing Messages to Single User Message, or serve the model with a less strict chat template.";
 
 type ChatCompletionsWireMessage = Record<string, unknown> & { role?: unknown; content?: unknown };
 

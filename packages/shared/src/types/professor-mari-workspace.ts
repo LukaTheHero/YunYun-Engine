@@ -105,7 +105,7 @@ export interface ProfessorMariAskContext {
   commandCenterResultId?: string;
   activeChat?: { id: string; label?: string; mode?: string };
   settingsLocation?: { tab?: string; controlId?: string };
-  /** The omnibar aside's answer, carried along when `⌘↵` escalates it into Mari (R25). */
+  /** The omnibar aside's answer, carried along when `⌘↵` escalates it into YunYun (R25). */
   asideAnswer?: { query: string; answer: string; tier: "local" | "remote"; sources?: ProfessorMariQuickSource[] };
 }
 
@@ -151,7 +151,7 @@ export interface ProfessorMariQuickPromptRequest {
 
 /**
  * Capability words mapped to the official Agent package id(s) that cover them,
- * so "does Marinara do images/music/maps" questions can point at the real
+ * so "does YunYun do images/music/maps" questions can point at the real
  * package. Shared so the server (grounding text) and the client (the
  * "Download Agents" chip, computed from the already-typed query, no extra
  * round trip) never drift apart.
@@ -325,7 +325,7 @@ export type MariChipEntity =
 export type MariChipTone = "default" | "danger" | "caution" | "success";
 
 /**
- * M5b: a next-step card that acts at once on the client, with no Mari round-trip. The first three
+ * M5b: a next-step card that acts at once on the client, with no YunYun round-trip. The first three
  * kinds are the client's own navigation targets; the prompt stays the fallback for surfaces that
  * only render chips.
  */
@@ -349,7 +349,7 @@ export interface MariSuggestionChip {
 }
 
 /**
- * Slice 71: one mutating command Mari held behind Accept, saved on her turn (`mariHeldChanges`) so the
+ * Slice 71: one mutating command YunYun held behind Accept, saved on her turn (`mariHeldChanges`) so the
  * "Needs you" card can say what Accept would do: the app-data action or command name, the record it
  * targets, its name when the command carries one, and the fields it sets (values cut short).
  */
@@ -502,7 +502,7 @@ const MARI_CHIP_DETAIL_MAX = 80;
 const MARI_ACTION_RESOURCES = new Set(["character", "persona", "preset", "lorebook", "agent"]);
 const MARI_ACTION_PANELS = new Set(["characters", "personas", "lorebooks", "presets", "connections", "agents"]);
 
-/** Only the action shapes the client knows how to run; anything else leaves a plain Mari card. */
+/** Only the action shapes the client knows how to run; anything else leaves a plain YunYun card. */
 function sanitizeMariSuggestionAction(raw: unknown): MariSuggestionAction | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const record = raw as Record<string, unknown>;
@@ -941,7 +941,7 @@ export interface MariUnderstoodRequest {
 }
 
 /**
- * The newest Professor Mari run, anchored on the server clock. `id` is the run's request message, which
+ * The newest Professor YunYun run, anchored on the server clock. `id` is the run's request message, which
  * is also what the client's "seen" marker stores, so a refresh or another device sees the same state.
  */
 export interface MariWorkspaceLatestRun {

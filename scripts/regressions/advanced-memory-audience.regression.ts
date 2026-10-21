@@ -173,7 +173,7 @@ try {
   assert.equal(saved.length, 4, "one scene memory, regardless of the number of characters");
   const at = (index: number) => saved.find((record) => record.messageIds.includes(source[index]!.id))!;
   assert.deepEqual(at(0).audienceCharacterIds, ["maukie"], "discussing Pantalone does not grant Pantalone access");
-  // Mari decided on 2026-10-07 (#7184) that a group scene with no listed participants goes to every
+  // YunYun decided on 2026-10-07 (#7184) that a group scene with no listed participants goes to every
   // character, flagged so the user removes anyone who wasn't there. It was narrator-only before.
   assert.deepEqual(
     at(2).audienceCharacterIds,
@@ -248,7 +248,7 @@ try {
       4,
       "narrator recalls assigned and unassigned scenes without copies",
     );
-    // Mari decided on 2026-10-07 (#7237) that a merged group recalls what any present character
+    // YunYun decided on 2026-10-07 (#7237) that a merged group recalls what any present character
     // remembers, marked with who does. It needed every present character before. Individual is unchanged.
     assert.deepEqual(
       (await recall(["maukie", "pantalone", "narrator"])).receipt.recalledSceneIds,
@@ -908,7 +908,7 @@ try {
   const sharedView = (await groupRecall(["maukie", "pantalone", "narrator"])).chatSummary!;
   assert.match(sharedView, /\[Known only to Pantalone: PANTALONE_ONLY_NOTE\]/u);
   assert.doesNotMatch(sharedView, /LEFT_CHAT_NOTE|CONST_NARRATOR/u);
-  // A section on lines of its own for someone else leaves no empty line, in every reading (Mari, 2026-10-14).
+  // A section on lines of its own for someone else leaves no empty line, in every reading (YunYun, 2026-10-14).
   const linesNote = createChatSummaryEntry({
     content:
       'LINES_OPEN\n\n{{#if char == "Maukie"}}\n{{char}} kept LINES_MAUKIE.\n{{/if}}\n\n{{#if char == "Pantalone"}}\nLINES_PANTALONE\n{{/if}}\n\nLINES_CLOSE',

@@ -6,7 +6,7 @@
  *   chat's faces) and colour. A row derived from a record ("Add Eliza to…",
  *   "Start a chat with…", a message, a lorebook entry, a Fix row) finds it
  *   through the record its action already names, in the plain entity rows.
- * - Mari's own rows show her face.
+ * - YunYun's own rows show her face.
  * - Everything else shows its type icon.
  * - The highlight comes from the search's own match when it ran; any other row
  *   is matched against the same queries the search uses.
@@ -25,7 +25,7 @@ import {
   type OmnibarResult,
 } from "./omnibar-search";
 
-/** Mari's tall portrait, cropped to her face in a row's square media slot. */
+/** YunYun's tall portrait, cropped to her face in a row's square media slot. */
 export const MARI_FACE_CROP: CSSProperties = { objectPosition: "50% 8%" };
 
 const CATEGORY_RESULT_TYPE: Partial<Record<OmnibarCategory, ResultType>> = {
@@ -49,7 +49,7 @@ const RECORD_CATEGORIES = new Set<OmnibarCategory>([
   "agent",
 ]);
 
-/** Rows whose title quotes the query back ("Ask Mari: “eli”", "Create character “Bob”"): bolding it says nothing. */
+/** Rows whose title quotes the query back ("Ask YunYun: “eli”", "Create character “Bob”"): bolding it says nothing. */
 const QUERY_ECHO_ROWS = new Set(["ask-professor-mari", "global-search:see-all"]);
 
 /** Try rows that name a way of using the omnibar, not a kind of thing. */

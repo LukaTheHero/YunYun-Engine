@@ -70,7 +70,7 @@ try {
     script("name", String.raw`\bMari\b`, "{{char}}"),
     script("ooc", String.raw`\(OOC: ([^)]*)\)`, "[$1]", { flags: "gi", trimStrings: '["!!"]' }),
   ];
-  const resolveMacros = (value: string) => value.replaceAll("{{char}}", "Professor Mari");
+  const resolveMacros = (value: string) => value.replaceAll("{{char}}", "Professor YunYun");
   for (const { pattern, text } of SLOW_CASES) {
     warnings.length = 0;
     const result = timed(() => applyRegexScriptsToPromptText(text, scripts, "user_input", 0, { resolveMacros }));
@@ -85,15 +85,15 @@ try {
   }
 
   const messages = [
-    { id: "1", role: "user", content: "Hi Mari! (OOC: be brief!!)" },
-    { id: "2", role: "assistant", content: "Mari waves. ".repeat(40).trim() },
+    { id: "1", role: "user", content: "Hi YunYun! (OOC: be brief!!)" },
+    { id: "2", role: "assistant", content: "YunYun waves. ".repeat(40).trim() },
     { id: "3", role: "user", content: SHORT_MESSAGES[0]! },
   ];
   const turn = timed(() => applyRegexScriptsToPromptMessages(messages, scripts, { resolveMacros }));
   assert.ok(turn.ms < TIME_BUDGET_MS * SLOW_PATTERNS.length * messages.length, `a turn took ${turn.ms} ms`);
   assert.deepEqual(
     messages.map((message) => message.content),
-    ["Hi Professor Mari! [be brief]", "Professor Mari waves. ".repeat(40).trim(), SHORT_MESSAGES[0]],
+    ["Hi Professor YunYun! [be brief]", "Professor YunYun waves. ".repeat(40).trim(), SHORT_MESSAGES[0]],
     "well-behaved scripts still apply after a slow one was skipped",
   );
 

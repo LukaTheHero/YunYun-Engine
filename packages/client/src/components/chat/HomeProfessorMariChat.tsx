@@ -214,13 +214,13 @@ type HomeProfessorMariChatProps = {
   initialAskContext?: ProfessorMariAskContext | null;
   /** Increments on every omnibar handoff that should send its query at once. */
   submitDraftRequest?: number;
-  /** A past Mari conversation to open, handed in from the omnibar. */
+  /** A past YunYun conversation to open, handed in from the omnibar. */
   openChatId?: string | null;
   pendingReviewRequest?: number;
   /** The specific review `pendingReviewRequest` should jump to, or null for the first one (R9). */
   pendingReviewId?: string | null;
   omnibarHeaderSlot?: HTMLElement | null;
-  /** Her status line under "Professor Mari" in the omnibar header's first row. */
+  /** Her status line under "Professor YunYun" in the omnibar header's first row. */
   omnibarStatusSlot?: HTMLElement | null;
   /** R11: the first header row's spot for the destinations menu while a phone keyboard is open. */
   omnibarMenuSlot?: HTMLElement | null;
@@ -228,7 +228,7 @@ type HomeProfessorMariChatProps = {
   arrival?: MariArrival | null;
   /**
    * D1: increments on every arrival-door open (⌘J, the pull, the drag, Home's "Ask Professor
-   * Mari"). When her chat already has messages, this appends the same arrival content at the
+   * YunYun"). When her chat already has messages, this appends the same arrival content at the
    * bottom of the transcript instead of only showing it on an empty chat.
    */
   arrivalAppendRequest?: number;
@@ -829,7 +829,7 @@ export function HomeProfessorMariChat({
     return () => window.removeEventListener(PROFESSOR_MARI_OPEN_EVENT, handleOpen);
   }, [applyHandoff, omnibarMode]);
 
-  // Direct prop channel (e.g. the omnibar Mari pane) — avoids the global open
+  // Direct prop channel (e.g. the omnibar YunYun pane) — avoids the global open
   // event so a co-mounted Home instance never steals the handoff context.
   // Read when the history load lands, not when it starts: M9's arrival context can come in a commit
   // after this pane mounted, and the load must not then restore an older focus over it.
@@ -952,7 +952,7 @@ export function HomeProfessorMariChat({
       const chat = await api.get<Chat>(`/chats/internal/professor-mari${query ? `?${query}` : ""}`);
       setActiveChatId(chat.id);
       // The ensure/restart/activate writes in this file are deliberately
-      // unguarded (#5641): each loads or switches to a Mari chat whose id is
+      // unguarded (#5641): each loads or switches to a YunYun chat whose id is
       // unknown before the request, with no concurrent local metadata edits
       // to protect.
       qc.setQueryData(chatKeys.detail(chat.id), chat);
@@ -1016,7 +1016,7 @@ export function HomeProfessorMariChat({
         return targetId;
       } catch (error) {
         // The open thread is still a fine place to land.
-        console.error("[Professor Mari] Failed to pick the thread for this screen", error);
+        console.error("[Professor YunYun] Failed to pick the thread for this screen", error);
         return currentId;
       } finally {
         setRoutedArrivalRequest(request);
@@ -1025,7 +1025,7 @@ export function HomeProfessorMariChat({
     [qc, setActiveChatId, startMariThread],
   );
 
-  // #5073: attaching chat history needs a Mari workspace chat to attach TO; create one if the user
+  // #5073: attaching chat history needs a YunYun workspace chat to attach TO; create one if the user
   // hasn't sent a message yet, then open the picker (the picker itself is gated on a live chatId).
   const handleOpenHistoryPicker = useCallback(async () => {
     if (!activeChatIdRef.current) {
@@ -1109,7 +1109,7 @@ export function HomeProfessorMariChat({
     // Invalidation marks every query stale either way; the default 'active'
     // refetch pulls only what is mounted now, and everything else refreshes on
     // its next mount. refetchType:'all' here made every cached chat re-drain
-    // its full message page history on each Mari workspace change (#4703).
+    // its full message page history on each YunYun workspace change (#4703).
     await qc.invalidateQueries();
   }, [qc]);
 
@@ -1164,7 +1164,7 @@ export function HomeProfessorMariChat({
       handled.add(entry.id);
     }
     void invalidateWorkspaceData().catch((error) => {
-      console.error("[Professor Mari] Failed to refresh app data after workspace change", error);
+      console.error("[Professor YunYun] Failed to refresh app data after workspace change", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariAppliedAWorkspaceChangeButAppData"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -1206,7 +1206,7 @@ export function HomeProfessorMariChat({
         });
       })
       .catch((error) => {
-        console.error("[Professor Mari] Failed to load home assistant", error);
+        console.error("[Professor YunYun] Failed to load home assistant", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotLoad"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -1261,7 +1261,7 @@ export function HomeProfessorMariChat({
 
   // Recovery for runs this client is no longer attached to (#5719): if the
   // status poll watches a server-side run finish while no local send closure
-  // is driving it — the stream died, or Mini-Mari was closed and reopened —
+  // is driving it — the stream died, or Mini-YunYun was closed and reopened —
   // reload the persisted reply so it does not sit invisible until a manual
   // chat switch. Arming requires TWO status writes observing the run active
   // with no local closure (a single observation is routinely the STALE
@@ -1299,7 +1299,7 @@ export function HomeProfessorMariChat({
         void loadMessages(chatIdToReload, {
           shouldApply: () => activeChatIdRef.current === chatIdToReload && workspaceRunIdRef.current === armedRunId,
         }).catch((error) => {
-          console.error("[Professor Mari] Failed to reload messages after a detached workspace run", error);
+          console.error("[Professor YunYun] Failed to reload messages after a detached workspace run", error);
         });
         void invalidateWorkspaceData();
       }
@@ -1308,8 +1308,8 @@ export function HomeProfessorMariChat({
 
   useEffect(() => {
     void loadSkills().catch((error) => {
-      console.error("[Professor Mari] Failed to load skills", error);
-      setSkillsDiagnostics(["Professor Mari skills unavailable"]);
+      console.error("[Professor YunYun] Failed to load skills", error);
+      setSkillsDiagnostics(["Professor YunYun skills unavailable"]);
       reportWorkspaceToolsIssue(error);
     });
   }, [loadSkills, reportWorkspaceToolsIssue]);
@@ -1317,7 +1317,7 @@ export function HomeProfessorMariChat({
   useEffect(() => {
     if (!chatHistoryOpen) return;
     void loadChatHistory().catch((error) => {
-      console.error("[Professor Mari] Failed to load chats", error);
+      console.error("[Professor YunYun] Failed to load chats", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotLoadHerPreviousChats"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -1351,7 +1351,7 @@ export function HomeProfessorMariChat({
 
   useEffect(() => {
     void loadMemories().catch((error) => {
-      console.error("[Professor Mari] Failed to load memories", error);
+      console.error("[Professor YunYun] Failed to load memories", error);
       reportWorkspaceToolsIssue(error);
     });
   }, [loadMemories, reportWorkspaceToolsIssue]);
@@ -1379,7 +1379,7 @@ export function HomeProfessorMariChat({
     [workspaceStatus?.pendingApprovals],
   );
 
-  // Alert the user when Professor Mari finished her work and is now blocked
+  // Alert the user when Professor YunYun finished her work and is now blocked
   // waiting on an approval. The notification helpers no-op while the app is
   // focused, so a present user just sees the in-app review card. Reviews are
   // re-fetched from the workspace service on re-entry, so the card is already waiting too.
@@ -1391,8 +1391,8 @@ export function HomeProfessorMariChat({
     for (const approval of fresh) notifiedApprovalIdsRef.current.add(approval.id);
     const uiState = useUIStore.getState();
     const notification = {
-      characterName: "Professor Mari",
-      title: "Professor Mari needs your approval",
+      characterName: "Professor YunYun",
+      title: "Professor YunYun needs your approval",
       tag: "marinara-mari-approval",
     };
     void showLocalMessageNotification({ ...notification, enabled: uiState.generationBrowserNotifications });
@@ -1429,9 +1429,9 @@ export function HomeProfessorMariChat({
   }, [workspaceTimelineActive, chatId, loadMessages, sending]);
   const emptyStateReady =
     omnibarMode && messages.length === 0 && !isBusy && chatId !== null && loadedMessagesChatId === chatId;
-  // D1: an arrival door (⌘J, the pull, the drag, Home's "Ask Professor Mari") opened into a chat that
+  // D1: an arrival door (⌘J, the pull, the drag, Home's "Ask Professor YunYun") opened into a chat that
   // already has history. Append the same arrival content (`buildMariArrival`'s output, unchanged) at
-  // the bottom of the transcript instead of only showing it on an empty chat, so the door's "ask Mari
+  // the bottom of the transcript instead of only showing it on an empty chat, so the door's "ask YunYun
   // about this" promise still holds on a return visit. Local UI only: never persisted, no model call.
   const appendedArrivalReady = shouldAppendMariArrival({
     omnibarMode,
@@ -1504,7 +1504,7 @@ export function HomeProfessorMariChat({
       setWorkspaceRunClock(null);
       if (chatHistoryOpen) await loadChatHistory();
     } catch (error) {
-      console.error("[Professor Mari] Failed to start a thread for this screen", error);
+      console.error("[Professor YunYun] Failed to start a thread for this screen", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotOpenThatChat"), {
         description: describeProfessorMariError(error),
       });
@@ -1559,7 +1559,7 @@ export function HomeProfessorMariChat({
           (item) => item.type === "tool" && isHardStepFailure(item.tool),
         )
       : false;
-  // A reply with a stored run shows Mari on its own timeline line; one without needs her line below it.
+  // A reply with a stored run shows YunYun on its own timeline line; one without needs her line below it.
   const latestTurnHasTrace = Boolean(latestMessage && getMessageWorkspaceTrace(latestMessage));
   const restingStory = resolveMariRestStory({
     working: workspaceTimelineActive,
@@ -1568,7 +1568,7 @@ export function HomeProfessorMariChat({
     needsApproval: visiblePendingChangeReviews.length > 0 || Boolean(pendingDeferredMutations),
     hasAppliedChanges: latestActionResults.length > 0,
   });
-  // I4: on the newest finished turn Mari stands on the "Worked for" line: her story (success just after
+  // I4: on the newest finished turn YunYun stands on the "Worked for" line: her story (success just after
   // the run, then idle), or the retry / stopped / approval story while that is her state.
   const latestTurnRestStory: MariStoryState | null = workspaceTimelineActive
     ? null
@@ -1781,7 +1781,7 @@ export function HomeProfessorMariChat({
 
   // #5725: the server-authoritative Permissions Mode. Display rides the status
   // payload; writes go through the dedicated validated PUT. The change applies
-  // to Mari's NEXT run - an in-flight turn is never aborted by a mode switch.
+  // to YunYun's NEXT run - an in-flight turn is never aborted by a mode switch.
   const permissionsMode: MariPermissionsMode = workspaceStatus?.permissionsMode ?? DEFAULT_MARI_PERMISSIONS_MODE;
   const permissionsModeDefault: MariPermissionsMode =
     workspaceStatus?.permissionsModeDefault ?? DEFAULT_MARI_PERMISSIONS_MODE;
@@ -1828,7 +1828,7 @@ export function HomeProfessorMariChat({
           // authoritative state rather than restoring a rendered snapshot
           // (which can itself be an optimistic value or another chat's).
           if (permissionsModeWriteSeqRef.current !== writeSeq) return;
-          console.error("[Professor Mari] Failed to change permissions mode", error);
+          console.error("[Professor YunYun] Failed to change permissions mode", error);
           toast.error(localizeUi("ui.chat.homeprofessormarichat.couldNotChangeThePermissionsMode"));
           void refreshWorkspaceStatus(
             () => activeChatIdRef.current === chatIdForMode && permissionsModeWriteSeqRef.current === writeSeq,
@@ -1859,7 +1859,7 @@ export function HomeProfessorMariChat({
             await ensureProfessorMariChat(id);
           } catch (error) {
             if (!pendingConnectionPersistRef.current && latestConnectionSelectionRef.current === id) {
-              console.error("[Professor Mari] Failed to save selected connection", error);
+              console.error("[Professor YunYun] Failed to save selected connection", error);
               toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRememberThatConnection"), {
                 description: describeProfessorMariError(error),
                 duration: 12_000,
@@ -1966,7 +1966,7 @@ export function HomeProfessorMariChat({
   const guidedPlanStep = guidedPlan ? (guidedPlan[mariPlanCursor] ?? null) : null;
   const chipRowChips = guidedPlanStep ? guidedPlanStep.chips : visibleSuggestionChips;
   // #5820: the Accept action for held edits is NOT a suggestion. Captioning
-  // the row "Suggestions only" told users the one control that applies Mari's
+  // the row "Suggestions only" told users the one control that applies YunYun's
   // pending changes was optional flavour text, so they concluded she had
   // silently done nothing - the visible half of the defer-and-approve
   // mechanism read as a failure of it.
@@ -1996,7 +1996,7 @@ export function HomeProfessorMariChat({
       await handleRestart();
       clearMariPlan();
     } catch (error) {
-      console.error("[Professor Mari] Failed to restart", error);
+      console.error("[Professor YunYun] Failed to restart", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRestartHerNotes"));
     } finally {
       setSending(false);
@@ -2051,7 +2051,7 @@ export function HomeProfessorMariChat({
         }
         return false;
       } catch (error) {
-        console.error("[Professor Mari] Failed to reject workspace rows", error);
+        console.error("[Professor YunYun] Failed to reject workspace rows", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRejectThatEntry"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -2077,7 +2077,7 @@ export function HomeProfessorMariChat({
         if (!result.ok) return null;
         return { before: result.before ?? null, after: result.after ?? null };
       } catch (error) {
-        console.error("[Professor Mari] Failed to render workspace prompt", error);
+        console.error("[Professor YunYun] Failed to render workspace prompt", error);
         return null;
       }
     },
@@ -2093,7 +2093,7 @@ export function HomeProfessorMariChat({
       await api.post("/professor-mari/workspace/abort");
     } catch (error) {
       setCancelledChatId(null);
-      console.error("[Professor Mari] Failed to stop workspace task", error);
+      console.error("[Professor YunYun] Failed to stop workspace task", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotStopTheWorkspaceTask"), {
         description: describeProfessorMariError(error),
         duration: 12_000,
@@ -2198,7 +2198,7 @@ export function HomeProfessorMariChat({
           });
         }
       } catch (error) {
-        console.error("[Professor Mari] Failed to prepare attachment", error);
+        console.error("[Professor YunYun] Failed to prepare attachment", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotAttachThatFile"), {
           description:
             error instanceof Error ? error.message : localizeUi("ui.chat.homeprofessormarichat.theFileCouldNotBeRead"),
@@ -2356,7 +2356,7 @@ export function HomeProfessorMariChat({
           void api
             .patch(`/chats/internal/professor-mari/chats/${chat.id}`, { name: autoTitle })
             .then(() => loadChatHistory())
-            .catch((error) => console.error("[Professor Mari] Failed to auto-title chat", error));
+            .catch((error) => console.error("[Professor YunYun] Failed to auto-title chat", error));
         }
       }
       trackAchievement.mutate("prof_mari_message_sent");
@@ -2422,7 +2422,7 @@ export function HomeProfessorMariChat({
     keepKeyboardInWindow();
   }, [connectionsLoading, draft, initialAskContext, isBusy, keepKeyboardInWindow, omnibarMode, submitDraftRequest]);
 
-  // M5b: an action card runs the same deterministic navigation as the omnibar rows, with no Mari round-trip.
+  // M5b: an action card runs the same deterministic navigation as the omnibar rows, with no YunYun round-trip.
   const runSuggestionAction = (action: MariSuggestionAction) => {
     if (action.kind === "start-chat") {
       useUIStore.getState().openModal("start-character-chat", {
@@ -2442,7 +2442,7 @@ export function HomeProfessorMariChat({
   };
 
   /**
-   * N4: a Mari card sends at once; `draft` (Shift, or a long press on touch) puts it in the composer
+   * N4: a YunYun card sends at once; `draft` (Shift, or a long press on touch) puts it in the composer
    * instead. `context` replaces the handoff for that one card (N6: an arrival Fix card's error).
    */
   const handleSuggestionSelect = (chip: MariSuggestionChip, draft = false, context?: ProfessorMariAskContext) => {
@@ -2528,7 +2528,7 @@ export function HomeProfessorMariChat({
         setWorkspaceStatus((current) => current && { ...current, error: null });
       }
     } catch (error) {
-      console.error("[Professor Mari] Failed to dismiss the error", error);
+      console.error("[Professor YunYun] Failed to dismiss the error", error);
     } finally {
       void qc.invalidateQueries({ queryKey: professorMariWorkspaceStatusKeys.all });
     }
@@ -2559,7 +2559,7 @@ export function HomeProfessorMariChat({
       await api.put(`/professor-mari/workspace/instructions/${memoryId}`, { enabled: true });
       return true;
     } catch (error) {
-      console.error("[Professor Mari] Failed to turn on memory", error);
+      console.error("[Professor YunYun] Failed to turn on memory", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUpdateThatMemory"));
       return false;
     }
@@ -2807,7 +2807,7 @@ export function HomeProfessorMariChat({
   const openActionResult = useCallback(
     async (result: MariWorkspaceActionResult) => {
       await invalidateActionResult(result).catch((error) => {
-        console.error("[Professor Mari] Failed to refresh action result before opening", error);
+        console.error("[Professor YunYun] Failed to refresh action result before opening", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariAppliedAWorkspaceChangeButAppData"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -2875,10 +2875,10 @@ export function HomeProfessorMariChat({
     };
   }, [reduceMotion, requestedReviewId, visiblePendingChangeReviewKey, workspaceDestination]);
 
-  // #5740 / M5a: on the turn the latest mutating round produced, its first line is the goal Mari
+  // #5740 / M5a: on the turn the latest mutating round produced, its first line is the goal YunYun
   // reported acting on - user-visible by default so people can self-correct ("that wasn't a request!")
   // before filing reports. One record only (latest round), read from status, never a model call. The
-  // server also reads the record back to Mari as context, so asking her "why did you treat that as
+  // server also reads the record back to YunYun as context, so asking her "why did you treat that as
   // permission?" gets an answer grounded in this same record - never a gate either way.
   const renderGoal = (message: Message) => {
     const understoodRequest =

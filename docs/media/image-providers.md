@@ -1,12 +1,12 @@
 # Image Generation Providers and Setup
 
-This guide explains how to connect an image generation service to Marinara Engine. It also covers what each service needs. Image generation powers scene illustrations, selfies, scene backgrounds, and generated avatars, portraits, and sprites.
+This guide explains how to connect an image generation service to YunYun Engine. It also covers what each service needs. Image generation powers scene illustrations, selfies, scene backgrounds, and generated avatars, portraits, and sprites.
 
 You set up image generation as a special kind of connection. Once one image connection works, every image feature in the app can use it.
 
 ## How to add an image generation connection
 
-An **API key** is a secret password from a provider that lets Marinara use your account. A **Base URL** is the web address of the service's application interface. Marinara fills in the correct Base URL for you when you pick a service.
+An **API key** is a secret password from a provider that lets YunYun use your account. A **Base URL** is the web address of the service's application interface. YunYun fills in the correct Base URL for you when you pick a service.
 
 Follow these steps to add an image connection.
 
@@ -17,7 +17,7 @@ Follow these steps to add an image connection.
 5. Paste your **API Key** if that service needs one. Free and local services do not.
 6. Pick a **Model** from the list, or type a model ID. Some services offer **Fetch Models from API** to load the current list.
 7. Click **Save**.
-8. Click **Test Image** to confirm it works. Marinara generates a small test image.
+8. Click **Test Image** to confirm it works. YunYun generates a small test image.
 
 If **Test Image** returns a picture, your connection is ready. If it fails, check the API key and Base URL.
 
@@ -58,9 +58,9 @@ Cloud service with the default Base URL `https://api.openai.com/v1`. It needs an
 
 ## ChatGPT (Codex login)
 
-Cloud service that uses your ChatGPT plan instead of an API key, so images don't need OpenAI API credits. On the computer that runs the Marinara server, install the Codex CLI and run `codex login` once. It is the same sign-in the **OpenAI (ChatGPT)** chat connection uses; see [Claude, ChatGPT, and Grok Subscription Connections](../connections/subscription-clis.md#openai-chatgpt) for the steps. There is no API key or Base URL to fill in. Marinara fills in the model `gpt-image-2`, the one Codex itself uses for images.
+Cloud service that uses your ChatGPT plan instead of an API key, so images don't need OpenAI API credits. On the computer that runs the YunYun server, install the Codex CLI and run `codex login` once. It is the same sign-in the **OpenAI (ChatGPT)** chat connection uses; see [Claude, ChatGPT, and Grok Subscription Connections](../connections/subscription-clis.md#openai-chatgpt) for the steps. There is no API key or Base URL to fill in. YunYun fills in the model `gpt-image-2`, the one Codex itself uses for images.
 
-**Test Connection** only checks that Marinara can read your Codex login. **Test Image** makes a real image and counts against your ChatGPT image limits. With reference images, Marinara sends an edit request with up to 16 of them. ChatGPT may return a different pixel size than the one asked for, so Marinara also states the wanted aspect ratio in the prompt.
+**Test Connection** only checks that YunYun can read your Codex login. **Test Image** makes a real image and counts against your ChatGPT image limits. With reference images, YunYun sends an edit request with up to 16 of them. ChatGPT may return a different pixel size than the one asked for, so YunYun also states the wanted aspect ratio in the prompt.
 
 This service talks to the ChatGPT image endpoint that Codex uses, not the public OpenAI API, so OpenAI can change it without notice.
 
@@ -74,13 +74,13 @@ Cloud service with the default Base URL `https://api.together.xyz/v1`. It needs 
 
 ## Arli AI
 
-Cloud service with the default Base URL `https://api.arliai.com/v1`. It needs an Arli AI API key. It runs hosted Stable Diffusion models. A **Model** is required, so type the name of the Arli AI image model you want. It uses the same **Local Image Defaults** fields as **SD Web UI (AUTOMATIC1111 / Forge)**, described below. When you send a reference image, Marinara uses the first one as a starting picture (image to image).
+Cloud service with the default Base URL `https://api.arliai.com/v1`. It needs an Arli AI API key. It runs hosted Stable Diffusion models. A **Model** is required, so type the name of the Arli AI image model you want. It uses the same **Local Image Defaults** fields as **SD Web UI (AUTOMATIC1111 / Forge)**, described below. When you send a reference image, YunYun uses the first one as a starting picture (image to image).
 
 The **Arli AI** service here is for images only. For Arli AI chat models, use the **Arli AI** chat provider instead; see [Supported AI Providers](../connections/providers-reference.md#arli-ai).
 
 ## NovelAI
 
-Cloud service with the default Base URL `https://image.novelai.net`. It needs a NovelAI API key. It focuses on anime style art. On V4, V4.5, and V5 models, Marinara sends native per-character prompts with positions for multi-character storyboards and Illustrator scenes. Some newer features, like precise reference images, only work on a V4.5 model.
+Cloud service with the default Base URL `https://image.novelai.net`. It needs a NovelAI API key. It focuses on anime style art. On V4, V4.5, and V5 models, YunYun sends native per-character prompts with positions for multi-character storyboards and Illustrator scenes. Some newer features, like precise reference images, only work on a V4.5 model.
 
 ## OpenRouter Images
 
@@ -92,31 +92,31 @@ Cloud service with the default Base URL `https://api.x.ai/v1`. It needs an xAI A
 
 ## Venice.ai
 
-Cloud service with the default Base URL `https://api.venice.ai/api/v1`. It needs a Venice API key. Use **Fetch Models from API** to load the image models available to your account. Marinara uses Venice's native image endpoint, disables Venice's optional safe-mode blur, and automatically maps requested dimensions to each model's pixel, aspect-ratio, or resolution-tier sizing format. Provider-side policy or model limits can still reject a request.
+Cloud service with the default Base URL `https://api.venice.ai/api/v1`. It needs a Venice API key. Use **Fetch Models from API** to load the image models available to your account. YunYun uses Venice's native image endpoint, disables Venice's optional safe-mode blur, and automatically maps requested dimensions to each model's pixel, aspect-ratio, or resolution-tier sizing format. Provider-side policy or model limits can still reject a request.
 
 ## Z.AI
 
-Cloud service with the default Base URL `https://api.z.ai/api/paas/v4`. It needs a general Z.AI API key; GLM Coding Plan keys and the `/api/coding/paas/v4` endpoint are not valid for image generation. Use **Fetch Models from API** to choose **GLM-Image** or **CogView 4**. Marinara maps the requested aspect ratio to a size supported by the selected model, sends the request to Z.AI's native image endpoint, and downloads the temporary result URL into local storage. This first version is text-to-image only and does not send reference images.
+Cloud service with the default Base URL `https://api.z.ai/api/paas/v4`. It needs a general Z.AI API key; GLM Coding Plan keys and the `/api/coding/paas/v4` endpoint are not valid for image generation. Use **Fetch Models from API** to choose **GLM-Image** or **CogView 4**. YunYun maps the requested aspect ratio to a size supported by the selected model, sends the request to Z.AI's native image endpoint, and downloads the temporary result URL into local storage. This first version is text-to-image only and does not send reference images.
 
 ## Atlas Cloud
 
-Cloud service with the default Base URL `https://api.atlascloud.ai/api/v1`. It needs an Atlas Cloud API key. **Fetch Models** loads Atlas Cloud's current text-to-image and image-to-image catalog. If the catalog cannot be reached, Marinara shows a small starter list for Nano Banana, Gemini Flash Image, and FLUX 1.1 Pro instead, and you can always type an exact Atlas Cloud image model ID. Jobs run asynchronously, so Marinara starts the generation and polls Atlas Cloud until the image is ready. Common text-to-image controls are mapped automatically; reference images are sent for model IDs that advertise image-to-image, edit, or Kontext behavior. Because Atlas model schemas can differ, check the selected model's Atlas Cloud documentation when using another model ID.
+Cloud service with the default Base URL `https://api.atlascloud.ai/api/v1`. It needs an Atlas Cloud API key. **Fetch Models** loads Atlas Cloud's current text-to-image and image-to-image catalog. If the catalog cannot be reached, YunYun shows a small starter list for Nano Banana, Gemini Flash Image, and FLUX 1.1 Pro instead, and you can always type an exact Atlas Cloud image model ID. Jobs run asynchronously, so YunYun starts the generation and polls Atlas Cloud until the image is ready. Common text-to-image controls are mapped automatically; reference images are sent for model IDs that advertise image-to-image, edit, or Kontext behavior. Because Atlas model schemas can differ, check the selected model's Atlas Cloud documentation when using another model ID.
 
 ## fal.ai
 
 Cloud service with the default **Base URL** `https://fal.run`. Create an API key at [fal.ai](https://fal.ai/dashboard/keys), then select **fal.ai** in the image service grid. The starter **Model** list offers `fal-ai/flux/schnell` and `fal-ai/flux/dev`; you can type another text-to-image endpoint ID with a compatible input/output schema. **Test Connection** checks the configuration only. **Test Image** sends a real generation request and uses your fal.ai credits.
 
-Marinara sends the prompt and requested dimensions, then downloads the first returned image into its existing image workflow. Negative prompts are appended as text instructions. Use **Custom Parameters** for model-specific options such as `seed`, `num_inference_steps`, or `image_size`. This integration uses synchronous text-to-image requests; it does not send reference images or resume interrupted jobs. Check the selected model's [API reference](https://fal.ai/models/fal-ai/flux/schnell/api) for its supported inputs.
+YunYun sends the prompt and requested dimensions, then downloads the first returned image into its existing image workflow. Negative prompts are appended as text instructions. Use **Custom Parameters** for model-specific options such as `seed`, `num_inference_steps`, or `image_size`. This integration uses synchronous text-to-image requests; it does not send reference images or resume interrupted jobs. Check the selected model's [API reference](https://fal.ai/models/fal-ai/flux/schnell/api) for its supported inputs.
 
 ## SpicyAPI
 
-Cloud service with the default **Base URL** `https://api.spicyapi.ai/api/v1`. Create an API key in the [SpicyAPI console](https://spicyapi.ai/console/keys), then select **SpicyAPI** in the image service grid. Marinara fills in the model `alibaba/z-image-spicy-pro/text-to-image`. Click **Fetch Models from API** to load every SpicyAPI text-to-image and edit model, or type a model ID such as `bytedance/seedream-5.0-pro/text-to-image`. **Test Connection** checks your key by reading the model list, so it costs nothing. **Test Image** makes a real image and uses your SpicyAPI balance.
+Cloud service with the default **Base URL** `https://api.spicyapi.ai/api/v1`. Create an API key in the [SpicyAPI console](https://spicyapi.ai/console/keys), then select **SpicyAPI** in the image service grid. YunYun fills in the model `alibaba/z-image-spicy-pro/text-to-image`. Click **Fetch Models from API** to load every SpicyAPI text-to-image and edit model, or type a model ID such as `bytedance/seedream-5.0-pro/text-to-image`. **Test Connection** checks your key by reading the model list, so it costs nothing. **Test Image** makes a real image and uses your SpicyAPI balance.
 
 Pick the **SpicyAPI** service. Don't use **OpenAI (DALL-E)** or a **Custom (OAI-Compatible)** connection with a SpicyAPI address. SpicyAPI's OpenAI-style address only handles text, so those can't make images.
 
-Each SpicyAPI model takes its own settings. Marinara asks SpicyAPI which ones the chosen model accepts and sends only those. It picks the closest shape the model offers, such as an aspect ratio, a width and height, or a fixed size. If the model has no negative prompt field, the negative prompt is added to the end of the prompt as text. Use **Custom Parameters** for other model options, such as `seed`, `resolution`, or `loras`.
+Each SpicyAPI model takes its own settings. YunYun asks SpicyAPI which ones the chosen model accepts and sends only those. It picks the closest shape the model offers, such as an aspect ratio, a width and height, or a fixed size. If the model has no negative prompt field, the negative prompt is added to the end of the prompt as text. Use **Custom Parameters** for other model options, such as `seed`, `resolution`, or `loras`.
 
-SpicyAPI runs each image as a task. Marinara waits for the task to finish, checks back if it takes more than about a minute, and then downloads the result. If the connection drops, Marinara picks up the same task instead of paying for a new one. Edit models (IDs that end in `/edit`) receive your reference images. SpicyAPI takes reference images up to 1 MB each and 2 MB per request, so Marinara shrinks larger images and leaves out extra ones that don't fit.
+SpicyAPI runs each image as a task. YunYun waits for the task to finish, checks back if it takes more than about a minute, and then downloads the result. If the connection drops, YunYun picks up the same task instead of paying for a new one. Edit models (IDs that end in `/edit`) receive your reference images. SpicyAPI takes reference images up to 1 MB each and 2 MB per request, so YunYun shrinks larger images and leaves out extra ones that don't fit.
 
 ## NanoGPT
 
@@ -124,7 +124,7 @@ Cloud service with the default Base URL `https://nano-gpt.com/api/v1`. It needs 
 
 ## Block Entropy
 
-Cloud service with the default Base URL `https://api.blockentropy.ai`. It needs an API key. Marinara has no dedicated handler for Block Entropy, so it sends requests in the OpenAI compatible format. Its real compatibility is not confirmed, so test it with **Test Image** before you rely on it.
+Cloud service with the default Base URL `https://api.blockentropy.ai`. It needs an API key. YunYun has no dedicated handler for Block Entropy, so it sends requests in the OpenAI compatible format. Its real compatibility is not confirmed, so test it with **Test Image** before you rely on it.
 
 ## RunPod Serverless (ComfyUI)
 
@@ -150,25 +150,25 @@ Local service with the default Base URL `http://127.0.0.1:8188`. It talks to a C
 
 Local service with the default Base URL `http://127.0.0.1:7801`. It talks to a SwarmUI server, which can spread ComfyUI work across its own queue. No API key is needed for a local server without accounts. If your SwarmUI server requires an account, paste a Swarm Auth Token into **API Key**. **Fetch Models from API** lists the models on your SwarmUI server.
 
-The **ComfyUI Workflow** field is optional for SwarmUI. Leave it empty to use SwarmUI's own image settings, or paste a workflow, described below. Turn on **Save images in SwarmUI** in **Local Image Defaults** to also keep each image in SwarmUI's output folder. Marinara keeps its own copy either way.
+The **ComfyUI Workflow** field is optional for SwarmUI. Leave it empty to use SwarmUI's own image settings, or paste a workflow, described below. Turn on **Save images in SwarmUI** in **Local Image Defaults** to also keep each image in SwarmUI's output folder. YunYun keeps its own copy either way.
 
 ## Draw Things
 
-Local service with the default Base URL `http://localhost:7860`. It talks to the Draw Things app on macOS or iOS. Marinara treats it like an AUTOMATIC1111 server. No API key is needed.
+Local service with the default Base URL `http://localhost:7860`. It talks to the Draw Things app on macOS or iOS. YunYun treats it like an AUTOMATIC1111 server. No API key is needed.
 
 ## Local services on your network
 
-The word `localhost` (also called loopback) means the same computer that runs Marinara. Local image servers on that same computer work with no extra setup.
+The word `localhost` (also called loopback) means the same computer that runs YunYun. Local image servers on that same computer work with no extra setup.
 
 If your image server runs on a different computer on your home network, you must allow local network addresses in the server configuration. See the [Server Configuration Reference](../CONFIGURATION.md) for how to do that.
 
-When a provider returns a URL instead of image bytes, Marinara downloads public CDN URLs through its normal outbound-request safety checks. A private or loopback result URL is accepted only when its scheme, hostname, and port exactly match the configured image provider. Redirects from that private origin cannot jump to another local service. If a local proxy stores results on a different private origin, configure the proxy to serve those files through the same origin as its image API.
+When a provider returns a URL instead of image bytes, YunYun downloads public CDN URLs through its normal outbound-request safety checks. A private or loopback result URL is accepted only when its scheme, hostname, and port exactly match the configured image provider. Redirects from that private origin cannot jump to another local service. If a local proxy stores results on a different private origin, configure the proxy to serve those files through the same origin as its image API.
 
 ## ComfyUI workflow JSON and RunPod
 
 For **ComfyUI**, **SwarmUI**, and **RunPod Serverless (ComfyUI)**, a **ComfyUI Workflow** field appears. Paste a workflow JSON that you exported from ComfyUI with **Save (API Format)**, **Export (API)**, or **Export to API**, depending on the frontend version. The field is labeled Optional for **ComfyUI** and **SwarmUI**, and Required for **RunPod Serverless (ComfyUI)**.
 
-Marinara fills your workflow using placeholders. Put these text markers in your workflow where the value should go.
+YunYun fills your workflow using placeholders. Put these text markers in your workflow where the value should go.
 
 - `%prompt%` and `%negative_prompt%` for the prompts.
 - `%width%`, `%height%`, and `%seed%` for the image size and seed.
@@ -229,13 +229,13 @@ A **reference image** is an existing picture you send along with your prompt. It
 | SwarmUI | Up to 4 |
 | Together AI, Pollinations, Stable Horde, fal.ai | Not supported |
 
-NovelAI precise reference images only work on a V4.5 model, such as `nai-diffusion-4-5-full`. NovelAI has not yet released Precise Reference for V5. If references are requested on another model, Marinara renders the image without them and records a warning in the server log.
+NovelAI precise reference images only work on a V4.5 model, such as `nai-diffusion-4-5-full`. NovelAI has not yet released Precise Reference for V5. If references are requested on another model, YunYun renders the image without them and records a warning in the server log.
 
 ## Queue media generation requests
 
 The **Queue media generation requests** toggle lives in **Settings**, then **Generations**, then **Overall Generations**. It is on by default.
 
-When it is on, Marinara sends image jobs to each image provider account one at a time, and video jobs to each video provider account one at a time, in separate queues. An image and a video for the same account can run together. This applies whichever feature asks for them: the Illustrator, trackers, commands, the Gallery, Game assets and downloaded agents such as Slurp. Two connections with the same address and API key share the corresponding queue. Different accounts and providers still work at the same time. NovelAI also gets a short pause between jobs. When NovelAI answers that it is busy, Marinara waits and tries again twice instead of failing the image.
+When it is on, YunYun sends image jobs to each image provider account one at a time, and video jobs to each video provider account one at a time, in separate queues. An image and a video for the same account can run together. This applies whichever feature asks for them: the Illustrator, trackers, commands, the Gallery, Game assets and downloaded agents such as Slurp. Two connections with the same address and API key share the corresponding queue. Different accounts and providers still work at the same time. NovelAI also gets a short pause between jobs. When NovelAI answers that it is busy, YunYun waits and tries again twice instead of failing the image.
 
 Keep it on for services that reject two requests at once. Turn it off only if your service handles many requests at the same time and you want them faster.
 

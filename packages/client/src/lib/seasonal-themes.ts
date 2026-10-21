@@ -22,7 +22,7 @@ export function isInMariSeason(season: MariSeason, now: Date = new Date()): bool
   return today >= season.from && today < season.to;
 }
 
-/** Halloween: October 30 00:00 until November 1 12:00, for the theme and Professor Mari's dated pack alike. */
+/** Halloween: October 30 00:00 until November 1 12:00, for the theme and Professor YunYun's dated pack alike. */
 export const HALLOWEEN_SEASON: MariSeason = { from: "10-30 00:00", to: "11-01 12:00" };
 
 export type SeasonalThemeId = "halloween";
@@ -82,7 +82,7 @@ export type SeasonalSettings = {
 
 /**
  * `resolveSeasonalTheme` for the UI store's settings: a preview uses its own unsaved records. App.tsx wears the
- * result and Professor Mari's dated appearance packs follow its `themeId`, so both switch on and off together.
+ * result and Professor YunYun's dated appearance packs follow its `themeId`, so both switch on and off together.
  */
 export function seasonalThemeFor(settings: SeasonalSettings, date: Date = new Date()): SeasonalThemeState {
   const preview = settings.seasonalPreview;

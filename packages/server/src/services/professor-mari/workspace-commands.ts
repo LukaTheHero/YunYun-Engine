@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Professor Mari workspace tool commands
+// Professor YunYun workspace tool commands
 // ──────────────────────────────────────────────
 import { constants, existsSync } from "node:fs";
 import { copyFile, link, mkdir, readdir, readFile, rmdir, stat, unlink, writeFile } from "node:fs/promises";
@@ -100,13 +100,13 @@ export type WorkspaceRunScope = {
 };
 
 /**
- * Professor Mari's workspace tool commands. Long-lived state (workspace root, change reviews and
+ * Professor YunYun's workspace tool commands. Long-lived state (workspace root, change reviews and
  * the single mutation queue) lives here; run-scoped state is read through `getRun` at call time.
  */
 export class WorkspaceCommands {
   workspaceRoot = getMonorepoRoot();
   readonly workspaceChangeReviews = new WorkspaceChangeReviewService(this.workspaceRoot);
-  // Professor Mari is the only untrusted workspace writer. Serialize all of
+  // Professor YunYun is the only untrusted workspace writer. Serialize all of
   // her mutations so path validation and the operation cannot overlap another
   // agent mutation; user and host processes remain outside this sandbox boundary.
   private workspaceMutationTail: Promise<void> = Promise.resolve();
@@ -180,14 +180,14 @@ export class WorkspaceCommands {
         // Dry-run previews (apply:false) are read-only and stay allowed.
         if (this.getRun().permissionsMode === "plan" && isMutatingWorkspaceCommand(command)) {
           throw new Error(
-            "Plan mode is active: do not stage changes. Describe the exact edits you would make in chat (app_data with apply:false is available for validated previews); the user can switch modes from the Mari panel or Settings.",
+            "Plan mode is active: do not stage changes. Describe the exact edits you would make in chat (app_data with apply:false is available for validated previews); the user can switch modes from the YunYun panel or Settings.",
           );
         }
         // #5725 Manual mode floor: silent mutating frames need a preceding
         // approved deferral - otherwise describe-and-ask first.
         if (this.getRun().manualSilentMutationBlocked && isMutatingWorkspaceCommand(command)) {
           throw new Error(
-            "Manual mode is active: describe the change you intend in say WITH the commands in the same response; Marinara will hold them and show the user an Accept action. Apply only after they approve.",
+            "Manual mode is active: describe the change you intend in say WITH the commands in the same response; YunYun will hold them and show the user an Accept action. Apply only after they approve.",
           );
         }
         // #5748 ask-latch floor: this run already asked the user whether to
@@ -195,7 +195,7 @@ export class WorkspaceCommands {
         // in a later round cannot be it.
         if (this.getRun().askLatchSilentMutationBlocked && isMutatingWorkspaceCommand(command)) {
           throw new Error(
-            "You already asked the user for approval in this run, so only their reply or Accept can answer it. Describe the change in say WITH the commands in the same response; Marinara will hold them and show the user an Accept action.",
+            "You already asked the user for approval in this run, so only their reply or Accept can answer it. Describe the change in say WITH the commands in the same response; YunYun will hold them and show the user an Accept action.",
           );
         }
         const validationIssue = workspaceCommandValidationIssue(command);
@@ -967,8 +967,8 @@ export class WorkspaceCommands {
       );
       if (offered.length === 0) {
         return packageId
-          ? `Package "${packageId}" offers no Mari actions, or it is not installed and enabled.`
-          : "No installed package offers Mari actions.";
+          ? `Package "${packageId}" offers no YunYun actions, or it is not installed and enabled.`
+          : "No installed package offers YunYun actions.";
       }
       return stringifyOutput(offered);
     }
@@ -1023,7 +1023,7 @@ export class WorkspaceCommands {
   }
 
   /**
-   * The session id this run's database commands carry, naming its Mari chat, so the
+   * The session id this run's database commands carry, naming its YunYun chat, so the
    * change cards they create belong to that chat (#6842).
    */
   private runSessionId(): string {
@@ -1083,7 +1083,7 @@ exit $LASTEXITCODE
     ]);
     this.withMariRuntimeEnv(process.env, binDir);
     if (!existsSync(posixCliPath) || !existsSync(cmdCliPath) || !existsSync(powershellCliPath)) {
-      logger.warn("[Professor Mari] failed to create one or more mari CLI shims at %s", binDir);
+      logger.warn("[Professor YunYun] failed to create one or more mari CLI shims at %s", binDir);
     }
     return binDir;
   }

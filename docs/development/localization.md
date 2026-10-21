@@ -179,7 +179,7 @@ intentionally excluded so commands, configuration, URLs, macros, and other machi
 Dynamic user-authored, generated, persisted, prompt, and protocol values must likewise remain outside the interface
 translator.
 
-Settings search, the omnibar and Professor Mari read setting names from `SETTINGS_SEARCHABLE_CONTROLS` in
+Settings search, the omnibar and Professor YunYun read setting names from `SETTINGS_SEARCHABLE_CONTROLS` in
 `packages/client/src/lib/settings-registry.ts`. Each control there carries a `labelKey` and a `descriptionKey` next to
 its English `label` and `description`. Reuse the control's existing key when its English text is the same; otherwise
 add `settings.search.<id>.label` or `.description` to `en.json`, with the control id in camelCase (for example

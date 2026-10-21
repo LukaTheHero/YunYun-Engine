@@ -73,7 +73,7 @@ function fitsMaxLength(textarea: HTMLTextAreaElement, suffix: string) {
 
 /**
  * Macro ghost-text for a textarea: typing `{{ch` greys in `ar}}` and Tab accepts it,
- * like the omnibar and the Professor Mari composer; tapping the ghost accepts it too,
+ * like the omnibar and the Professor YunYun composer; tapping the ghost accepts it too,
  * for phone keyboards without Tab. Attach `textareaRef`, call
  * `refresh` on focus, select and scroll, `clear` on blur, and `accept` first in keydown.
  */

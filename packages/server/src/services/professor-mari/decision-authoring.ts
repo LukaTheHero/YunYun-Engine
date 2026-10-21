@@ -75,7 +75,7 @@ async function isActiveRecord(context: AuthoringContext, record: DecisionRecord)
 
 async function readState(context: AuthoringContext) {
   const chat = await createChatsStorage(context.db).getById(context.chatId);
-  if (!chat) throw new Error("The active Professor Mari chat no longer exists.");
+  if (!chat) throw new Error("The active Professor YunYun chat no longer exists.");
   return stateFromMetadata(chat.metadata);
 }
 
@@ -145,13 +145,13 @@ export async function recordMariDecisionInteraction(context: AuthoringContext, i
     },
     { touchUpdatedAt: false },
   );
-  if (!result) throw new Error("The active Professor Mari chat no longer exists.");
+  if (!result) throw new Error("The active Professor YunYun chat no longer exists.");
   return saved;
 }
 
 export async function executeMariDecisionAction(action: string, data: unknown) {
   const context = contextStorage.getStore();
-  if (!context) throw new Error("Decision interactions require an active Professor Mari chat.");
+  if (!context) throw new Error("Decision interactions require an active Professor YunYun chat.");
   if (action === "decision.get") return mariDecisionContext(context);
   if (action === "decision.record") return recordMariDecisionInteraction(context, data);
   throw new Error("Unsupported Decision interaction action.");
@@ -231,7 +231,7 @@ function historyPlacement(change: MariAuthoringChange) {
 /** Shared normalized write boundary: structured actions, raw CLI and whole-entity child inserts. */
 export async function guardMariDecisionWrites(changes: MariAuthoringChange[]): Promise<void> {
   const context = contextStorage.getStore();
-  if (!context) return; // Direct user/CLI editing outside Mari retains its existing behavior.
+  if (!context) return; // Direct user/CLI editing outside YunYun retains its existing behavior.
   const relevant = changes.filter((change) => AUTHORING_TABLES.has(change.table) && change.afterRaw);
   const decisions = relevant.some((change) => introducesMariDecisionContent(change.beforeRaw, change.afterRaw));
   const history = relevant.some(historyPlacement);
@@ -269,7 +269,7 @@ export async function guardMariDecisionWrites(changes: MariAuthoringChange[]): P
   }
 }
 
-/** Decision authoring policy for the built-in Mari workspace assistant. */
+/** Decision authoring policy for the built-in YunYun workspace assistant. */
 export const MARI_DECISION_AUTHORING_PROMPT = `
 Decision authoring (presets, agents, lorebooks/entries, characters and prompt fields):
 - Check the live Decision status and relevant enabled Memories/Skills before adding Decision dependencies. A Skill explaining syntax is not the user's permission to use it. Read relevant Memory bodies; page the index when necessary. Disabled Memories do not apply.

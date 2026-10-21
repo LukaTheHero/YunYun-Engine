@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { isQuestionShaped } from "../../packages/client/src/lib/omnibar-scope.js";
 
-// Ctrl/⌘+J carries only question-shaped text into Mari's composer (UX-22). Half-typed searches open her empty.
+// Ctrl/⌘+J carries only question-shaped text into YunYun's composer (UX-22). Half-typed searches open her empty.
 assert.equal(isQuestionShaped("why is my lorebook empty"), true, "a wh-question carries");
 assert.equal(isQuestionShaped("Can I use two presets?"), true, "a question mark carries");
 assert.equal(isQuestionShaped("is it slow"), true, "an auxiliary question carries");

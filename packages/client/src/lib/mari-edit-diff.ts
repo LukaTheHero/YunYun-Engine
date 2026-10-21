@@ -70,7 +70,7 @@ export function changeRecordName(change: MariDbRowChange): string {
   return typeof name === "string" ? name : "";
 }
 
-/** Mari's reply fix (`chat.updateMessage`, a new active swipe) names its chat; null for any other change. */
+/** YunYun's reply fix (`chat.updateMessage`, a new active swipe) names its chat; null for any other change. */
 export function replyFixChat(change: MariDbRowChange): { id: string; name: string } | null {
   if (change.table !== "messages") return null;
   const row = change.after ?? change.before;

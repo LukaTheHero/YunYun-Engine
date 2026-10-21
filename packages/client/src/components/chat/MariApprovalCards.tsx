@@ -32,7 +32,7 @@ import { TranscriptRow } from "./MariTranscriptRow";
 import { Field } from "./MariChangeReceipt";
 
 /**
- * Professor Mari's approval gates and the summaries they are built from.
+ * Professor YunYun's approval gates and the summaries they are built from.
  *
  * These are what the user reads while deciding whether to allow a change. Each
  * one renders inside the turn that asked for it (`assignReviewsToTurns`).
@@ -56,7 +56,7 @@ function formatRowPreview(row: Record<string, unknown> | null | undefined) {
   }
 }
 
-/** Raw is one disclosure: the command Mari ran, then the snapshot of every row she created or removed. */
+/** Raw is one disclosure: the command YunYun ran, then the snapshot of every row she created or removed. */
 export function RawDetails({
   approval,
   open,
@@ -182,7 +182,7 @@ function DatabaseWorkspaceApprovalCard({
     />
   ) : null;
 
-  // R42: a delete is a risky prompt. Mari already removed the rows; Delete keeps them gone.
+  // R42: a delete is a risky prompt. YunYun already removed the rows; Delete keeps them gone.
   if (deleteReview) {
     return (
       <TranscriptRow layout="document" marker={null}>
@@ -259,11 +259,11 @@ function DatabaseWorkspaceApprovalCard({
 
 /**
  * Slice 71 (N3, N7): the deletes of one turn as ONE "Needs you" card - "Delete 2 lorebook entries", their
- * names, what each button does. Mari already hid the rows; Delete keeps them gone, Put back restores
+ * names, what each button does. YunYun already hid the rows; Delete keeps them gone, Put back restores
  * them, for every review in the group at once.
  * ponytail: a preset section or group delete also edits the preset (and orphans the group's sections);
  * those automatic side-effect updates show only in Raw's command and table counts, not as rows here.
- * Split the card if Mari ever mixes deletes with edits the user should judge.
+ * Split the card if YunYun ever mixes deletes with edits the user should judge.
  */
 export function DeleteReviewCard({
   approvals,
@@ -347,7 +347,7 @@ export function DeleteReviewCard({
 }
 
 /**
- * Slice 71 (N3): a change Mari held behind Accept, as a "Needs you" card. Its words come from the saved
+ * Slice 71 (N3): a change YunYun held behind Accept, as a "Needs you" card. Its words come from the saved
  * commands (`mariHeldChanges`), never from her prose; an old turn without them still gets the card,
  * named generically. Accept and Don't apply send the same replies the chips did.
  */

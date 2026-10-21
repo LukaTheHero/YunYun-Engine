@@ -27,7 +27,7 @@ export function useSeasonalTheme() {
   const date = useMinuteClock();
   const year = date.getFullYear();
   // The `?seasonalPreview=` page keeps its greeting and "Turn it off" in the store, unsaved, so trying it never
-  // saves anything and Professor Mari's dated pack sees them too.
+  // saves anything and Professor YunYun's dated pack sees them too.
   const { themeId, showGreeting } = useUIStore(useShallow((state) => seasonalThemeFor(state, date)));
 
   const markGreeted = useCallback(() => {

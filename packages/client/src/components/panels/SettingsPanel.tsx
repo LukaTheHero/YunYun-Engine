@@ -410,10 +410,10 @@ function isStandaloneIosInstall(): boolean {
 function getNativeConsoleShortcutHelp(): string {
   const bridge = getMarinaraAndroidBridge();
   if (typeof bridge?.openConsole === "function") {
-    return "Opens Termux from the Android APK so you can view Marinara server logs while Debug mode is enabled.";
+    return "Opens Termux from the Android APK so you can view YunYun server logs while Debug mode is enabled.";
   }
   if (isMarinaraAndroidShell()) {
-    return "This Android APK build cannot expose the Termux console shortcut yet. Update Marinara, or open Termux manually.";
+    return "This Android APK build cannot expose the Termux console shortcut yet. Update YunYun, or open Termux manually.";
   }
   if (isStandaloneIosInstall()) {
     return "iPhone installations do not expose a native console shortcut yet. Use the host server logs or Safari Web Inspector.";
@@ -504,7 +504,7 @@ const EXPUNGE_SCOPE_OPTIONS: Array<{ id: ExpungeScope; label: string; descriptio
   {
     id: "characters",
     label: "Characters",
-    description: "Characters and character groups. Professor Mari is always preserved.",
+    description: "Characters and character groups. Professor YunYun is always preserved.",
   },
   { id: "personas", label: "Personas", description: "Personas and persona groups." },
   { id: "lorebooks", label: "Lorebooks", description: "Lorebooks and lorebook entries." },
@@ -2366,7 +2366,7 @@ function GeneralSettings() {
             )}
             disabled={!musicDjInstalled}
           />
-          {/* Q2: every omnibar and Professor Mari setting lives in the omnibar; this row opens it. */}
+          {/* Q2: every omnibar and Professor YunYun setting lives in the omnibar; this row opens it. */}
           <div
             id={getSettingsSectionAnchorId("omnibar")}
             className="flex scroll-mt-3 items-center justify-between gap-3 p-1.5"
@@ -3847,7 +3847,7 @@ function AppearanceSettings({ group = "app" }: { group?: AppearanceGroup }) {
                     [
                       {
                         id: "default" as VisualTheme,
-                        label: "Default (Marinara)",
+                        label: "Default (YunYun)",
                         desc: "Y2K / retro aesthetic with glow effects",
                       },
                       {
@@ -7178,7 +7178,7 @@ function AdvancedSettings() {
     // only the timeout carve-out is new.
     retry: (failureCount, error) => !isRequestTimeoutError(error) && failureCount < 1,
   });
-  // #5740: the report includes what Mari last reported acting on. Safari only
+  // #5740: the report includes what YunYun last reported acting on. Safari only
   // lets a tap write to the clipboard while the tap is handled, so this cannot
   // be fetched after the tap; it reloads whenever Settings opens instead. The
   // deadline keeps a frozen host from disabling the copy button (#5657).
@@ -7233,7 +7233,7 @@ function AdvancedSettings() {
       model: activeConnection?.model ?? null,
     });
     // Fenced so Discord and GitHub render the report as a code block (#6668). Discord only knows
-    // ``` fences, so a backtick run inside the report (a connection name, Mari's phrase) is split
+    // ``` fences, so a backtick run inside the report (a connection name, YunYun's phrase) is split
     // with a zero-width space instead of lengthening the fence.
     const copied = await copyToClipboard(
       `\`\`\`\n${report.replace(/``+/gu, (run) => run.split("").join("\u200b"))}\n\`\`\``,
@@ -7424,7 +7424,7 @@ function AdvancedSettings() {
         open={exportProfileDialogOpen}
         title={localizeUi("settings.transfer.exportProfile.title")}
         description={localizeUi("settings.transfer.exportProfile.description")}
-        nativeDescription="Keeps Marinara fields, lorebook folders, character/persona metadata, presets, agents, themes, and inline assets for re-import."
+        nativeDescription="Keeps YunYun fields, lorebook folders, character/persona metadata, presets, agents, themes, and inline assets for re-import."
         compatibleDescription="Exports direct character JSON, simple persona JSON, and folderless lorebooks for other roleplay tools."
         onClose={() => setExportProfileDialogOpen(false)}
         onSelect={handleExportProfileChoice}

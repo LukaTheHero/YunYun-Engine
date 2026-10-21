@@ -1,10 +1,10 @@
 # Game Mode: Getting Started
 
-Game Mode turns Marinara Engine into a single-player role-playing game run by an AI Game Master. This guide covers what Game Mode is and what you need before you start. It then walks through the setup wizard and shows where to find each gameplay feature. Read it once, start a game, then follow the links at the end for deeper topics.
+Game Mode turns YunYun Engine into a single-player role-playing game run by an AI Game Master. This guide covers what Game Mode is and what you need before you start. It then walks through the setup wizard and shows where to find each gameplay feature. Read it once, start a game, then follow the links at the end for deeper topics.
 
 ## What Game Mode is
 
-Game Mode is one of Marinara's chat modes. The others are Conversation and Roleplay.
+Game Mode is one of YunYun's chat modes. The others are Conversation and Roleplay.
 
 In Game Mode, an AI Game Master (GM) runs a story for you. A Game Master is the AI that narrates the world, plays every character you meet, and decides what happens next. It works like the Dungeon Master in a tabletop game.
 
@@ -14,24 +14,24 @@ You do not have to use every mechanic. Some players skip combat and dice and use
 
 ## Before you start
 
-You need only one thing to start a game: an AI provider connection for the GM. A connection links Marinara to an AI provider so it can generate text. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md) if you have not set one up yet.
+You need only one thing to start a game: an AI provider connection for the GM. A connection links YunYun to an AI provider so it can generate text. See [Connecting to an AI Provider](../connections/connecting-to-a-provider.md) if you have not set one up yet.
 
 Everything else is optional and off by default. You can add these later:
 
 - **Image generation.** Game Mode has a visual layout with backgrounds and character art. To fill it, you need an image generation connection. The **Visual Generation** setting in the wizard is off by default, so you must turn it on yourself. Without it, you still get the story, state tracking, and combat, but the visual areas stay empty.
-- **A Local Model for scene effects.** Marinara can run a small model on your own machine, labeled **Local Model (Gemma)**. It powers background and music suggestions without extra cost. It is the default choice in the wizard. See [Local Model Setup](../connections/local-model.md).
+- **A Local Model for scene effects.** YunYun can run a small model on your own machine, labeled **Local Model (Gemma)**. It powers background and music suggestions without extra cost. It is the default choice in the wizard. See [Local Model Setup](../connections/local-model.md).
 - **The Storyboard Agent.** Install it from **Agents > Download Agents**, then activate it for the finished Game under **Chat Settings > Agents** when you want still or animated Storyboards.
 - **A video generation connection.** This is only needed for scene videos or animated Storyboards.
 - **Music.** The **Music DJ** agent can play game music. It needs Spotify or a local music folder, and it is off by default.
 
 ## The setup wizard
 
-When you create a Game Mode chat, a **setup wizard** opens. It has seven steps. The only required field is the GM connection on the first step. Every other field has a sensible default. You can move through the wizard quickly and let Marinara fill in the rest.
+When you create a Game Mode chat, a **setup wizard** opens. It has seven steps. The only required field is the GM connection on the first step. Every other field has a sensible default. You can move through the wizard quickly and let YunYun fill in the rest.
 
 The seven steps are:
 
 1. **Connection.** Choose the **Game Mode**: **Overworld RPG** or **Classic**. Overworld RPG is not ready yet, so for now new games start as **Classic**. See [Classic or Overworld RPG](#classic-or-overworld-rpg). Set the game name, pick the GM connection, and optionally set a scene-effects connection. Scene effects default to **Local Model (Gemma)**.
-2. **World.** Set the genre, setting, tone, difficulty, content rating, and language. The ideas offered under the setting, and later under the goals, come from different kinds of setting, a new mix each time the wizard opens. Choose **Classic** or **Tactical** under **Combat Preference**. Tactical games also offer optional battlefield seed, size and terrain guidance. When a Game Mode ruleset is installed, a **Rules** choice appears below it: keep **Marinara's own rules**, or pick the ruleset. See [Choosing rules](#choosing-rules). On the Overworld RPG, below that are the **Setting kit** and **Your world**. See [Choosing a setting kit](#choosing-a-setting-kit) and [Making a world](#making-a-world).
+2. **World.** Set the genre, setting, tone, difficulty, content rating, and language. The ideas offered under the setting, and later under the goals, come from different kinds of setting, a new mix each time the wizard opens. Choose **Classic** or **Tactical** under **Combat Preference**. Tactical games also offer optional battlefield seed, size and terrain guidance. When a Game Mode ruleset is installed, a **Rules** choice appears below it: keep **YunYun's own rules**, or pick the ruleset. See [Choosing rules](#choosing-rules). On the Overworld RPG, below that are the **Setting kit** and **Your world**. See [Choosing a setting kit](#choosing-a-setting-kit) and [Making a world](#making-a-world).
 3. **Party.** Pick your persona (the character you play), the **Game Master Mode**, and any party members. **GM intro message** sets the game's first message. See [The GM intro message](#the-gm-intro-message).
 4. **Goals.** Tell the GM what you want from the adventure.
 5. **Lorebooks.** Attach any lorebooks whose facts the GM should treat as canon. A lorebook is a set of background world facts. See [Lorebooks](../lorebooks/overview.md).
@@ -57,8 +57,8 @@ Overworld RPG is still being finished. Until it is ready, its card is greyed out
 
 **Rules** only appears when at least one ruleset is installed, and only for a new game. It is separate from **Combat Preference**: one decides how checks and character sheets work, the other decides how battles are shown.
 
-- **Marinara's own rules** is the default: the built-in d20 checks and the six-attribute sheet.
-- A ruleset, such as **5e (SRD 5.1)**, shows a short summary of what it covers, and one line saying what battles will do. A ruleset that resolves its own fights says so. One that only lends the sheet says that battles run on Marinara's combat with the sheet's own health, energy and abilities. One that does neither says that battles run on Marinara's combat and names the **Combat Preference** you picked.
+- **YunYun's own rules** is the default: the built-in d20 checks and the six-attribute sheet.
+- A ruleset, such as **5e (SRD 5.1)**, shows a short summary of what it covers, and one line saying what battles will do. A ruleset that resolves its own fights says so. One that only lends the sheet says that battles run on YunYun's combat with the sheet's own health, energy and abilities. One that does neither says that battles run on YunYun's combat and names the **Combat Preference** you picked.
 
 When the ruleset resolves its own fights, the battle screen is that ruleset's: the menu is your character's own attacks and abilities, each saying what it spends out of the ruleset's own action economy and pools; the panel below shows the turn order, the round, everybody's conditions by the ruleset's own names, and what is left of each budget; and the log prints the real arithmetic, such as "Juno attacks Rust jackal with Road axe: 8 (5 + 3) + 3 = 11 against Guard 6, a hit." Every action is written to the character sheet the moment it lands, so closing the tab mid-fight loses nothing and the Game Master is told afterwards that the numbers are already settled. If that ruleset also says what one square of a battlefield is worth in its own distance, your **Combat Preference** decides how the fight is shown: **Classic** plays it without positions, and **Tactical** plays it on a board where you walk, measure reach and range in the ruleset's own unit, and aim a shape at a square. See [Combat](combat.md#games-whose-ruleset-resolves-its-own-fights). A ruleset that says nothing about distance keeps the preference and does not use it.
 
@@ -70,7 +70,7 @@ Rulesets come from two places. Official ones are installed from **Download Agent
 
 After you pick a ruleset, the **Party** step lists your persona and party members below the pickers and says who **Has a sheet** for it and who **Starts on a blank sheet**. A sheet is added under **Stats** in the character or persona editor (see [Ruleset sheets](../characters/colors-and-stats.md#ruleset-sheets)). The game takes a copy of each sheet when the world is generated. Nothing you change in the game goes back to the character or persona. A member without a sheet gets a blank one with every value at the ruleset's default; world generation never makes up scores.
 
-A shared setup file remembers its ruleset. If you import one and do not have that ruleset, or have an older version of it, the wizard tells you which ruleset it was and the game uses Marinara's own rules unless you install it and pick it.
+A shared setup file remembers its ruleset. If you import one and do not have that ruleset, or have an older version of it, the wizard tells you which ruleset it was and the game uses YunYun's own rules unless you install it and pick it.
 
 ### Choosing a setting kit
 
@@ -158,7 +158,7 @@ These are the starting values in the **World**, **Party**, and **Features** step
 | Custom HUD Widgets | On            | Uses AI-made status widgets from the new world                                                                                             |
 | Start Muted        | Off           | Begins the game with audio muted                                                                                                           |
 
-New to Game Mode? Leave **Game Master Mode** on **Standalone GM**. Marinara builds a fair, slightly snarky GM for you, and you can feel out the mode before writing a custom GM card.
+New to Game Mode? Leave **Game Master Mode** on **Standalone GM**. YunYun builds a fair, slightly snarky GM for you, and you can feel out the mode before writing a custom GM card.
 
 Choose **Storyboard Optimized** on the final step when you want GM turns written as filmable visual beats. It selects the built-in **Storyboard Game Prompt** for GM narration. It does not install or activate the Storyboard Agent, turn image or video generation on, change your connections, or replace the Agent's planner and formatter defaults. After the Game is created, install and activate Storyboard separately and configure its keyframe, planner, image, and video settings under **Chat Settings > Agents > Storyboards**.
 
@@ -266,9 +266,9 @@ The most common cause is that the model could not produce the full structured JS
 2. Try again. Some failures are one-off, and the same setup works on a second try.
 3. Shorten a very long setting or preferences field. Long inputs leave the model less room for the JSON output.
 
-If a call almost worked but the JSON was slightly broken, Marinara offers a **Repair JSON** modal. It opens a line-numbered editor with the model's raw output. A status line tells you whether the JSON is valid or shows the parse error. Click **Format** to tidy valid JSON. Then click **Apply Repaired JSON** to use your fixed version without paying for a full retry. The **Repair JSON** option also appears for session summaries and other structured calls.
+If a call almost worked but the JSON was slightly broken, YunYun offers a **Repair JSON** modal. It opens a line-numbered editor with the model's raw output. A status line tells you whether the JSON is valid or shows the parse error. Click **Format** to tidy valid JSON. Then click **Apply Repaired JSON** to use your fixed version without paying for a full retry. The **Repair JSON** option also appears for session summaries and other structured calls.
 
-For more symptoms and fixes, see [Troubleshooting Marinara Engine](../TROUBLESHOOTING.md).
+For more symptoms and fixes, see [Troubleshooting YunYun Engine](../TROUBLESHOOTING.md).
 
 ### The GM narrates cheerfully even though you chose a dark tone
 
@@ -288,4 +288,4 @@ Some models stay upbeat no matter the tone. You have two options. Add a clear in
 - [Connecting to an AI Provider](../connections/connecting-to-a-provider.md)
 - [Agents: AI Helpers for Your Chats](../agents/agents-overview.md)
 - [Generation Parameters](../prompts/generation-parameters.md)
-- [Troubleshooting Marinara Engine](../TROUBLESHOOTING.md)
+- [Troubleshooting YunYun Engine](../TROUBLESHOOTING.md)

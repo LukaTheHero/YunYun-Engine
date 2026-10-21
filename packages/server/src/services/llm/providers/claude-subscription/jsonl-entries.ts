@@ -295,7 +295,7 @@ export function buildAssistantEntry(args: {
  *
  * `historyCacheControl` marks the newest assistant reply that is not the last
  * history entry. Claude Code only marks the system prompt and the current
- * turn, and Marinara's current turn carries per-turn blocks that are gone from
+ * turn, and YunYun's current turn carries per-turn blocks that are gone from
  * it a turn later, so without a history marker the next request can only reuse
  * the system prompt. The last history entry is skipped because prompt
  * wrappers (the xml `</chat_history>` close) ride on it and move every turn.

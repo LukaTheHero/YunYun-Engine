@@ -200,7 +200,7 @@ export const CHAT_SUMMARY_PROMPT_SETTINGS_KEY = "chat-summary-prompts";
 
 const PROFESSOR_MARI_SEEN_RUN_SETTINGS_PREFIX = "professor-mari-seen-run:";
 
-/** Per Professor Mari thread: the id of the newest run the user has seen in her window. */
+/** Per Professor YunYun thread: the id of the newest run the user has seen in her window. */
 export function professorMariSeenRunSettingsKey(chatId: string) {
   return `${PROFESSOR_MARI_SEEN_RUN_SETTINGS_PREFIX}${chatId}`;
 }
@@ -964,22 +964,22 @@ export interface MessageExtra {
   roleplayDocuments?: RoleplayDocument[] | null;
   /** User-only command disclosures. Their labels and raw text never enter prompt history. */
   roleplayCommandActivity?: RoleplayCommandActivity[] | null;
-  /** Professor Mari workspace trace shown on the home assistant transcript. */
+  /** Professor YunYun workspace trace shown on the home assistant transcript. */
   mariWorkspaceTimeline?: MariWorkspaceTraceItem[] | null;
-  /** Trusted resource results from Professor Mari workspace app-data commands. */
+  /** Trusted resource results from Professor YunYun workspace app-data commands. */
   mariWorkspaceActionResults?: MariWorkspaceActionResult[] | null;
-  /** Resource focus used for this Professor Mari exchange, retained for transcript context. */
+  /** Resource focus used for this Professor YunYun exchange, retained for transcript context. */
   professorMariContext?: ProfessorMariAskContext | null;
-  /** True when this Mari turn deferred mutating commands behind an Accept action (#5725 Manual mode). */
+  /** True when this YunYun turn deferred mutating commands behind an Accept action (#5725 Manual mode). */
   mariDeferredMutations?: boolean | null;
   /** Slice 71: what those held commands would change, for the "Needs you" card. */
   mariHeldChanges?: MariHeldChange[] | null;
   /** The raw held commands, so Accept can apply exactly them server-side (server-validated on read). */
   mariHeldCalls?: unknown;
-  /** Slice 70: the quick-reply chips this Mari turn offered (raw; the client sanitizes), so a reload keeps them. */
+  /** Slice 70: the quick-reply chips this YunYun turn offered (raw; the client sanitizes), so a reload keeps them. */
   mariSuggestions?: unknown;
   /**
-   * R14: why this Mari turn failed, on the turn's last saved message (her partial reply, or your message
+   * R14: why this YunYun turn failed, on the turn's last saved message (her partial reply, or your message
    * when she saved nothing), so a reload still shows it failed. `dismissed` once you close its card.
    */
   mariRunError?: { message: string; dismissed?: boolean } | null;

@@ -72,7 +72,7 @@ const provider = createServer(async (request, response) => {
         {
           message: {
             role: "assistant",
-            content: JSON.stringify({ audience: "all", summary: summary ?? "Kaito and Mari rested." }),
+            content: JSON.stringify({ audience: "all", summary: summary ?? "Kaito and YunYun rested." }),
           },
           finish_reason: "stop",
         },
@@ -87,10 +87,10 @@ const LIGHTHOUSE_SCENE = 7;
 // Kaito is named in four of ten scenes, under the half that would mute a name by frequency alone.
 const dojoSummaries = Array.from({ length: 10 }, (_, index) =>
   index < 4
-    ? "Mari and Kaito trained in the dojo until dusk."
+    ? "YunYun and Kaito trained in the dojo until dusk."
     : index === LIGHTHOUSE_SCENE
-      ? "Mari found the old lighthouse key under the floorboards."
-      : "Mari walked alone through the market and bought bread.",
+      ? "YunYun found the old lighthouse key under the floorboards."
+      : "YunYun walked alone through the market and bought bread.",
 );
 const chores = [
   "repainted the hallway",
@@ -104,10 +104,10 @@ const chores = [
 ];
 const summaries: string[] = Array.from({ length: 64 }, (_, index) =>
   SHIRO_SCENES.includes(index)
-    ? `Mari and Kaito looked after Shiro, the small white kitten Mari adopted; Shiro hid under the bed during scene ${index}.`
+    ? `YunYun and Kaito looked after Shiro, the small white kitten YunYun adopted; Shiro hid under the bed during scene ${index}.`
     : index === CAT_INN_SCENE
-      ? "Mari and Kaito stayed at the Cat's Tail inn, where the resident cats slept by the fire and the cat bowl was full."
-      : `Mari and Kaito ${chores[index % chores.length]} and talked about work. Kaito promised Mari to help again.`,
+      ? "YunYun and Kaito stayed at the Cat's Tail inn, where the resident cats slept by the fire and the cat bowl was full."
+      : `YunYun and Kaito ${chores[index % chores.length]} and talked about work. Kaito promised YunYun to help again.`,
 );
 
 const { createFileNativeDB } = await import("../../packages/server/src/db/file-backed-store.js");
@@ -162,7 +162,7 @@ try {
   });
   await chats.createMessagesBatch(chat.id, [
     ...summaries.flatMap((_, index) => [
-      { role: "user" as const, content: `SCENE_CHANGE [scene ${index}] Mari and Kaito meet at home.` },
+      { role: "user" as const, content: `SCENE_CHANGE [scene ${index}] YunYun and Kaito meet at home.` },
       {
         role: "assistant" as const,
         characterId: "kaito",
@@ -172,9 +172,9 @@ try {
             ? "Kaito scratches one of the inn's cats behind the ears."
             : `Kaito ${chores[index % chores.length]}.`,
       },
-      { role: "user" as const, content: "Mari thanks Kaito, and they talk about work for a while." },
+      { role: "user" as const, content: "YunYun thanks Kaito, and they talk about work for a while." },
     ]),
-    { role: "user", content: "SCENE_CHANGE Mari comes home late.", extra: { isConversationStart: true } },
+    { role: "user", content: "SCENE_CHANGE YunYun comes home late.", extra: { isConversationStart: true } },
     { role: "assistant", characterId: "kaito", content: "Kaito waves from the kitchen." },
     { role: "user", content: "Kaito, have you seen my cat? Shiro's bowl is still full." },
   ]);
@@ -201,7 +201,7 @@ try {
   // Decision recall: one shortlist batch of scene summaries, then messages from the chosen scenes.
   const beforeCalls = calls.length;
   const prepared = await memory.prepare(input);
-  // Mari reversed "Decision mode makes no embeddings" (#7699): the archive has vectors, so the query is embedded once.
+  // YunYun reversed "Decision mode makes no embeddings" (#7699): the archive has vectors, so the query is embedded once.
   assert.deepEqual(calls.slice(beforeCalls), ["embedding"], "the Decision shortlist embeds its query once");
   assert.equal(recallRequests.length, 2, "one request picks scenes and one picks their messages");
   const [scenePass, messagePass] = recallRequests.splice(0);
@@ -297,20 +297,20 @@ try {
   });
   await chats.createMessagesBatch(dojo.id, [
     ...dojoSummaries.flatMap((_, index) => [
-      { role: "user" as const, content: `SCENE_CHANGE [dojo ${index}] Mari starts her day.` },
+      { role: "user" as const, content: `SCENE_CHANGE [dojo ${index}] YunYun starts her day.` },
       {
         role: "assistant" as const,
         characterId: "kaito",
         content:
           index < 4
-            ? "Mari, Kaito and the class bow before practice."
+            ? "YunYun, Kaito and the class bow before practice."
             : index === LIGHTHOUSE_SCENE
               ? "The rusty lighthouse key glints in the dust."
               : "The wind rattles the shutters.",
       },
-      { role: "user" as const, content: "Mari nods." },
+      { role: "user" as const, content: "YunYun nods." },
     ]),
-    { role: "user", content: "SCENE_CHANGE Mari comes home.", extra: { isConversationStart: true } },
+    { role: "user", content: "SCENE_CHANGE YunYun comes home.", extra: { isConversationStart: true } },
     { role: "assistant", characterId: "kaito", content: "The house is quiet." },
     { role: "user", content: "Kaito, do you still have the lighthouse key?" },
   ]);
@@ -330,7 +330,7 @@ try {
 
   // #7264: a character who joined at the conversation start knows no earlier scene, so the
   // Decision model is never asked about memories for them. Kaito, who knows them, still is.
-  const joined = source.find((message) => message.content === "SCENE_CHANGE Mari comes home late.")!;
+  const joined = source.find((message) => message.content === "SCENE_CHANGE YunYun comes home late.")!;
   await chats.update(chat.id, { characterIds: ["kaito", "cyno"] });
   await chats.patchMetadata(chat.id, { groupChatMode: "individual" });
   await memory.updateSettings(chat.id, {

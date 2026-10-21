@@ -36,4 +36,4 @@ assert.match(many, /omitted from the index/);
 // Diagnostics survive.
 assert.match(renderMariSkillsPrompt([], ["broken"]) ?? "", /<skill_diagnostics>\nbroken/);
 
-console.log("Professor Mari skills prompt regression checks passed.");
+console.log("Professor YunYun skills prompt regression checks passed.");

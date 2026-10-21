@@ -81,7 +81,7 @@ try {
     ["Maukie", "Pantalone", "Narrator"].map((name) => characters.create(characterDataSchema.parse({ name }))),
   );
   assert(maukie && pantalone && narrator);
-  const persona = await characters.createPersona("Mari", "The player.");
+  const persona = await characters.createPersona("YunYun", "The player.");
   assert(persona);
   const presets = createPromptsStorage(db);
   const preset = await presets.create({
@@ -117,7 +117,7 @@ try {
     groupChatMode: "individual",
     groupResponseOrder: "manual",
   });
-  await chats.createMessage({ chatId: chat.id, role: "user", content: "OPENING_LINE Mari walks the empty pier." });
+  await chats.createMessage({ chatId: chat.id, role: "user", content: "OPENING_LINE YunYun walks the empty pier." });
   const generate = async (output: string, forCharacterId: string, options: Record<string, unknown> = {}) => {
     outputs = [output];
     const response = await app.inject({
@@ -148,9 +148,9 @@ try {
     assert.equal(response.statusCode, 200, response.body);
   };
 
-  // The narrator talks to Mari alone, whispering to absent Maukie and to Mari.
+  // The narrator talks to YunYun alone, whispering to absent Maukie and to YunYun.
   await generate(
-    'NARRATION_HEAD on the pier. [whisper: character="Maukie" text="MAUKIE_SECRET"] NARRATION_TAIL as the tide turns. [whisper: character="Mari" text="PERSONA_SECRET"]',
+    'NARRATION_HEAD on the pier. [whisper: character="Maukie" text="MAUKIE_SECRET"] NARRATION_TAIL as the tide turns. [whisper: character="YunYun" text="PERSONA_SECRET"]',
     narrator.id,
   );
   const narration = (await chats.listMessages(chat.id)).at(-1)!;
@@ -269,7 +269,7 @@ try {
     content: "MEMORY_OPENER_NARRATION on the pier.",
     extra: { hiddenFromAICharacterIds: [maukie.id], roleplayCommandActivity: before },
   });
-  await chats.createMessage({ chatId: memoryChat.id, role: "user", content: "MEMORY_VISIBLE_LINE Mari calls out." });
+  await chats.createMessage({ chatId: memoryChat.id, role: "user", content: "MEMORY_VISIBLE_LINE YunYun calls out." });
   for (const content of [
     await generate("Maukie answers.", maukie.id, { chatId: memoryChat.id }),
     await preview(maukie.id, { chatId: memoryChat.id }),
@@ -393,7 +393,7 @@ try {
     role: "user",
     content: '[whisper: character="Narrator" text="BEFORE_NOTICE_SECRET"]',
   });
-  await chats.createMessage({ chatId: noticeChat.id, role: "system", content: "You are now playing as Mari." });
+  await chats.createMessage({ chatId: noticeChat.id, role: "system", content: "You are now playing as YunYun." });
   await chats.createMessage({ chatId: noticeChat.id, role: "user", content: "AFTER_NOTICE_LINE" });
   for (const content of [
     await preview(narrator.id, { chatId: noticeChat.id }),

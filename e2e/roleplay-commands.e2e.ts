@@ -576,7 +576,7 @@ for (const presentation of ["classic", "visual-novel"] as const) {
   }, info) => {
     test.setTimeout(90_000);
     let output =
-      'Before the secret. [whisper: character="Bob" text="The hidden key is beneath the blue vase."] Between the secrets. [whisper: character="Mari" text="A silver door appears in your vision."] After the secret.';
+      'Before the secret. [whisper: character="Bob" text="The hidden key is beneath the blue vase."] Between the secrets. [whisper: character="YunYun" text="A silver door appears in your vision."] After the secret.';
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     // openChat already stubs settings. Resolve that stub in-page so WebKit's
@@ -634,7 +634,7 @@ for (const presentation of ["classic", "visual-novel"] as const) {
       return rows.at(-1);
     };
     try {
-      const personaResponse = await request.post("/api/characters/personas", { data: { name: "Mari" } });
+      const personaResponse = await request.post("/api/characters/personas", { data: { name: "YunYun" } });
       expect(personaResponse.ok()).toBeTruthy();
       const persona = await personaResponse.json();
       fixture.resources.push(`/api/characters/personas/${persona.id}`);
@@ -683,7 +683,7 @@ for (const presentation of ["classic", "visual-novel"] as const) {
           ? page.getByRole("region", { name: "Current paragraph", exact: true })
           : page.locator(`[data-message-id="${saved.id}"]`);
       const secret = bubble.locator("[data-roleplay-whisper]").filter({ hasText: "Whisper to Bob" });
-      const personal = bubble.locator("[data-roleplay-whisper]").filter({ hasText: "Whisper to Mari" });
+      const personal = bubble.locator("[data-roleplay-whisper]").filter({ hasText: "Whisper to YunYun" });
       await expect(secret).toBeVisible();
       await expect(personal).toContainText("A silver door appears in your vision.");
       await expect(personal.getByRole("button", { name: "Edit whisper", exact: true })).toBeVisible();
@@ -858,7 +858,7 @@ test("Roleplay users send and edit private whispers and notes in Manual group ch
     return contentOf((await response.json()).prompt);
   };
   try {
-    const personaResponse = await request.post("/api/characters/personas", { data: { name: "Mari" } });
+    const personaResponse = await request.post("/api/characters/personas", { data: { name: "YunYun" } });
     expect(personaResponse.ok()).toBeTruthy();
     const persona = await personaResponse.json();
     fixture.resources.push(`/api/characters/personas/${persona.id}`);
@@ -904,7 +904,7 @@ test("Roleplay users send and edit private whispers and notes in Manual group ch
     await expect(editor).toBeHidden();
     await expect(whisper).toContainText("USER_WHISPER_EDITED: meet at the bridge.");
     const note = bubble.locator('[data-roleplay-command="notes"]');
-    await note.getByRole("button", { name: "Mari used notes command!", exact: true }).click();
+    await note.getByRole("button", { name: "YunYun used notes command!", exact: true }).click();
     await expect(note).toContainText("USER_NOTE: keep the map hidden.");
     await note.getByRole("button", { name: "Edit", exact: true }).click();
     await editor.locator("textarea").fill("USER_NOTE_EDITED: the map is in my coat.");
@@ -923,7 +923,7 @@ test("Roleplay users send and edit private whispers and notes in Manual group ch
     expect(narratorPrompt).not.toContain("USER_NOTE: keep");
     await page.reload();
     await expect(whisper).toContainText("USER_WHISPER_EDITED");
-    await note.getByRole("button", { name: "Mari used notes command!", exact: true }).click();
+    await note.getByRole("button", { name: "YunYun used notes command!", exact: true }).click();
     await expect(note).toContainText("USER_NOTE_EDITED");
     await note.getByRole("button", { name: "Delete", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
@@ -971,13 +971,13 @@ test("Roleplay users send and edit private whispers and notes in Manual group ch
     expect(await preview(bob.id)).toContain("ONLY_WHISPER_SECRET");
     expect(await preview(alice.id)).not.toContain("ONLY_WHISPER_SECRET");
     const onlyNote = await sendPrivateCommand('[notes: content="ONLY_NOTE_SECRET"]');
-    await onlyNote.getByRole("button", { name: "Mari used notes command!", exact: true }).click();
+    await onlyNote.getByRole("button", { name: "YunYun used notes command!", exact: true }).click();
     await expect(onlyNote.locator('[data-roleplay-command="notes"]')).toContainText("ONLY_NOTE_SECRET");
     expect(await preview(narrator.id)).toContain("ONLY_NOTE_SECRET");
     expect(await preview(bob.id)).not.toContain("ONLY_NOTE_SECRET");
     const malformed = await sendPrivateCommand('[whisper: character="Bob", text="UNFINISHED_PRIVATE_SECRET');
     // #7412: a failed private command has lost its place in the message, so its notice starts open.
-    await expect(malformed.getByRole("button", { name: "Mari used whisper command!", exact: true })).toHaveAttribute(
+    await expect(malformed.getByRole("button", { name: "YunYun used whisper command!", exact: true })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
@@ -998,7 +998,7 @@ test("Roleplay users send and edit private whispers and notes in Manual group ch
       const failedWhisper = rejected.locator('[data-roleplay-command="whisper"]');
       // #7412: a rejected private command's notice starts open too.
       await expect(
-        failedWhisper.getByRole("button", { name: "Mari used whisper command!", exact: true }),
+        failedWhisper.getByRole("button", { name: "YunYun used whisper command!", exact: true }),
       ).toHaveAttribute("aria-expanded", "true");
       await expect(failedWhisper).toContainText(invalid.reason);
       await expect(failedWhisper).toContainText("REJECTED_SECRET");
@@ -1768,7 +1768,7 @@ for (const [native, targetKind, modifier, dc] of [
     let resultMessageFound = false;
     let followupPrompt = "";
     const roller = targetKind === "character" ? "Alice" : "Narrator";
-    const target = targetKind === "character" ? "Alice" : "Mari";
+    const target = targetKind === "character" ? "Alice" : "YunYun";
     const provider = createServer(async (incoming, response) => {
       if (incoming.method !== "POST") {
         incoming.resume();

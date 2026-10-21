@@ -1,10 +1,10 @@
 {
   "tool": "Built-in image_gen",
   "pack": "basic",
-  "notes": "Pixel-art replacement for all Home Mari poses. Legacy Home pose composition was preserved; Basic omnibar story strips and assistant portrait locked the character, visible pixel grid, 1-2 px dark outline, limited palette and chunky shading. Native sprites are 192 px tall (full body), 128x128 (profile), or 128 px tall (chibi); @4x files are exact nearest-neighbour enlargements.",
+  "notes": "Pixel-art replacement for all Home YunYun poses. Legacy Home pose composition was preserved; Basic omnibar story strips and assistant portrait locked the character, visible pixel grid, 1-2 px dark outline, limited palette and chunky shading. Native sprites are 192 px tall (full body), 128x128 (profile), or 128 px tall (chibi); @4x files are exact nearest-neighbour enlargements.",
   "prompts": [
     {"asset":"wave","prompt":"Re-create the legacy Mari_wave composition exactly as Basic omnibar pixel art: high raised wave, opposite arm down, blonde curls, blue eyes, black glasses, navy hoodie, charcoal trousers and black boots. True low-resolution grid, dark 1-2 px outline, limited palette, chunky shading, transparent background."},
-    {"asset":"greet","prompt":"Re-create Mari_greet exactly as Basic omnibar pixel art: shoulder-height open greeting hand, opposite arm relaxed, feet together. Preserve Basic Mari identity; crisp low-resolution pixels and transparent background."},
+    {"asset":"greet","prompt":"Re-create Mari_greet exactly as Basic omnibar pixel art: shoulder-height open greeting hand, opposite arm relaxed, feet together. Preserve Basic YunYun identity; crisp low-resolution pixels and transparent background."},
     {"asset":"point-up","prompt":"Re-create Mari_point_up_left exactly as Basic omnibar pixel art: crossed legs and index finger pointing LEFT AND UP at the same angle and height. Crisp low-resolution grid and transparent background."},
     {"asset":"point-middle","prompt":"Re-create Mari_point_middle_left exactly as Basic omnibar pixel art: crossed legs and index finger pointing horizontally LEFT at the same height. Crisp low-resolution grid and transparent background."},
     {"asset":"point-down","prompt":"Re-create Mari_point_down_left exactly as Basic omnibar pixel art: crossed legs and index finger pointing LEFT AND DOWN at the same angle and height. Crisp low-resolution grid and transparent background."},

@@ -72,7 +72,7 @@ async function cleanup(request: APIRequestContext, connectionId: string) {
 /** Scroll the transcript to its end, then return how far its lowest content sits under the stack top. */
 function contentUnderStack(page: Page) {
   return page.evaluate(() => {
-    const pane = document.querySelector('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+    const pane = document.querySelector('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
     const transcript = pane?.querySelector<HTMLElement>('[data-component="HomeProfessorMariChat.Transcript"]');
     const stack = transcript?.querySelector<HTMLElement>(".mari-transcript-stack");
     const dock = pane?.querySelector<HTMLElement>(".mari-workspace-composer-dock");
@@ -101,7 +101,7 @@ test("the last answer ends above the composer, and stays so while the composer g
       .first()
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
-    const pane = page.locator('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+    const pane = page.locator('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
     const composer = pane.locator("textarea:visible");
     await expect(composer).toBeVisible();
     await expect.poll(() => contentUnderStack(page), { message: "answers at rest" }).toBeLessThanOrEqual(1);
@@ -115,7 +115,7 @@ test("the last answer ends above the composer, and stays so while the composer g
   }
 });
 
-test("the empty state ends above the composer after Mari, Search, Mari", async ({ page, request }) => {
+test("the empty state ends above the composer after YunYun, Search, YunYun", async ({ page, request }) => {
   const { connectionId } = await openMariFixture(page, request);
   try {
     await page.goto("/");
@@ -125,20 +125,20 @@ test("the empty state ends above the composer after Mari, Search, Mari", async (
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+k");
     await page.locator('[data-component="GlobalOmnibar.ProfessorMariButton"]').click();
-    const pane = page.locator('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+    const pane = page.locator('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
     await expect(pane.locator("textarea:visible")).toBeVisible();
     await expect.poll(() => contentUnderStack(page), { message: "first open" }).toBeLessThanOrEqual(1);
     await page.keyboard.press("Escape");
     await expect(pane).toHaveCount(0);
     await page.keyboard.press("Control+j");
     await expect(pane.locator("textarea:visible")).toBeVisible();
-    await expect.poll(() => contentUnderStack(page), { message: "back to Mari" }).toBeLessThanOrEqual(1);
+    await expect.poll(() => contentUnderStack(page), { message: "back to YunYun" }).toBeLessThanOrEqual(1);
   } finally {
     await cleanup(request, connectionId);
   }
 });
 
-test("answers end above the composer after Mari, Search, Mari", async ({ page, request }) => {
+test("answers end above the composer after YunYun, Search, YunYun", async ({ page, request }) => {
   const { connectionId, chatId } = await openMariFixture(page, request);
   try {
     await seedAnswers(request, chatId, 2);
@@ -148,14 +148,14 @@ test("answers end above the composer after Mari, Search, Mari", async ({ page, r
       .first()
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
-    const pane = page.locator('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+    const pane = page.locator('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
     await expect(pane.locator("textarea:visible")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(pane).toHaveCount(0);
     await page.keyboard.press("Control+j");
     await expect(pane.locator("textarea:visible")).toBeVisible();
     await expect
-      .poll(() => contentUnderStack(page), { message: "answers after Mari, Search, Mari" })
+      .poll(() => contentUnderStack(page), { message: "answers after YunYun, Search, YunYun" })
       .toBeLessThanOrEqual(1);
   } finally {
     await cleanup(request, connectionId);
@@ -177,7 +177,7 @@ test("mobile: answers end above the composer when the keyboard opens and closes"
       .first()
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
-    const pane = page.locator('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+    const pane = page.locator('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
     const composer = pane.locator("textarea:visible");
     await expect(composer).toBeVisible();
     for (const round of [1, 2]) {
@@ -240,7 +240,7 @@ async function openWindowAndSend(page: Page, text: string) {
     .first()
     .click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Control+j");
-  const pane = page.locator('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+  const pane = page.locator('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
   const composer = pane.locator("textarea:visible");
   await expect(composer).toBeVisible();
   await composer.fill(text);
@@ -316,7 +316,7 @@ test("a change card ends above the composer", async ({ page, request }) => {
   }
 });
 
-test("the live run line ends above the composer while Mari works", async ({ page, request }) => {
+test("the live run line ends above the composer while YunYun works", async ({ page, request }) => {
   const model = await startFixtureModel([
     {
       delayMs: 6_000,

@@ -37,4 +37,4 @@ assert.match(
   "active must reset in the same guard that clears the controller, not a second independent check",
 );
 
-console.log("Mari workspace-agent active-reset regression passed.");
+console.log("YunYun workspace-agent active-reset regression passed.");

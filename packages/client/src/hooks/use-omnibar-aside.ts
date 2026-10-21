@@ -59,7 +59,7 @@ const IDLE: OmnibarAsideState = { status: "idle", answer: "", error: null, query
  * on it and never degraded by its failure (R2, R24).
  */
 export function useOmnibarAside(params: {
-  /** The connection that answers, already resolved (never the "same as Mari" sentinel). */
+  /** The connection that answers, already resolved (never the "same as YunYun" sentinel). */
   connectionId: string;
   /** The typed query, after any scope prefix is stripped. */
   query: string;
@@ -109,7 +109,7 @@ export function useOmnibarAside(params: {
       const controller = new AbortController();
       abortRef.current = controller;
       // The hook belongs to the whole dialog: a token update also renders every
-      // result row. Match the full Mari chat's frame batching instead of asking
+      // result row. Match the full YunYun chat's frame batching instead of asking
       // React (and the markdown renderer) to keep up with the provider's tokens.
       const streamText = rafThrottle<OmnibarAsideState>((next) => {
         if (!controller.signal.aborted) setState(next);
@@ -162,7 +162,7 @@ export function useOmnibarAside(params: {
                 ? new QuickAnswerFailure("provider", failure)
                 : new QuickAnswerFailure(
                     failure.kind ?? "provider",
-                    failure.message ?? "Professor Mari could not answer.",
+                    failure.message ?? "Professor YunYun could not answer.",
                   );
             }
           }
@@ -170,7 +170,7 @@ export function useOmnibarAside(params: {
           // intermediary omitted the optional terminal event.
           if (!controller.signal.aborted) {
             // No words at all is a failed answer, not a finished one: never leave it "thinking" or cache it.
-            if (!answer) throw new QuickAnswerFailure("empty", "Professor Mari could not answer.");
+            if (!answer) throw new QuickAnswerFailure("empty", "Professor YunYun could not answer.");
             streamText.cancel();
             omnibarAsideAnswerCache.set(connectionId, trimmed, { answer, tier, sources: sourcesRef.current });
             setState({ status: "complete", answer, error: null, query: trimmed, tier, sources: sourcesRef.current });

@@ -3123,7 +3123,7 @@ try {
     promptTemplate: "REWRITE_FIXTURE",
     settings: {},
   });
-  const player = await createCharactersStorage(db).createPersona("Mari", "The player.");
+  const player = await createCharactersStorage(db).createPersona("YunYun", "The player.");
   assert(player);
   const rewriteChat = await chats.create({
     name: "POV split rewrite",
@@ -3190,7 +3190,7 @@ try {
   }
   rewriteFailsFor = undefined;
   // A whisper written in a later part moves with that part's rewrite.
-  mainReply = splitReply.replace("run through", 'run [whisper: character="Mari" text="PART_SECRET"] through');
+  mainReply = splitReply.replace("run through", 'run [whisper: character="YunYun" text="PART_SECRET"] through');
   const whisperEvents = await splitGenerate(rewriteChat.id);
   const whisperOffset = (message: { extra?: unknown }) => extraOf(message).roleplayCommandActivity?.[0]?.contentOffset;
   const writtenWhisperPart = whisperEvents.filter((event) => event.type === "message_saved").at(-1)!.data;

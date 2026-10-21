@@ -81,7 +81,7 @@ try {
   outcome = "success";
   await run();
   assert.equal(await count(), 0, "a successful Pi run resets the streak");
-  console.log("Professor Mari runtime rollout and recovery regression passed");
+  console.log("Professor YunYun runtime rollout and recovery regression passed");
 } finally {
   await closeDB();
   rmSync(root, { recursive: true, force: true });

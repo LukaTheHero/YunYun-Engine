@@ -96,7 +96,7 @@ assert.equal(
 );
 assert.equal(toolNamesAction.suggestions[0]?.label, "Run lorebook test scan", "chip labels name no action");
 assert.equal(toolNamesAction.suggestions[0]?.detail, "via app data", "chip details name no tool");
-assert.equal(toolNamesAction.suggestions[0]?.prompt, "Run lorebook.testScan", "the chip prompt to Mari stays raw");
+assert.equal(toolNamesAction.suggestions[0]?.prompt, "Run lorebook.testScan", "the chip prompt to YunYun stays raw");
 assert.equal(toolNamesAction.commands[0]?.arguments.action, "chat.diagnose", "command arguments stay raw");
 assert.equal(
   scrubInternalNames("Open character.json; marinara.ui.registerContribution stays."),
@@ -122,7 +122,7 @@ const session = normalizeCommandCenterSessionState({
   activeResultId: "character:luna",
   mariReturnResultId: "character:luna",
 });
-assert.equal(session.query, "find Luna", "the Mari return keeps the search query");
+assert.equal(session.query, "find Luna", "the YunYun return keeps the search query");
 assert.equal(session.activeResultId, "character:luna", "the selected result remains selected");
 assert.equal(session.mariReturnResultId, "character:luna", "the return result is persisted in the session contract");
 
@@ -139,4 +139,4 @@ assert.equal(session.mariReturnResultId, "character:luna", "the return result is
   assert.equal(kept[0]?.error, "Character missing not found", "the reason is kept for the card");
 }
 
-console.log("Professor Mari action-result regression checks passed.");
+console.log("Professor YunYun action-result regression checks passed.");

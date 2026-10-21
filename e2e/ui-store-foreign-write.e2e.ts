@@ -188,7 +188,7 @@ ui?.getState().setRoleplayReducedPaintEffects(true);`,
 
   test("settings survive an old package client saving its v74 copy over them", async ({ page }) => {
     await prepare(page);
-    // From a v74 blob, migrations would size the sheet like this background and restore this old Mari connection;
+    // From a v74 blob, migrations would size the sheet like this background and restore this old YunYun connection;
     // the user's saved sheet size and cleared connection must win instead.
     await seedUIState(page, { hasCompletedOnboarding: true, imageBackgroundWidth: 1536 }, "if-missing");
     await page.addInitScript((key) => localStorage.setItem(key, "e2e-legacy-mari"), LEGACY_MARI_CONNECTION_KEY);

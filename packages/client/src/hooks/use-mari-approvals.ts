@@ -23,7 +23,7 @@ export type WorkspaceApprovalResponse = {
 };
 
 /**
- * Keeping and restoring one of Mari's pending approvals, with the toasts that go
+ * Keeping and restoring one of YunYun's pending approvals, with the toasts that go
  * with it. Shared by the Work pane and the omnibar so an approval reads the same
  * wherever the user meets it; a second copy of this is how the two surfaces would
  * drift into looking like two features.
@@ -51,7 +51,7 @@ export function useMariApprovals(options: { onRefresh?: () => Promise<void> | vo
   // Invalidation marks every query stale either way; the default 'active' refetch
   // pulls only what is mounted now, and everything else refreshes on its next
   // mount. refetchType:'all' here made every cached chat re-drain its full message
-  // page history on each Mari workspace change (#4703).
+  // page history on each YunYun workspace change (#4703).
   const invalidateWorkspaceData = useCallback(async () => {
     await qc.invalidateQueries();
   }, [qc]);
@@ -85,7 +85,7 @@ export function useMariApprovals(options: { onRefresh?: () => Promise<void> | vo
               .map((change) => replyFixChat(change)?.id)
               .filter((chatId): chatId is string => Boolean(chatId)),
           );
-          // Slice 74: the server wrote "Kept" onto the receipt of the Mari message that made the change.
+          // Slice 74: the server wrote "Kept" onto the receipt of the YunYun message that made the change.
           const mariChatId = chatIdForMariSession(result.approval?.sessionId);
           if (mariChatId) fixedChatIds.add(mariChatId);
           await Promise.all(
@@ -102,7 +102,7 @@ export function useMariApprovals(options: { onRefresh?: () => Promise<void> | vo
         }
         return result;
       } catch (error) {
-        console.error("[Professor Mari] Failed to keep workspace change", error);
+        console.error("[Professor YunYun] Failed to keep workspace change", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotKeepThatWorkspaceChange"), {
           description: describeProfessorMariError(error),
           duration: 12_000,
@@ -139,7 +139,7 @@ export function useMariApprovals(options: { onRefresh?: () => Promise<void> | vo
         }
         return result;
       } catch (error) {
-        console.error("[Professor Mari] Failed to restore workspace change", error);
+        console.error("[Professor YunYun] Failed to restore workspace change", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRestoreThatWorkspaceChange"), {
           description: describeProfessorMariError(error),
           duration: 12_000,

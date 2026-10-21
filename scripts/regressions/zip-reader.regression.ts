@@ -1,4 +1,4 @@
-// Archives Marinara did not create are read strictly: honest archives from common tools read exactly as
+// Archives YunYun did not create are read strictly: honest archives from common tools read exactly as
 // before, self-contradictory or unsupported ones are refused with a plain message, every read names a
 // byte limit, and each outside-archive entry point goes through the strict reader.
 import assert from "node:assert/strict";
@@ -218,7 +218,7 @@ function assertReadRefused(bytes: Buffer, name: string, maxBytes: number, messag
   );
 }
 
-const text = Buffer.from("Marinara reads this archive.\n".repeat(64));
+const text = Buffer.from("YunYun reads this archive.\n".repeat(64));
 const binary = Buffer.from(Array.from({ length: 70_000 }, (_, index) => (index * 7919) % 251));
 const honest: Fixture[] = [
   { name: "folder/", data: Buffer.alloc(0), method: 0 },
@@ -265,7 +265,7 @@ assertReadsAsBefore(
 );
 const sequential = new AdmZip();
 for (const fixture of honest) if (!fixture.name.endsWith("/")) sequential.addFile(fixture.name, fixture.data);
-assertReadsAsBefore(sequential.toBuffer(), "Marinara in-memory exports");
+assertReadsAsBefore(sequential.toBuffer(), "YunYun in-memory exports");
 const streamed: Buffer[] = [];
 for await (const chunk of streamZip(
   (async function* () {
@@ -282,7 +282,7 @@ for await (const chunk of streamZip(
 )) {
   streamed.push(chunk);
 }
-assertReadsAsBefore(Buffer.concat(streamed), "Marinara streamed exports");
+assertReadsAsBefore(Buffer.concat(streamed), "YunYun streamed exports");
 /** The archive followed by zero bytes up to a whole number of blocks, as libarchive writes to a pipe. */
 function blockPadded(bytes: Buffer, block = 10_240) {
   return Buffer.concat([bytes, Buffer.alloc(block - (bytes.length % block))]);
@@ -346,7 +346,7 @@ class Unseekable(io.RawIOBase):
         return len(data)
     def value(self):
         return b"".join(self.chunks)
-text = b"Marinara reads this archive.\n" * 64
+text = b"YunYun reads this archive.\n" * 64
 binary = bytes((index * 7919) % 251 for index in range(70000))
 def fill(archive, force_zip64=False):
     archive.writestr(zipfile.ZipInfo("folder/"), b"")
@@ -880,7 +880,7 @@ sys.stdout.write(json.dumps(out))
       "a self-contradictory .charx is refused",
     );
 
-    // ── Entry points: .marinara packages, from Marinara's own export. ──
+    // ── Entry points: .marinara packages, from YunYun's own export. ──
 
     const exported = await app.inject({ method: "GET", url: `/api/characters/${imported.json().characterId}/export` });
     assert.equal(exported.statusCode, 200, exported.body);
@@ -905,7 +905,7 @@ sys.stdout.write(json.dumps(out))
       packageChunks.push(chunk);
     }
     const marinaraPackage = Buffer.concat(packageChunks);
-    assertReadsAsBefore(marinaraPackage, "Marinara .marinara package");
+    assertReadsAsBefore(marinaraPackage, "YunYun .marinara package");
     const packaged = await upload("/api/import/marinara-package", "file", "Archive Card.marinara", marinaraPackage);
     assert.equal(packaged.statusCode, 200, packaged.body);
     assert.equal(packaged.json().success, true, packaged.body);

@@ -47,7 +47,7 @@ type OmnibarMariArrivalInput = {
   undoLabel: string | null;
 };
 
-/** M9 + R7: what Mari says when she opens on this screen, and which of her threads it goes to. */
+/** M9 + R7: what YunYun says when she opens on this screen, and which of her threads it goes to. */
 export function useOmnibarMariArrival({
   activeChat,
   activeChatId,
@@ -72,7 +72,7 @@ export function useOmnibarMariArrival({
   const { t } = useTranslation();
   const localize = useLocalizedUiText();
   const queryClient = useQueryClient();
-  // M9: what Mari says when she opens on this screen. Built here, where the omnibar context already is,
+  // M9: what YunYun says when she opens on this screen. Built here, where the omnibar context already is,
   // so every door (⌘J, the pull, Home, ⌘K) shows the same thing. Names, counts and times only (R22).
   const arrivalChat = activeChat && activeChat.id === activeChatId ? activeChat : null;
   const arrivalMessageCount = useChatMessageCount(
@@ -207,7 +207,7 @@ export function useOmnibarMariArrival({
     settingsTargetControlId,
     t,
   ]);
-  // R7: which Mari thread this screen's arrivals go to.
+  // R7: which YunYun thread this screen's arrivals go to.
   const mariThreadContext = useMemo(
     () => mariThreadContextFor(omnibarContext, mariArrival),
     [mariArrival, omnibarContext],

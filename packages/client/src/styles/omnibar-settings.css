@@ -43,7 +43,7 @@
   outline-offset: 2px;
 }
 
-/* The settings view fills the omnibar card, like Mari's view: same card, its own back arrow. */
+/* The settings view fills the omnibar card, like YunYun's view: same card, its own back arrow. */
 .omnibar-settings-sheet {
   position: absolute;
   inset: 0;
@@ -107,8 +107,8 @@
   line-height: 1.35;
 }
 
-/* Q2: Search, Quick answers, Professor Mari, Around the app, Appearance. Each section is a small heading over one
-   direction A hairline group (`.mari-edit`, like Mari's side panels), rows split by a divider. */
+/* Q2: Search, Quick answers, Professor YunYun, Around the app, Appearance. Each section is a small heading over one
+   direction A hairline group (`.mari-edit`, like YunYun's side panels), rows split by a divider. */
 .omnibar-settings-section {
   margin-top: 0.75rem;
 }

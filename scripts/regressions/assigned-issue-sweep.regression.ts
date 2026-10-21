@@ -44,7 +44,7 @@ const gameFormatContext = {
   gameTime: "Day 1, 09:00",
   map: null,
   partyNames: [],
-  playerName: "Mari",
+  playerName: "YunYun",
   characterSprites: [],
   playerInventory: [],
   language: "English",
@@ -380,7 +380,7 @@ assert.equal(
 assert.equal(
   isStockMarinaraUniversalPreset({
     name: "Marinara's Universal Preset",
-    author: "Marinara",
+    author: "YunYun",
     systemKey: "",
   }),
   false,
@@ -437,12 +437,12 @@ const professorMariChatSource = readFileSync(
 assert.match(
   professorMariChatSource,
   /inputDrafts\.get\(PROFESSOR_MARI_DRAFT_KEY\)/u,
-  "Home Professor Mari restores her composer from the persisted draft store",
+  "Home Professor YunYun restores her composer from the persisted draft store",
 );
 assert.match(
   professorMariChatSource,
   /setInputDraft\(PROFESSOR_MARI_DRAFT_KEY,/u,
-  "Home Professor Mari saves composer changes through the persisted draft store",
+  "Home Professor YunYun saves composer changes through the persisted draft store",
 );
 
 const continuationChips = [{ id: "continue", label: "Continue", prompt: "Continue with the current lorebook." }];
@@ -467,16 +467,16 @@ useAgentStore.getState().resetForChatChange();
 assert.deepEqual(
   useAgentStore.getState().mariChips,
   [],
-  "chat navigation clears Professor Mari's suggestions so they cannot leak into another chat",
+  "chat navigation clears Professor YunYun's suggestions so they cannot leak into another chat",
 );
 assert.equal(useAgentStore.getState().mariChipsChatId, null);
-assert.equal(useAgentStore.getState().mariPlan, null, "chat navigation clears Professor Mari's guided plan");
+assert.equal(useAgentStore.getState().mariPlan, null, "chat navigation clears Professor YunYun's guided plan");
 assert.equal(useAgentStore.getState().mariPlanChatId, null);
 assert.equal(useAgentStore.getState().mariPlanCursor, 0);
 assert.deepEqual(useAgentStore.getState().mariPlanAnswers, {});
 assert.deepEqual(useAgentStore.getState().activeAgents, [], "other Agent runtime state still resets between chats");
 useAgentStore.getState().reset();
-assert.equal(useAgentStore.getState().mariPlan, null, "full Agent reset clears Professor Mari's guided plan");
+assert.equal(useAgentStore.getState().mariPlan, null, "full Agent reset clears Professor YunYun's guided plan");
 assert.equal(useAgentStore.getState().mariPlanChatId, null);
 assert.equal(useAgentStore.getState().mariPlanCursor, 0);
 assert.deepEqual(useAgentStore.getState().mariPlanAnswers, {});
@@ -627,7 +627,7 @@ assert.equal(
 );
 
 const liveMacroContext = {
-  user: "Mari",
+  user: "YunYun",
   char: "Dottore",
   characters: ["Dottore"],
   variables: {},

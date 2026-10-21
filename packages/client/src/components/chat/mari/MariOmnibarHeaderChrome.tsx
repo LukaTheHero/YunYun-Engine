@@ -13,7 +13,7 @@ import {
 import { ProfessorMariWorkspaceDestination } from "../../../lib/professor-mari-workspace-navigation";
 import { MariTurnReviewEntry } from "./MariTranscript";
 
-/** The omnibar header's Mari parts, portaled into its slots: destinations, her status line, and the phone menu. */
+/** The omnibar header's YunYun parts, portaled into its slots: destinations, her status line, and the phone menu. */
 type MariOmnibarHeaderChromeProps = {
   activeMemoryCount: number;
   activeSkillCount: number;

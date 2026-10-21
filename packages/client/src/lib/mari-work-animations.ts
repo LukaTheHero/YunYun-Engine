@@ -63,12 +63,12 @@ export interface MariAppearancePack {
 
 /**
  * Sprites keep their file names when art is replaced, and the service worker serves them CacheFirst
- * (`mari-sprites` in vite.config.ts). Bump this whenever any Mari art changes.
+ * (`mari-sprites` in vite.config.ts). Bump this whenever any YunYun art changes.
  */
 export const MARI_SPRITE_VERSION = "39c2";
 
-/** Every Mari URL is loaded by URL from its own pack folder, never imported into the bundle. */
-const sprite = (path: string) => `/sprites/mari/${path}?v=${MARI_SPRITE_VERSION}`;
+/** Every YunYun URL is loaded by URL from its own pack folder, never imported into the bundle. */
+const sprite = (path: string) => `/sprites/yunyun/${path}?v=${MARI_SPRITE_VERSION}`;
 const packStories = (packId: string) =>
   Object.fromEntries(MARI_STORY_STATES.map((id) => [id, { id, src: sprite(`${packId}/${id}.webp`) }])) as Record<
     MariStoryState,
@@ -84,7 +84,7 @@ export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
   {
     id: "basic",
     label: "Basic",
-    description: "The classic pixel Professor Mari.",
+    description: "The classic pixel Professor YunYun.",
     portraits: {
       idle: sprite("basic/portrait-idle.webp"),
       blink: sprite("basic/portrait-blink.webp"),
@@ -98,7 +98,7 @@ export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
   },
   {
     id: "dottore",
-    label: "Prof. Mari loves Dottore",
+    label: "Prof. YunYun loves Dottore",
     description: "A cyan heart pin and a Dottore plush.",
     portraits: {
       idle: sprite("dottore/portrait-idle.webp"),
@@ -113,7 +113,7 @@ export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
   },
   {
     id: "golden",
-    label: "Golden Prof. Mari",
+    label: "Golden Prof. YunYun",
     description: "A gold outfit and a confident grin.",
     portraits: {
       idle: sprite("golden/portrait-idle.webp"),
@@ -129,7 +129,7 @@ export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
   },
   {
     id: "safari",
-    label: "Safari Prof. Mari",
+    label: "Safari Prof. YunYun",
     description: "Safari gear for jungle trips.",
     portraits: {
       idle: sprite("safari/portrait-idle.webp"),
@@ -144,7 +144,7 @@ export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
   },
   {
     id: "raccoon",
-    label: "Feral Raccoon Prof. Mari",
+    label: "Feral Raccoon Prof. YunYun",
     description: "A raccoon onesie, slightly chewed.",
     portraits: {
       idle: sprite("raccoon/portrait-idle.webp"),
@@ -162,9 +162,9 @@ export const MARI_APPEARANCE_PACKS: readonly MariAppearancePack[] = [
 
 /**
  * Loading tier per asset, for the selected pack only (M16). 1: on screen at first paint (the Home
- * profile tab and the Home Mari widget's greet pose): started from `main.tsx` with the page at high
- * priority, then `fetchpriority="high"` on the `<img>`. 2: likely next (omnibar, Mari pane, the Home
- * Mari header): prefetched once the app has loaded and is idle. (The top-bar presence line is CSS
+ * profile tab and the Home YunYun widget's greet pose): started from `main.tsx` with the page at high
+ * priority, then `fetchpriority="high"` on the `<img>`. 2: likely next (omnibar, YunYun pane, the Home
+ * YunYun header): prefetched once the app has loaded and is idle. (The top-bar presence line is CSS
  * only, no image.) The portraits stay tier 2 because some packs' portraits weigh ~330 KB. 3: behind
  * another step (onboarding, FAQ, the
  * chibi toast, the other stories, the pack chooser): lazy, only when that surface renders. The memory

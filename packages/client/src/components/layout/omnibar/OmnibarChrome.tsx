@@ -1,4 +1,4 @@
-// The search dialog's chrome around the result list: Mari's head door, the scope and filter strips,
+// The search dialog's chrome around the result list: YunYun's head door, the scope and filter strips,
 // the bare empty state and the footer.
 import { Search } from "lucide-react";
 import { motion } from "framer-motion";
@@ -22,7 +22,7 @@ import { formatShortcutKey } from "../../../lib/keyboard-shortcuts";
 const CHIP_TOUCH_HIT =
   "relative [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:inset-x-0 [@media(pointer:coarse)]:after:-inset-y-[0.3125rem] [@media(pointer:coarse)]:after:content-['']";
 
-/** Slice 79b: Mari's head in the search header is the door to her. */
+/** Slice 79b: YunYun's head in the search header is the door to her. */
 export function OmnibarMariDoor({
   onClick,
   working,
@@ -37,16 +37,16 @@ export function OmnibarMariDoor({
   held: string;
 }) {
   const { t } = useTranslation();
-  // Slice 85: press and hold her head to lift her; a tap still opens Mari.
+  // Slice 85: press and hold her head to lift her; a tap still opens YunYun.
   return (
     <MariHold heldSrc={held}>
       <button
         type="button"
         onClick={onClick}
         // Slice 79b: her head is the door to her (the footer pill is gone), so it says so.
-        aria-label={t("commandCenter.askMariDoor", "Ask Prof. Mari")}
+        aria-label={t("commandCenter.askMariDoor", "Ask Prof. YunYun")}
         aria-keyshortcuts={isApplePlatform() ? "Meta+J" : "Control+J"}
-        title={t("commandCenter.askMariDoorTooltip", "Ask Prof. Mari ({{shortcut}})", {
+        title={t("commandCenter.askMariDoorTooltip", "Ask Prof. YunYun ({{shortcut}})", {
           shortcut: isApplePlatform() ? "⌘J" : "Ctrl+J",
         })}
         data-component="GlobalOmnibar.ProfessorMariButton"
@@ -167,7 +167,7 @@ export function OmnibarEmpty() {
     >
       <Search size={20} aria-hidden="true" className="mb-2 text-[var(--primary)]" />
       <p className="text-sm font-semibold text-[var(--foreground)]">
-        {t("commandCenter.empty.title", "Search across Marinara")}
+        {t("commandCenter.empty.title", "Search across YunYun")}
       </p>
       <p className="mt-1 max-w-[32rem] text-xs leading-relaxed text-[var(--muted-foreground)]">
         {t(
@@ -217,8 +217,8 @@ export function OmnibarFooter({
           // Says whether ⌘↵ sends: "Ask" sends what you typed, "Continue" opens her or carries the quick answer.
           <span>
             {mariSends(activeResult) && !(asideSettled && activeResult.id === "ask-professor-mari")
-              ? t("commandCenter.keyboard.askMari", "{{mod}}+Enter Ask Prof. Mari", { mod: formatShortcutKey("Mod") })
-              : t("commandCenter.keyboard.continueMari", "{{mod}}+Enter Continue with Prof. Mari", {
+              ? t("commandCenter.keyboard.askMari", "{{mod}}+Enter Ask Prof. YunYun", { mod: formatShortcutKey("Mod") })
+              : t("commandCenter.keyboard.continueMari", "{{mod}}+Enter Continue with Prof. YunYun", {
                   mod: formatShortcutKey("Mod"),
                 })}
           </span>
@@ -234,7 +234,7 @@ export function OmnibarFooter({
       <span className="flex min-w-0 items-center gap-3">
         {mariEnabled ? (
           <span className="hidden sm:inline">
-            {t("commandCenter.keyboard.askMariShortcut", "{{mod}}+J Open Prof. Mari", {
+            {t("commandCenter.keyboard.askMariShortcut", "{{mod}}+J Open Prof. YunYun", {
               mod: formatShortcutKey("Mod"),
             })}
           </span>

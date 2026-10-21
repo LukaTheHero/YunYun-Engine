@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// R3 (slice 62): Professor Mari's `chat.diagnose` read. Covers the payload shape (findings +
+// R3 (slice 62): Professor YunYun's `chat.diagnose` read. Covers the payload shape (findings +
 // generation numbers + lorebook budgets + preset sampler keys) against a known fixture, and the
 // hard R22 requirement that no seeded message text ever reaches the payload.
 
@@ -113,7 +113,7 @@ try {
     /Advanced Parameters/u,
     "a finding without its own write points to Chat Settings",
   );
-  // Item 3 (slice 69): on-screen words only, so Mari has no internal key to repeat.
+  // Item 3 (slice 69): on-screen words only, so YunYun has no internal key to repeat.
   assert.equal(output.reply["Prompt tokens"], 9300);
   assert.equal(output.reply["Max Context Window"], 8192);
   assert.equal(output.reply.ended, "It was cut off at the output limit.", "the end state is plain words");
@@ -131,7 +131,7 @@ try {
   const rawKeys = JSON.stringify(output).match(
     /"(?:maxTokens|maxContext|tokensContext|tokensCompletion|finishReason|contextFit|samplerKeys|tokenBudget|droppedHistory|inputBudget|replyBudget\w*|advanced-parameters)"/gu,
   );
-  assert.equal(rawKeys, null, `no internal field name may reach Mari as a key or value: ${rawKeys}`);
+  assert.equal(rawKeys, null, `no internal field name may reach YunYun as a key or value: ${rawKeys}`);
 
   // ── R22: not one byte of either seeded message's own text may leave this action ──
   const serialized = JSON.stringify(output);
@@ -167,7 +167,7 @@ try {
   assert.deepEqual((empty.output as any).findings, []);
   assert.equal((empty.output as any).messageId, null);
 
-  // Slice 69: a problem report from a chat runs this checkup before Mari's first round, deterministically.
+  // Slice 69: a problem report from a chat runs this checkup before YunYun's first round, deterministically.
   const { replyCheckupChatId } =
     await import("../../packages/server/src/services/professor-mari/workspace-agent.service.js");
   const inChat = { source: "command-center", activeChat: { id: "chat-1", label: "Dice" } } as never;

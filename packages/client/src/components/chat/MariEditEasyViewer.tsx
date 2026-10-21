@@ -1,4 +1,4 @@
-// #4919 Easy Viewer, direction A (slice 13): Professor Mari's applied edit reads as one summary line
+// #4919 Easy Viewer, direction A (slice 13): Professor YunYun's applied edit reads as one summary line
 // per record ("Zylo Vantrell · 3 changes") that opens to tracked changes: old text struck and muted,
 // new text underlined on a tint, lists, switches and one-word values as −/+ chips. The exact
 // line-by-line diff sits behind one toggle. All data comes from approval.diffPreview (full
@@ -58,7 +58,7 @@ export function rowTitle(
 // A character or preset edit can be previewed as an assembled prompt. Deletes are NOT offered: the
 // field diff already shows the removed content, and a synthetic re-assembly of a deleted row is
 // either impossible (a character delete has no live row for the proxy to substitute) or misleading
-// (Mari's section delete also prunes the id from the preset's sectionOrder, so the assembler skips
+// (YunYun's section delete also prunes the id from the preset's sectionOrder, so the assembler skips
 // the re-spliced section and the before/after come out identical).
 const PROMPT_RENDER_TABLES = new Set(["prompt_presets", "prompt_sections", "prompt_groups", "choice_blocks"]);
 export function canRenderPrompt(change: MariDbRowChange): boolean {

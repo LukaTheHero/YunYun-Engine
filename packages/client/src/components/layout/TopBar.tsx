@@ -56,10 +56,10 @@ import {
 
 // English source text for `localize()` - the lookup matches on the literal string, not the key.
 const MARI_EDGE_GLOW_LABEL: Record<Exclude<MariEdgeGlow, null>, string> = {
-  working: "Professor Mari is working",
-  finished: "Professor Mari finished",
-  approval: "Professor Mari needs your answer",
-  error: "Professor Mari's last run failed",
+  working: "Professor YunYun is working",
+  finished: "Professor YunYun finished",
+  approval: "Professor YunYun needs your answer",
+  error: "Professor YunYun's last run failed",
 };
 
 type RightPanelButtonPanel = "lorebooks" | "presets" | "connections" | "agents" | "personas";
@@ -233,7 +233,7 @@ export function TopBar({ mobileTopbarNavigation }: { mobileTopbarNavigation: boo
   const handlePullOpen = useCallback(
     (target: PullTarget) => {
       if (target === "search") return handleOmnibarClick();
-      // The same door as Home's "Ask Professor Mari": the omnibar, straight in Mari's pane. The open editor
+      // The same door as Home's "Ask Professor YunYun": the omnibar, straight in YunYun's pane. The open editor
       // stays open, because she arrives with what is on screen (M9).
       requestProfessorMariOpen();
     },
@@ -460,7 +460,7 @@ export function TopBar({ mobileTopbarNavigation }: { mobileTopbarNavigation: boo
     >
       {/* Subtle bottom border only */}
       <div className="absolute inset-x-0 bottom-0 h-px bg-[var(--marinara-topbar-border)]" />
-      {/* Mari is busy or has a result you have not seen: a thin line in her state colour (P2). */}
+      {/* YunYun is busy or has a result you have not seen: a thin line in her state colour (P2). */}
       {mariEdgeGlow ? (
         <span
           aria-hidden="true"

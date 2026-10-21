@@ -2,7 +2,7 @@ import type { ProfessorMariCapability } from "@marinara-engine/shared";
 
 // Local, LLM-free "what would help here" heuristic. Given the text a user is
 // looking at (a character field or a chat draft), pick the single most useful
-// Mari suggestion. Pure and synchronous so the caller can run it on a debounce.
+// YunYun suggestion. Pure and synchronous so the caller can run it on a debounce.
 
 export interface MariFieldSuggestion {
   /** Short chip label, e.g. "Suggest a greeting". English fallback for `labelKey`. */
@@ -13,7 +13,7 @@ export interface MariFieldSuggestion {
   labelValues?: Record<string, string>;
   /** Capability the handoff should carry. */
   capability: ProfessorMariCapability;
-  /** Draft query pre-filled into the Mari assistant. */
+  /** Draft query pre-filled into the YunYun assistant. */
   draft: string;
 }
 

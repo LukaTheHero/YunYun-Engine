@@ -60,7 +60,7 @@ function event(files = [], types = ["Files"]) {
   };
 }
 
-for (const name of ["Mari.vroid", "MARI.VROID"]) {
+for (const name of ["YunYun.vroid", "MARI.VROID"]) {
   const file = { name };
   const project = event([file]);
   dragOver(project);
@@ -72,7 +72,7 @@ for (const name of ["Mari.vroid", "MARI.VROID"]) {
 assert.deepEqual(messages, Array(4).fill("avatars.vrm.vroidProject"));
 assert.equal(uploads.length, 0, "neither picker nor drop may upload a VRoid project");
 
-for (const file of [{ name: "Mari.vrm" }, { name: "idle.vrma" }]) {
+for (const file of [{ name: "YunYun.vrm" }, { name: "idle.vrma" }]) {
   pick(file);
   assert.equal(uploads.at(-1).file, file, "valid model and animation picks must reach the existing import");
   assert.equal(uploads.at(-1).kind, "vrm");
@@ -86,7 +86,7 @@ drop(resource);
 assert.equal(resource.defaultPrevented, false, "internal resource dragging must remain unchanged");
 
 scope.agentId = "2d-avatars";
-const on2d = event([{ name: "Mari.vroid" }]);
+const on2d = event([{ name: "YunYun.vroid" }]);
 dragOver(on2d);
 drop(on2d);
 assert.equal(on2d.defaultPrevented, false, "the 3D hint must not claim drops on the 2D page");

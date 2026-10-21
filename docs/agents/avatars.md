@@ -2,11 +2,11 @@
 
 Two downloadable agents give your characters and personas an animated avatar that reacts while a reply streams in. **2D Avatars** shows PNGTuber-style sprites or mesh avatars, and **3D Avatars** shows VRM models. Faces follow the reply, and mouths move with the text or with text-to-speech.
 
-Live2D models are not supported. Live2D's licence needs a separate agreement with Live2D even for free open-source apps, and its runtime cannot be shipped with Marinara Engine.
+Live2D models are not supported. Live2D's licence needs a separate agreement with Live2D even for free open-source apps, and its runtime cannot be shipped with YunYun Engine.
 
 ## Downloading the agents
 
-Both agents are in **Download Agents** for every install, under the **Roleplay** and **Game** filters. They need Marinara Engine 2.5.1 or newer.
+Both agents are in **Download Agents** for every install, under the **Roleplay** and **Game** filters. They need YunYun Engine 2.5.1 or newer.
 
 **2D Avatars** and **3D Avatars** are separate downloads, so you can install only the one you want. Both work for characters and personas in Roleplay and Game chats.
 
@@ -65,7 +65,7 @@ Importing a save needs image processing on the server. Some Android installs (Te
 
 ### Mesh avatars
 
-A mesh avatar is a `.mavatar` file. Marinara Engine can make one from one of your sprites (see [Making an avatar from a sprite](#mesh-avatar)), or you can make one with [Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio) (see [Make your own model](#mesh-avatar-studio)). Choose **Import .mavatar file** to add one, or **Replace file** to swap it. With idle motion on, the avatar breathes and looks around on its own. It blinks, and its mouth follows the reply. If the file has drawn mouth shapes, they are used; otherwise simple ones are drawn for it.
+A mesh avatar is a `.mavatar` file. YunYun Engine can make one from one of your sprites (see [Making an avatar from a sprite](#mesh-avatar)), or you can make one with [Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio) (see [Make your own model](#mesh-avatar-studio)). Choose **Import .mavatar file** to add one, or **Replace file** to swap it. With idle motion on, the avatar breathes and looks around on its own. It blinks, and its mouth follows the reply. If the file has drawn mouth shapes, they are used; otherwise simple ones are drawn for it.
 
 Under **Look for each feeling**, choose what each feeling shows: one of the six feelings, or **Smile**, **Shy**, **Half-closed eyes** or **Wink**.
 
@@ -81,7 +81,7 @@ No model yet? [Make one in VRoid Studio](#get-a-3d-model), a free app, and impor
 
 1. Open **3D Avatars** in the Agent editor and pick the character or persona.
 2. Under **VRM model**, select **Import VRM** and choose a `.vrm` file.
-3. Read **The author's terms**. They come from the model file and say who may use the model as an avatar, whether commercial use is allowed, whether you may change the model, whether sexual or very violent content is allowed, and for VRM 1.0 models whether you must credit the author and may share the file. When the file links to a license or to the author's own terms, open them too. Marinara Engine shows the terms but does not enforce them, so please follow them yourself.
+3. Read **The author's terms**. They come from the model file and say who may use the model as an avatar, whether commercial use is allowed, whether you may change the model, whether sexual or very violent content is allowed, and for VRM 1.0 models whether you must credit the author and may share the file. When the file links to a license or to the author's own terms, open them too. YunYun Engine shows the terms but does not enforce them, so please follow them yourself.
 4. Under **Faces and mouth shapes**, check which of the model's expressions shows each face (Neutral, Happy, Angry, Sad, Relaxed and Surprised), each mouth shape (A, I, U, E and O) and blinking. Most are filled in for you: **Set by the model** means the model has the standard VRM expression, and **Guessed from its name** means one of its own expressions has a matching name. An expression the model left empty changes nothing, so it is never filled in for any face but Neutral, which is the model at rest, and the import says when it skipped one. Pick another expression, or **None**, whenever a guess looks wrong.
 5. Optionally, under **Idle animation**, add a `.vrma` file for the model to play while it waits. Without one, the model breathes and sways gently.
 
@@ -119,7 +119,7 @@ A model made earlier with the removed Tripo generator still loads and moves its 
 
 Avatars react on their own; there is nothing to set up for this part.
 
-**Faces in Roleplay.** While a reply streams in, Marinara Engine reads each finished sentence and guesses its mood. To keep the face from flickering:
+**Faces in Roleplay.** While a reply streams in, YunYun Engine reads each finished sentence and guesses its mood. To keep the face from flickering:
 
 - The face changes only when the new mood is clearly stronger than the current one.
 - A face stays for at least two seconds.
@@ -132,10 +132,10 @@ With streaming off, each sentence still gets its own mood. The faces change in o
 
 A PNGTuber avatar with faces for [more feelings](#pngtuber-sprites) can also show the more specific feeling a sentence reads as, such as Amusement while it is happy. That face follows the same rules: it needs a clear reading and stays for at least two seconds, and a feeling without its own face shows its main feeling's face. Expression Engine and Game Master picks work the same way: when the avatar has no face with the picked name, such as `scared`, it shows that feeling's face, here Fear. 3D and mesh avatars show the six feelings only.
 
-**How the mood is read.** Your chat connection is not asked. Your chat text stays with your own Marinara Engine and is never sent to an outside service.
+**How the mood is read.** Your chat connection is not asked. Your chat text stays with your own YunYun Engine and is never sent to an outside service.
 
 - A built-in word list answers at once, everywhere, and knows common mood words in several languages.
-- On computers that can run it, Marinara Engine reads the sentences with a small emotion model instead, the mood reader. It understands 36 languages. It downloads once, about 300 MB, the first time you open a Roleplay chat with 2D Avatars or 3D Avatars turned on. It does not download while both agents are off. Each avatar agent's page in **Agents** shows the download's progress, and a failed download tries again by itself about 10 minutes later. The word list answers until the mood reader is ready, and after the download it works offline. It uses about 1 GB of memory while in use and unloads after 10 idle minutes. Lite installs, Android and computers with less than 3 GB of memory keep the word list.
+- On computers that can run it, YunYun Engine reads the sentences with a small emotion model instead, the mood reader. It understands 36 languages. It downloads once, about 300 MB, the first time you open a Roleplay chat with 2D Avatars or 3D Avatars turned on. It does not download while both agents are off. Each avatar agent's page in **Agents** shows the download's progress, and a failed download tries again by itself about 10 minutes later. The word list answers until the mood reader is ready, and after the download it works offline. It uses about 1 GB of memory while in use and unloads after 10 idle minutes. Lite installs, Android and computers with less than 3 GB of memory keep the word list.
 
 **Faces in Game mode.** Each line the Game Master shows comes with an expression, and the speaking character's avatar takes it. The Game Master chooses the face even when a voice reads the line. A character's inner thoughts change the face but not the mouth.
 
@@ -166,7 +166,7 @@ When text to speech reads a Roleplay reply, the avatar of the character who is s
 - **Personas:** a persona's mouth does not move for your own messages, with or without text to speech.
 - **Game Mode:** with text to speech and **Auto-play** on, avatar mouths wait for their character's voice and follow it. Pausing, stopping or switching chats stops the mouth. Lines without a voice keep their text animation, and a voice that fails or never starts falls back to the text once. Narrator and player voices move no character's mouth; inner thoughts stay unspoken.
 
-Lip sync does not change how the voice plays. Marinara Engine reads a separate copy of each voice clip to time the mouth, so playback works as before, including in Safari and on iPhone and iPad. It prepares the mouth timing as clips arrive while an avatar is present. If the first clip starts before that timing is ready, its text moves the mouth until the voice timing takes over. If your browser cannot read a clip, the voice still plays and only the mouth stops following it.
+Lip sync does not change how the voice plays. YunYun Engine reads a separate copy of each voice clip to time the mouth, so playback works as before, including in Safari and on iPhone and iPad. It prepares the mouth timing as clips arrive while an avatar is present. If the first clip starts before that timing is ready, its text moves the mouth until the voice timing takes over. If your browser cannot read a clip, the voice still plays and only the mouth stops following it.
 
 ## Making an avatar from a sprite
 
@@ -196,7 +196,7 @@ Some connections can't edit pictures, such as Pollinations, Together AI, Horde, 
 
 1. Pick one sprite. The full-body neutral sprite is picked for you when the character has one, otherwise the neutral sprite; you can choose another. A front-facing full-body or bust sprite works best.
 2. Choose the **Chat connection that can see pictures**. **The agent's connection** uses the connection set on the 2D Avatars page, then your default agent connection. Its model must accept pictures.
-3. Select **Make mesh avatar**. The chat model finds the face, and Marinara Engine builds the avatar from your sprite as it is. **Cancel** stops it.
+3. Select **Make mesh avatar**. The chat model finds the face, and YunYun Engine builds the avatar from your sprite as it is. **Cancel** stops it.
 4. Check the preview: the outlines should sit on the eyes, brows and mouth. Select **Save as mesh avatar**, or **Discard** and try another sprite or model.
 
 A generated mesh avatar moves its head, eyes, brows and mouth, and blinks and talks with its own eyelids and mouth. Its hair moves with the head; hands, single hair strands and hanging accessories are not rigged. Small sprites are built from a bigger copy so the mouth fits the face. When the face fills most of a large sprite, the avatar is built from a smaller copy so making it stays quick.
@@ -231,7 +231,7 @@ You don't have to make anything to start. A character or persona with expression
 ### Mesh Avatar Studio
 
 1. Start from a front-facing head-and-shoulders picture with a transparent background. Mesh Avatar Studio runs on your computer with Node.js, and a coding agent such as Claude Code or Codex rigs the picture. Its README walks you through it.
-2. Optionally, add drawn eyes and mouths under **Drawn variants**. Marinara Engine uses its mouth shapes (`mouth_a`, `mouth_i`, `mouth_o` and `mouth_a_half`) and closed eyes (`eyes_closed_0` and `eyes_closed_1`) by themselves. Every mesh avatar has the six feelings built in, so there is nothing to name.
+2. Optionally, add drawn eyes and mouths under **Drawn variants**. YunYun Engine uses its mouth shapes (`mouth_a`, `mouth_i`, `mouth_o` and `mouth_a_half`) and closed eyes (`eyes_closed_0` and `eyes_closed_1`) by themselves. Every mesh avatar has the six feelings built in, so there is nothing to name.
 3. Choose **Export .mavatar**. Don't zip the project folder yourself.
 4. Open **2D Avatars** in **Agents**, choose the character or persona, then **Mesh avatar** and **Import .mavatar file**.
 

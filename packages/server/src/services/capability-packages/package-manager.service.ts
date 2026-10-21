@@ -6395,7 +6395,7 @@ async function installCatalogPackage(entry: CapabilityCatalogPackage, activateDu
   if (capabilityApiIssue) throw new CapabilityPackageCompatibilityError(capabilityApiIssue);
   if (!supportsEngineVersion(entry, APP_VERSION)) {
     throw new CapabilityPackageCompatibilityError(
-      `Package requires Marinara Engine ${manifest.engine.min} to below ${manifest.engine.maxExclusive}`,
+      `Package requires YunYun Engine ${manifest.engine.min} to below ${manifest.engine.maxExclusive}`,
     );
   }
   const archive = await fetchBytes(artifact.url, Math.min(artifact.bytes + 1, MAX_ARTIFACT_BYTES));

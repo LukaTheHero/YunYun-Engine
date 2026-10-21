@@ -6984,7 +6984,7 @@ export async function gameRoutes(app: FastifyInstance, options: GameRouteOptions
       const read = await readMapPack(experienceId);
       if (read && !read.ok) {
         return rejectGenerationOutput(reply, 400, {
-          error: `Marinara could not read this Experience's map pack: ${read.reason}`,
+          error: `YunYun could not read this Experience's map pack: ${read.reason}`,
           code: "map_pack_invalid",
         });
       }
@@ -11815,7 +11815,7 @@ export async function gameRoutes(app: FastifyInstance, options: GameRouteOptions
     const read = await readMapPack(req.params.packageId);
     if (!read) return { mapPack: null };
     if (!read.ok)
-      return reply.status(400).send({ error: `Marinara could not read this Experience's map pack: ${read.reason}` });
+      return reply.status(400).send({ error: `YunYun could not read this Experience's map pack: ${read.reason}` });
     return { mapPack: read.pack };
   });
 

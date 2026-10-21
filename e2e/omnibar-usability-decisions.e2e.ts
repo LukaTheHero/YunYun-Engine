@@ -52,19 +52,19 @@ test.beforeEach(async ({ page, request }) => {
   await page.goto("/");
 });
 
-test("UX-35: a question handed to Professor Mari does not come back when the omnibar reopens", async ({
+test("UX-35: a question handed to Professor YunYun does not come back when the omnibar reopens", async ({
   page,
 }, testInfo) => {
-  // Mari's hand-off is covered on desktop (command-palette.e2e.ts uses the same rule); a phone run is not needed for this logic.
-  test.skip(!testInfo.project.name.includes("desktop"), "Professor Mari hand-off is covered on desktop.");
+  // YunYun's hand-off is covered on desktop (command-palette.e2e.ts uses the same rule); a phone run is not needed for this logic.
+  test.skip(!testInfo.project.name.includes("desktop"), "Professor YunYun hand-off is covered on desktop.");
   const width = 1440;
   await openOmnibar(page);
 
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  const input = omnibar.getByRole("searchbox", { name: "Search Marinara" });
+  const input = omnibar.getByRole("searchbox", { name: "Search YunYun" });
   await input.fill("why is my lorebook empty");
   await omnibar.locator('[data-result-id="ask-professor-mari"]').click();
-  await expect(omnibar.locator('[data-component="GlobalOmnibar.Mari"]')).toHaveAttribute("aria-hidden", "false");
+  await expect(omnibar.locator('[data-component="GlobalOmnibar.YunYun"]')).toHaveAttribute("aria-hidden", "false");
 
   // Leave her window, then close the omnibar. The handed-off question must not survive the close.
   await closeOmnibar(page, omnibar);
@@ -74,15 +74,15 @@ test("UX-35: a question handed to Professor Mari does not come back when the omn
   await omnibar.screenshot({ path: shotPath("UX-35", width) });
 });
 
-test("UX-11: the bar under Professor Mari has no Review or Return button", async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.name.includes("desktop"), "Professor Mari hand-off is covered on desktop.");
+test("UX-11: the bar under Professor YunYun has no Review or Return button", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.includes("desktop"), "Professor YunYun hand-off is covered on desktop.");
   const width = 1440;
   await openOmnibar(page);
 
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill("why is my lorebook empty");
+  await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill("why is my lorebook empty");
   await omnibar.locator('[data-result-id="ask-professor-mari"]').click();
-  await expect(omnibar.locator('[data-component="GlobalOmnibar.Mari"]')).toHaveAttribute("aria-hidden", "false");
+  await expect(omnibar.locator('[data-component="GlobalOmnibar.YunYun"]')).toHaveAttribute("aria-hidden", "false");
 
   // The receipt cards and the header's back arrow cover review and return, so the bar is gone.
   await expect(omnibar.locator('[data-component="GlobalOmnibar.CompletionActions"]')).toHaveCount(0);
@@ -90,27 +90,27 @@ test("UX-11: the bar under Professor Mari has no Review or Return button", async
   await omnibar.screenshot({ path: shotPath("UX-11", width) });
 });
 
-test("UX-22: Ctrl+J carries a question into Professor Mari, and opens her empty for other text", async ({
+test("UX-22: Ctrl+J carries a question into Professor YunYun, and opens her empty for other text", async ({
   page,
 }, testInfo) => {
-  test.skip(!testInfo.project.name.includes("desktop"), "Professor Mari hand-off is covered on desktop.");
+  test.skip(!testInfo.project.name.includes("desktop"), "Professor YunYun hand-off is covered on desktop.");
   const width = 1440;
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  const composer = omnibar.locator('[data-component="GlobalOmnibar.Mari"] textarea:visible');
+  const composer = omnibar.locator('[data-component="GlobalOmnibar.YunYun"] textarea:visible');
 
   await openOmnibar(page);
-  await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill("lorebook");
+  await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill("lorebook");
   await page.keyboard.press("Control+j");
-  await expect(omnibar.locator('[data-component="GlobalOmnibar.Mari"]')).toHaveAttribute("aria-hidden", "false");
+  await expect(omnibar.locator('[data-component="GlobalOmnibar.YunYun"]')).toHaveAttribute("aria-hidden", "false");
   await expect(composer).toHaveValue("");
   await omnibar.screenshot({ path: shotPath("UX-22-empty", width) });
 
   await closeOmnibar(page, omnibar);
 
   await openOmnibar(page);
-  await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill("why is my lorebook empty");
+  await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill("why is my lorebook empty");
   await page.keyboard.press("Control+j");
-  await expect(omnibar.locator('[data-component="GlobalOmnibar.Mari"]')).toHaveAttribute("aria-hidden", "false");
+  await expect(omnibar.locator('[data-component="GlobalOmnibar.YunYun"]')).toHaveAttribute("aria-hidden", "false");
   await expect(composer).toHaveValue("why is my lorebook empty");
   await omnibar.screenshot({ path: shotPath("UX-22-question", width) });
 });
@@ -152,7 +152,7 @@ test("UX-32: the search field has no filter syntax in its hint, and touch rows s
   const touch = await page.evaluate(() => matchMedia("(pointer: coarse)").matches);
   await openOmnibar(page);
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  const input = omnibar.getByRole("searchbox", { name: "Search Marinara" });
+  const input = omnibar.getByRole("searchbox", { name: "Search YunYun" });
   await expect(input).not.toHaveAttribute("placeholder", /faq:|msg:|char:/u);
   await input.fill("lorebook");
   await expect(omnibar.locator("[data-command-center-result-row]").first()).toBeVisible();
@@ -222,7 +222,7 @@ test("UX-18: result rows are list items with buttons, not listbox options, so ne
   const width = testInfo.project.name.includes("mobile") ? 390 : 1440;
   await openOmnibar(page);
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill("lorebook");
+  await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill("lorebook");
   const rows = omnibar.locator('[data-component="GlobalOmnibar.Results"] ul > [data-command-center-result-row]');
   await expect(rows.first()).toBeVisible();
   // No option or listbox roles: a row holds its own Keep, Undo or Set default buttons.
@@ -257,7 +257,7 @@ test("UX-13: Max output tokens and Memory Recall are found in search and open Ch
 
     await openOmnibar(page);
     const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-    const input = omnibar.getByRole("searchbox", { name: "Search Marinara" });
+    const input = omnibar.getByRole("searchbox", { name: "Search YunYun" });
     await input.fill("memory recall");
     const memoryRow = omnibar.locator('[data-result-id^="chat-tool:memory-recall:"]');
     await expect(memoryRow).toBeAttached();
@@ -268,7 +268,7 @@ test("UX-13: Max output tokens and Memory Recall are found in search and open Ch
 
     await page.keyboard.press("Escape");
     await openOmnibar(page);
-    await omnibar.getByRole("searchbox", { name: "Search Marinara" }).fill("max output tokens");
+    await omnibar.getByRole("searchbox", { name: "Search YunYun" }).fill("max output tokens");
     await expect(omnibar.locator('[data-result-id^="chat-tool:advanced-parameters:"]')).toBeAttached();
     await omnibar.locator('[data-result-id^="chat-tool:advanced-parameters:"] button').first().click();
     await expect(omnibar).toHaveCount(0);
@@ -279,7 +279,7 @@ test("UX-13: Max output tokens and Memory Recall are found in search and open Ch
   }
 });
 
-test("Search lists none of Professor Mari's changes; the pill and the way into her window stay", async ({
+test("Search lists none of Professor YunYun's changes; the pill and the way into her window stay", async ({
   page,
 }, testInfo) => {
   const width = testInfo.project.name.includes("mobile") ? 390 : 1440;
@@ -345,7 +345,7 @@ test("Search lists none of Professor Mari's changes; the pill and the way into h
   await expect(page.locator('[data-component="TopBar.MariStatus"]')).toBeVisible();
   await openOmnibar(page);
   const omnibar = page.locator('[data-component="GlobalOmnibar"]');
-  const input = omnibar.getByRole("searchbox", { name: "Search Marinara" });
+  const input = omnibar.getByRole("searchbox", { name: "Search YunYun" });
   const changeRows = omnibar.locator(
     '[data-result-id^="mari-approval:"], [data-command-center-result-row]:has-text("wants to"), [data-command-center-result-row]:has-text("Put back"), [data-command-center-result-row]:has-text("Don\'t apply")',
   );

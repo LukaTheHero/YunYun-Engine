@@ -1,4 +1,4 @@
-// How Professor Mari's turns are stored in a chat: the user message's run-start extra and the assistant
+// How Professor YunYun's turns are stored in a chat: the user message's run-start extra and the assistant
 // message with its extra (timeline, deferral marker, continuity, usage). Runtime-agnostic, so any
 // runtime that drives her stores an identical record.
 import type { LLMUsage } from "../llm/base-provider.js";

@@ -5,7 +5,7 @@ import { seedUIState } from "./ui-state-fixture.js";
 const version = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const shots = ".tmp/mari-window-height";
 
-test("Professor Mari height slider keeps the old minimum and persists its choice", async ({ page }, testInfo) => {
+test("Professor YunYun height slider keeps the old minimum and persists its choice", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const mobile = testInfo.project.name.includes("mobile");
   const diagnostics: string[] = [];
@@ -32,7 +32,7 @@ test("Professor Mari height slider keeps the old minimum and persists its choice
       return (await import(modulePath)).isApplePlatform();
     });
     await page.keyboard.press(apple ? "Meta+j" : "Control+j");
-    await expect(page.locator('[data-component="GlobalOmnibar.Mari"]')).toHaveAttribute("aria-hidden", "false");
+    await expect(page.locator('[data-component="GlobalOmnibar.YunYun"]')).toHaveAttribute("aria-hidden", "false");
   };
   await openMari();
   const panel = page.locator('[data-component="GlobalOmnibar.Panel"]');
@@ -61,12 +61,12 @@ test("Professor Mari height slider keeps the old minimum and persists its choice
     await page.setViewportSize({ width: 1440, height: 1080 });
     await assertHeight(48);
   }
-  await panel.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
-  const slider = panel.getByRole("slider", { name: "Professor Mari window height" });
-  // Phones always show Professor Mari full screen, so #7501 hides the window size section below 640px.
-  const sizeSection = panel.getByRole("region", { name: "Professor Mari window", exact: true, includeHidden: true });
+  await panel.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
+  const slider = panel.getByRole("slider", { name: "Professor YunYun window height" });
+  // Phones always show Professor YunYun full screen, so #7501 hides the window size section below 640px.
+  const sizeSection = panel.getByRole("region", { name: "Professor YunYun window", exact: true, includeHidden: true });
   const expectSizeSectionHidden = async () => {
-    await expect(panel.getByText("Ask Professor Mari from Search", { exact: true })).toBeVisible();
+    await expect(panel.getByText("Ask Professor YunYun from Search", { exact: true })).toBeVisible();
     await expect(sizeSection).toHaveCount(1);
     await expect(sizeSection).toBeHidden();
   };
@@ -98,7 +98,7 @@ test("Professor Mari height slider keeps the old minimum and persists its choice
   await page.reload();
   await openMari();
   await assertHeight(maxRem);
-  await panel.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
+  await panel.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
   await expect(slider).toHaveValue(String(maxRem));
   mkdirSync(shots, { recursive: true });
   await slider.scrollIntoViewIfNeeded();
@@ -122,7 +122,7 @@ test("Professor Mari height slider keeps the old minimum and persists its choice
           );
           await assertHeight(maxRem);
           await page.screenshot({ path: `${shots}/${width}-${visualTheme}-${theme}-window.png` });
-          await panel.getByRole("button", { name: "Search and Professor Mari settings", exact: true }).click();
+          await panel.getByRole("button", { name: "Search and Professor YunYun settings", exact: true }).click();
           if (width < 640) await expectSizeSectionHidden();
           else await slider.scrollIntoViewIfNeeded();
           await page.screenshot({ path: `${shots}/${width}-${visualTheme}-${theme}-settings.png` });

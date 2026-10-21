@@ -6,7 +6,7 @@ import { describeEmptyModelResponse } from "./empty-response-reason.js";
 /**
  * Reply checkup (slice 61, R2): why a reply may have gone wrong, read from the facts the server
  * already saved on the message. Deterministic, no model call. The chat's quiet line, the omnibar
- * Fix row, the Peek header and Professor Mari's `chat.diagnose` read all show this one result.
+ * Fix row, the Peek header and Professor YunYun's `chat.diagnose` read all show this one result.
  */
 export type ReplyCheckupCode =
   "cut_off" | "empty_reply" | "history_trimmed" | "reply_budget_cut" | "lore_budget_skipped" | "card_large";
@@ -18,7 +18,7 @@ export type ReplyCheckupLink =
 
 export interface ReplyCheckupFinding {
   code: ReplyCheckupCode;
-  /** One English line with the numbers, for logs and Professor Mari. The UI localizes `code` + `values`. */
+  /** One English line with the numbers, for logs and Professor YunYun. The UI localizes `code` + `values`. */
   text: string;
   /** The numbers and names `text` quotes. */
   values: Record<string, string | number>;

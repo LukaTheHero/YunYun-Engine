@@ -77,7 +77,7 @@ try {
 
   const refusedEngine = await install("newer-engine");
   assert.equal(refusedEngine.statusCode, 409, refusedEngine.body);
-  assert.deepEqual(refusedEngine.json(), { error: "Package requires Marinara Engine 98.0.0 to below 99.0.0" });
+  assert.deepEqual(refusedEngine.json(), { error: "Package requires YunYun Engine 98.0.0 to below 99.0.0" });
   assert.equal(downloads, 0, "the refusal comes before the download");
 
   // The update check refuses the same versions, so the two never disagree.

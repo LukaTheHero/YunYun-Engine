@@ -1,7 +1,7 @@
 /**
  * The single source of truth for settings navigation: every tab and section
  * the Settings panel exposes. Lives in `shared` (not just the client) so the
- * server can also point at a real setting label, e.g. for Professor Mari's
+ * server can also point at a real setting label, e.g. for Professor YunYun's
  * quick-answer docs grounding, without duplicating this list.
  *
  * Adding a setting: add it here and every surface that reads this finds it.
@@ -117,8 +117,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
     // that opens it, and every jump to this section or its controls opens the omnibar instead.
     id: "omnibar",
     tab: "general",
-    label: "Search and Professor Mari",
-    description: "Search, quick answers, Professor Mari and her appearance. Opens in Search.",
+    label: "Search and Professor YunYun",
+    description: "Search, quick answers, Professor YunYun and her appearance. Opens in Search.",
     aliases: ["omnibar", "search", "command palette", "ctrl k", "quick answers", "professor mari", "mari", "mini mari"],
   },
   {
@@ -281,7 +281,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
     id: "personal-extensions",
     tab: "addons",
     label: "Personal Extensions",
-    description: "Sandboxed extension drafts authored by Professor Mari.",
+    description: "Sandboxed extension drafts authored by Professor YunYun.",
     aliases: ["extensions", "addons", "local code", "browser", "server", "professor mari"],
   },
   {
@@ -294,8 +294,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   {
     id: "profile-marinara",
     tab: "import",
-    label: "Profile & Marinara",
-    description: "Restore full profiles or import individual Marinara files.",
+    label: "Profile & YunYun",
+    description: "Restore full profiles or import individual YunYun files.",
     aliases: ["profile", "import", "restore", "marinara", "json", "zip"],
   },
   {

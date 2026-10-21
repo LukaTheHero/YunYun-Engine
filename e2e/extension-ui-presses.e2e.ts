@@ -76,7 +76,7 @@ test("accepting a browser extension's suggestion keeps the expanded summary edit
   const entry = createChatSummaryEntry({
     id: "extension-memory",
     title: "Extension memory",
-    content: "Mari found teh key and opened teh door.",
+    content: "YunYun found teh key and opened teh door.",
     enabled: true,
     rangeStartIndex: 0,
     rangeEndIndex: 0,
@@ -96,7 +96,7 @@ test("accepting a browser extension's suggestion keeps the expanded summary edit
     // Accepting the suggestion is a real press on the card, outside Chat Settings.
     const acceptInBody = await addExtensionCard(page, "body");
     await acceptInBody.click();
-    await expect(field).toHaveValue("Mari found the key and opened teh door.");
+    await expect(field).toHaveValue("YunYun found the key and opened teh door.");
     await expect(editor).toBeVisible();
     await expect(settings).toBeVisible();
 
@@ -111,7 +111,7 @@ test("accepting a browser extension's suggestion keeps the expanded summary edit
 
     const acceptInHtml = await addExtensionCard(page, "html");
     await acceptInHtml.click();
-    await expect(field).toHaveValue("Mari found the key and opened the door.");
+    await expect(field).toHaveValue("YunYun found the key and opened the door.");
     await expect(editor).toBeVisible();
     await expect(settings).toBeVisible();
 
@@ -125,7 +125,7 @@ test("accepting a browser extension's suggestion keeps the expanded summary edit
           ((await (await request.get(`/api/chats/${id}`)).json()).metadata.summaryEntries as ChatSummaryEntry[])[0]
             ?.content,
       )
-      .toBe("Mari found the key and opened the door.");
+      .toBe("YunYun found the key and opened the door.");
 
     // A press on the chat itself still closes Chat Settings, as before.
     await page.evaluate(() => document.querySelector("grammarly-popups")?.remove());
@@ -156,30 +156,30 @@ test("a browser extension's card keeps the conversation Edit Summaries editor an
     // Added only now, so the day appears once the editor's refetch on open has landed. That refetch also
     // collapses every entry, and would fold one opened before it.
     const seeded = await request.patch(`/api/chats/${id}/summaries`, {
-      data: { daySummaries: { [day]: { summary: "Mari found teh key.", keyDetails: [] } } },
+      data: { daySummaries: { [day]: { summary: "YunYun found teh key.", keyDetails: [] } } },
     });
     expect(seeded.ok()).toBeTruthy();
     await section.getByRole("button", { name: "Edit Summaries" }).click();
     const editor = page.getByRole("dialog", { name: "Automatic Summarization", exact: true });
     await editor.getByRole("button", { name: day }).click();
     const field = editor.getByRole("textbox").first();
-    await expect(field).toHaveValue("Mari found teh key.");
+    await expect(field).toHaveValue("YunYun found teh key.");
 
     const accept = await addExtensionCard(page, "html", '[aria-labelledby="summaries-editor-title"] textarea');
     await accept.click();
-    await expect(field).toHaveValue("Mari found the key.");
+    await expect(field).toHaveValue("YunYun found the key.");
     await expect(settings).toBeVisible();
 
     // Escape in the card closes the card, not the editor with its unsaved draft.
     await accept.focus();
     await page.keyboard.press("Escape");
     await expect(editor).toBeVisible();
-    await expect(field).toHaveValue("Mari found the key.");
+    await expect(field).toHaveValue("YunYun found the key.");
 
     await editor.getByRole("button", { name: "Save", exact: true }).click();
     await expect
       .poll(async () => (await (await request.get(`/api/chats/${id}`)).json()).metadata.daySummaries?.[day]?.summary)
-      .toBe("Mari found the key.");
+      .toBe("YunYun found the key.");
   } finally {
     await request.delete(`/api/chats/${id}?force=true`);
   }
@@ -199,7 +199,7 @@ test("Escape in a browser extension's card keeps a preset variable's value edito
     data: {
       variableName: "EXTENSION_TONE",
       question: "Choose a tone",
-      options: [{ id: "extension_tone_a", label: "Option A", value: "Mari found teh key." }],
+      options: [{ id: "extension_tone_a", label: "Option A", value: "YunYun found teh key." }],
     },
   });
   expect(variable.ok()).toBeTruthy();
@@ -215,13 +215,13 @@ test("Escape in a browser extension's card keeps a preset variable's value edito
     const heading = page.getByRole("heading", { name: "Edit Value: Option A", exact: true });
     const fieldSelector = 'textarea[placeholder^="Prompt content"]';
     const field = page.locator(fieldSelector);
-    await expect(field).toHaveValue("Mari found teh key.");
+    await expect(field).toHaveValue("YunYun found teh key.");
     // The editor focuses its field shortly after opening; wait for it so that cannot take focus from the card.
     await expect(field).toBeFocused();
 
     const accept = await addExtensionCard(page, "html", fieldSelector);
     await accept.click();
-    await expect(field).toHaveValue("Mari found the key.");
+    await expect(field).toHaveValue("YunYun found the key.");
     await accept.focus();
     await page.keyboard.press("Escape");
     await expect(heading).toBeVisible();
@@ -237,7 +237,7 @@ test("Escape in a browser extension's card keeps a preset variable's value edito
         const options = typeof block?.options === "string" ? JSON.parse(block.options) : block?.options;
         return options?.[0]?.value;
       })
-      .toBe("Mari found the key.");
+      .toBe("YunYun found the key.");
   } finally {
     await request.delete(`/api/prompts/${preset.id}`);
   }

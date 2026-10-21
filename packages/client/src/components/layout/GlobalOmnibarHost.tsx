@@ -24,7 +24,7 @@ import { mariAssetUrls } from "../../lib/mari-work-animations";
 import { preloadedLazy } from "../../lib/preloaded-lazy";
 import { useUIStore } from "../../stores/ui.store";
 
-// The dialog carries the whole Command Center (search, browse, Mari panes), so it
+// The dialog carries the whole Command Center (search, browse, YunYun panes), so it
 // stays out of the eager app shell chunk until the user actually opens it.
 // Preloaded at idle below; rendered directly once loaded, so the first open skips React's Suspense throttle.
 const GlobalOmnibarDialog = preloadedLazy(() => import("./GlobalOmnibar").then((module) => module.GlobalOmnibarDialog));
@@ -91,7 +91,7 @@ export function GlobalOmnibar() {
   const open = useUIStore((state) => state.omnibarOpen);
   const setOpen = useUIStore((state) => state.setOmnibarOpen);
   // This host is mounted for the whole session while the dialog below it is
-  // not, so the heartbeat lives here. Without it Professor Mari's state dies
+  // not, so the heartbeat lives here. Without it Professor YunYun's state dies
   // with the dialog and a task that finishes after a close is never noticed.
   // The top-bar edge glow (useMariEdgeGlow) reads the same query.
   useMariPresence();
@@ -114,7 +114,7 @@ export function GlobalOmnibar() {
   }, []);
 
   // M16 tier 2: once the page has loaded, warm the selected pack's omnibar sprites at idle, so the
-  // first ⌘K, ⌘J or pull shows Mari at once. Only this pack; a switch warms the new one (its tier 1
+  // first ⌘K, ⌘J or pull shows YunYun at once. Only this pack; a switch warms the new one (its tier 1
   // sprites come from the Home <img> tags themselves).
   const pack = useMariAppearancePack();
   useMariPackUnlocks();
@@ -146,15 +146,15 @@ export function GlobalOmnibar() {
       if (event.defaultPrevented || event.isComposing) return;
       if (isOmnibarShortcut(event)) {
         // L8: ⌘K opens on top of any dialog or the game setup wizard. While the
-        // omnibar is open, a dialog opened above it (a confirm from Mari, say)
+        // omnibar is open, a dialog opened above it (a confirm from YunYun, say)
         // keeps the keyboard: ⌘K there does not close the omnibar beneath it.
         const dialog = event.target instanceof Element ? event.target.closest('[aria-modal="true"]') : null;
         if (ui.omnibarOpen && dialog && !dialog.closest('[data-component="GlobalOmnibar"]')) return;
         event.preventDefault();
         setOpen(!ui.omnibarOpen);
       } else if (isAskMariShortcut(event) && !ui.omnibarOpen && ui.commandCenterMariEnabled) {
-        // M18: ⌘J opens Mari with this screen's context, over any dialog like ⌘K (L8). While the
-        // omnibar is open its dialog owns ⌘J (back to search, or into Mari).
+        // M18: ⌘J opens YunYun with this screen's context, over any dialog like ⌘K (L8). While the
+        // omnibar is open its dialog owns ⌘J (back to search, or into YunYun).
         event.preventDefault();
         requestProfessorMariOpen();
       } else if (

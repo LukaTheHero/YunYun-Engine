@@ -17,7 +17,7 @@ async function emptyBarPoint(page: Page) {
   const point = await page.evaluate(() => {
     const bar = document.querySelector('[data-component="TopBar"]')!.getBoundingClientRect();
     const y = bar.top + bar.height / 2;
-    // The left half opens Search (the right half opens Mari).
+    // The left half opens Search (the right half opens YunYun).
     for (let x = bar.left + bar.width * 0.3; x < bar.right - 4; x += 8) {
       const hit = document.elementFromPoint(x, y);
       if (hit && !hit.closest('button, a, input, select, textarea, [role="button"], [role="menuitem"], [role="tab"]'))

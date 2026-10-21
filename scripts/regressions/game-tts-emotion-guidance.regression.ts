@@ -47,7 +47,7 @@ for (const hasSceneModel of [false, true]) {
     sessionNumber: 1,
     map: null,
     partyNames: ["Dottore"],
-    playerName: "Mari",
+    playerName: "YunYun",
     hasSceneModel,
   };
   const original = buildGmFormatReminder(context);
@@ -60,7 +60,7 @@ for (const hasSceneModel of [false, true]) {
 
 const partyContext = {
   partyCards: [{ name: "Dottore", card: "A sardonic scholar." }],
-  playerName: "Mari",
+  playerName: "YunYun",
   gameActiveState: "dialogue",
 };
 const partyOriginal = buildPartySystemPrompt(partyContext);
@@ -72,7 +72,7 @@ assert.equal(withoutGuidance(partyAnnotated), partyOriginal, "party instructions
 
 const combatPrompt = (enabled?: boolean) =>
   buildInitPrompt(
-    "Mari",
+    "YunYun",
     "persona",
     "party cards",
     [],

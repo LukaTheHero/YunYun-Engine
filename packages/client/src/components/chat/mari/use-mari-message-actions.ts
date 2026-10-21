@@ -97,7 +97,7 @@ export function useMariMessageActions({
       try {
         await api.delete(`/chats/${chatId}/messages/${messageId}?trash=false`);
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete message", error);
+        console.error("[Professor YunYun] Failed to delete message", error);
         await loadMessages(chatId).catch(() => undefined);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatMessage"), {
           description: describeProfessorMariError(error),
@@ -115,7 +115,7 @@ export function useMariMessageActions({
       try {
         await api.patch(`/chats/${chatId}/messages/${messageId}`, { content });
       } catch (error) {
-        console.error("[Professor Mari] Failed to edit message", error);
+        console.error("[Professor YunYun] Failed to edit message", error);
         await loadMessages(chatId).catch(() => undefined);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotSaveThatEdit"), {
           description: describeProfessorMariError(error),
@@ -129,7 +129,7 @@ export function useMariMessageActions({
     async (messageId: string) => {
       if (isBusy || regenerationInFlightRef.current || !chatId) return;
       if (!effectiveConnectionId) {
-        // Fix inside the Mari pane, not the right panel: that panel renders behind
+        // Fix inside the YunYun pane, not the right panel: that panel renders behind
         // the omnibar (z-100) and would silently swallow this request.
         setConnectionMenuOpen(true);
         return;
@@ -171,7 +171,7 @@ export function useMariMessageActions({
           userMessage.id,
           getProfessorMariMessageContext(userMessage) ?? null,
         );
-        if (!received && !hiddenDuringStream) throw new Error("Professor Mari did not return a regenerated response");
+        if (!received && !hiddenDuringStream) throw new Error("Professor YunYun did not return a regenerated response");
         void refreshAfterWorkspaceRun(chatId, runId);
       } catch (error) {
         void loadMessages(chatId).catch(() => undefined);
@@ -211,7 +211,7 @@ export function useMariMessageActions({
       const index = initialMessages.findIndex((message) => message.id === messageId);
       const userMessage = initialMessages[index];
       const later = initialMessages.slice(index + 1);
-      // Only your latest turn: Mari keeps no branches, so an older edit would silently drop later turns.
+      // Only your latest turn: YunYun keeps no branches, so an older edit would silently drop later turns.
       if (userMessage?.role !== "user" || later.some((message) => message.role === "user")) return;
 
       regenerationInFlightRef.current = true;
@@ -242,7 +242,7 @@ export function useMariMessageActions({
           userMessage.id,
           getProfessorMariMessageContext(userMessage) ?? null,
         );
-        if (!received && !hiddenDuringStream) throw new Error("Professor Mari did not answer the edited message");
+        if (!received && !hiddenDuringStream) throw new Error("Professor YunYun did not answer the edited message");
         void refreshAfterWorkspaceRun(chatId, runId);
       } catch (error) {
         void loadMessages(chatId).catch(() => undefined);
@@ -298,7 +298,7 @@ export function useMariMessageActions({
         );
         await api.patch(`/chats/${chatId}/messages/${messageId}/extra`, { attachments: updated });
       } catch (error) {
-        console.error("[Professor Mari] Failed to remove attachment", error);
+        console.error("[Professor YunYun] Failed to remove attachment", error);
         await loadMessages(chatId).catch(() => undefined);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotRemoveThatAttachment"), {
           description: describeProfessorMariError(error),

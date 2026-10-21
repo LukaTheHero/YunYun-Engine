@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 cd /d "%~dp0\.."
-title Marinara Engine - Installer
+title YunYun Engine - Installer
 color 0A
 
 :: -- Safety net: if anything goes catastrophically wrong, the window stays open --
@@ -13,14 +13,14 @@ set "GIT_DOWNLOAD_URL=https://github.com/git-for-windows/git/releases/download/v
 set "GIT_SHA256=2b96e7854f0520f0f6b709c21041d9801b1be44d5e1a0d9fa621b2fbc40f1983"
 set "RELEASE_TAG=v2.5.1"
 if not defined MARINARA_RELEASE_COMMIT (
-    set "INSTALL_ERROR=This installer is missing its required release commit pin. Download the official Windows installer from the Marinara Engine GitHub release."
+    set "INSTALL_ERROR=This installer is missing its required release commit pin. Download the official Windows installer from the YunYun Engine GitHub release."
     goto :fatal
 )
 set "RELEASE_COMMIT=%MARINARA_RELEASE_COMMIT%"
 
 echo.
 echo  +==========================================+
-echo  ^|   Marinara Engine - Windows Installer     ^|
+echo  ^|   YunYun Engine - Windows Installer     ^|
 echo  ^|   v2.5.1                                  ^|
 
 echo  +==========================================+
@@ -54,10 +54,10 @@ goto :after_same_install_dir_warning
 
 :warn_same_install_dir
 echo.
-echo  [WARN] You are reinstalling Marinara Engine into:
+echo  [WARN] You are reinstalling YunYun Engine into:
 echo         %INSTALL_DIR%
 echo.
-echo         Before continuing, copy the Marinara data folder(s) below to
+echo         Before continuing, copy the YunYun data folder(s) below to
 echo         a backup location outside this install folder if you want to
 echo         keep chats, characters, images, and settings:
 if exist "%INSTALL_DIR%\packages\server\data\" echo           %INSTALL_DIR%\packages\server\data
@@ -192,7 +192,7 @@ echo.
 set "FRESH_CLONE_CREATED=0"
 if exist "%INSTALL_DIR%\.git" goto :update_repo
 if not exist "%INSTALL_DIR%\" set "FRESH_CLONE_CREATED=1"
-echo  [..] Cloning Marinara Engine to %INSTALL_DIR%...
+echo  [..] Cloning YunYun Engine to %INSTALL_DIR%...
 git clone --branch "%RELEASE_TAG%" --depth 1 https://github.com/Pasta-Devs/Marinara-Engine.git "%INSTALL_DIR%"
 if errorlevel 1 (
     call :discard_unverified_fresh_clone
@@ -380,7 +380,7 @@ echo  [OK] Dependencies installed
 
 :: -- Build --
 echo.
-echo  [..] Building Marinara Engine...
+echo  [..] Building YunYun Engine...
 call :run_pnpm --filter @marinara-engine/shared build
 if %errorlevel% neq 0 (
     set "INSTALL_ERROR=Shared package build failed."
@@ -395,7 +395,7 @@ echo  [OK] Build complete
 
 :: -- Create desktop shortcut --
 echo  [..] Creating desktop shortcut...
-set "SHORTCUT=%USERPROFILE%\Desktop\Marinara Engine.lnk"
+set "SHORTCUT=%USERPROFILE%\Desktop\YunYun Engine.lnk"
 set "VBS=%TEMP%\create_shortcut.vbs"
 
 (
@@ -405,7 +405,7 @@ set "VBS=%TEMP%\create_shortcut.vbs"
     echo oLink.TargetPath = "%INSTALL_DIR%\start.bat"
     echo oLink.WorkingDirectory = "%INSTALL_DIR%"
     echo oLink.IconLocation = "%INSTALL_DIR%\win\installer\app-icon.ico,0"
-    echo oLink.Description = "Marinara Engine - AI Chat ^& Roleplay"
+    echo oLink.Description = "YunYun Engine - AI Chat ^& Roleplay"
     echo oLink.Save
 ) > "%VBS%"
 cscript //nologo "%VBS%"
@@ -417,7 +417,7 @@ echo.
 echo  ==========================================
 echo    Installation complete!
 echo.
-echo    To start: double-click "Marinara Engine"
+echo    To start: double-click "YunYun Engine"
 echo    on your Desktop, or run start.bat in:
 echo    %INSTALL_DIR%
 echo.

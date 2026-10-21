@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { build } from "esbuild";
 
-// Render the actual component without launching Marinara or a browser. Interactive
+// Render the actual component without launching YunYun or a browser. Interactive
 // focus, mutation and persistence coverage lives in the matching Playwright spec.
 const clientRoot = fileURLToPath(new URL("../../packages/client/", import.meta.url));
 const messages = JSON.parse(await readFile(join(clientRoot, "src/localization/locales/en.json"), "utf8"));

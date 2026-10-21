@@ -74,10 +74,10 @@ export function useMariSkillMemoryActions({
   const handleNewSkill = useCallback(() => {
     void createSkillFromContent({
       name: "custom-skill",
-      description: "User-defined Professor Mari skill.",
+      description: "User-defined Professor YunYun skill.",
       content: NEW_SKILL_CONTENT,
     }).catch((error) => {
-      console.error("[Professor Mari] Failed to create skill", error);
+      console.error("[Professor YunYun] Failed to create skill", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotAddThatSkill"));
     });
   }, [createSkillFromContent, localizeUi]);
@@ -95,7 +95,7 @@ export function useMariSkillMemoryActions({
         .text()
         .then((content) => createSkillFromContent({ content, fileName: file.name }))
         .catch((error) => {
-          console.error("[Professor Mari] Failed to upload skill", error);
+          console.error("[Professor YunYun] Failed to upload skill", error);
           toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUploadThatSkill"));
         });
     },
@@ -119,7 +119,7 @@ export function useMariSkillMemoryActions({
       await refreshWorkspaceStatus().catch(() => undefined);
       toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariSkillSaved"));
     } catch (error) {
-      console.error("[Professor Mari] Failed to save skill", error);
+      console.error("[Professor YunYun] Failed to save skill", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotSaveThatSkill"));
     } finally {
       setSkillsSaving(false);
@@ -146,7 +146,7 @@ export function useMariSkillMemoryActions({
         await loadSkills();
         await refreshWorkspaceStatus().catch(() => undefined);
       } catch (error) {
-        console.error("[Professor Mari] Failed to toggle skill", error);
+        console.error("[Professor YunYun] Failed to toggle skill", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUpdateThatSkill"));
       } finally {
         setSkillsSaving(false);
@@ -168,7 +168,7 @@ export function useMariSkillMemoryActions({
         await refreshWorkspaceStatus().catch(() => undefined);
         toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariSkillDeleted"));
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete skill", error);
+        console.error("[Professor YunYun] Failed to delete skill", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatSkill"));
       } finally {
         setSkillsSaving(false);
@@ -202,9 +202,9 @@ export function useMariSkillMemoryActions({
   const handleNewMemory = useCallback(() => {
     void createMemory({
       name: "New memory",
-      content: "Describe a preference or instruction for Professor Mari.",
+      content: "Describe a preference or instruction for Professor YunYun.",
     }).catch((error) => {
-      console.error("[Professor Mari] Failed to create memory", error);
+      console.error("[Professor YunYun] Failed to create memory", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotAddThatMemory"));
     });
   }, [createMemory, localizeUi]);
@@ -240,7 +240,7 @@ export function useMariSkillMemoryActions({
           return createMemory({ content, name: baseName || undefined });
         })
         .catch((error) => {
-          console.error("[Professor Mari] Failed to upload memory", error);
+          console.error("[Professor YunYun] Failed to upload memory", error);
           toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUploadThatMemory"));
         });
     },
@@ -259,7 +259,7 @@ export function useMariSkillMemoryActions({
       setSelectedMemoryId(result.instruction.id);
       toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariMemorySaved"));
     } catch (error) {
-      console.error("[Professor Mari] Failed to save memory", error);
+      console.error("[Professor YunYun] Failed to save memory", error);
       toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotSaveThatMemory"));
     } finally {
       setMemoriesSaving(false);
@@ -282,7 +282,7 @@ export function useMariSkillMemoryActions({
         await api.put<MariInstructionMutationResponse>(`/professor-mari/workspace/instructions/${memory.id}`, patch);
         await loadMemories();
       } catch (error) {
-        console.error("[Professor Mari] Failed to update memory", error);
+        console.error("[Professor YunYun] Failed to update memory", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotUpdateThatMemory"));
       } finally {
         setMemoriesSaving(false);
@@ -313,7 +313,7 @@ export function useMariSkillMemoryActions({
         await loadMemories();
         toast.success(localizeUi("ui.chat.homeprofessormarichat.professorMariMemoryDeleted"));
       } catch (error) {
-        console.error("[Professor Mari] Failed to delete memory", error);
+        console.error("[Professor YunYun] Failed to delete memory", error);
         toast.error(localizeUi("ui.chat.homeprofessormarichat.professorMariCouldNotDeleteThatMemory"));
       } finally {
         setMemoriesSaving(false);

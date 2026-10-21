@@ -8,7 +8,7 @@
 //   2. A card without it is unchanged, so existing cards are untouched.
 //   3. Variables keep the preset-variable shape (minus randomPick) and stay
 //      lenient, so an unfinished variable never blocks a card import.
-//   4. Export policy: Marinara Native and the Compatible PNG keep it (so an
+//   4. Export policy: YunYun Native and the Compatible PNG keep it (so an
 //      author's card still onboards when someone else imports it); the
 //      Compatible JSON export drops it and stays a clean V2 card.
 import assert from "node:assert/strict";

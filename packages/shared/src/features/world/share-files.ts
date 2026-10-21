@@ -123,7 +123,7 @@ function readShareFile(
     };
   }
   if (!versions.includes(file.version as number)) {
-    return { ok: false, issues: ["The file was made by a newer version of Marinara Engine."] };
+    return { ok: false, issues: ["The file was made by a newer version of YunYun Engine."] };
   }
   return { ok: true, value: file };
 }

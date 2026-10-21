@@ -1,4 +1,4 @@
-// One message in Mari's transcript, with its reply actions, referenced records and the outcome of her run.
+// One message in YunYun's transcript, with its reply actions, referenced records and the outcome of her run.
 import { type ReactNode, memo, useEffect, useState } from "react";
 import { Check, Copy, ChevronRight, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -474,7 +474,7 @@ export const CompactMariMessage = memo(function CompactMariMessage({
   thinking?: string | null;
   onDelete?: (messageId: string) => void;
   onEdit?: (messageId: string, content: string) => void;
-  /** Only on your latest message: save the edit and run Mari again from it, like Claude and Gemini. */
+  /** Only on your latest message: save the edit and run YunYun again from it, like Claude and Gemini. */
   onEditAndResend?: (messageId: string, content: string) => void;
   onRegenerate?: (messageId: string) => void;
   canRegenerate?: boolean;
@@ -487,7 +487,7 @@ export const CompactMariMessage = memo(function CompactMariMessage({
   lorebookPreviews: ReadonlyMap<string, LorebookPreviewModel>;
   /** What was sent with this message, so its chip (C2) survives the send. */
   messageContext?: ProfessorMariAskContext | null;
-  /** Only on the newest finished turn: the story Mari plays on its "Worked for" line. */
+  /** Only on the newest finished turn: the story YunYun plays on its "Worked for" line. */
   restStory?: MariStoryState | null;
   /** D1: suppressed while an appended arrival at the bottom of the transcript owns the marker instead. */
   pullTarget?: boolean;

@@ -3444,7 +3444,7 @@ const cases: RegressionCase[] = [
   {
     name: "macro output limits preserve authored text while bounding generated expansion",
     run() {
-      const context: MacroContext = { user: "Mari", char: "Dottore", characters: ["Dottore"], variables: {} };
+      const context: MacroContext = { user: "YunYun", char: "Dottore", characters: ["Dottore"], variables: {} };
       const literal = "Preserved summary detail. ".repeat(10_000);
       const options = { trimResult: false };
       assert.ok(
@@ -10156,7 +10156,7 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
         chatChoices: {},
         chatId: "large-summary",
         characterIds: [],
-        personaName: "Mari",
+        personaName: "YunYun",
         personaDescription: "",
         chatMessages: [{ role: "user", content: "Continue." }],
         chatSummary: activeSummary,
@@ -10570,10 +10570,10 @@ Use HTML sparingly and diegetically. Do not replace normal prose/dialogue unless
     },
   },
   {
-    // Mari, 2026-10-14: a section for a character who is not replying is replaced with nothing, not an empty line.
+    // YunYun, 2026-10-14: a section for a character who is not replying is replaced with nothing, not an empty line.
     name: "Chat Summary sections for someone who is not replying leave no empty line",
     async run() {
-      const ctx = (char: string): MacroContext => ({ user: "Mari", char, characters: [char], variables: {} });
+      const ctx = (char: string): MacroContext => ({ user: "YunYun", char, characters: [char], variables: {} });
       const section = (name: string, text: string) => `{{#if char == "${name}"}}\n${text}\n{{/if}}`;
       const summary = `Shared opening.\n\n${section("Cyno", "Cyno alone saw the ruins.")}\n\n${section("Tighnari", "Tighnari found the herb.")}\n\nShared closing.`;
       const tighnari = "Shared opening.\n\nTighnari found the herb.\n\nShared closing.";

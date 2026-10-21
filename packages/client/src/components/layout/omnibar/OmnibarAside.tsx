@@ -22,14 +22,14 @@ export interface OmnibarAsideProps {
   onEscalate: () => void;
   /** Opens the omnibar settings, where the answering model is chosen. */
   onChooseModel: () => void;
-  /** Mari's own connection, offered for quick answers when no local model is downloaded. */
+  /** YunYun's own connection, offered for quick answers when no local model is downloaded. */
   connectionOffer?: { id: string; name: string } | null;
   onUseConnectionOffer: (id: string) => void;
   /** Re-fires the call after an error (R24: plain error, never a toast). */
   onRetry: () => void;
   /** Asks the same question again, past the answer cache. */
   onAnswerAgain: () => void;
-  /** The follow-up line. Every follow-up goes to Mari's window with this answer attached. */
+  /** The follow-up line. Every follow-up goes to YunYun's window with this answer attached. */
   onFollowUp: (question: string) => void;
   /** Things the answer names, which a click opens like their own rows. `src` is the row's face, when it has one. */
   links: readonly { id: string; title: string; src?: string | null; icon?: LucideIcon }[];
@@ -71,7 +71,7 @@ function AnswerText({ text, muted }: { text: string; muted?: boolean }) {
 }
 
 /**
- * The cheap answer, grown inside the promoted "Ask Prof. Mari" row (R9).
+ * The cheap answer, grown inside the promoted "Ask Prof. YunYun" row (R9).
  *
  * It renders as that row's expansion, so it only ever pushes rows below the
  * selection: nothing above the Ask row moves while it streams. It is not a row
@@ -196,7 +196,7 @@ export function OmnibarAside({
         data-component="GlobalOmnibar.Aside"
         className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted-foreground)]"
       >
-        <span>{t("omnibar.aside.needsModel", "Choose a model so Professor Mari can answer searches like this.")}</span>
+        <span>{t("omnibar.aside.needsModel", "Choose a model so Professor YunYun can answer searches like this.")}</span>
         <button type="button" onClick={onChooseModel} className={textAction}>
           {t("omnibar.aside.chooseModel", "Choose a model")}
         </button>
@@ -225,7 +225,7 @@ export function OmnibarAside({
           <span className="min-w-0">
             {readingNames
               ? t("omnibar.aside.reading", "Reading {{sources}}…", { sources: readingNames })
-              : t("omnibar.aside.thinking", "Professor Mari is thinking…")}
+              : t("omnibar.aside.thinking", "Professor YunYun is thinking…")}
           </span>
         </div>
       ) : failed ? (
@@ -240,7 +240,7 @@ export function OmnibarAside({
                     model: tierLabel,
                   })
                 : errorKind === "missing-model"
-                  ? t("omnibar.aside.needsModel", "Choose a model so Professor Mari can answer searches like this.")
+                  ? t("omnibar.aside.needsModel", "Choose a model so Professor YunYun can answer searches like this.")
                   : errorKind === "empty"
                     ? t("omnibar.aside.error.empty", "No quick answer this time: {{model}} sent no words.", {
                         model: tierLabel,
@@ -306,7 +306,7 @@ export function OmnibarAside({
                 </button>
               ) : null}
               <button type="button" onClick={onEscalate} className={continueAction}>
-                {t("omnibar.aside.escalate", "Continue with Prof. Mari")}
+                {t("omnibar.aside.escalate", "Continue with Prof. YunYun")}
               </button>
             </>
           ) : (
@@ -347,11 +347,11 @@ export function OmnibarAside({
                 onClick={state.status === "streaming" ? () => setContinueQueued(true) : onEscalate}
                 aria-busy={continueQueued || undefined}
                 className={continueAction}
-                title={t("commandCenter.keyboard.continueMari", "{{mod}}+Enter Continue with Prof. Mari", {
+                title={t("commandCenter.keyboard.continueMari", "{{mod}}+Enter Continue with Prof. YunYun", {
                   mod: formatShortcutKey("Mod"),
                 })}
               >
-                {t("omnibar.aside.escalate", "Continue with Prof. Mari")}
+                {t("omnibar.aside.escalate", "Continue with Prof. YunYun")}
               </button>
             </>
           )}
@@ -359,7 +359,7 @@ export function OmnibarAside({
       )}
       {!disclosed && complete ? (
         <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] text-[var(--muted-foreground)]">
-          <span>{t("omnibar.aside.disclosure", "Professor Mari answered your question.")}</span>
+          <span>{t("omnibar.aside.disclosure", "Professor YunYun answered your question.")}</span>
           <button type="button" onClick={onDisable} className={textAction}>
             {t("omnibar.aside.turnOff", "Turn this off")}
           </button>
@@ -376,7 +376,7 @@ export function OmnibarAside({
           onKeyDown={onFollowUpKeyDown}
           maxLength={500}
           aria-label={t("omnibar.aside.followUp.label", "Follow-up question")}
-          placeholder={t("omnibar.aside.followUp.placeholder", "Ask Prof. Mari more…")}
+          placeholder={t("omnibar.aside.followUp.placeholder", "Ask Prof. YunYun more…")}
           className="mt-2 h-11 w-full min-w-0 border-0 border-t border-[var(--border)] bg-transparent px-0 text-base text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)] focus-visible:border-[var(--ring)] sm:h-8 sm:text-xs"
         />
       ) : null}

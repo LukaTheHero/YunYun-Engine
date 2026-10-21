@@ -90,7 +90,7 @@ function writeOmnibarFrecencyEntries(
   }
 }
 
-/** Records one activation. A no-op for Mari's row (O2: never recorded). Returns the updated list to store in state. */
+/** Records one activation. A no-op for YunYun's row (O2: never recorded). Returns the updated list to store in state. */
 export function recordOmnibarFrecencyUse(
   resultId: string,
   surface: OmnibarSurface,
@@ -143,7 +143,7 @@ export function frecencyScore(
 
 /**
  * A bounded nudge for the search ranking, not a replacement for it — see
- * {@link FRECENCY_BOOST_CAP}. Always 0 for Mari's row.
+ * {@link FRECENCY_BOOST_CAP}. Always 0 for YunYun's row.
  */
 export function frecencyBoost(
   entries: readonly OmnibarFrecencyEntry[],

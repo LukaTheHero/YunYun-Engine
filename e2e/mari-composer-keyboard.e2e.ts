@@ -22,7 +22,7 @@ test.afterEach(() => {
   releaseMariThreadLock();
 });
 
-test("mobile: Mari's composer sits on the bottom edge right after the keyboard closes", async ({
+test("mobile: YunYun's composer sits on the bottom edge right after the keyboard closes", async ({
   page,
   request,
 }, testInfo) => {
@@ -59,7 +59,7 @@ test("mobile: Mari's composer sits on the bottom edge right after the keyboard c
       .first()
       .click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Control+j");
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]');
     const composer = mariPane.locator("textarea:visible");
     await expect(composer).toBeVisible();
     const dockGap = () =>
@@ -97,11 +97,11 @@ test("mobile: Mari's composer sits on the bottom edge right after the keyboard c
 });
 
 /**
- * Slice 80: "If I go to Mari, then the omnibar, then Mari again, the empty Mari state goes behind the
+ * Slice 80: "If I go to YunYun, then the omnibar, then YunYun again, the empty YunYun state goes behind the
  * composer." Leaving her pane for Search unmounted the composer dock, and the dock that came back was
  * never measured, so the transcript lost the bottom padding that keeps her empty state above it.
  */
-test("Mari's empty state stays above the composer after Mari, Search, Mari", async ({ page, request }) => {
+test("YunYun's empty state stays above the composer after YunYun, Search, YunYun", async ({ page, request }) => {
   let connectionId = "";
   try {
     const connection = await request.post("/api/connections", {
@@ -128,11 +128,11 @@ test("Mari's empty state stays above the composer after Mari, Search, Mari", asy
       .locator("main")
       .first()
       .click({ position: { x: 5, y: 5 } });
-    const mariPane = page.locator('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+    const mariPane = page.locator('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
     // The empty state is the transcript's last block; the composer floats over the transcript's bottom.
     const overlap = () =>
       page.evaluate(() => {
-        const pane = document.querySelector('[data-component="GlobalOmnibar.Mari"]:not([aria-hidden="true"])');
+        const pane = document.querySelector('[data-component="GlobalOmnibar.YunYun"]:not([aria-hidden="true"])');
         const last = pane?.querySelector(".mari-transcript-stack")?.lastElementChild;
         const dock = pane?.querySelector(".mari-workspace-composer-dock");
         if (!last || !dock) return null;
@@ -154,7 +154,7 @@ test("Mari's empty state stays above the composer after Mari, Search, Mari", asy
       await expect(mariPane).toHaveCount(0);
       await open();
       await expect(mariPane.locator("textarea:visible")).toBeVisible();
-      await expect.poll(overlap, { message: `back to Mari by ${door}` }).toBeLessThanOrEqual(0);
+      await expect.poll(overlap, { message: `back to YunYun by ${door}` }).toBeLessThanOrEqual(0);
     }
   } finally {
     const threads = (await (await request.get("/api/chats/internal/professor-mari/chats")).json()) as Array<{

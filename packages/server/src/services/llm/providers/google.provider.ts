@@ -635,7 +635,7 @@ function geminiUsage(usage?: GeminiUsageMetadata): LLMUsage | undefined {
 
 function normalizeGeminiFinishReason(reason: string | null | undefined): string {
   const normalized = typeof reason === "string" ? reason.trim().toUpperCase() : "";
-  // Argon ends a reply cut at its per-request output limit with CONTINUATION (a long-decode token Marinara does not use).
+  // Argon ends a reply cut at its per-request output limit with CONTINUATION (a long-decode token YunYun does not use).
   if (normalized === "MAX_TOKENS" || normalized === "CONTINUATION") return "length";
   if (normalized === "STOP") return "stop";
   return reason ?? "stop";

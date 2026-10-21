@@ -36,62 +36,62 @@ const homeBrowserHubSource = readFileSync(
 assert.doesNotMatch(
   homeBrowserHubSource,
   /<HomeProfessorMariChat/u,
-  "The Home Professor tab must not mount a second Mari chat surface",
+  "The Home Professor tab must not mount a second YunYun chat surface",
 );
 assert.match(
   homeBrowserHubSource,
   /tab === "professor"[\s\S]*?requestProfessorMariOpen\(\)/u,
-  "The Home Professor tab must open the canonical omnibar Mari surface",
+  "The Home Professor tab must open the canonical omnibar YunYun surface",
 );
 assert.match(
   professorMariHomeSource,
   /shouldShowProfessorMariConnectionHint\(\{/u,
-  "Professor Mari's connection guidance must use the shared presentation contract",
+  "Professor YunYun's connection guidance must use the shared presentation contract",
 );
 assert.match(
   professorMariHomeSource,
   /setMessages\(\[\]\);\s*setLoadedMessagesChatId\(chat\.id\);/u,
-  "Restarting Professor Mari must mark the new empty chat history as loaded",
+  "Restarting Professor YunYun must mark the new empty chat history as loaded",
 );
 assert.equal(
   mariChatAll.match(/showConnectionFirstHint &&/gu)?.length,
   1,
-  "The mounted Professor Mari transcript must render one connection guidance note",
+  "The mounted Professor YunYun transcript must render one connection guidance note",
 );
-assert.doesNotMatch(mariChatAll, /mari-workspace-focusbar/u, "The omnibar must not mount a second Mari header");
+assert.doesNotMatch(mariChatAll, /mari-workspace-focusbar/u, "The omnibar must not mount a second YunYun header");
 assert.doesNotMatch(mariChatAll, /OmnibarIntro/u, "The empty omnibar must not mount the long first-open intro");
-// Like other agents, the composer's Send button turns into Stop while Mari works, and it is the one Stop
+// Like other agents, the composer's Send button turns into Stop while YunYun works, and it is the one Stop
 // control: the header and the live work line no longer carry their own.
 assert.match(
   mariComposerSource,
   /data-mode=\{workspaceTimelineActive \? "stop" : "send"\}[\s\S]{0,900}stopProfessorMariWorkspaceAgent/u,
-  "The composer's Send button must turn into a labelled Stop while Mari works",
+  "The composer's Send button must turn into a labelled Stop while YunYun works",
 );
 assert.doesNotMatch(mariChatAll, /mari-omnibar-header-stop|mari-live-work__stop/u, "Stop lives only in the composer");
 assert.match(
   mariWorkTimelineSource,
   /className="mari-live-work__sprite"/u,
-  "The running step must keep its animated mini Mari sprite",
+  "The running step must keep its animated mini YunYun sprite",
 );
 assert.match(
   compactMariMessageSource,
   /<MariWorkTimeline[\s\S]*?items=\{traceItems\}[\s\S]*?active=\{false\}/u,
-  "Completed workspace traces must remain visible, fully open, in Mari's message",
+  "Completed workspace traces must remain visible, fully open, in YunYun's message",
 );
 assert.match(
   mariComposerSource,
   /<form[\s\S]*?mari-workspace-question-dock[\s\S]*?mari-workspace-answer-strip[\s\S]*?mari-workspace-composer\b/u,
-  "Mari's question and suggestions must stay together above the composer",
+  "YunYun's question and suggestions must stay together above the composer",
 );
 assert.doesNotMatch(
   mariChatAll,
   /mari-omnibar-trust-chrome/u,
-  "Omnibar Mari must not render a separate trust toolbar above the composer",
+  "Omnibar YunYun must not render a separate trust toolbar above the composer",
 );
 assert.match(
   mariTranscriptSource,
   /mari-omnibar-empty-welcome[\s\S]*?chips=\{chipRowChips\}/u,
-  "Empty omnibar Mari must show a styled welcome with starter actions",
+  "Empty omnibar YunYun must show a styled welcome with starter actions",
 );
 assert.match(
   mariComposerSource,
@@ -101,7 +101,7 @@ assert.match(
 assert.doesNotMatch(
   mariChatAll,
   /id: "details"|workspaceDestination === "details"/u,
-  "Mari has no Details sidebar or destination: results and reviews live in the chat",
+  "YunYun has no Details sidebar or destination: results and reviews live in the chat",
 );
 assert.match(
   professorMariHomeSource,
@@ -122,7 +122,7 @@ assert.match(
 assert.match(
   compactMariMessageSource,
   /<MariOutcomeGroup\s+changed=\{reviews\?\.changed \?\? \[\]\}[\s\S]*?needsOk=\{reviews\?\.needsOk \?\? \[\]\}/u,
-  "A Mari turn must render the reviews assigned to it",
+  "A YunYun turn must render the reviews assigned to it",
 );
 assert.match(
   mariTranscriptSource,
@@ -213,9 +213,9 @@ assert.equal(
   false,
   "Starter suggestions must not return after a conversation has begun",
 );
-assert.equal(presentation.stripProfessorMariSpeakerPrefix("Professor Mari: Hello"), "Hello");
-assert.equal(presentation.stripProfessorMariSpeakerPrefix("Mari: Hello"), "Hello");
-assert.equal(presentation.stripProfessorMariSpeakerPrefix("Mari thinks this through."), "Mari thinks this through.");
+assert.equal(presentation.stripProfessorMariSpeakerPrefix("Professor YunYun: Hello"), "Hello");
+assert.equal(presentation.stripProfessorMariSpeakerPrefix("YunYun: Hello"), "Hello");
+assert.equal(presentation.stripProfessorMariSpeakerPrefix("YunYun thinks this through."), "YunYun thinks this through.");
 assert.equal(
   presentation.professorMariContextCount(1, {
     source: "character-card",
@@ -289,12 +289,12 @@ try {
 
 console.info("Issue sweep #5371-#5375 regression passed");
 
-// Mari's work reads in the order it happened: her words, her thinking and her steps, with
+// YunYun's work reads in the order it happened: her words, her thinking and her steps, with
 // back-to-back steps in one list and internal status lines left out.
 {
   const { buildWorkTimelineBlocks } = await import("../../packages/client/src/lib/mari-work-timeline.js");
   const blocks = buildWorkTimelineBlocks<string>([
-    { id: "t1", type: "text", content: "Professor Mari: I'll read her card first." },
+    { id: "t1", type: "text", content: "Professor YunYun: I'll read her card first." },
     { id: "s1", type: "status", content: "Pacing requests to stay under this connection's rate limit" },
     { id: "a", type: "tool", tool: "read" },
     { id: "b", type: "tool", tool: "search" },

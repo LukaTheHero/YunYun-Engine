@@ -205,4 +205,4 @@ assert.equal(isNewMariSmash({ side: -1, at: 1_000 }, -1, 1_200), false, "its bou
 assert.equal(isNewMariSmash({ side: -1, at: 1_000 }, 1, 1_050), true, "the opposite wall is a new hit");
 assert.equal(isNewMariSmash({ side: -1, at: 1_000 }, -1, 1_500), true, "the same wall later is a new hit");
 
-console.info("Mari hold: press thresholds, shake, fling, spring and pendulum rules pass.");
+console.info("YunYun hold: press thresholds, shake, fling, spring and pendulum rules pass.");

@@ -1,4 +1,4 @@
-// Ordering for Professor Mari's inline work timeline. Kept out of the component so the rule that
+// Ordering for Professor YunYun's inline work timeline. Kept out of the component so the rule that
 // decides what the user reads, and in which order, has one runnable check.
 import { stripProfessorMariSpeakerPrefix } from "./professor-mari-presentation";
 
@@ -22,7 +22,7 @@ export type WorkTimelineBlock<Tool> =
   | { kind: "steps"; id: string; steps: Extract<WorkTimelineItem<Tool>, { type: "tool" }>[] };
 
 /**
- * Mari's run in the order it happened: what she said, what she thought, and the steps she took
+ * YunYun's run in the order it happened: what she said, what she thought, and the steps she took
  * between. Back-to-back steps share one list. Status lines are internal bookkeeping (pacing,
  * deferrals) and stay out, as they did in the old work card.
  */

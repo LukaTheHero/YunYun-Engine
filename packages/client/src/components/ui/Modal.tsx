@@ -75,7 +75,7 @@ export function Modal({
   // before actually removing the DOM nodes.
   const [mounted, setMounted] = useState(false);
   const [animating, setAnimating] = useState<"enter" | "exit" | null>(null);
-  // A dialog the omnibar or Mari opens (a confirm, say) must not land beneath them.
+  // A dialog the omnibar or YunYun opens (a confirm, say) must not land beneath them.
   const [overOmnibar, setOverOmnibar] = useState(false);
   const enterRafRef = useRef<number | null>(null);
   const backdropDismiss = useBackdropDismiss(onClose, closeDisabled);

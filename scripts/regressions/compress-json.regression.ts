@@ -12,7 +12,7 @@ const Fastify = requireServer("fastify") as typeof import("fastify").default;
 // API JSON is compressed for clients that accept it; SSE, streams, small bodies, non-API routes and the
 // server's own app.inject() reads are not.
 const big = {
-  messages: Array.from({ length: 200 }, (_, i) => ({ id: `m${i}`, content: "Professor Mari ".repeat(20) })),
+  messages: Array.from({ length: 200 }, (_, i) => ({ id: `m${i}`, content: "Professor YunYun ".repeat(20) })),
 };
 const json = JSON.stringify(big);
 const app = Fastify();

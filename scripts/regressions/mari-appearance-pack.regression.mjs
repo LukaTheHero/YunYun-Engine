@@ -45,7 +45,7 @@ for (const appearance of MARI_APPEARANCE_PACKS) {
     ...Object.values(appearance.poses),
   ];
   for (const url of urls) {
-    assert.ok(url.startsWith(`/sprites/mari/${appearance.id}/`), `${url} must stay inside its pack folder`);
+    assert.ok(url.startsWith(`/sprites/yunyun/${appearance.id}/`), `${url} must stay inside its pack folder`);
     assert.ok(url.endsWith(`?v=${MARI_SPRITE_VERSION}`), `${url} must carry the sprite version`);
   }
   for (const pose of MARI_POSES) assert.ok(readFileSync(publicFile(appearance.poses[pose])).length);
@@ -76,7 +76,7 @@ for (const appearance of MARI_APPEARANCE_PACKS) {
   for (const url of Object.values(appearance.portraits)) {
     assert.ok(readFileSync(publicFile(url)).length);
   }
-  // P5: the Home Mari widget draws the greet pose at exactly 1x with fixed 106x192 width/height.
+  // P5: the Home YunYun widget draws the greet pose at exactly 1x with fixed 106x192 width/height.
   const greet = await sharp(publicFile(appearance.poses.greet).pathname).metadata();
   assert.deepEqual([greet.width, greet.height], [106, 192], `${appearance.id} greet pose must stay 106x192`);
   // 45b: six 96 px pull heads at native size; the circle crops them in CSS.
@@ -86,7 +86,7 @@ for (const appearance of MARI_APPEARANCE_PACKS) {
   // Slice 85: every pack holds its own four-frame dangle sheet (4 cells of 300x450), never a shared idle story.
   assert.equal(
     appearance.portraits.drag,
-    `/sprites/mari/${appearance.id}/portrait-drag.webp?v=${MARI_SPRITE_VERSION}`,
+    `/sprites/yunyun/${appearance.id}/portrait-drag.webp?v=${MARI_SPRITE_VERSION}`,
     "held sheet is per pack",
   );
   const held = await sharp(publicFile(appearance.portraits.drag).pathname).metadata();
@@ -191,5 +191,5 @@ assert.equal(shown("safari", day("2026-03-05"), { changed: previewOff }), "safar
 assert.ok(!listed(day("2026-03-05"), previewOff).includes("raccoon"));
 
 console.info(
-  "Mari appearance pack: fallback, lifecycle outcomes, activity selection, per-pack isolation, loading tiers and all sprite assets passed.",
+  "YunYun appearance pack: fallback, lifecycle outcomes, activity selection, per-pack isolation, loading tiers and all sprite assets passed.",
 );

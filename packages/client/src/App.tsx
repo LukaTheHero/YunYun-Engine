@@ -551,7 +551,7 @@ export function App() {
   }, []);
 
   // While the omnibar is open the toast moves to bottom-right on desktop and to the top, under the
-  // omnibar header, on the mobile shell (N3, slice 46), so it covers neither the search field nor Mari's
+  // omnibar header, on the mobile shell (N3, slice 46), so it covers neither the search field nor YunYun's
   // composer; same viewport check AppShell uses for layout decisions.
   useEffect(() => {
     const mq = window.matchMedia(MOBILE_SHELL_MEDIA_QUERY);

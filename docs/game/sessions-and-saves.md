@@ -1,6 +1,6 @@
 # Game Mode: Sessions and Saves
 
-This guide explains how Marinara Engine tracks your Game Mode progress across play sessions. It covers ending and starting a session and reading past sessions in **Session History**. It also covers the **Show Spoilers** view, fixing the game's data by hand, and how the game saves your data.
+This guide explains how YunYun Engine tracks your Game Mode progress across play sessions. It covers ending and starting a session and reading past sessions in **Session History**. It also covers the **Show Spoilers** view, fixing the game's data by hand, and how the game saves your data.
 
 ## What a session is
 

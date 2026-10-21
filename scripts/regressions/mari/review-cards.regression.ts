@@ -1,9 +1,9 @@
-// #6842: Professor Mari's Keep/Restore cards piled up in every chat and some could not be
+// #6842: Professor YunYun's Keep/Restore cards piled up in every chat and some could not be
 // cleared. Drives the real MariDbService against a file-native store and asserts that:
 //   - (slice 71 F3) a sensitive file or install review belongs to its chat too, and the status filters it,
 //   - (slice 71 F1) a delete waits on the user like an install or a file; an applied edit does not,
 //   - (slice 71 N3) a held change is saved as what it would change, and read back in plain words,
-//   - Mari's own built-in card cannot be edited or deleted, by action or raw db command,
+//   - YunYun's own built-in card cannot be edited or deleted, by action or raw db command,
 //   - a write that changes nothing is not applied and makes no card,
 //   - a card belongs to the chat that made it, and deleting that chat keeps its reviews,
 //   - a refused Restore tells the user Keep dismisses the card,
@@ -44,7 +44,7 @@ try {
   const character = async (id: string) =>
     (await mari.executeAction({ action: "character.get", id })).output as Record<string, unknown> | undefined;
 
-  // ── Mari's own built-in card is off limits, by action and by raw db command ──
+  // ── YunYun's own built-in card is off limits, by action and by raw db command ──
   {
     const before = JSON.stringify(await character(PROFESSOR_MARI_ID));
     const viaAction = await mari.executeAction({
@@ -53,15 +53,15 @@ try {
       patch: { description: "Rewritten." },
       apply: true,
     });
-    assert.equal(viaAction.ok, false, "character.update refuses Mari's own card");
+    assert.equal(viaAction.ok, false, "character.update refuses YunYun's own card");
     assert.ok(
-      viaAction.validation?.errors.some((issue) => /built-in card is managed by Marinara/u.test(issue.message)),
+      viaAction.validation?.errors.some((issue) => /built-in card is managed by YunYun/u.test(issue.message)),
       "and says why",
     );
     const viaRaw = await mari.executeCli({
       argv: ["db", "patch", "characters", PROFESSOR_MARI_ID, "--json", JSON.stringify({ comment: "raw" }), "--apply"],
     });
-    assert.equal(viaRaw.ok, false, "a raw db patch of Mari's card is refused too");
+    assert.equal(viaRaw.ok, false, "a raw db patch of YunYun's card is refused too");
     const viaDelete = await mari.executeCli({ argv: ["db", "delete", "characters", PROFESSOR_MARI_ID, "--apply"] });
     assert.equal(viaDelete.ok, false, "and so is deleting it");
     assert.equal(JSON.stringify(await character(PROFESSOR_MARI_ID)), before, "the card is untouched");
@@ -88,7 +88,7 @@ try {
     });
     assert.equal(same.ok, true, "an unchanged update is not an error");
     assert.equal(same.approval?.status, "not_required", "and needs no review");
-    assert.match(String(same.output), /^No changes/u, "Mari is told nothing changed");
+    assert.match(String(same.output), /^No changes/u, "YunYun is told nothing changed");
     assert.equal(mari.getPendingApprovals().length, 0, "no empty card");
     assert.equal((await character("plain-character"))?.updatedAt, stampBefore, "nothing was written");
 
@@ -156,7 +156,7 @@ try {
       apply: true,
     });
     const reviewId = created.approval!.id!;
-    // A newer edit lands after Mari's change, outside the review (the user's editor).
+    // A newer edit lands after YunYun's change, outside the review (the user's editor).
     const { characters } = await import("../../../packages/server/src/db/schema/characters.js");
     const { eq } = await import("../../../packages/server/src/db/file-query.js");
     await db.update(characters).set({ comment: "edited by the user" }).where(eq(characters.id, "edited-later"));
@@ -203,7 +203,7 @@ try {
     await mari.keepAppliedReview(reviewId);
   }
 
-  // ── Reviews of Mari's own card saved before the fix are retired on load ──
+  // ── Reviews of YunYun's own card saved before the fix are retired on load ──
   {
     // Such a review can no longer be made, so build one from an ordinary review's file,
     // the way an install that ran the old build has them on disk.
@@ -231,7 +231,7 @@ try {
 
     const restarted = new MariDbService(db);
     const loadedIds = new Set(restarted.getPendingApprovals().map((review) => review.id));
-    assert.equal(loadedIds.has(legacyId), false, "an old review of Mari's own card is retired on load");
+    assert.equal(loadedIds.has(legacyId), false, "an old review of YunYun's own card is retired on load");
     assert.equal(existsSync(join(pendingDir, `${legacyId}.json`)), false, "its file is gone");
     assert.ok(loadedIds.has(ordinaryId), "an ordinary review is still there to Keep or Restore");
     await restarted.keepAppliedReview(ordinaryId);
@@ -310,7 +310,7 @@ try {
     assert.equal(describeMariHeldChanges(null, () => undefined).kind, "change", "an old turn still gets a card");
   }
 
-  // ── Wiring: Mari's commands name their chat, status filters, deletion keeps ──
+  // ── Wiring: YunYun's commands name their chat, status filters, deletion keeps ──
   {
     const agent =
       source("services/professor-mari/workspace-agent.service.ts") +
@@ -322,7 +322,7 @@ try {
       "executeCli, executeAction and (slice 71 F3) every file and install review carry the run's chat",
     );
     assert.doesNotMatch(agent, /sessionId: SESSION_ID/u, "no review is staged without its chat");
-    assert.match(agent, /env\.MARI_WORKSPACE_SESSION_ID = this\.runSessionId\(\);/u, "so does Mari's shell");
+    assert.match(agent, /env\.MARI_WORKSPACE_SESSION_ID = this\.runSessionId\(\);/u, "so does YunYun's shell");
     assert.match(
       agent,
       /\.\.\.this\.commands\.workspaceChangeReviews\.getPendingApprovals\(\),\s*\]\.filter\(\(approval\) => isMariReviewVisibleInChat\(approval\.sessionId, chatId\)\)/u,
@@ -340,7 +340,7 @@ try {
     assert.match(
       deleteRoute.slice(0, deleteRoute.indexOf("return reply.status(204)")),
       /keepReviewsForChat\(target\.id\)/u,
-      "deleting a Mari chat keeps its reviews",
+      "deleting a YunYun chat keeps its reviews",
     );
     const routes = source("routes/professor-mari-workspace.routes.ts");
     assert.equal(

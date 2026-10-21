@@ -71,7 +71,7 @@ const MAX_GLOBAL_MESSAGE_HITS_PER_CHAT = 2;
  */
 const CHAT_CONTEXT_MAX_RESULTS = 8;
 const MAX_SLASH_RESULTS = 8;
-/** UX-01: the words that mean "open Professor Mari" on their own. */
+/** UX-01: the words that mean "open Professor YunYun" on their own. */
 const OPEN_MARI_QUERIES: ReadonlySet<string> = new Set([
   "mari",
   "professor",
@@ -213,7 +213,7 @@ export type OmnibarSearchResultsInput = {
   controls: readonly OmnibarResult[];
   data: OmnibarSearchData;
   deferredQuery: string;
-  /** Exact message/lorebook-entry hits found elsewhere, so a direct hit outranks the Mari fallback (F1). */
+  /** Exact message/lorebook-entry hits found elsewhere, so a direct hit outranks the YunYun fallback (F1). */
   directHitCount?: number;
   docsResults: readonly DocsCommandSearchPassage[];
   faqItems: readonly HomeFaqItem[];
@@ -225,7 +225,7 @@ export type OmnibarSearchResultsInput = {
   mariEnabled: boolean;
   /**
    * R6 (slice 65): false when no language connection and no local model exist (a fresh install).
-   * Mari cannot answer then, so her row is only promoted on a dead end, never above docs or FAQ rows.
+   * YunYun cannot answer then, so her row is only promoted on a dead end, never above docs or FAQ rows.
    */
   mariHasModel?: boolean;
   /** Clock for the frecency boost's recency decay; defaults to Date.now(). */
@@ -331,7 +331,7 @@ export type OmnibarContinueResultInput = {
   t: OmnibarTranslate;
   workspaceStatus:
     { active?: boolean; pendingApprovals: readonly Parameters<typeof isMariReviewWaiting>[0][] } | undefined;
-  /** A task the user handed to Mari that she has since finished. */
+  /** A task the user handed to YunYun that she has since finished. */
   mariFinished?: boolean;
 };
 
@@ -707,24 +707,24 @@ export function buildOmnibarSearchResults({
             } satisfies OmnibarResult,
           ];
         });
-  // Professor Mari blur: the fallback row speaks the query's intent, and is
+  // Professor YunYun blur: the fallback row speaks the query's intent, and is
   // promoted above search hits when the query reads like a question or nothing
-  // matched well. Its preview "peeks" what Mari will do before you commit.
+  // matched well. Its preview "peeks" what YunYun will do before you commit.
   const trimmedQuery = query.trim();
   const capability = inferProfessorMariCommandCenterCapability(trimmedQuery);
   const intent = parseOmnibarIntent(trimmedQuery);
   const askPeeks: Partial<Record<typeof capability, string>> = {
-    repair: t("omnibar.askMari.peek.repair", "Professor Mari finds the problem and helps you fix it."),
-    recommend: t("omnibar.askMari.peek.recommend", "Professor Mari compares the options and recommends one."),
-    create: t("omnibar.askMari.peek.create", "Professor Mari helps you create this."),
-    edit: t("omnibar.askMari.peek.change", "Open Professor Mari to check or change this."),
+    repair: t("omnibar.askMari.peek.repair", "Professor YunYun finds the problem and helps you fix it."),
+    recommend: t("omnibar.askMari.peek.recommend", "Professor YunYun compares the options and recommends one."),
+    create: t("omnibar.askMari.peek.create", "Professor YunYun helps you create this."),
+    edit: t("omnibar.askMari.peek.change", "Open Professor YunYun to check or change this."),
   };
   // The row names what it will send (R8); the line under it says what she will do.
   const askTitle = trimmedQuery
-    ? t("omnibar.askMari.withQuery", "Ask Prof. Mari: “{{query}}”", { query: trimmedQuery })
-    : t("omnibar.askProfessorMari", "Ask Professor Mari");
+    ? t("omnibar.askMari.withQuery", "Ask Prof. YunYun: “{{query}}”", { query: trimmedQuery })
+    : t("omnibar.askProfessorMari", "Ask Professor YunYun");
   const askPeek =
-    askPeeks[capability] ?? t("omnibar.askMari.peek.explain", "Professor Mari explains this and suggests a next step.");
+    askPeeks[capability] ?? t("omnibar.askMari.peek.explain", "Professor YunYun explains this and suggests a next step.");
   // R40: with a query typed, a choice control's options join the searchable set,
   // so "gpt" reaches "Use GPT-4 for this chat" without finding the Model row and
   // drilling into it. They stay out of the idle deck, which would otherwise gain
@@ -732,8 +732,8 @@ export function buildOmnibarSearchResults({
   const controlChoices = trimmedQuery
     ? [...controls, ...chatControls].flatMap((control) => buildChoiceOptionResults(control))
     : [];
-  // F8 (O5): Mari's promotion and "unambiguous direct hit" must never turn on a
-  // frecency boost - "never moves Mari's row" means never decides it either.
+  // F8 (O5): YunYun's promotion and "unambiguous direct hit" must never turn on a
+  // frecency boost - "never moves YunYun's row" means never decides it either.
   // bestMatchScore/directResult/clearDirect are computed from the pre-boost
   // scores below; the boost is applied only afterwards, to final ordering.
   // UX-01: typing her name opens her, as Ctrl+J does. Without this row "mari" only found settings rows.
@@ -742,9 +742,9 @@ export function buildOmnibarSearchResults({
       ? [
           {
             id: "open-professor-mari",
-            title: t("commandCenter.openMari", "Open Prof. Mari"),
+            title: t("commandCenter.openMari", "Open Prof. YunYun"),
             category: "professor",
-            // The presenter otherwise picks a Top hit by title prefix ("Mari changed…", "Ask Professor Mari from Search").
+            // The presenter otherwise picks a Top hit by title prefix ("YunYun changed…", "Ask Professor YunYun from Search").
             group: "top-hit",
             score: 1000,
             kind: "action",
@@ -774,7 +774,7 @@ export function buildOmnibarSearchResults({
   );
   const directResult = getUnambiguousOmnibarResult(preBoostResults);
   // O2: a small, capped nudge from past uses on this surface, applied only to
-  // the final display order. Never applied to Mari's row (frecencyBoost returns
+  // the final display order. Never applied to YunYun's row (frecencyBoost returns
   // 0 for it) and never enough on its own to outrank an exact name match — see
   // FRECENCY_BOOST_CAP.
   const baseResults = preBoostResults
@@ -813,7 +813,7 @@ export function buildOmnibarSearchResults({
           preview: () => ({
             kind: "docs" as const,
             title: askTitle,
-            categoryLabel: t("omnibar.askProfessorMari", "Ask Professor Mari"),
+            categoryLabel: t("omnibar.askProfessorMari", "Ask Professor YunYun"),
             description: askPeek,
             facts: trimmedQuery
               ? [{ label: t("omnibar.askMari.peek.searchLabel", "Your search"), value: trimmedQuery }]
@@ -871,8 +871,8 @@ export function buildOmnibarMariChatResults({
     .map((chat) => ({
       id: `mari-chat:${chat.id}`,
       action: { kind: "open-mari-chat", chatId: chat.id } as const,
-      title: chat.name || t("omnibar.categories.professor", "Professor Mari"),
-      description: t("commandCenter.mariChat", "Professor Mari conversation"),
+      title: chat.name || t("omnibar.categories.professor", "Professor YunYun"),
+      description: t("commandCenter.mariChat", "Professor YunYun conversation"),
       category: "chat" as const,
       group: "chats" as const,
       score: 120,
@@ -1378,17 +1378,17 @@ export function buildOmnibarContextResults({
           icon: "connection",
         });
     }
-    // After the "Editing" rows: the first context row is what an unpinned Mari handoff focuses,
+    // After the "Editing" rows: the first context row is what an unpinned YunYun handoff focuses,
     // and the editor resource must travel with the field.
     if (omnibarSuggestionsEnabled && mariEnabled && activeEditorField) {
       push({
         id: "suggestion:edit-focused-field",
-        title: t("commandCenter.suggestions.editFocusedField", "Improve {{field}} with Prof. Mari", {
+        title: t("commandCenter.suggestions.editFocusedField", "Improve {{field}} with Prof. YunYun", {
           field: activeEditorField.label,
         }),
         description: t(
           "commandCenter.suggestions.editFocusedFieldDescription",
-          "Professor Mari suggests a change to the selected field.",
+          "Professor YunYun suggests a change to the selected field.",
         ),
         category: "professor",
         score: 460,
@@ -1785,19 +1785,19 @@ export function buildOmnibarContinueResult({
   const hasPendingApprovals = countBlockingReviews(status?.pendingApprovals ?? []) > 0;
   if (!hasPendingApprovals && !status?.active && !mariFinished) return null;
   const title = status?.active
-    ? t("commandCenter.continueMariActive", "Professor Mari is working")
+    ? t("commandCenter.continueMariActive", "Professor YunYun is working")
     : mariFinished
-      ? t("commandCenter.continueMariFinished", "Professor Mari finished your task")
+      ? t("commandCenter.continueMariFinished", "Professor YunYun finished your task")
       : hasPendingApprovals
-        ? t("commandCenter.continueMariReview", "Review Professor Mari's pending work")
-        : t("commandCenter.continueMari", "Continue with Professor Mari");
+        ? t("commandCenter.continueMariReview", "Review Professor YunYun's pending work")
+        : t("commandCenter.continueMari", "Continue with Professor YunYun");
   const description = status?.active
-    ? t("commandCenter.continueMariActiveDescription", "Go back to what Professor Mari is doing.")
+    ? t("commandCenter.continueMariActiveDescription", "Go back to what Professor YunYun is doing.")
     : mariFinished
-      ? t("commandCenter.continueMariFinishedDescription", "Open Professor Mari to see what she did.")
+      ? t("commandCenter.continueMariFinishedDescription", "Open Professor YunYun to see what she did.")
       : hasPendingApprovals
-        ? t("commandCenter.continueMariReviewDescription", "Professor Mari is waiting for your review.")
-        : t("commandCenter.continueMariDescription", "Open Professor Mari with the current work attached.");
+        ? t("commandCenter.continueMariReviewDescription", "Professor YunYun is waiting for your review.")
+        : t("commandCenter.continueMariDescription", "Open Professor YunYun with the current work attached.");
   return {
     id: "ask-professor-mari",
     title,

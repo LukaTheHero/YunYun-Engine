@@ -11,7 +11,7 @@ import type {
 export function useOmnibarLabels(activeChat: Chat | null, activeChatId: string | null) {
   const { t } = useTranslation();
   const idleGreeting = useMemo(() => {
-    if (!activeChat) return t("omnibar.hello", "Hi, I'm Professor Mari. Type to search, or ask me anything.");
+    if (!activeChat) return t("omnibar.hello", "Hi, I'm Professor YunYun. Type to search, or ask me anything.");
 
     const greetings =
       activeChat.mode === "roleplay"
@@ -47,7 +47,7 @@ export function useOmnibarLabels(activeChat: Chat | null, activeChatId: string |
       connection: t("omnibar.categories.connection", "Connections"),
       agent: t("omnibar.categories.agent", "Agents"),
       settings: t("omnibar.categories.settings", "Settings"),
-      professor: t("omnibar.categories.professor", "Professor Mari"),
+      professor: t("omnibar.categories.professor", "Professor YunYun"),
       docs: t("omnibar.categories.docs", "Docs"),
     }),
     [t],
@@ -98,9 +98,9 @@ export function useOmnibarLabels(activeChat: Chat | null, activeChatId: string |
       agents: filterLabels.agents,
       settings: filterLabels.settings,
       docs: filterLabels.docs,
-      "professor-suggested": t("commandCenter.groups.mariSuggested", "Professor Mari"),
+      "professor-suggested": t("commandCenter.groups.mariSuggested", "Professor YunYun"),
       "top-hit": t("commandCenter.groups.topHit", "Top hit"),
-      "professor-fallback": t("commandCenter.groups.askMari", "Ask Professor Mari"),
+      "professor-fallback": t("commandCenter.groups.askMari", "Ask Professor YunYun"),
     }),
     [filterLabels, t],
   );

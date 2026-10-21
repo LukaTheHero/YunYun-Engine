@@ -410,13 +410,13 @@ try {
     chatId: chat.id,
     role: "assistant",
     characterId: narrator.id,
-    content: "The fog lifts. [whisper character=Mari PERSONA_SECRET] The bells ring.",
+    content: "The fog lifts. [whisper character=YunYun PERSONA_SECRET] The bells ring.",
   });
   assert(personaReply);
   const personaEdit = await app.inject({
     method: "PATCH",
     url: `/api/chats/${chat.id}/messages/${personaReply.id}`,
-    payload: { content: "The fog lifts. [whisper: character=”Mari” text=”PERSONA_SECRET”] The bells ring." },
+    payload: { content: "The fog lifts. [whisper: character=”YunYun” text=”PERSONA_SECRET”] The bells ring." },
   });
   assert.equal(personaEdit.statusCode, 200, personaEdit.body);
   const personaMessage = personaEdit.json() as { content: string; extra: unknown };
@@ -433,7 +433,7 @@ try {
     chatId: chat.id,
     role: "user",
     characterId: null,
-    content: '[whisper: character="Mari" text="SELF_SECRET"]',
+    content: '[whisper: character="YunYun" text="SELF_SECRET"]',
   });
   assert.deepEqual(
     getRoleplayCommandActivity(JSON.parse(String(selfWhisper!.extra))).map((item) => item.error),

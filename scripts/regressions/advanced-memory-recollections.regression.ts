@@ -64,14 +64,14 @@ function summaryAnswer(system: string, user: string) {
   }
   if (user.includes("SCENE_ONE"))
     return answer(
-      "SUMMARY_ONE Mari, Ada and Bram repaired the lighthouse lamp.",
+      "SUMMARY_ONE YunYun, Ada and Bram repaired the lighthouse lamp.",
       ["Ada", "Bram", "Cato"],
       [
         // Copies the message hidden from Ada: left out, and a later recollection-only request writes hers.
         ["Ada", "ADA_LEAK I keep thinking the crimson heron sings at dawn."],
-        ["Bram", "*BRAM_ONE I remember Mari's relief when the lamp caught, and Ada's steady hands.*"],
+        ["Bram", "*BRAM_ONE I remember YunYun's relief when the lamp caught, and Ada's steady hands.*"],
         ["Cato", "CATO_ONE I was never there."],
-        ["Mari", "PERSONA_ONE The user's persona gets none."],
+        ["YunYun", "PERSONA_ONE The user's persona gets none."],
         ["Narrator", "NARRATOR_ONE The narrator gets none."],
       ],
     );
@@ -146,7 +146,7 @@ const { characters } = await import("../../packages/server/src/db/schema/charact
 const db = await createFileNativeDB();
 const chats = createChatsStorage(db);
 const memory = createAdvancedMemoryService(db);
-const persona = { personaSnapshot: { name: "Mari" } };
+const persona = { personaSnapshot: { name: "YunYun" } };
 const recollections = async (chatId: string) =>
   (await memory.status(chatId)).records.filter((record) => record.kind === "recollection");
 const summaries = async (chatId: string) =>
@@ -221,7 +221,7 @@ try {
   await chats.createMessagesBatch(chat.id, [
     {
       role: "user",
-      content: "SCENE_ONE Mari, Ada and Bram climb up to repair the lighthouse lamp.",
+      content: "SCENE_ONE YunYun, Ada and Bram climb up to repair the lighthouse lamp.",
       extra: { ...persona, ...awayFromOne },
     },
     {
@@ -236,7 +236,7 @@ try {
     { role: "assistant", characterId: "bram", content: "Bram watches the tide roll in beside the pier." },
     {
       role: "user",
-      content: "SCENE_CHANGE Back at the lighthouse, Mari checks the repaired lamp.",
+      content: "SCENE_CHANGE Back at the lighthouse, YunYun checks the repaired lamp.",
       extra: { ...persona, isConversationStart: true },
     },
   ]);
@@ -256,8 +256,8 @@ try {
     "only characters who could read the scene get their card in the request",
   );
   const adaCard = cards.find((entry) => entry.name === "Ada")!;
-  assert.equal(adaCard.description, "Ada is a logical engineer who trusts Mari.", "card macros resolve per character");
-  assert.equal(adaCard.scenario, "Ada keeps the old lighthouse with Mari.");
+  assert.equal(adaCard.description, "Ada is a logical engineer who trusts YunYun.", "card macros resolve per character");
+  assert.equal(adaCard.scenario, "Ada keeps the old lighthouse with YunYun.");
   assert.equal(adaCard.exampleDialogue, "Ada: Hold the lamp steady.");
   assert.equal(adaCard.backstory, "Ada grew up on the cliffs.", "the full card is sent, extensions included");
   assert(!sceneOneCall.system.includes("{{char}}") && !sceneOneCall.system.includes("{{user}}"));
@@ -290,13 +290,13 @@ try {
   assert.deepEqual(Object.keys(owned(sceneOne.sceneId)).sort(), ["ada", "bram"], "only participants keep one");
   assert.equal(
     owned(sceneOne.sceneId).bram,
-    "BRAM_ONE I remember Mari's relief when the lamp caught, and Ada's steady hands.",
+    "BRAM_ONE I remember YunYun's relief when the lamp caught, and Ada's steady hands.",
     "wrapping asterisks are removed",
   );
   assert.match(owned(sceneOne.sceneId).ada!, /^ADA_\d+_SCENE_ONE /u, "Ada's comes from the recollection-only request");
   assert(!saved.some((record) => /crimson heron|CATO_|PERSONA_|NARRATOR_/u.test(record.content)));
   assert.deepEqual(Object.keys(owned(sceneTwo.sceneId)).sort(), ["ada", "bram"]);
-  assert.equal(sceneOne.content, "SUMMARY_ONE Mari, Ada and Bram repaired the lighthouse lamp.");
+  assert.equal(sceneOne.content, "SUMMARY_ONE YunYun, Ada and Bram repaired the lighthouse lamp.");
   assert.deepEqual(sceneOne.audienceCharacterIds, ["ada", "bram"], "Cato, away for the whole scene, is no participant");
   assert(
     saved.every((record) => record.embeddingStatus === "pending" && record.audienceCharacterIds.length === 1),
@@ -395,7 +395,7 @@ try {
   // scene two's messages.
   await chats.createMessagesBatch(chat.id, [
     { role: "assistant", characterId: "bram", content: "Bram nods." },
-    { role: "user", content: "Mari asks about the glowing moonstone pendant.", extra: persona },
+    { role: "user", content: "YunYun asks about the glowing moonstone pendant.", extra: persona },
     { role: "assistant", characterId: "narr", content: "A glowing moonstone pendant is mentioned again." },
     { role: "user", content: "Where did the moonstone pendant go?", extra: persona },
     { role: "assistant", characterId: "narr", content: "Nobody answers about the moonstone pendant yet." },
@@ -414,7 +414,7 @@ try {
 
   // ── 5. A corrected summary makes its recollections out of date; the next run writes them again ──
   await memory.updateRecord(chat.id, sceneOne.id, {
-    content: "SUMMARY_ONE_CORRECTED Mari, Ada and Bram repaired the lighthouse lamp together.",
+    content: "SUMMARY_ONE_CORRECTED YunYun, Ada and Bram repaired the lighthouse lamp together.",
   });
   saved = await recollections(chat.id);
   assert(

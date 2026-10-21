@@ -1,4 +1,4 @@
-// A reverse proxy or tunnel on the same computer connects to Marinara from
+// A reverse proxy or tunnel on the same computer connects to YunYun from
 // 127.0.0.1, so every visitor it relays has a loopback socket address. Such a
 // request must not inherit the passwordless trust meant for the person sitting
 // at this computer: it carries proxy forwarding headers and must pass the same
