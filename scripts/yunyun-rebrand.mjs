@@ -20,7 +20,11 @@
 // Professor Mari's persona lore in seed-mari.ts / workspace-agent.service.ts,
 // or new What's New announcements and their /releases/ media (the fork keeps
 // RELEASE_ANNOUNCEMENTS empty because upstream writes them as Mari and
-// illustrates them with its characters).
+// illustrates them with its characters). Upstream's official agent covers
+// (Marinara-Agents artwork/agent-covers/) all draw Mari too, so no text rule
+// can help there: resolveCapabilityPackageIconUrl in package-manager.service.ts
+// must keep returning no icon for them (capability-package-lifecycle pins it),
+// and nothing else may build that artwork URL.
 //
 // Usage:  node scripts/yunyun-rebrand.mjs [--dry] [--list]
 // ──────────────────────────────────────────────
@@ -75,8 +79,17 @@ const RULES = [
   // maps onto it. This must run before the catch-all below, which would turn
   // "sprites/mari/basic/idle.webp" into "chibi-yunyun.png/idle.webp".
   [/sprites\/mari\/(?!generated\/)[a-z][a-z0-9-]*\//g, "sprites/yunyun/basic/"],
+  // The memory wheel is a 1152 × 768 sheet of four frames that advanced-memory.css
+  // crops with fixed geometry, so it gets its own generated sheet rather than the
+  // plain chibi (which that crop would cut off). Before the catch-all below. The
+  // second rule is the e2e spec's regex-literal spelling, with escaped slashes.
+  [/sprites\/mari\/generated\/professor-mari-memory-wheel-v2\.(?:webp|png)/g, "sprites/yunyun/memory-wheel.webp"],
+  [
+    /sprites\\\/mari\\\/generated\\\/professor-mari-memory-wheel-v2\\\.(?:webp|png)/g,
+    "sprites\\/yunyun\\/memory-wheel\\.webp",
+  ],
   // Everything else under sprites/mari/ — the six assistant states, the chibi,
-  // the pointing/waving tutorial sprites, the memory wheel and its prompt note.
+  // the pointing/waving tutorial sprites and the memory wheel's prompt note.
   [/sprites\/mari\/(?:generated\/)?[A-Za-z0-9_][A-Za-z0-9_.-]*/g, "sprites/yunyun/chibi-yunyun.png"],
   // The directory is also interpolated, e.g. `sprites/mari/${image}` in a
   // Playwright avatar helper, which the path rules above cannot match.
@@ -86,19 +99,39 @@ const RULES = [
   [/releases\/2\.4\.2\/professor-mari-memories\.png/g, "sprites/yunyun/chibi-yunyun.png"],
   [/releases\/2\.5\.0\/chat-ui-mari\.jpg/g, "sprites/yunyun/chibi-yunyun.png"],
   [/images\/chat-widgets\/mari-primogem\.svg/g, "sprites/yunyun/chibi-yunyun.png"],
-  [/assets\/imagegen\/home-v5-tabs\/professor-mari-(?:blink-source|idle-reference)\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  [
+    /assets\/imagegen\/home-v5-tabs\/professor-mari-(?:blink-source|idle-reference)\.png/g,
+    "sprites/yunyun/chibi-yunyun.png",
+  ],
   [/assets\/imagegen\/professor-mari-assistant-source\.png/g, "sprites/yunyun/chibi-yunyun.png"],
+  // Playwright fixtures read this deleted source art from disk (readFileSync of
+  // "../packages/client/assets/imagegen/..."), so it maps to a repository path
+  // under public/. Full-body sprite and avatar fixtures get the chibi, which has
+  // the same portrait aspect. The NovelAI style-plate upload instead needs an
+  // edge over the 1536 px attachment limit, so it is re-encoded as JPEG: the
+  // logo is the one tracked PNG that wide. That rule must run first.
+  [
+    /(name: "style-plate\.png",[\s\S]{0,200}?)\.\.\/packages\/client\/assets\/imagegen\/mari-generated-originals\/professor-mari-assistant-map-source\.png/g,
+    "$1../packages/client/public/yunyun-logo.png",
+  ],
+  [
+    /assets\/imagegen\/mari-generated-originals\/professor-mari-assistant-map-source\.png/g,
+    "public/sprites/yunyun/chibi-yunyun.png",
+  ],
   // Bare basenames, for the test helpers and CSS assertions that use the
   // filename on its own with no directory in front of it.
   [/\bMari_profile\.png/g, "yunyun-profile.png"],
-  [/\bMari_(?:wave|greet|thinking|explaining|point_up_left|point_middle_left|point_down_left|noodler_teaser_locked|noodler_teaser_unlocked)\.(?:png|webp)/g, "chibi-yunyun.png"],
+  [
+    /\bMari_(?:wave|greet|thinking|explaining|point_up_left|point_middle_left|point_down_left|noodler_teaser_locked|noodler_teaser_unlocked)\.(?:png|webp)/g,
+    "chibi-yunyun.png",
+  ],
   // Appears bare in an imagegen prompt note. NB: must stay anchored to ".png" so
   // it cannot touch the "marinara:chibi-professor-mari-toast-seen" localStorage
   // key in ChibiProfessorMariEasterEgg.tsx — renaming that wipes user state.
   [/\bchibi-professor-mari\.png/g, "chibi-yunyun.png"],
   // The memory-wheel sprite is asserted as a regex literal in an e2e spec, where
   // the dot arrives backslash-escaped, so accept both spellings.
-  [/\bprofessor-mari-memory-wheel-v2\\?\.png/g, "chibi-yunyun.png"],
+  [/\bprofessor-mari-memory-wheel-v2\\?\.(?:webp|png)/g, "memory-wheel.webp"],
   [/\bmari-primogem\.svg/g, "chibi-yunyun.png"],
   // Upstream's Dottore art (the chat-widget crest and the support GIF) is not
   // shipped either.
@@ -197,6 +230,12 @@ const PROTECT = [
 ];
 const SENTINEL = "YYP";
 
+// Applied BEFORE the PROTECT mask, which would otherwise shield the "Mari CLI"
+// inside these. The work card's "Prof. Mari CLI" names the character, not the
+// binary; lowercase `mari` is the literal command, like the card's own
+// "Running mari …" titles, and no rule above touches lowercase `mari`.
+const PRE_MASK_RULES = [[new RegExp(`\\bProf\\. ${OLD_ASSISTANT} CLI\\b`, "g"), "mari CLI"]];
+
 // LICENSE + CHANGELOG are historical/legal records — leave them verbatim.
 // TRADEMARKS.md is UPSTREAM's policy about THEIR marks — rewriting it would
 // misstate their policy and imply we claim their marks.
@@ -234,6 +273,14 @@ for (const file of files) {
 
   let out = text;
   let hits = 0;
+
+  for (const [from, to] of PRE_MASK_RULES) {
+    const n = (out.match(from) || []).length;
+    if (n > 0) {
+      out = out.replace(from, to);
+      hits += n;
+    }
+  }
 
   // Mask protected phrases so the rules below cannot touch them.
   const masked = [];

@@ -16,3 +16,12 @@ the exact size and frame layout of the upstream file it replaces, so the existin
 The chibi is bottom-centered in each frame with transparent padding, then saved as WebP at quality 88.
 The art is static, so the animated slots hold still. Replace any file with real animation frames of the
 same size to animate it, and bump `MARI_SPRITE_VERSION` so the service worker refetches it.
+
+## Memory wheel
+
+`../memory-wheel.webp` sits outside the pack because every appearance shares it: it is the sheet behind the
+advanced-memory progress wheel (`.mari-memory-wheel` in `src/components/chat/advanced-memory.css`). It keeps
+the geometry of upstream's original memory-wheel sheet, which the CSS crop expects: 1152 × 768, four
+288 × 336 frames in the band centered vertically (y 216–552), transparent everywhere else. Each frame holds
+the chibi, bottom-centered with small transparent padding, saved as WebP at quality 88. The CSS URL has no
+version query, so give replacement art a new file name.

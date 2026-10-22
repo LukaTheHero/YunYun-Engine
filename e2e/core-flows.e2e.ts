@@ -3265,12 +3265,8 @@ test("NovelAI style plate upload keeps the connection editor mounted", async ({ 
     await editor.locator('input[type="file"][accept*="image/png"]').setInputFiles({
       name: "style-plate.png",
       mimeType: "image/png",
-      buffer: readFileSync(
-        new URL(
-          "../packages/client/assets/imagegen/mari-generated-originals/professor-mari-assistant-map-source.png",
-          import.meta.url,
-        ),
-      ),
+      // Wider than the 1536 px attachment edge, so the upload must be downscaled and re-encoded as JPEG.
+      buffer: readFileSync(new URL("../packages/client/public/yunyun-logo.png", import.meta.url)),
     });
 
     await expect(editor).toBeVisible();
@@ -8186,7 +8182,7 @@ test("Roleplay Tracker preserves named characters with missing or malformed card
     characterId = (await characterResponse.json()).id;
     const avatarResponse = await request.post(`/api/characters/${characterId}/avatar`, {
       data: {
-        avatar: `data:image/png;base64,${readFileSync(new URL("../packages/client/assets/imagegen/mari-generated-originals/professor-mari-assistant-map-source.png", import.meta.url)).toString("base64")}`,
+        avatar: `data:image/png;base64,${readFileSync(new URL("../packages/client/public/sprites/yunyun/chibi-yunyun.png", import.meta.url)).toString("base64")}`,
         filename: "tracker-fixture.png",
       },
     });

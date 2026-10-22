@@ -679,7 +679,7 @@ function extractMariGenericCommand(command: string) {
 }
 
 function mariGenericTitle(info: NonNullable<ReturnType<typeof extractMariGenericCommand>>) {
-  if (info.group === "help") return "Opening Prof. Mari CLI help";
+  if (info.group === "help") return "Opening mari CLI help";
   if (info.group === "storage") return "Checking reserved storage command";
   if (info.action === "help") return `Opening mari ${info.group} help`;
   return `Running mari ${info.group} ${info.action}`;
@@ -813,7 +813,7 @@ export function inferToolPresentation(tool: WorkspaceToolCall): ToolPresentation
   }
   if (command && mariGeneric) {
     return {
-      eyebrow: "Prof. Mari CLI",
+      eyebrow: "mari CLI",
       title: mariGenericTitle(mariGeneric),
       detail: mariGenericDetail(mariGeneric),
       tone: "shell",
