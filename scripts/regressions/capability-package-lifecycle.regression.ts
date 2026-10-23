@@ -783,8 +783,8 @@ try {
   );
   assert.equal(
     normalizedCatalog.packages[0]?.iconUrl,
-    "https://raw.githubusercontent.com/Pasta-Devs/Marinara-Agents/staging/artwork/agent-covers/legacy.png",
-    "The catalog response must expose artwork normalized through the active catalog URL",
+    undefined,
+    "YunYun: the catalog response must not expose upstream's official agent covers (they draw upstream's assistant character)",
   );
   assert.equal(getCapabilityPackageArtifactSourceIssue(canonicalArtifactEntry, officialCatalogUrl), null);
   assert.equal(
@@ -797,11 +797,13 @@ try {
     "https://raw.githubusercontent.com/Pasta-Devs/Marinara-Agents/staging/artifacts/legacy-1.0.0.zip",
     "Engine staging must download official artifacts from Marinara-Agents staging even when generated metadata remains stable",
   );
-  assert.equal(
-    resolveCapabilityPackageIconUrl(canonicalArtifactEntry, stagingCatalogUrl),
-    "https://raw.githubusercontent.com/Pasta-Devs/Marinara-Agents/staging/artwork/agent-covers/legacy.png",
-    "Engine staging must load official artwork from Marinara-Agents staging even when generated metadata remains stable",
-  );
+  for (const catalogUrl of [officialCatalogUrl, stagingCatalogUrl]) {
+    assert.equal(
+      resolveCapabilityPackageIconUrl(canonicalArtifactEntry, catalogUrl),
+      undefined,
+      "YunYun: official catalog entries must fall back to the generic icon instead of upstream's character covers",
+    );
+  }
   assert.match(
     getCapabilityPackageArtifactSourceIssue(
       {
@@ -842,6 +844,11 @@ try {
     ),
     "https://packages.example/legacy.png",
     "Explicit custom catalogs must retain their configured artwork URLs",
+  );
+  assert.equal(
+    resolveCapabilityPackageIconUrl(canonicalArtifactEntry, "https://catalog.example.test/custom.json"),
+    undefined,
+    "YunYun: a custom catalog that points back at upstream's agent covers must not show them either",
   );
   const {
     buildHierarchicalMapsSelectionCorrectionPatch,

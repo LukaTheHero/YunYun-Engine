@@ -26,10 +26,7 @@ async function fixture(request: APIRequestContext, art = false) {
     const character = await create("/api/characters", { data: { name: "YunYun", first_mes: "" } });
     if (art) {
       const image = readFileSync(
-        new URL(
-          "../packages/client/assets/imagegen/mari-generated-originals/professor-mari-assistant-map-source.png",
-          import.meta.url,
-        ),
+        new URL("../packages/client/public/sprites/yunyun/chibi-yunyun.png", import.meta.url),
       ).toString("base64");
       expect(
         (
@@ -625,7 +622,9 @@ test("Roleplay VN shows dice and image-only messages without findLast support", 
       data: {
         role: "user",
         content: "",
-        extra: { attachments: [{ type: "image", url: "/sprites/yunyun/yunyun-profile.png", filename: "portrait.png" }] },
+        extra: {
+          attachments: [{ type: "image", url: "/sprites/yunyun/yunyun-profile.png", filename: "portrait.png" }],
+        },
       },
     });
     expect(attachment.ok(), await attachment.text()).toBeTruthy();
@@ -654,10 +653,7 @@ test("VN history opens at the newest message and scene art respects size, activi
   const extras: string[] = [];
   try {
     const image = readFileSync(
-      new URL(
-        "../packages/client/assets/imagegen/mari-generated-originals/professor-mari-assistant-map-source.png",
-        import.meta.url,
-      ),
+      new URL("../packages/client/public/sprites/yunyun/chibi-yunyun.png", import.meta.url),
     ).toString("base64");
     for (const name of ["Second active", "Inactive"]) {
       const created = await request.post("/api/characters", { data: { data: { name, first_mes: "" } } });
@@ -701,9 +697,7 @@ test("VN history opens at the newest message and scene art respects size, activi
         content: "The newest turn.\n\nThe experiment is ready.",
         extra: {
           spriteExpressions: { [ids[0]!]: "neutral", [ids[1]!]: "neutral" },
-          attachments: [
-            { type: "image", url: "/sprites/yunyun/chibi-yunyun.png", filename: "Scene illustration" },
-          ],
+          attachments: [{ type: "image", url: "/sprites/yunyun/chibi-yunyun.png", filename: "Scene illustration" }],
         },
       },
     });

@@ -127,9 +127,6 @@ function officialCatalogRoot(branch: OfficialAgentBranch): string {
 function officialArtifactRoot(branch: OfficialAgentBranch): string {
   return `${OFFICIAL_AGENT_RAW_ROOT}/${branch}/artifacts`;
 }
-function officialArtworkRoot(branch: OfficialAgentBranch): string {
-  return `${OFFICIAL_AGENT_RAW_ROOT}/${branch}/artwork/agent-covers`;
-}
 function isOfficialCatalogUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -6223,13 +6220,18 @@ export function resolveCapabilityPackageArtifactUrl(entry: CapabilityCatalogPack
   return `${officialArtifactRoot(branch)}/${entry.manifest.id}-${entry.manifest.version}.zip`;
 }
 
+// YunYun: every official Marinara-Agents cover (artwork/agent-covers/<id>.png) is a drawing of
+// upstream's assistant character, so the fork never shows them. Official entries, and any catalog that
+// points back into that repository for art, get no icon and render the generic fallback; a
+// third-party catalog keeps its own artwork.
 export function resolveCapabilityPackageIconUrl(
   entry: CapabilityCatalogPackage,
   catalogUrl = CATALOG_URL,
 ): string | undefined {
-  const branch = getOfficialAgentBranchFromCatalogUrl(catalogUrl);
-  if (!branch || !entry.iconUrl) return entry.iconUrl;
-  return `${officialArtworkRoot(branch)}/${entry.manifest.id}.png`;
+  if (getOfficialAgentBranchFromCatalogUrl(catalogUrl)) return undefined;
+  return entry.iconUrl?.toLowerCase().startsWith(`${OFFICIAL_AGENT_RAW_ROOT.toLowerCase()}/`)
+    ? undefined
+    : entry.iconUrl;
 }
 
 async function readInstalledAgentDefinitions(installed: InstalledCapabilityPackage) {
