@@ -15,7 +15,11 @@ import type {
   CreateChoiceBlockInput,
   UpdateChoiceBlockInput,
 } from "@marinara-engine/shared";
-import { DEFAULT_GENERATION_PARAMS, resolveScopedRegexMode } from "@marinara-engine/shared";
+import {
+  DEFAULT_GENERATION_PARAMS,
+  normalizePromptPresetEngineMode,
+  resolveScopedRegexMode,
+} from "@marinara-engine/shared";
 import { normalizeTimestampOverrides, type TimestampOverrides } from "../import/import-timestamps.js";
 
 function resolveTimestamps(overrides?: TimestampOverrides | null) {
@@ -97,6 +101,7 @@ export function createPromptsStorage(db: DB) {
         isDefault: String(input.isDefault ?? false),
         author: input.author ?? "",
         systemKey: "",
+        engineMode: input.engineMode ?? "",
         createdAt: timestamp.createdAt,
         updatedAt: timestamp.updatedAt,
       });
@@ -129,6 +134,7 @@ export function createPromptsStorage(db: DB) {
       }
       if (data.wrapFormat !== undefined) updateFields.wrapFormat = data.wrapFormat;
       if (data.scopedRegexMode !== undefined) updateFields.scopedRegexMode = data.scopedRegexMode;
+      if (data.engineMode !== undefined) updateFields.engineMode = data.engineMode;
       if (data.author !== undefined) updateFields.author = data.author;
       if ((data as any).defaultChoices !== undefined)
         updateFields.defaultChoices = JSON.stringify((data as any).defaultChoices);
@@ -166,6 +172,8 @@ export function createPromptsStorage(db: DB) {
         parameters: JSON.parse(preset.parameters as string),
         wrapFormat: preset.wrapFormat as "xml" | "markdown",
         scopedRegexMode: resolveScopedRegexMode(preset.scopedRegexMode),
+        // A copy stays a Megumin preset; only systemKey (stock identity) is dropped.
+        engineMode: normalizePromptPresetEngineMode(preset.engineMode),
         author: preset.author,
       });
       if (!newPreset) return null;

@@ -35,6 +35,7 @@ import { chatBackgroundMetadataToUrl, chatBackgroundUrlToMetadata } from "../../
 import { useChatStore } from "../../stores/chat.store";
 import { useUIStore } from "../../stores/ui.store";
 import { ChoiceSelectionModal } from "../presets/ChoiceSelectionModal";
+import { useMeguminAssignGuard } from "../../features/megumin/use-megumin-assign";
 import { ChatCharacterDropOptions } from "./ChatCharacterDropOptions";
 
 type CharacterDropOptions = { chatId: string; characterId: string; characterName: string; askGreeting: boolean };
@@ -231,6 +232,7 @@ export function ChatResourceDropOverlay({ chat }: { chat: Chat }) {
   const [characterOptions, setCharacterOptions] = useState<CharacterDropOptions | null>(null);
   const [assigning, setAssigning] = useState(false);
   const agentSetupHandoffRef = useRef(false);
+  const guardMeguminAssign = useMeguminAssignGuard();
   chatRef.current = chat;
 
   const resolveOverlay = useCallback(
@@ -328,6 +330,15 @@ export function ChatResourceDropOverlay({ chat }: { chat: Chat }) {
       }
 
       if (!ensureConnectionReady(latestAction, validatedConnectionRows)) return;
+      let confirmMeguminAssign: (() => Promise<boolean>) | null = null;
+      if (latestAction.type === "set-preset") {
+        const presetId = latestAction.id;
+        const preset = (presets as Array<{ id: string; name?: string; engineMode?: unknown }>).find(
+          (item) => item.id === presetId,
+        );
+        confirmMeguminAssign = await guardMeguminAssign(preset);
+        if (!confirmMeguminAssign) return;
+      }
 
       if (
         (latestAction.type === "set-persona" ||
@@ -392,6 +403,8 @@ export function ChatResourceDropOverlay({ chat }: { chat: Chat }) {
           return;
         }
       }
+      // Megumin Mode turns on only once every question is answered, so a later Cancel leaves it off.
+      if (confirmMeguminAssign && !(await confirmMeguminAssign())) return;
 
       try {
         if (latestAction.type === "add-characters") {
@@ -574,6 +587,7 @@ export function ChatResourceDropOverlay({ chat }: { chat: Chat }) {
       currentPersona?.name,
       lorebooks,
       ensureConnectionReady,
+      guardMeguminAssign,
       presets,
       refetchConnections,
       refetchPresets,

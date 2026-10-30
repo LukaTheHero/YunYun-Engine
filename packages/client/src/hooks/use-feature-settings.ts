@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FEATURE_SETTINGS_KEY,
+  FEATURE_SWITCH_DEFAULTS,
   resolveFeatureEnabled,
   type FeatureSettings,
   type FeatureSettingsResponse,
@@ -29,8 +30,24 @@ export function useFeatureSettings() {
  * saved setting, else the default. Returns the default (off) until the settings load.
  */
 export function useFeatureEnabled(name: FeatureSwitchName): boolean {
-  const data = useFeatureSettings().data;
+  return readFeatureEnabled(useFeatureSettings().data, name);
+}
+
+/** useFeatureEnabled outside a component, from the loaded settings (off until they load). */
+export function readFeatureEnabled(data: FeatureSettingsResponse | undefined, name: FeatureSwitchName): boolean {
   return data?.effective?.[name] ?? resolveFeatureEnabled(data?.settings, name);
+}
+
+/**
+ * `settings` with `patch` applied, keeping only what differs from the defaults so a later default change
+ * still reaches this install. `PUT /features` replaces the whole object, so every save sends this.
+ */
+export function mergeFeatureSettings(settings: FeatureSettings | undefined, patch: FeatureSettings): FeatureSettings {
+  const next: FeatureSettings = { ...(settings ?? {}), ...patch };
+  for (const key of Object.keys(next) as FeatureSwitchName[]) {
+    if (next[key] === FEATURE_SWITCH_DEFAULTS[key]) delete next[key];
+  }
+  return next;
 }
 
 /** Save the complete switch object (omitted keys return to their defaults). */

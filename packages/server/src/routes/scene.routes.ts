@@ -23,7 +23,7 @@ import { createReplyFallbackNotifier } from "./generate/fallback-notification.js
 import { stripConversationPromptTimestamps } from "../services/conversation/transcript-sanitize.js";
 import { DATA_DIR } from "../utils/data-dir.js";
 import type { ChatCompletionResult, ChatMessage } from "../services/llm/base-provider.js";
-import { localAuthProviderBaseUrl, parseChoiceOptions } from "@marinara-engine/shared";
+import { isMeguminPreset, localAuthProviderBaseUrl, parseChoiceOptions } from "@marinara-engine/shared";
 import type {
   SceneCreateRequest,
   SceneCreateResponse,
@@ -40,6 +40,7 @@ import type {
 } from "@marinara-engine/shared";
 import { resolveBaseUrl as resolveSceneConnectionBaseUrl } from "./generate/generate-route-utils.js";
 import { assemblePrompt } from "../services/prompt/assembler.js";
+import { isFeatureEnabled } from "../services/features/feature-settings.js";
 import { parsePromptPresetChoices } from "../services/generation/conversation-context-utils.js";
 import { withDeadline } from "../services/capability-packages/capability-prompt-context.service.js";
 import {
@@ -1204,7 +1205,10 @@ export async function sceneRoutes(app: FastifyInstance) {
       },
     ];
 
-    if (preset) {
+    // The scene chat is a Roleplay chat that runs this preset, so a Megumin preset fills its slots
+    // when Megumin Mode is on. While it is off those slots hold nothing, so the plan goes without it.
+    const meguminScene = isMeguminPreset(preset) && isFeatureEnabled("meguminMode");
+    if (preset && (meguminScene || !isMeguminPreset(preset))) {
       const [sections, groups] = await Promise.all([prompts.listSections(preset.id), prompts.listGroups(preset.id)]);
       const assembled = await assemblePrompt({
         db: app.db,
@@ -1225,6 +1229,7 @@ export async function sceneRoutes(app: FastifyInstance) {
         enableAgents: false,
         disableLorebooks: true,
         previewOnly: true,
+        megumin: { enabled: meguminScene },
       });
       const instructions = assembled.messages
         .map((message) => message.content)

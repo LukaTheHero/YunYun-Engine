@@ -19,7 +19,8 @@ import {
   resolveStoredModelContextLimit,
 } from "../../services/generation/model-access-policy.js";
 import { sentOutputBudget } from "../../services/generation/empty-response-reason.js";
-import { buildGenerationPromptPresetCandidates } from "./prompt-preset-selection.js";
+import { buildGenerationPromptPresetCandidates, resolveGenerationPromptPreset } from "./prompt-preset-selection.js";
+import { isFeatureEnabled } from "../../services/features/feature-settings.js";
 import { resolveBaseUrl, parseExtra, parseStoredGenerationParameters } from "./generate-route-utils.js";
 
 const previewSchema = z.object({ connectionId: z.string().min(1), chatId: z.string().min(1).optional() });
@@ -35,15 +36,17 @@ export async function registerParameterPreviewRoute(app: FastifyInstance) {
     const metadata = parseExtra(chat?.metadata);
     const chatMode = chat?.mode ?? "roleplay";
     const presets = createPromptsStorage(app.db);
-    let preset: Awaited<ReturnType<typeof presets.getById>> = null;
-    for (const candidate of buildGenerationPromptPresetCandidates({
+    const { preset } = await resolveGenerationPromptPreset({
+      candidates: buildGenerationPromptPresetCandidates({
+        chatMode,
+        chatPromptPresetId: chat?.promptPresetId,
+        connectionPromptPresetId: connection.promptPresetId,
+      }),
+      presetsStorage: presets,
+      meguminEnabled: isFeatureEnabled("meguminMode"),
       chatMode,
-      chatPromptPresetId: chat?.promptPresetId,
-      connectionPromptPresetId: connection.promptPresetId,
-    })) {
-      preset = await presets.getById(candidate.id);
-      if (preset) break;
-    }
+      logLabel: "[generate/parameters]",
+    });
     const presetParams = preset ? parsePresetParameters(preset.parameters) : { ...DEFAULT_GENERATION_PARAMS };
     const storedPresetParams = parseStoredGenerationParameters(preset?.parameters);
     const policy = resolveModelAccessPolicy(connection);

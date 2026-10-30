@@ -411,6 +411,7 @@ import { normalizeHydratedMessage } from "../../packages/client/src/lib/message-
 import { HOME_CHAT_MODE_ACCENTS } from "../../packages/client/src/lib/home-chat-mode-style.js";
 import {
   homeCustomWidgetCatalogSchema,
+  MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
   type BuiltInAgentManifest,
   type CapabilityPackageManifest,
   type CharacterData,
@@ -6899,13 +6900,14 @@ assert.match(
   "LinkAPI actions must share the available banner width instead of overflowing it",
 );
 assert.equal(
-  resolvePresetArtwork({ name: "Marinara's Universal Preset", author: "YunYun" }),
+  resolvePresetArtwork({ systemKey: MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY }),
   MARINARA_UNIVERSAL_PRESET_ARTWORK,
+  "the stock Universal preset gets its artwork by reserved identity",
 );
+assert.equal(resolvePresetArtwork({ systemKey: "" }), null, "a user preset has no stock artwork");
 assert.equal(
   resolvePresetArtwork({
-    name: "Marinara's Universal Preset",
-    author: "YunYun",
+    systemKey: MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
     imagePath: "/api/prompts/images/file/custom.png",
   }),
   "/api/prompts/images/file/custom.png",

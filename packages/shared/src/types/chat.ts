@@ -313,6 +313,8 @@ export interface ChatMetadata {
   windowLayout?: unknown;
   /** Hide Chat Settings' introductory tips for this chat; included in settings profiles. */
   chatSettingsHintDismissed?: boolean;
+  /** This chat's own Megumin Suite profile (sparse); null or absent inherits the character or default profile. */
+  meguminProfile?: import("../features/megumin/profile-schema.js").MeguminProfile | null;
   /** Chat-local tracker icon overrides keyed by persona id, unique character id, or tracker character slot. */
   trackerStatIconOverrides?: Record<string, import("../constants/stat-icons.js").TrackerStatIconAssignment[]>;
   /** Compiled enabled rolling summary text for context injection. Derived from summaryEntries when present. */

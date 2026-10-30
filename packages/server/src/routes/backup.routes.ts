@@ -49,8 +49,7 @@ import { TRIPO_API_KEY_SETTING } from "../services/avatars/generation/tripo-key.
 import {
   canReparentFolder,
   CHAT_METADATA_LOCAL_DESTINATION_KEYS,
-  isStockMarinaraUniversalPreset,
-  MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
+  isStockPreset,
   normalizePersonalExtensionCapabilities,
   TRANSLATOR_DEFAULTS_SETTINGS_KEY,
   type ExportEnvelope,
@@ -903,14 +902,18 @@ export function quarantineProfileThemeRow(row: Record<string, unknown>) {
   return { ...row, isActive: "false" };
 }
 
+/**
+ * `localStockPresetIds` maps each stock systemKey to this profile's row for it. A local stock row keeps its
+ * identity; an imported row claiming a stock key this profile already has becomes an editable copy.
+ */
 export function normalizeProfilePromptPresetRow(
   row: Record<string, unknown>,
-  localStockPresetId: string | null,
+  localStockPresetIds: ReadonlyMap<string, string>,
 ): Record<string, unknown> {
-  if (localStockPresetId && row.id === localStockPresetId) {
-    return { ...row, systemKey: MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY };
+  for (const [systemKey, id] of localStockPresetIds) {
+    if (row.id === id) return { ...row, systemKey };
   }
-  if (!localStockPresetId || row.systemKey !== MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY) return row;
+  if (typeof row.systemKey !== "string" || !localStockPresetIds.has(row.systemKey)) return row;
   return { ...row, systemKey: "" };
 }
 
@@ -1407,8 +1410,13 @@ async function importProfileStorageSnapshot(
     let rollbackFailed = false;
     try {
       await app.db.transaction(async (tx) => {
-        const localStockPresetId =
-          ((await tx.select().from(schema.promptPresets)).find(isStockMarinaraUniversalPreset)?.id as string) ?? null;
+        const localStockPresetIds = new Map<string, string>();
+        for (const preset of await tx.select().from(schema.promptPresets)) {
+          const systemKey = preset.systemKey as string;
+          if (isStockPreset(preset) && !localStockPresetIds.has(systemKey)) {
+            localStockPresetIds.set(systemKey, preset.id as string);
+          }
+        }
         const plannedSnapshot = await planProfileNoodleImport(
           tx,
           snapshot,
@@ -1460,7 +1468,7 @@ async function importProfileStorageSnapshot(
             if (tableName === "mari_instructions") cleanRow = quarantineProfileMariInstructionRow(cleanRow);
             if (tableName === "custom_themes") cleanRow = quarantineProfileThemeRow(cleanRow);
             if (tableName === "prompt_presets") {
-              cleanRow = normalizeProfilePromptPresetRow(cleanRow, localStockPresetId);
+              cleanRow = normalizeProfilePromptPresetRow(cleanRow, localStockPresetIds);
             }
             const insert = tx.insert(table as any).values(cleanRow as any) as any;
             const conflictTarget = schemaPrimaryKeyColumn(table);

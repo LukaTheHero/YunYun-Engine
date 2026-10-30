@@ -114,7 +114,8 @@ async function defaultPresetId(db: DB): Promise<string | null> {
 // so lorebook timing/ephemeral state is never consumed. `chatChoices` is a Record (use {}, not []).
 // When `withPlaceholders` is set (the preset preview), the persona + chat-history markers are fed
 // visible placeholder text so a reviewer sees WHERE those inject; the character preview leaves them
-// blank because it filters those markers out of the section order entirely.
+// blank because it filters those markers out of the section order entirely. It is no chat's turn,
+// so a Megumin preset's {{megumin_*}} slots stay as written: both sides differ only by the edit.
 function baseInput(db: DB, loaded: LoadedPreset, characterIds: string[], withPlaceholders = false): AssemblerInput {
   return {
     db,

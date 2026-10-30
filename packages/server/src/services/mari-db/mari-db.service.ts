@@ -27,7 +27,10 @@ import { createPromptsStorage } from "../storage/prompts.storage.js";
 import { createLorebooksStorage } from "../storage/lorebooks.storage.js";
 import { runLorebookTestScan, type LorebookTestBlockReason } from "../lorebook/test-scan.js";
 import { loadLorebookIncludes } from "../lorebook/index.js";
-import { buildGenerationPromptPresetCandidates } from "../../routes/generate/prompt-preset-selection.js";
+import {
+  buildGenerationPromptPresetCandidates,
+  resolveGenerationPromptPreset,
+} from "../../routes/generate/prompt-preset-selection.js";
 import { createAgentsStorage } from "../storage/agents.storage.js";
 import {
   clearCharacterEmbeddedLorebook,
@@ -59,6 +62,8 @@ import {
   homeCustomWidgetSchema,
   normalizeLorebookCategory,
   normalizePersonalExtensionCapabilities,
+  normalizePromptPresetEngineMode,
+  promptPresetEngineModeSchema,
   scopedRegexModeSchema,
   type MariDbCommandResult,
   type MariDbMutationReadBack,
@@ -91,7 +96,7 @@ import { computePersonalExtensionHash } from "../extensions/personal-extension-h
 import { HomeWidgetCatalogConflictError, replaceHomeWidgetCatalog } from "../home-widget-catalog.service.js";
 import { createMariWherePredicate } from "./mari-where-expression.js";
 import { runMariTransformSandbox } from "./mari-transform-sandbox.js";
-import { reloadFeatureSettingsIfTouched } from "../features/feature-settings.js";
+import { isFeatureEnabled, reloadFeatureSettingsIfTouched } from "../features/feature-settings.js";
 import { createAppSettingsStorage } from "../storage/app-settings.storage.js";
 import { encryptCustomToolWebhookUrl, ENCRYPTED_WEBHOOK_PREFIX } from "../../utils/custom-tool-webhook.js";
 import { getProfessorMariWorkspaceSkillsService } from "../professor-mari/workspace-skills.service.js";
@@ -1560,6 +1565,10 @@ function normalizePromptPresetActionData(input: Row, existing?: Row | null): Row
           ? input.scoped_regex_mode
           : (existing?.scopedRegexMode ?? "disabled"),
     ),
+    engineMode:
+      input.engineMode !== undefined || input.engine_mode !== undefined
+        ? promptPresetEngineModeSchema.parse(input.engineMode ?? input.engine_mode)
+        : normalizePromptPresetEngineMode(existing?.engineMode),
     defaultChoices: jsonString(input.defaultChoices ?? input.default_choices ?? existing?.defaultChoices, {}),
     isDefault: boolText(
       firstBoolean(input, ["isDefault", "is_default"]) ?? (existing ? existing.isDefault === "true" : false),
@@ -1577,6 +1586,7 @@ function normalizePromptPresetActionData(input: Row, existing?: Row | null): Row
   delete row.variable_values;
   delete row.wrap_format;
   delete row.scoped_regex_mode;
+  delete row.engine_mode;
   delete row.default_choices;
   delete row.is_default;
   delete row.system_key;
@@ -4953,6 +4963,8 @@ export class MariDbService {
             "wrapFormat",
             "scopedRegexMode",
             "scoped_regex_mode",
+            "engineMode",
+            "engine_mode",
             "defaultChoices",
             "isDefault",
             "author",
@@ -5001,6 +5013,8 @@ export class MariDbService {
             "wrapFormat",
             "scopedRegexMode",
             "scoped_regex_mode",
+            "engineMode",
+            "engine_mode",
             "defaultChoices",
             "isDefault",
             "author",
@@ -7640,16 +7654,20 @@ export class MariDbService {
       }));
 
     const connection = chat.connectionId ? await createConnectionsStorage(this.db).getById(chat.connectionId) : null;
-    const presetCandidates = buildGenerationPromptPresetCandidates({
+    // The preset the reply ran on, Megumin Mode's fallback included.
+    const { preset: row } = await resolveGenerationPromptPreset({
+      candidates: buildGenerationPromptPresetCandidates({
+        chatMode: chat.mode,
+        chatPromptPresetId: chat.promptPresetId,
+        connectionPromptPresetId: connection?.promptPresetId ?? null,
+      }),
+      presetsStorage: createPromptsStorage(this.db),
+      meguminEnabled: isFeatureEnabled("meguminMode"),
       chatMode: chat.mode,
-      chatPromptPresetId: chat.promptPresetId,
-      connectionPromptPresetId: connection?.promptPresetId ?? null,
+      logLabel: "[mari-db checkup]",
     });
-    const promptsStorage = createPromptsStorage(this.db);
     let preset: { name: string; sends: string[] } | null = null;
-    for (const candidate of presetCandidates) {
-      const row = await promptsStorage.getById(candidate.id);
-      if (!row) continue;
+    if (row) {
       const parameters = parseJsonMaybe(row.parameters);
       const enabledParameters =
         parameters && typeof parameters === "object" && !Array.isArray(parameters)
@@ -7659,7 +7677,6 @@ export class MariDbService {
         (key) => GENERATION_PARAMETER_LABELS[key],
       );
       preset = { name: row.name, sends };
-      break;
     }
 
     return {

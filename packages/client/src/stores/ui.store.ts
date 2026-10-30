@@ -772,6 +772,8 @@ interface UIState {
   presetDetailId: string | null;
   /** One-shot tab the preset editor should open to. */
   presetDetailInitialTab: string | null;
+  /** When set, the main area shows the Megumin Suite editor on this tab instead of chat */
+  meguminSuiteTab: string | null;
   /** When set, the main area shows the full-page connection editor instead of chat */
   connectionDetailId: string | null;
   /** When set, the main area shows the full-page agent editor. Value is the agent *type* id (e.g. "world-state") */
@@ -1304,6 +1306,9 @@ interface UIState {
   setLorebookLinkClipboard: (links: NonNullable<UIState["lorebookLinkClipboard"]>) => void;
   openPresetDetail: (id: string, options?: { initialTab?: string }) => void;
   closePresetDetail: () => void;
+  openMeguminSuite: (tab?: string) => void;
+  setMeguminSuiteTab: (tab: string) => void;
+  closeMeguminSuite: () => void;
   openConnectionDetail: (id: string) => void;
   closeConnectionDetail: () => void;
   openAgentDetail: (agentType: string) => void;
@@ -1549,6 +1554,7 @@ function normalizePersistedMainSurface(persisted: Record<string, unknown>) {
     "agentDetailId",
     "connectionDetailId",
     "presetDetailId",
+    "meguminSuiteTab",
     "characterDetailId",
     "lorebookDetailId",
     "characterLibraryOpen",
@@ -1814,6 +1820,7 @@ export function pickPersistedUIState(state: UIState) {
     characterDetailId: state.characterDetailId,
     lorebookDetailId: state.lorebookDetailId,
     presetDetailId: state.presetDetailId,
+    meguminSuiteTab: state.meguminSuiteTab,
     connectionDetailId: state.connectionDetailId,
     agentDetailId: state.agentDetailId,
     toolDetailId: state.toolDetailId,
@@ -2133,6 +2140,7 @@ export const useUIStore = create<UIState>()(
         lorebookDetailId: null,
         lorebookLinkClipboard: null,
         presetDetailId: null,
+        meguminSuiteTab: null,
         presetDetailInitialTab: null,
         connectionDetailId: null,
         agentDetailId: null,
@@ -2573,6 +2581,7 @@ export const useUIStore = create<UIState>()(
               characterDetailInitialTab: options?.initialTab ?? null,
               lorebookDetailId: null,
               presetDetailId: null,
+              meguminSuiteTab: null,
               connectionDetailId: null,
               agentDetailId: null,
               toolDetailId: null,
@@ -2608,6 +2617,7 @@ export const useUIStore = create<UIState>()(
             noodleOpen: false,
             characterDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2626,6 +2636,7 @@ export const useUIStore = create<UIState>()(
           set((s) => ({
             presetDetailId: id,
             presetDetailInitialTab: options?.initialTab ?? null,
+            meguminSuiteTab: null,
             characterLibraryOpen: false,
             agentCatalogOpen: false,
             botBrowserOpen: false,
@@ -2648,6 +2659,32 @@ export const useUIStore = create<UIState>()(
             editorDirty: false,
             ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
           })),
+        openMeguminSuite: (tab) =>
+          set((s) => ({
+            meguminSuiteTab: tab ?? s.meguminSuiteTab ?? "engine",
+            characterLibraryOpen: false,
+            agentCatalogOpen: false,
+            botBrowserOpen: false,
+            gameAssetsBrowserOpen: false,
+            noodleOpen: false,
+            characterDetailId: null,
+            lorebookDetailId: null,
+            presetDetailId: null,
+            connectionDetailId: null,
+            agentDetailId: null,
+            toolDetailId: null,
+            personaDetailId: null,
+            regexDetailId: null,
+            spatialMapDetailChatId: null,
+            ...getMobileDetailReturnState(s),
+          })),
+        setMeguminSuiteTab: (tab) => set({ meguminSuiteTab: tab }),
+        closeMeguminSuite: () =>
+          set((s) => ({
+            meguminSuiteTab: null,
+            editorDirty: false,
+            ...restoreMobileDetailReturnPanel(s.detailReturnRightPanel),
+          })),
         openConnectionDetail: (id) =>
           set((s) => ({
             connectionDetailId: id,
@@ -2659,6 +2696,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             agentDetailId: null,
             toolDetailId: null,
             personaDetailId: null,
@@ -2683,6 +2721,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             toolDetailId: null,
             personaDetailId: null,
@@ -2708,6 +2747,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             personaDetailId: null,
             regexDetailId: null,
@@ -2736,6 +2776,7 @@ export const useUIStore = create<UIState>()(
               characterDetailId: null,
               lorebookDetailId: null,
               presetDetailId: null,
+              meguminSuiteTab: null,
               connectionDetailId: null,
               agentDetailId: null,
               toolDetailId: null,
@@ -2765,6 +2806,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2802,6 +2844,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2821,6 +2864,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2851,6 +2895,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2873,6 +2918,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2896,6 +2942,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2925,6 +2972,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2945,6 +2993,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2965,6 +3014,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -2981,6 +3031,7 @@ export const useUIStore = create<UIState>()(
             s.characterDetailId ||
             s.lorebookDetailId ||
             s.presetDetailId ||
+            s.meguminSuiteTab ||
             s.connectionDetailId ||
             s.agentDetailId ||
             s.toolDetailId ||
@@ -2999,6 +3050,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,
@@ -3021,6 +3073,7 @@ export const useUIStore = create<UIState>()(
             characterDetailId: null,
             lorebookDetailId: null,
             presetDetailId: null,
+            meguminSuiteTab: null,
             connectionDetailId: null,
             agentDetailId: null,
             toolDetailId: null,

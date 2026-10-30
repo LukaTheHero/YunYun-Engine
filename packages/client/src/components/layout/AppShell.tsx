@@ -82,6 +82,9 @@ const LorebookEditor = lazy(() =>
   import("../lorebooks/LorebookEditor").then((module) => ({ default: module.LorebookEditor })),
 );
 const PresetEditor = lazy(() => import("../presets/PresetEditor").then((module) => ({ default: module.PresetEditor })));
+const MeguminSuiteEditor = lazy(() =>
+  import("../../features/megumin/MeguminSuiteEditor").then((module) => ({ default: module.MeguminSuiteEditor })),
+);
 const ConnectionEditor = lazy(() =>
   import("../connections/ConnectionEditor").then((module) => ({ default: module.ConnectionEditor })),
 );
@@ -610,6 +613,7 @@ export function AppShell({
   const agentCatalogOpen = useUIStore((s) => s.agentCatalogOpen);
   const lorebookDetailId = useUIStore((s) => s.lorebookDetailId);
   const presetDetailId = useUIStore((s) => s.presetDetailId);
+  const meguminSuiteOpen = useUIStore((s) => !!s.meguminSuiteTab);
   const connectionDetailId = useUIStore((s) => s.connectionDetailId);
   const agentDetailId = useUIStore((s) => s.agentDetailId);
   const toolDetailId = useUIStore((s) => s.toolDetailId);
@@ -870,6 +874,8 @@ export function AppShell({
     <AgentCatalogView />
   ) : lorebookDetailId ? (
     <LorebookEditor />
+  ) : meguminSuiteOpen ? (
+    <MeguminSuiteEditor />
   ) : null;
 
   const showAmbientDecor = isPageActive && !activeChatId && !detailView && !botBrowserOpen && !gameAssetsBrowserOpen;

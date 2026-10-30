@@ -179,7 +179,8 @@ import {
   shouldEnableAgentsForGeneration,
   type PromptAttachment,
 } from "../generate/generate-route-utils.js";
-import { buildGenerationPromptPresetCandidates, type PromptPresetCandidateSource } from "./prompt-preset-selection.js";
+import { buildGenerationPromptPresetCandidates, resolveGenerationPromptPreset } from "./prompt-preset-selection.js";
+import { isFeatureEnabled } from "../../services/features/feature-settings.js";
 import {
   CONVERSATION_NO_REPEAT_INSTRUCTION,
   conversationPromptHistoryContent,
@@ -1042,25 +1043,19 @@ export async function registerDryRunRoute(app: FastifyInstance) {
           impersonatePromptPresetId: body.impersonatePresetId,
           requestPromptPresetId: body.presetId,
         });
-    let effectivePresetId: string | null = null;
-    let effectivePresetSource: PromptPresetCandidateSource | null = null;
-    let effectivePreset: Awaited<ReturnType<typeof presets.getById>> | null = null;
-    for (const candidate of promptPresetCandidates) {
-      const candidatePreset = await presets.getById(candidate.id);
-      if (candidatePreset) {
-        effectivePresetId = candidate.id;
-        effectivePresetSource = candidate.source;
-        effectivePreset = candidatePreset;
-        break;
-      }
-      if (candidate.source !== "chat") {
-        logger.warn(
-          "[dryRun] %s prompt preset override %s was not found; falling back to the next preset candidate",
-          candidate.source,
-          candidate.id,
-        );
-      }
-    }
+    const presetSelection = await resolveGenerationPromptPreset({
+      candidates: promptPresetCandidates,
+      presetsStorage: presets,
+      meguminEnabled: isFeatureEnabled("meguminMode"),
+      chatMode,
+      impersonate,
+      logLabel: "[dryRun]",
+    });
+    const effectivePresetId = presetSelection.presetId;
+    const effectivePresetSource = presetSelection.source;
+    const effectivePreset = presetSelection.preset;
+    // The same turn flag generation computes, so Peek Prompt shows what would be sent.
+    const isMeguminTurn = presetSelection.isMeguminTurn;
 
     // Choice selections are stored per-chat (chat metadata), not per prompt preset.
     // If a request or connection overrides the prompt preset, reusing the chat's stored selections can make it
@@ -1857,6 +1852,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         deferCharacterMacros,
         decisions: promptMacroContext.decisions,
         lorebookDecisions,
+        megumin: { enabled: isMeguminTurn },
       };
 
       const assembled = await assemblePrompt(assemblerInput);

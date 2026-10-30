@@ -513,9 +513,7 @@ const generateRouteSource = readFileSync(
   new URL("../../packages/server/src/routes/generate.routes.ts", import.meta.url),
   "utf8",
 );
-const inlineThinkingStart = generateRouteSource.indexOf(
-  "const inlineThinking = extractLeadingThinkingBlocks(fullResponse, customThinkingTags);",
-);
+const inlineThinkingStart = generateRouteSource.indexOf("const inlineThinking = extractLeadingThinkingBlocks(");
 const inlineThinkingEnd = generateRouteSource.indexOf("// ── LOG_LEVEL=debug", inlineThinkingStart);
 const spatialSanitizationStart = generateRouteSource.indexOf(
   "const parsedSpatial = extractAssistantSpatialDirective(fullResponse);",

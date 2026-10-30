@@ -4,6 +4,8 @@ import { useLibraryOrder } from "../../hooks/use-library-order";
 // Panel: Presets (overhauled — search, assign, edit, duplicate)
 // ──────────────────────────────────────────────
 import {
+  lazy,
+  Suspense,
   useState,
   useMemo,
   useCallback,
@@ -74,7 +76,8 @@ import { cn } from "../../lib/utils";
 import { sortBasicPanelItems, sortPanelFolders } from "../../lib/panel-sort";
 import { downloadJsonFile } from "../../lib/download-json";
 import { downloadZipFile } from "../../lib/download-zip";
-import { getFolderImportEntries, isPatternSafe, isStockMarinaraUniversalPreset } from "@marinara-engine/shared";
+import { getFolderImportEntries, isMeguminPreset, isPatternSafe, isStockPreset } from "@marinara-engine/shared";
+import { useFeatureEnabled } from "../../hooks/use-feature-settings";
 import {
   createCustomToolFolderPackageFiles,
   importCustomToolEntries,
@@ -102,6 +105,10 @@ import { clearActiveChatResourceDrag, writeChatResourceDragPayload } from "../..
 import { ChatResourceActionButton } from "../chat/ChatResourceActionButton";
 import { resolvePresetArtwork } from "../../lib/preset-artwork";
 
+const MeguminPresetCard = lazy(() =>
+  import("../../features/megumin/MeguminPresetCard").then((module) => ({ default: module.MeguminPresetCard })),
+);
+
 type PresetRow = {
   id: string;
   name: string;
@@ -111,6 +118,7 @@ type PresetRow = {
   isDefault?: string | boolean;
   author?: string;
   systemKey?: string;
+  engineMode?: string;
   sectionOrder?: string | string[];
   createdAt?: string;
   updatedAt?: string;
@@ -312,6 +320,7 @@ export function PresetsPanel() {
   const sort = useUIStore((s) => s.presetPanelSort);
   const setSort = useUIStore((s) => s.setPresetPanelSort);
   const activeChat = useChatStore((s) => s.activeChat);
+  const meguminEnabled = useFeatureEnabled("meguminMode");
   const updateChat = useUpdateChat();
   const updateMetadata = useUpdateChatMetadata();
   const [search, setSearch] = useState("");
@@ -925,7 +934,8 @@ export function PresetsPanel() {
       const sectionCount = getSectionCount(preset);
       const wrapFormat = (preset.wrapFormat ?? "xml") as string;
       const isDefault = String(preset.isDefault) === "true";
-      const isStock = isStockMarinaraUniversalPreset(preset);
+      const isStock = isStockPreset(preset);
+      const isMegumin = isMeguminPreset(preset);
       const artwork = resolvePresetArtwork(preset);
       const pictureLabel = artwork
         ? localizeUi("ui.panels.presetspanel.replacePresetPicture")
@@ -966,7 +976,9 @@ export function PresetsPanel() {
             isSelected &&
               "bg-[var(--marinara-chat-chrome-highlight-bg)] ring-1 ring-[var(--marinara-chat-chrome-button-border-active)]",
             draggedPresetId === preset.id && "opacity-50",
+            isMegumin && !meguminEnabled && "opacity-60",
           )}
+          data-megumin-preset={isMegumin ? (meguminEnabled ? "on" : "off") : undefined}
           draggable
           onDragStart={(event) => {
             const ids = getDraggedPresetIds(preset.id);
@@ -1054,7 +1066,17 @@ export function PresetsPanel() {
                     {localizeUi("ui.panels.presetspanel.default")}
                   </span>
                 )}
+                {isMegumin && (
+                  <span className="mari-chrome-muted-badge shrink-0 rounded px-1 py-0.5 text-[0.5625rem]">
+                    {localizeUi("megumin.presetRow.badge")}
+                  </span>
+                )}
               </div>
+              {isMegumin && !meguminEnabled && (
+                <div className="text-[0.625rem] leading-4 text-[var(--muted-foreground)]">
+                  {localizeUi("megumin.presetRow.needsMode")}
+                </div>
+              )}
               <div className="flex min-w-0 items-center gap-2 text-[0.6875rem] leading-4 text-[var(--muted-foreground)]">
                 <span className="flex shrink-0 items-center gap-0.5">
                   {wrapFormat === "xml" ? <Code2 size="0.5625rem" /> : <Hash size="0.5625rem" />}
@@ -1187,6 +1209,7 @@ export function PresetsPanel() {
       startPresetTouchDrag,
       toggleSelection,
       localizeUi,
+      meguminEnabled,
     ],
   );
 
@@ -1301,6 +1324,9 @@ export function PresetsPanel() {
       </div>
 
       <PanelSection title={localizeUi("ui.panels.presetspanel.prompts")} icon={<FileText size="0.8125rem" />}>
+        <Suspense fallback={null}>
+          <MeguminPresetCard />
+        </Suspense>
         <div className="flex flex-col gap-0.5">
           {folderDrag.orderItems(sortPanelFolders(presetFolders, sort)).map((folder) => {
             const isEditing = editingFolderId === folder.id;

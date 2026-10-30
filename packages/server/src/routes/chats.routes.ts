@@ -152,6 +152,12 @@ import { rebuildMemoryChunks } from "../services/memory-recall.js";
 import { createAdvancedMemoryService } from "../services/advanced-memory.js";
 import { copyAdvancedMemoryRecords, remapAdvancedMemoryMetadata } from "../services/advanced-memory-transfer.js";
 import { forwardPromptPreview } from "./generate/prompt-preview.js";
+import {
+  buildGenerationPromptPresetCandidates,
+  resolveGenerationPromptPreset,
+  resolveGenerationPromptPresetChoices,
+} from "./generate/prompt-preset-selection.js";
+import { parsePromptPresetChoices } from "../services/generation/conversation-context-utils.js";
 import { wrapContent } from "../services/prompt/format-engine.js";
 import { chatSummaryFingerprintMatches, fingerprintChatSummary } from "../services/prompt/chat-summary-fingerprint.js";
 import { newId } from "../utils/id-generator.js";
@@ -3565,9 +3571,26 @@ export async function chatsRoutes(app: FastifyInstance) {
         const { resolveReasoningMacroValue } = await import("../services/generation/provider-generation-runtime.js");
         const presetStore = createPromptsStorage(app.db);
         const charStore = createCharactersStorage(app.db);
-
-        const preset = presetId ? await presetStore.getById(presetId) : null;
         const chatMode = (chat.mode as string) ?? "roleplay";
+        const connections = createConnectionsStorage(app.db);
+        const connection = chat.connectionId
+          ? await connections.getById(chat.connectionId)
+          : await connections.getDefault();
+
+        // The preset generation would use: a Roleplay connection's first, and while Megumin Mode is
+        // off a Megumin preset gives way to the fallback, with the same turn flag generation reads.
+        const presetSelection = await resolveGenerationPromptPreset({
+          candidates: buildGenerationPromptPresetCandidates({
+            chatMode,
+            chatPromptPresetId: presetId,
+            connectionPromptPresetId: connection?.promptPresetId,
+          }),
+          presetsStorage: presetStore,
+          meguminEnabled: isFeatureEnabled("meguminMode"),
+          chatMode,
+          logLabel: "[peek-prompt]",
+        });
+        const preset = presetSelection.preset;
         if (preset || chatMode === "conversation" || chatMode === "game" || chatMode === "roleplay") {
           // Apply conversation-start filter
           let scopedMessages = chatMessages;
@@ -3653,11 +3676,12 @@ export async function chatsRoutes(app: FastifyInstance) {
             }
           })();
 
-          const chatChoices = (chatMeta.presetChoices ?? {}) as Record<string, string | string[]>;
-          const connections = createConnectionsStorage(app.db);
-          const connection = chat.connectionId
-            ? await connections.getById(chat.connectionId)
-            : await connections.getDefault();
+          const chatChoices = resolveGenerationPromptPresetChoices({
+            presetSource: presetSelection.source,
+            selectedPresetDiffersFromChat: !!preset && preset.id !== presetId,
+            presetDefaultChoices: parsePromptPresetChoices(preset?.defaultChoices) ?? {},
+            chatPresetChoices: (chatMeta.presetChoices ?? {}) as Record<string, string | string[]>,
+          });
           // Generation counts the preset's level only where the preset assembles the prompt.
           const chatMacroVariables = normalizeChatMacroVariables(chatMeta.macroVariables);
           const promptReasoning = connection
@@ -4056,6 +4080,7 @@ export async function chatsRoutes(app: FastifyInstance) {
                 : null,
             lastGenerationType: "preview",
             idleDuration: promptIdleDuration,
+            megumin: { enabled: presetSelection.isMeguminTurn },
           });
 
           // ── Strip <speaker> tags from chat history to save tokens (game already returned above, so this is Roleplay) ──

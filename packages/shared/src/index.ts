@@ -159,6 +159,13 @@ export {
 export * from "./features/function-calls/tool-definitions.js";
 export * from "./features/folder-packages/manifest-package.js";
 
+// Megumin Mode
+export * from "./features/megumin/mode.js";
+export * from "./features/megumin/catalog.js";
+export * from "./features/megumin/engines.js";
+export * from "./features/megumin/story-config.js";
+export * from "./features/megumin/profile-schema.js";
+
 // Turn-game framework (UNO and future turn-based games)
 export * from "./features/turn-games/engine.types.js";
 export {

@@ -14,7 +14,7 @@ import {
   createChoiceBlockSchema,
   updateChoiceBlockSchema,
   createFolderEntry,
-  isStockMarinaraUniversalPreset,
+  isStockPreset,
   normalizeAdvancedMemorySettings,
   type LorebookEntryTimingState,
 } from "@marinara-engine/shared";
@@ -35,11 +35,15 @@ import { DATA_DIR } from "../utils/data-dir.js";
 import { assertInsideDir, extensionFromImageMime, isAllowedImageBuffer } from "../utils/security.js";
 import { logger } from "../lib/logger.js";
 import { forwardPromptPreview } from "./generate/prompt-preview.js";
+import { resolveGenerationPromptPreset } from "./generate/prompt-preset-selection.js";
+import { isFeatureEnabled } from "../services/features/feature-settings.js";
+import { parsePromptPresetChoices } from "../services/generation/conversation-context-utils.js";
 
 const PROMPT_IMAGES_DIR = join(DATA_DIR, "prompts", "images");
 const PROMPT_IMAGE_URL_PREFIX = "/api/prompts/images/file/";
-const STOCK_PRESET_READ_ONLY_ERROR =
-  "The stock YunYun Universal preset is read-only. Open it to create an editable copy.";
+function stockPresetReadOnlyError(preset: { name: string }): string {
+  return `The stock preset "${preset.name}" is read-only. Open it to create an editable copy.`;
+}
 
 async function rejectStockPresetMutation(
   storage: ReturnType<typeof createPromptsStorage>,
@@ -47,8 +51,8 @@ async function rejectStockPresetMutation(
   reply: FastifyReply,
 ): Promise<boolean> {
   const preset = await storage.getById(presetId);
-  if (!preset || !isStockMarinaraUniversalPreset(preset)) return false;
-  reply.status(409).send({ error: STOCK_PRESET_READ_ONLY_ERROR });
+  if (!preset || !isStockPreset(preset)) return false;
+  reply.status(409).send({ error: stockPresetReadOnlyError(preset) });
   return true;
 }
 
@@ -205,8 +209,8 @@ export async function promptsRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>("/:id/image", async (req, reply) => {
     const preset = await storage.getById(req.params.id);
     if (!preset) return reply.status(404).send({ error: "Preset not found" });
-    if (isStockMarinaraUniversalPreset(preset)) {
-      return reply.status(409).send({ error: STOCK_PRESET_READ_ONLY_ERROR });
+    if (isStockPreset(preset)) {
+      return reply.status(409).send({ error: stockPresetReadOnlyError(preset) });
     }
 
     const body = req.body as { image?: string };
@@ -235,8 +239,8 @@ export async function promptsRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>("/:id", async (req, reply) => {
     const preset = await storage.getById(req.params.id);
-    if (preset && isStockMarinaraUniversalPreset(preset)) {
-      return reply.status(409).send({ error: STOCK_PRESET_READ_ONLY_ERROR });
+    if (preset && isStockPreset(preset)) {
+      return reply.status(409).send({ error: stockPresetReadOnlyError(preset) });
     }
     await storage.remove(req.params.id);
     await removePromptImageIfUnreferenced(storage, preset?.imagePath ?? null);
@@ -467,8 +471,8 @@ export async function promptsRoutes(app: FastifyInstance) {
    */
   app.post<{ Params: { id: string } }>("/:id/preview", async (req, reply) => {
     const { chatId, choices } = req.body as { chatId: string; choices?: Record<string, string> };
-    const preset = await storage.getById(req.params.id);
-    if (!preset) return reply.status(404).send({ error: "Preset not found" });
+    const requested = await storage.getById(req.params.id);
+    if (!requested) return reply.status(404).send({ error: "Preset not found" });
 
     const chats = createChatsStorage(app.db);
     const chat = await chats.getById(chatId);
@@ -487,7 +491,7 @@ export async function promptsRoutes(app: FastifyInstance) {
       chatMeta = {};
     }
     if (chat.mode === "roleplay" && normalizeAdvancedMemorySettings(chatMeta.advancedMemory).enabled) {
-      const preview = await forwardPromptPreview(app, req, { chatId, presetId: preset.id, presetChoices: choices });
+      const preview = await forwardPromptPreview(app, req, { chatId, presetId: requested.id, presetChoices: choices });
       if (preview.statusCode >= 400) return reply.status(preview.statusCode).send(preview.body);
       const messages = preview.body.prompt?.messages ?? [];
       return {
@@ -497,6 +501,18 @@ export async function promptsRoutes(app: FastifyInstance) {
         advancedMemory: preview.body.prompt?.advancedMemory,
       };
     }
+    // As the dry run above does: while Megumin Mode is off, a Roleplay chat passes over a Megumin
+    // preset and previews the fallback generation would use, on that preset's own default choices.
+    const selection = await resolveGenerationPromptPreset({
+      candidates: [{ id: requested.id, source: "request" }],
+      presetsStorage: storage,
+      meguminEnabled: isFeatureEnabled("meguminMode"),
+      chatMode: chat.mode,
+      logLabel: "[prompts/preview]",
+    });
+    const preset = selection.preset ?? requested;
+    const presetChoices =
+      preset.id === requested.id ? (choices ?? {}) : (parsePromptPresetChoices(preset.defaultChoices) ?? {});
     const lorebookScopeExclusions = resolveLorebookScopeExclusions(chat.mode, chatMeta);
     const mappedMessages = chatMessages.map((m: any) => ({
       role: m.role === "narrator" ? ("system" as const) : (m.role as "user" | "assistant" | "system"),
@@ -532,9 +548,9 @@ export async function promptsRoutes(app: FastifyInstance) {
     }
 
     const [sections, groups, choiceBlocks] = await Promise.all([
-      storage.listSections(req.params.id),
-      storage.listGroups(req.params.id),
-      storage.listChoiceBlocksForPreset(req.params.id),
+      storage.listSections(preset.id),
+      storage.listGroups(preset.id),
+      storage.listChoiceBlocksForPreset(preset.id),
     ]);
 
     const connections = createConnectionsStorage(app.db);
@@ -557,7 +573,7 @@ export async function promptsRoutes(app: FastifyInstance) {
       sections: sections as any,
       groups: groups as any,
       choiceBlocks: choiceBlocks as any,
-      chatChoices: choices ?? {},
+      chatChoices: presetChoices,
       // Chat variables win over built-in macros of the same name, as in generation.
       localVariables: normalizeChatMacroVariables(chatMeta.macroVariables),
       chatId,
@@ -593,6 +609,7 @@ export async function promptsRoutes(app: FastifyInstance) {
         ? (chatMeta.generationTriggers as string[])
         : undefined,
       previewOnly: true,
+      megumin: { enabled: selection.isMeguminTurn },
     };
 
     const result = await assemblePrompt(assemblerInput);

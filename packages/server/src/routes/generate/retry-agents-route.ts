@@ -225,7 +225,8 @@ import {
   prepareCapabilityAgentContexts,
 } from "../../services/capability-packages/capability-agent-runtime.service.js";
 import { isSseReplyWritable, sendSseEvent, startSseKeepalive, startSseReply } from "./sse.js";
-import { buildGenerationPromptPresetCandidates } from "./prompt-preset-selection.js";
+import { buildGenerationPromptPresetCandidates, resolveGenerationPromptPreset } from "./prompt-preset-selection.js";
+import { isFeatureEnabled } from "../../services/features/feature-settings.js";
 import {
   buildAgentConnectionUnavailableWarning,
   buildDefaultAgentConnectionWarning,
@@ -551,16 +552,19 @@ async function resolveRetryAgentWrapFormat(args: {
     return "xml";
   }
 
-  const candidates = buildGenerationPromptPresetCandidates({
+  // The preset the generation used, Megumin Mode's fallback included.
+  const { preset } = await resolveGenerationPromptPreset({
+    candidates: buildGenerationPromptPresetCandidates({
+      chatMode: args.chatMode,
+      chatPromptPresetId: args.chat.promptPresetId,
+      connectionPromptPresetId: args.conn?.promptPresetId,
+    }),
+    presetsStorage: args.presets,
+    meguminEnabled: isFeatureEnabled("meguminMode"),
     chatMode: args.chatMode,
-    chatPromptPresetId: args.chat.promptPresetId,
-    connectionPromptPresetId: args.conn?.promptPresetId,
+    logLabel: "[retry-agents]",
   });
-  for (const candidate of candidates) {
-    const preset = await args.presets.getById(candidate.id);
-    if (preset) return normalizeWrapFormat(preset.wrapFormat);
-  }
-  return "xml";
+  return preset ? normalizeWrapFormat(preset.wrapFormat) : "xml";
 }
 
 function getGameImageStylePrompt(chat: any, chatMeta: Record<string, unknown>): string {

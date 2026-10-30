@@ -71,6 +71,8 @@ import {
   type MariSuggestionChip,
   type PendingSpatialTransition,
   type Persona,
+  type FeatureSettingsResponse,
+  type PromptPreset,
   type ResolvedSpatialTravel,
   type ThinkingTagPair,
 } from "@marinara-engine/shared";
@@ -681,6 +683,8 @@ import { characterKeys } from "./use-characters";
 import { connectionKeys } from "./use-connections";
 import { lorebookKeys } from "./use-lorebooks";
 import { presetKeys } from "./use-presets";
+import { featureSettingsKeys, readFeatureEnabled } from "./use-feature-settings";
+import { resolveMeguminModeState } from "../features/megumin/megumin-mode-state";
 import { playConfiguredNotificationPing } from "../lib/notification-sound";
 import { showLocalMessageNotification, showNativeMessageNotification } from "../lib/local-notifications";
 import {
@@ -876,6 +880,14 @@ function getCachedConnectionForGeneration(qc: QueryClient, connectionId: string 
   return list?.find((connection) => connection.id === connectionId);
 }
 
+function getCachedPresetForGeneration(qc: QueryClient, presetId: string | null): PromptPreset | undefined {
+  if (!presetId) return undefined;
+  const full = qc.getQueryData<{ preset: PromptPreset }>(presetKeys.full(presetId));
+  if (full?.preset) return full.preset;
+  return qc.getQueryData<PromptPreset[]>(presetKeys.list())?.find((preset) => preset.id === presetId);
+}
+
+/** The server's layering: the effective preset's tags, then the connection's, then the chat's. */
 function resolveCachedCustomThinkingTags(
   qc: QueryClient,
   chatId: string,
@@ -884,11 +896,25 @@ function resolveCachedCustomThinkingTags(
   const chat = getCachedChatForGeneration(qc, chatId);
   const chatMeta = parseChatMetadata(chat?.metadata);
   const effectiveConnectionId = connectionId ?? chat?.connectionId ?? null;
-  const connectionTags = readCustomThinkingTags(
-    getCachedConnectionForGeneration(qc, effectiveConnectionId)?.defaultParameters,
-  );
+  const connection = getCachedConnectionForGeneration(qc, effectiveConnectionId);
+  const connectionTags = readCustomThinkingTags(connection?.defaultParameters);
   const chatTags = readCustomThinkingTags(chatMeta.chatParameters);
-  return chatTags ?? connectionTags ?? [];
+  // The preset generation runs, as the server picks it: in Roleplay the connection's preset wins over
+  // the chat's, and while Megumin Mode is off a Megumin preset gives way to the fallback.
+  const connectionPresetId =
+    chat?.mode === "roleplay" && typeof connection?.promptPresetId === "string" ? connection.promptPresetId : null;
+  const { usedPreset } = resolveMeguminModeState({
+    enabled: readFeatureEnabled(qc.getQueryData<FeatureSettingsResponse>(featureSettingsKeys.all), "meguminMode"),
+    chatMode: chat?.mode,
+    chatPromptPresetId: chat?.promptPresetId,
+    connectionPromptPresetId: connectionPresetId,
+    presets: qc.getQueryData<PromptPreset[]>(presetKeys.list()),
+  });
+  const presetTags = readCustomThinkingTags(
+    getCachedPresetForGeneration(qc, usedPreset?.id ?? (connectionPresetId || chat?.promptPresetId || null))
+      ?.parameters,
+  );
+  return chatTags ?? connectionTags ?? presetTags ?? [];
 }
 
 function getCachedChatMode(qc: QueryClient, chatId: string): Chat["mode"] | undefined {

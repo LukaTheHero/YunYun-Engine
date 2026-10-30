@@ -13,6 +13,19 @@ export interface LeadingThinkingExtraction {
   stripped: boolean;
 }
 
+export interface LeadingThinkingOptions {
+  /**
+   * Also lift reasoning the reply never opened: the text before the first known close tag, when
+   * that tag starts within the first MAX_UNOPENED_THINKING_CHARS characters and its own opening
+   * tag does not come before it. Only the reply's first block can be unopened. Megumin Mode turns
+   * with reasoning on use it, for providers that swallow the opening `<think>`.
+   */
+  allowLeadingUnopenedClose?: boolean;
+}
+
+/** How far into a reply an unopened close tag may start and still end the reasoning. */
+export const MAX_UNOPENED_THINKING_CHARS = 16_384;
+
 type InternalThinkingTagPair = ThinkingTagPair & {
   openLower: string;
   closeLower: string;
@@ -108,10 +121,32 @@ function indexOfInsensitive(value: string, needleLower: string, fromIndex = 0): 
 }
 
 /**
+ * The earliest close tag starting inside the unopened-reasoning window, and whether it really is
+ * unopened: a close tag its own opening comes before is ordinary text, not reasoning.
+ */
+function findEarliestClose(value: string, pairs: InternalThinkingTagPair[]) {
+  const lower = value.toLocaleLowerCase();
+  let found: { index: number; pair: InternalThinkingTagPair } | null = null;
+  for (const pair of pairs) {
+    const index = lower.indexOf(pair.closeLower);
+    if (index < 0 || index >= MAX_UNOPENED_THINKING_CHARS) continue;
+    if (found && (index > found.index || (index === found.index && pair.close.length <= found.pair.close.length))) {
+      continue;
+    }
+    found = { index, pair };
+  }
+  return found && { ...found, unopened: !lower.slice(0, found.index).includes(found.pair.openLower) };
+}
+
+/**
  * Extract leading inline reasoning blocks that some models emit instead of
  * returning provider-native thinking channels.
  */
-export function extractLeadingThinkingBlocks(text: string, customTags?: unknown): LeadingThinkingExtraction {
+export function extractLeadingThinkingBlocks(
+  text: string,
+  customTags?: unknown,
+  options?: LeadingThinkingOptions,
+): LeadingThinkingExtraction {
   let remaining = text;
   let stripped = false;
   const chunks: string[] = [];
@@ -119,7 +154,15 @@ export function extractLeadingThinkingBlocks(text: string, customTags?: unknown)
 
   while (true) {
     const opening = findLeadingOpening(remaining, pairs);
-    if (!opening) break;
+    if (!opening) {
+      const unopened = options?.allowLeadingUnopenedClose && !stripped ? findEarliestClose(remaining, pairs) : null;
+      if (!unopened?.unopened) break;
+      stripped = true;
+      const thinking = remaining.slice(0, unopened.index).trim();
+      if (thinking) chunks.push(thinking);
+      remaining = remaining.slice(unopened.index + unopened.pair.close.length).trimStart();
+      continue;
+    }
 
     const closeIndex = indexOfInsensitive(remaining, opening.pair.closeLower, opening.end);
     if (closeIndex < 0) break;
@@ -148,12 +191,18 @@ export interface InlineThinkingStreamFilter {
   reset(): void;
 }
 
-export function createInlineThinkingStreamFilter(customTags?: unknown): InlineThinkingStreamFilter {
+export function createInlineThinkingStreamFilter(
+  customTags?: unknown,
+  options?: LeadingThinkingOptions,
+): InlineThinkingStreamFilter {
   const pairs = toInternalThinkingTagPairs(customTags);
   const maxDetectBuffer = Math.max(32, ...pairs.map((pair) => pair.open.length + 64));
-  let state: "detect" | "inside" | "done" = "detect";
+  // Past this, no close tag can still start inside the unopened-reasoning window.
+  const maxUnopenedBuffer = MAX_UNOPENED_THINKING_CHARS + Math.max(...pairs.map((pair) => pair.close.length));
+  let state: "detect" | "inside" | "unopened" | "done" = "detect";
   let buffer = "";
   let activePair: InternalThinkingTagPair | null = null;
+  let liftedBlock = false;
 
   const drain = (): InlineThinkingStreamFilterResult => {
     let visible = "";
@@ -175,6 +224,21 @@ export function createInlineThinkingStreamFilter(customTags?: unknown): InlineTh
           continue;
         }
         if (buffer.length <= maxDetectBuffer && isPotentialLeadingOpening(buffer, pairs)) break;
+        state = options?.allowLeadingUnopenedClose && !liftedBlock ? "unopened" : "done";
+        continue;
+      }
+
+      if (state === "unopened") {
+        // Held back, not shown: until a close tag arrives this may be reasoning or the reply.
+        const close = findEarliestClose(buffer, pairs);
+        if (close?.unopened) {
+          thinking += buffer.slice(0, close.index);
+          buffer = buffer.slice(close.index + close.pair.close.length).trimStart();
+          liftedBlock = true;
+          state = "detect";
+          continue;
+        }
+        if (!close && buffer.length < maxUnopenedBuffer) break;
         state = "done";
         continue;
       }
@@ -189,6 +253,7 @@ export function createInlineThinkingStreamFilter(customTags?: unknown): InlineTh
         thinking += buffer.slice(0, closeIndex);
         buffer = buffer.slice(closeIndex + activePair.close.length).trimStart();
         activePair = null;
+        liftedBlock = true;
         state = "detect";
         continue;
       }
@@ -212,7 +277,8 @@ export function createInlineThinkingStreamFilter(customTags?: unknown): InlineTh
       return drain();
     },
     flush() {
-      if (state === "detect") {
+      // Unopened text still held when the reply ends had no close tag: it was the reply.
+      if (state === "detect" || state === "unopened") {
         state = "done";
       }
       return drain();
@@ -221,6 +287,7 @@ export function createInlineThinkingStreamFilter(customTags?: unknown): InlineTh
       state = "detect";
       buffer = "";
       activePair = null;
+      liftedBlock = false;
     },
   };
 }

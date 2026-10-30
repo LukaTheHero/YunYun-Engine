@@ -3,14 +3,33 @@
 // ──────────────────────────────────────────────
 
 import type { ThinkingTagPair } from "../utils/thinking-tags.js";
+import type { PromptPresetEngineMode } from "../features/megumin/mode.js";
 import type { ScopedRegexMode } from "./regex.js";
 
 export const MARINARA_UNIVERSAL_PRESET_NAME = "Marinara's Universal Preset";
 export const MARINARA_UNIVERSAL_PRESET_AUTHOR = "Marinara";
 export const MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY = "marinara-universal-preset";
 
+export const MEGUMIN_SUITE_PRESET_NAME = "Megumin Suite";
+export const MEGUMIN_SUITE_PRESET_AUTHOR = "KazumaONIISAN";
+export const MEGUMIN_SUITE_PRESET_SYSTEM_KEY = "megumin-suite-preset";
+
+/** Reserved `systemKey`s of the Engine-owned stock presets. Stock rows are read-only and kept current at startup. */
+export const STOCK_PRESET_SYSTEM_KEYS: readonly string[] = [
+  MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
+  MEGUMIN_SUITE_PRESET_SYSTEM_KEY,
+];
+
+export function isStockPreset(preset: { systemKey?: unknown }): boolean {
+  return typeof preset.systemKey === "string" && STOCK_PRESET_SYSTEM_KEYS.includes(preset.systemKey);
+}
+
 export function isStockMarinaraUniversalPreset(preset: { systemKey?: unknown }): boolean {
   return preset.systemKey === MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY;
+}
+
+export function isStockMeguminPreset(preset: { systemKey?: unknown }): boolean {
+  return preset.systemKey === MEGUMIN_SUITE_PRESET_SYSTEM_KEY;
 }
 
 /** Role for a prompt section. */
@@ -91,6 +110,8 @@ export interface PromptPreset {
   author: string;
   /** Reserved identifier for Engine-owned presets. Empty for user presets. */
   systemKey: string;
+  /** "megumin" for a Megumin Mode preset. Unlike `systemKey`, copies, exports and imports keep it. */
+  engineMode: PromptPresetEngineMode;
   createdAt: string;
   updatedAt: string;
 }

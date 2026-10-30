@@ -2,22 +2,83 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { seedDefaultPreset } from "../../packages/server/src/db/seed.js";
+import { seedDefaultPreset, seedMeguminSuitePreset } from "../../packages/server/src/db/seed.js";
 import { createFileNativeDB } from "../../packages/server/src/db/file-backed-store.js";
 import { createAppSettingsStorage } from "../../packages/server/src/services/storage/app-settings.storage.js";
 import { createPromptsStorage } from "../../packages/server/src/services/storage/prompts.storage.js";
-import { isStockMarinaraUniversalPreset } from "../../packages/shared/src/types/prompt.js";
+import {
+  MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
+  MEGUMIN_SUITE_PRESET_SYSTEM_KEY,
+  STOCK_PRESET_SYSTEM_KEYS,
+  isStockMarinaraUniversalPreset,
+  isStockMeguminPreset,
+  isStockPreset,
+} from "../../packages/shared/src/types/prompt.js";
+
+// ── isStockPreset covers every reserved key, and nothing else ──
+assert.deepEqual([...STOCK_PRESET_SYSTEM_KEYS].sort(), [
+  MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
+  MEGUMIN_SUITE_PRESET_SYSTEM_KEY,
+]);
+for (const systemKey of STOCK_PRESET_SYSTEM_KEYS) {
+  assert.equal(isStockPreset({ systemKey }), true, `${systemKey} is a stock preset`);
+}
+for (const systemKey of ["", "megumin", "claimed", null, undefined, 1]) {
+  assert.equal(isStockPreset({ systemKey }), false, `${String(systemKey)} is not a stock preset`);
+}
+assert.equal(isStockMeguminPreset({ systemKey: MEGUMIN_SUITE_PRESET_SYSTEM_KEY }), true);
+assert.equal(isStockMeguminPreset({ systemKey: MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY }), false);
+assert.equal(isStockMarinaraUniversalPreset({ systemKey: MEGUMIN_SUITE_PRESET_SYSTEM_KEY }), false);
 
 const dir = mkdtempSync(join(tmpdir(), "marinara-stock-preset-"));
 process.env.FILE_STORAGE_DIR = dir;
+process.env.DATA_DIR = dir;
 const db = await createFileNativeDB();
 
 try {
   const storage = createPromptsStorage(db);
   const appSettings = createAppSettingsStorage(db);
   await seedDefaultPreset(db);
+  await seedMeguminSuitePreset(db);
   const original = (await storage.list()).find(isStockMarinaraUniversalPreset);
   assert.ok(original, "a fresh profile receives the stock Marinara universal preset");
+  const megumin = (await storage.list()).find(isStockMeguminPreset);
+  assert.ok(megumin, "a fresh profile receives the stock Megumin Suite preset");
+  assert.equal(original.isDefault, "true", "the Universal preset is the fresh default");
+  assert.equal(megumin.isDefault, "false", "the Megumin Suite preset is never the fresh default");
+
+  // ── profile import keeps each local stock row and demotes foreign rows claiming either key ──
+  const { normalizeProfilePromptPresetRow } = await import("../../packages/server/src/routes/backup.routes.js");
+  const localStock = new Map([
+    [MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY, original.id],
+    [MEGUMIN_SUITE_PRESET_SYSTEM_KEY, megumin.id],
+  ]);
+  assert.equal(
+    normalizeProfilePromptPresetRow({ id: megumin.id, systemKey: "" }, localStock).systemKey,
+    MEGUMIN_SUITE_PRESET_SYSTEM_KEY,
+    "the local Megumin Suite row keeps its identity",
+  );
+  assert.equal(
+    normalizeProfilePromptPresetRow({ id: original.id, systemKey: MEGUMIN_SUITE_PRESET_SYSTEM_KEY }, localStock)
+      .systemKey,
+    MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
+    "an import cannot swap the identity of a local stock row",
+  );
+  for (const systemKey of STOCK_PRESET_SYSTEM_KEYS) {
+    assert.equal(
+      normalizeProfilePromptPresetRow({ id: "foreign-stock", systemKey }, localStock).systemKey,
+      "",
+      `a foreign ${systemKey} row imports as an editable copy`,
+    );
+    assert.equal(
+      normalizeProfilePromptPresetRow(
+        { id: "foreign-stock", systemKey },
+        new Map([...localStock].filter(([key]) => key !== systemKey)),
+      ).systemKey,
+      systemKey,
+      `a foreign ${systemKey} row stays stock when this profile has none`,
+    );
+  }
 
   await storage.setSystemKey(original.id, "");
   await seedDefaultPreset(db);

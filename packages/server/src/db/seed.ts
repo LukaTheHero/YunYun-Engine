@@ -1,7 +1,8 @@
 // ──────────────────────────────────────────────
-// Seed: Marinara's Universal Prompt Preset
-// Creates or refreshes Marinara's bundled universal roleplay preset.
-// Reads the exported preset JSON and imports it via the standard importer.
+// Seed: the stock prompt presets
+// Creates or refreshes Marinara's bundled universal roleplay preset and the
+// bundled Megumin Suite preset. Reads each exported preset JSON and imports it
+// via the standard importer.
 // ──────────────────────────────────────────────
 import { logger } from "../lib/logger.js";
 import type { DB } from "./connection.js";
@@ -15,7 +16,10 @@ import {
   MARINARA_UNIVERSAL_PRESET_AUTHOR,
   MARINARA_UNIVERSAL_PRESET_NAME,
   MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
-  isStockMarinaraUniversalPreset,
+  MEGUMIN_SUITE_PRESET_AUTHOR,
+  MEGUMIN_SUITE_PRESET_NAME,
+  MEGUMIN_SUITE_PRESET_SYSTEM_KEY,
+  normalizePromptPresetEngineMode,
 } from "@marinara-engine/shared";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -29,8 +33,61 @@ const __dirname = dirname(__filename);
 
 const LEGACY_MARINARA_PRESET_NAME = "Default";
 const MARINARA_PRESET_DESCRIPTION = "Marinara's universal roleplay preset. Serves as a good base.";
-const MARINARA_PRESET_SEED_HASH_KEY = "seed:marinara-universal-preset:sha256";
-const MARINARA_PRESET_SNAPSHOT_KEY = "seed:marinara-universal-preset:snapshot-sha256";
+
+/** One Engine-owned preset that startup creates, restores and keeps current. */
+export interface StockPresetDefinition {
+  /** Reserved identity; one of STOCK_PRESET_SYSTEM_KEYS. */
+  systemKey: string;
+  /** Absolute path of the bundled `marinara_preset` envelope. */
+  file: string;
+  /** App setting holding the SHA-256 of the last applied bundled file. */
+  hashKey: string;
+  /** App setting holding the snapshot hash of the stock row as last applied. */
+  snapshotKey: string;
+  /** Used when the envelope omits them. */
+  name: string;
+  author: string;
+  description: string;
+  /** Short name for log lines. */
+  label: string;
+  /** Make the row the default when it is seeded into a profile that has no presets at all. */
+  makeDefaultOnFresh: boolean;
+  /**
+   * Older display names of a preset seeded before systemKey existed. A row named `name` or one of
+   * these, by `author`, is claimed only on snapshot evidence, and an old name is renamed to `name`.
+   * Without it a row is never claimed by name.
+   */
+  legacyNames?: readonly string[];
+  /** Migrate the old Conversation prompt lead sentence (the Universal preset only). */
+  migrateConversationPromptLead?: boolean;
+}
+
+export const MARINARA_UNIVERSAL_STOCK_PRESET: StockPresetDefinition = {
+  systemKey: MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY,
+  file: join(__dirname, "default-preset.json"),
+  hashKey: "seed:marinara-universal-preset:sha256",
+  snapshotKey: "seed:marinara-universal-preset:snapshot-sha256",
+  name: MARINARA_UNIVERSAL_PRESET_NAME,
+  author: MARINARA_UNIVERSAL_PRESET_AUTHOR,
+  description: MARINARA_PRESET_DESCRIPTION,
+  label: "universal preset",
+  makeDefaultOnFresh: true,
+  legacyNames: [LEGACY_MARINARA_PRESET_NAME],
+  migrateConversationPromptLead: true,
+};
+
+export const MEGUMIN_SUITE_STOCK_PRESET: StockPresetDefinition = {
+  systemKey: MEGUMIN_SUITE_PRESET_SYSTEM_KEY,
+  file: join(__dirname, "megumin-suite-preset.json"),
+  hashKey: "seed:megumin-suite-preset:sha256",
+  snapshotKey: "seed:megumin-suite-preset:snapshot-sha256",
+  name: MEGUMIN_SUITE_PRESET_NAME,
+  author: MEGUMIN_SUITE_PRESET_AUTHOR,
+  description: "Megumin Suite by KazumaONIISAN (Arif-salah), ported with permission.",
+  label: "Megumin Suite preset",
+  // Megumin Mode is off by default: the stock row is never starred or assigned automatically.
+  makeDefaultOnFresh: false,
+};
 
 type BundledPresetEnvelope = {
   type: "marinara_preset";
@@ -44,8 +101,7 @@ type BundledPresetEnvelope = {
   };
 };
 
-function readBundledDefaultPreset(): { hash: string; envelope: BundledPresetEnvelope } {
-  const jsonPath = join(__dirname, "default-preset.json");
+function readBundledPreset(jsonPath: string): { hash: string; envelope: BundledPresetEnvelope } {
   const raw = readFileSync(jsonPath, "utf-8");
   const envelope = JSON.parse(raw) as BundledPresetEnvelope;
   return {
@@ -133,10 +189,6 @@ function orderedStableKeys(value: unknown, keyMap: Map<string, string>): string[
     .filter((id): id is string => Boolean(id));
 }
 
-function bundledPresetDescription(envelope: BundledPresetEnvelope): string {
-  return String(envelope.data.preset.description ?? MARINARA_PRESET_DESCRIPTION);
-}
-
 function bundledConversationPrompt(preset: Record<string, unknown>): string {
   return String(preset.conversationPrompt ?? preset.conversation_prompt ?? DEFAULT_CONVERSATION_PROMPT);
 }
@@ -172,6 +224,8 @@ function buildPresetSnapshot(args: {
       defaultChoices: parseJsonField(preset.defaultChoices, {}),
       sectionOrder: orderedStableKeys(preset.sectionOrder, sectionKeyMap),
       groupOrder: orderedStableKeys(preset.groupOrder, groupKeyMap),
+      // Emitted only when set so snapshot hashes stored before this field existed still match.
+      ...(normalizePromptPresetEngineMode(preset.engineMode) ? { engineMode: preset.engineMode } : {}),
     },
     groups: groups
       .map((group) => ({
@@ -218,7 +272,7 @@ function buildPresetSnapshot(args: {
   };
 }
 
-function computeBundledPresetSnapshotHash(envelope: BundledPresetEnvelope): string {
+export function computeBundledPresetSnapshotHash(envelope: BundledPresetEnvelope): string {
   const bundled = envelope.data;
   return contentHash(
     buildPresetSnapshot({
@@ -230,7 +284,7 @@ function computeBundledPresetSnapshotHash(envelope: BundledPresetEnvelope): stri
   );
 }
 
-async function computePresetSnapshotHash(
+export async function computePresetSnapshotHash(
   storage: ReturnType<typeof createPromptsStorage>,
   presetId: string,
 ): Promise<string | null> {
@@ -249,7 +303,7 @@ async function computePresetSnapshotHash(
   );
 }
 
-async function migrateExistingMarinaraConversationPrompt(
+async function migrateExistingConversationPromptLead(
   storage: ReturnType<typeof createPromptsStorage>,
   preset: { id: string; conversationPrompt?: unknown },
   bundledPrompt: string,
@@ -266,20 +320,22 @@ async function applyBundledPresetToExisting(
   storage: ReturnType<typeof createPromptsStorage>,
   presetId: string,
   envelope: BundledPresetEnvelope,
+  def: StockPresetDefinition,
 ) {
   const bundled = envelope.data;
   const preset = bundled.preset;
 
   await storage.update(presetId, {
-    name: String(preset.name ?? MARINARA_UNIVERSAL_PRESET_NAME),
-    description: String(preset.description ?? MARINARA_PRESET_DESCRIPTION),
+    name: String(preset.name ?? def.name),
+    description: String(preset.description ?? def.description),
     conversationPrompt: bundledConversationPrompt(preset),
     gamePrompt: bundledGamePrompt(preset),
     variableGroups: parseJsonField(preset.variableGroups, []),
     variableValues: parseJsonField(preset.variableValues, {}),
     parameters: parseJsonField(preset.parameters, {}),
     wrapFormat: (preset.wrapFormat as "xml" | "markdown" | "none" | undefined) ?? "xml",
-    author: String(preset.author ?? MARINARA_UNIVERSAL_PRESET_AUTHOR),
+    engineMode: normalizePromptPresetEngineMode(preset.engineMode),
+    author: String(preset.author ?? def.author),
     defaultChoices: parseJsonField(preset.defaultChoices, {}),
   });
 
@@ -354,27 +410,37 @@ async function applyBundledPresetToExisting(
 }
 
 // ─────────────────────────────────────────────
-//  Main seed function
+//  Main seed functions
 // ─────────────────────────────────────────────
-export async function seedDefaultPreset(db: DB) {
+
+/** Seed Marinara's Universal Preset. Runs before every other stock preset so a fresh profile stars it. */
+export function seedDefaultPreset(db: DB) {
+  return seedStockPreset(db, MARINARA_UNIVERSAL_STOCK_PRESET);
+}
+
+/** Seed the Megumin Suite preset. It is never made the default. */
+export function seedMeguminSuitePreset(db: DB) {
+  return seedStockPreset(db, MEGUMIN_SUITE_STOCK_PRESET);
+}
+
+export async function seedStockPreset(db: DB, def: StockPresetDefinition) {
   const storage = createPromptsStorage(db);
   const appSettings = createAppSettingsStorage(db);
-  const bundled = readBundledDefaultPreset();
+  const bundled = readBundledPreset(def.file);
 
   const existing = await storage.list();
-  const appliedHash = await appSettings.get(MARINARA_PRESET_SEED_HASH_KEY);
-  const appliedSnapshotHash = await appSettings.get(MARINARA_PRESET_SNAPSHOT_KEY);
+  const appliedHash = await appSettings.get(def.hashKey);
+  const appliedSnapshotHash = await appSettings.get(def.snapshotKey);
   const bundledSnapshotHash = computeBundledPresetSnapshotHash(bundled.envelope);
-  let existingMarinaraPreset = existing.find(isStockMarinaraUniversalPreset);
+  let stockPreset = existing.find((preset) => preset.systemKey === def.systemKey);
 
   // One-time migration for presets seeded before the reserved system key
   // existed. Match immutable seed evidence rather than editable name/author
   // alone so a user preset cannot accidentally become protected stock.
-  if (!existingMarinaraPreset) {
+  if (!stockPreset && def.legacyNames) {
+    const claimableNames = [def.name, ...def.legacyNames];
     const legacyCandidates = existing.filter(
-      (preset) =>
-        (preset.name === MARINARA_UNIVERSAL_PRESET_NAME || preset.name === LEGACY_MARINARA_PRESET_NAME) &&
-        preset.author === MARINARA_UNIVERSAL_PRESET_AUTHOR,
+      (preset) => claimableNames.includes(preset.name) && preset.author === def.author,
     );
     for (const candidate of legacyCandidates) {
       const candidateSnapshotHash = await computePresetSnapshotHash(storage, candidate.id);
@@ -382,52 +448,55 @@ export async function seedDefaultPreset(db: DB) {
         candidateSnapshotHash === bundledSnapshotHash ||
         (appliedSnapshotHash !== null && candidateSnapshotHash === appliedSnapshotHash);
       if (!matchesKnownSnapshot) continue;
-      const taggedPreset = await storage.setSystemKey(candidate.id, MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY);
-      if (taggedPreset) existingMarinaraPreset = taggedPreset;
+      const taggedPreset = await storage.setSystemKey(candidate.id, def.systemKey);
+      if (taggedPreset) stockPreset = taggedPreset;
       break;
     }
   }
 
   // Normalize the old display name before any reconciliation branch can
   // return, including profiles without a prior snapshot marker.
-  if (existingMarinaraPreset?.name === LEGACY_MARINARA_PRESET_NAME) {
-    const renamedPreset = await storage.update(existingMarinaraPreset.id, {
-      name: MARINARA_UNIVERSAL_PRESET_NAME,
-      description: bundledPresetDescription(bundled.envelope),
+  if (stockPreset && def.legacyNames?.includes(stockPreset.name)) {
+    const renamedPreset = await storage.update(stockPreset.id, {
+      name: def.name,
+      description: String(bundled.envelope.data.preset.description ?? def.description),
     });
-    if (renamedPreset) existingMarinaraPreset = renamedPreset;
+    if (renamedPreset) stockPreset = renamedPreset;
   }
 
   const bundledConversationPromptValue = bundledConversationPrompt(bundled.envelope.data.preset);
-  if (existingMarinaraPreset && appliedSnapshotHash) {
-    const currentSnapshotHash = await computePresetSnapshotHash(storage, existingMarinaraPreset.id);
+  const migrateConversationPromptLead = (preset: { id: string; conversationPrompt?: unknown }) =>
+    def.migrateConversationPromptLead
+      ? migrateExistingConversationPromptLead(storage, preset, bundledConversationPromptValue)
+      : Promise.resolve(false);
+
+  if (stockPreset && appliedSnapshotHash) {
+    const currentSnapshotHash = await computePresetSnapshotHash(storage, stockPreset.id);
     if (currentSnapshotHash && currentSnapshotHash !== appliedSnapshotHash) {
-      const wasDefault = existingMarinaraPreset.isDefault === "true";
-      const preserved = await storage.duplicate(existingMarinaraPreset.id);
-      await applyBundledPresetToExisting(db, storage, existingMarinaraPreset.id, bundled.envelope);
-      if (wasDefault) await storage.setDefault(existingMarinaraPreset.id);
-      await appSettings.set(MARINARA_PRESET_SEED_HASH_KEY, bundled.hash);
-      const nextSnapshotHash = await computePresetSnapshotHash(storage, existingMarinaraPreset.id);
-      if (nextSnapshotHash) await appSettings.set(MARINARA_PRESET_SNAPSHOT_KEY, nextSnapshotHash);
+      const wasDefault = stockPreset.isDefault === "true";
+      const preserved = await storage.duplicate(stockPreset.id);
+      await applyBundledPresetToExisting(db, storage, stockPreset.id, bundled.envelope, def);
+      if (wasDefault) await storage.setDefault(stockPreset.id);
+      await appSettings.set(def.hashKey, bundled.hash);
+      const nextSnapshotHash = await computePresetSnapshotHash(storage, stockPreset.id);
+      if (nextSnapshotHash) await appSettings.set(def.snapshotKey, nextSnapshotHash);
       logger.info(
-        "[seed] Restored the stock Marinara universal preset and preserved customization as %s",
+        "[seed] Restored the stock %s and preserved customization as %s",
+        def.label,
         preserved?.name ?? "an editable copy",
       );
       return;
     }
   }
 
-  if (existingMarinaraPreset && appliedHash !== bundled.hash) {
+  if (stockPreset && appliedHash !== bundled.hash) {
     if (!appliedSnapshotHash) {
-      const migratedConversationPrompt = await migrateExistingMarinaraConversationPrompt(
-        storage,
-        existingMarinaraPreset,
-        bundledConversationPromptValue,
-      );
-      await appSettings.set(MARINARA_PRESET_SEED_HASH_KEY, bundled.hash);
-      await appSettings.set(MARINARA_PRESET_SNAPSHOT_KEY, computeBundledPresetSnapshotHash(bundled.envelope));
+      const migratedConversationPrompt = await migrateConversationPromptLead(stockPreset);
+      await appSettings.set(def.hashKey, bundled.hash);
+      await appSettings.set(def.snapshotKey, bundledSnapshotHash);
       logger.info(
-        "[seed] Preserved existing Marinara universal preset without prior snapshot while recording bundled hash %s",
+        "[seed] Preserved existing %s without prior snapshot while recording bundled hash %s",
+        def.label,
         bundled.hash.slice(0, 12),
       );
       if (migratedConversationPrompt) {
@@ -436,47 +505,46 @@ export async function seedDefaultPreset(db: DB) {
       return;
     }
 
-    const wasDefault = existingMarinaraPreset.isDefault === "true";
-    await applyBundledPresetToExisting(db, storage, existingMarinaraPreset.id, bundled.envelope);
-    if (wasDefault) await storage.setDefault(existingMarinaraPreset.id);
-    await appSettings.set(MARINARA_PRESET_SEED_HASH_KEY, bundled.hash);
-    const nextSnapshotHash = await computePresetSnapshotHash(storage, existingMarinaraPreset.id);
-    if (nextSnapshotHash) await appSettings.set(MARINARA_PRESET_SNAPSHOT_KEY, nextSnapshotHash);
-    logger.info("[seed] Updated bundled Marinara universal preset to %s", bundled.hash.slice(0, 12));
+    const wasDefault = stockPreset.isDefault === "true";
+    await applyBundledPresetToExisting(db, storage, stockPreset.id, bundled.envelope, def);
+    if (wasDefault) await storage.setDefault(stockPreset.id);
+    await appSettings.set(def.hashKey, bundled.hash);
+    const nextSnapshotHash = await computePresetSnapshotHash(storage, stockPreset.id);
+    if (nextSnapshotHash) await appSettings.set(def.snapshotKey, nextSnapshotHash);
+    logger.info("[seed] Updated bundled %s to %s", def.label, bundled.hash.slice(0, 12));
     return;
   }
 
-  if (
-    existingMarinaraPreset &&
-    (await migrateExistingMarinaraConversationPrompt(storage, existingMarinaraPreset, bundledConversationPromptValue))
-  ) {
+  if (stockPreset && (await migrateConversationPromptLead(stockPreset))) {
     logger.info("[seed] Updated the legacy Marinara Conversation prompt lead sentence");
   }
 
-  if (existingMarinaraPreset && !appliedSnapshotHash) {
-    await appSettings.set(MARINARA_PRESET_SNAPSHOT_KEY, computeBundledPresetSnapshotHash(bundled.envelope));
+  if (stockPreset && !appliedSnapshotHash) {
+    await appSettings.set(def.snapshotKey, bundledSnapshotHash);
   }
 
-  if (existingMarinaraPreset) return;
+  if (stockPreset) return;
 
   // Import using the standard importer
   const result = await importMarinara(bundled.envelope, db);
   if (!result.success || result.type !== "marinara_preset") {
-    logger.error("[seed] Failed to import default preset: %j", result);
+    logger.error("[seed] Failed to import the bundled %s: %j", def.label, result);
     return;
   }
 
   // The first preset becomes the default. If the stock preset is being
   // recovered after deletion, preserve the user's current default.
   const presetId = (result as { id: string }).id;
-  if (existing.length === 0) await storage.setDefault(presetId);
-  await storage.setSystemKey(presetId, MARINARA_UNIVERSAL_PRESET_SYSTEM_KEY);
+  if (def.makeDefaultOnFresh && existing.length === 0) await storage.setDefault(presetId);
+  await storage.setSystemKey(presetId, def.systemKey);
   await storage.update(presetId, {
     conversationPrompt: bundledConversationPrompt(bundled.envelope.data.preset),
     gamePrompt: bundledGamePrompt(bundled.envelope.data.preset),
     defaultChoices: parseJsonField(bundled.envelope.data.preset.defaultChoices, {}),
+    // The importer drops parameters (an imported file never carries them); stock rows keep the bundled ones.
+    parameters: parseJsonField(bundled.envelope.data.preset.parameters, {}),
   });
-  await appSettings.set(MARINARA_PRESET_SEED_HASH_KEY, bundled.hash);
+  await appSettings.set(def.hashKey, bundled.hash);
   const seededSnapshotHash = await computePresetSnapshotHash(storage, presetId);
-  if (seededSnapshotHash) await appSettings.set(MARINARA_PRESET_SNAPSHOT_KEY, seededSnapshotHash);
+  if (seededSnapshotHash) await appSettings.set(def.snapshotKey, seededSnapshotHash);
 }

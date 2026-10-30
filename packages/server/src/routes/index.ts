@@ -66,6 +66,7 @@ import { sidecarRoutes } from "./sidecar.routes.js";
 import { ttsRoutes } from "./tts.routes.js";
 import { speechToTextRoutes } from "./speech-to-text.routes.js";
 import { promptOverridesRoutes } from "./prompt-overrides.routes.js";
+import { meguminRoutes } from "./megumin.routes.js";
 import { csrfDiagnosticsRoutes } from "./csrf-diagnostics.routes.js";
 import { professorMariWorkspaceRoutes } from "./professor-mari-workspace.routes.js";
 import { professorMariQuickRoutes } from "./professor-mari-quick.routes.js";
@@ -171,6 +172,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await app.register(ttsRoutes, { prefix: "/api/tts" });
   await app.register(speechToTextRoutes, { prefix: "/api/speech-to-text" });
   await app.register(promptOverridesRoutes, { prefix: "/api/prompt-overrides" });
+  await app.register(meguminRoutes, { prefix: "/api/megumin" });
   await app.register(csrfDiagnosticsRoutes, { prefix: "/api/csrf" });
   await app.register(professorMariWorkspaceRoutes, { prefix: "/api/professor-mari/workspace" });
   await app.register(professorMariQuickRoutes, { prefix: "/api/professor-mari/quick" });

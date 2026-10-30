@@ -45,6 +45,7 @@ async function buildLowMemoryServer() {
 function copyRuntimeAssets() {
   mkdirSync(resolve(DIST_DIR, "db"), { recursive: true });
   cpSync(resolve(SRC_DIR, "db", "default-preset.json"), resolve(DIST_DIR, "db", "default-preset.json"));
+  cpSync(resolve(SRC_DIR, "db", "megumin-suite-preset.json"), resolve(DIST_DIR, "db", "megumin-suite-preset.json"));
   if (existsSync(resolve(SRC_DIR, "assets"))) {
     cpSync(resolve(SRC_DIR, "assets"), resolve(DIST_DIR, "assets"), { recursive: true });
   }

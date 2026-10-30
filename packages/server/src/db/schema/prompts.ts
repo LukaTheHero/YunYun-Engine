@@ -34,6 +34,8 @@ export const promptPresets = fileTable("prompt_presets", {
   author: text("author").notNull().default(""),
   /** Reserved identifier for Engine-owned presets; never accepted from user input. */
   systemKey: text("system_key").notNull().default(""),
+  /** "" | "megumin". Unlike systemKey, duplicates, exports and imports keep it. */
+  engineMode: text("engine_mode").notNull().default(""),
   /** Pre-computed semantic embedding of name/description/author (JSON float[]), null until vectorized (#4768) */
   embedding: text("embedding"),
   createdAt: text("created_at").notNull(),

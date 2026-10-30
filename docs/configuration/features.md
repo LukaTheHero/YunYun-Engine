@@ -12,6 +12,7 @@ A change applies straight away. You do not need to restart the server or reload 
 | **Retry failed provider calls**   | `providerRetry`            | Off     | `PROVIDER_RETRY_TRANSIENT_ERRORS` |
 | **Lorebook activation stats**     | `usageAndActivationStats`  | Off     | none                              |
 | **Recover deleted chat messages** | `messageTrash`             | Off     | none                              |
+| **Megumin Mode**                  | `meguminMode`              | Off     | none                              |
 
 Searching settings for `features` takes you to the section.
 
@@ -56,6 +57,16 @@ Setting key: `messageTrash`. No environment variable.
 On: deleted chat messages go to the **Trash** tab in chat search. Use **Restore** there within 30 days; after that they are removed for good. Game messages and rollback deletes are still permanent.
 
 Off: deleted messages are removed right away.
+
+### Megumin Mode
+
+Setting key: `meguminMode`. No environment variable. The **Megumin Suite** card at the top of the Presets tab has the same switch.
+
+On: a Roleplay chat whose preset is a Megumin Suite preset (the stock **Megumin Suite** preset or a copy of it) has its prompt built from Megumin Suite's engines, reasoning frameworks, writing styles, add-ons and Story Config. You choose them in the Megumin Suite editor, opened from the card. Other presets and other chats are unchanged. Turning the switch on from the card also gives the open Roleplay chat the Megumin Suite preset, with Undo.
+
+Off: no Megumin code runs. A chat that has a Megumin Suite preset generates with the starred default preset instead, or with the stock Universal preset when the starred one is a Megumin preset, and shows a banner. The chat keeps its preset, so turning the switch back on restores Megumin.
+
+Megumin Suite is by KazumaONIISAN (Arif-salah), <https://github.com/Arif-salah/Megumin-Suite>, licensed CC BY-NC 4.0, and is ported with the author's permission. See `THIRD_PARTY_NOTICES.md`.
 
 ## Precedence
 

@@ -19,7 +19,13 @@ import type {
   MacroDecisionAnswers,
   ResolveMacroOptions,
 } from "@marinara-engine/shared";
-import { DEFAULT_GENERATION_PARAMS, generationParametersSchema, resolveMacros } from "@marinara-engine/shared";
+import {
+  DEFAULT_GENERATION_PARAMS,
+  generationParametersSchema,
+  isMeguminPreset,
+  resolveMacros,
+} from "@marinara-engine/shared";
+import type { MeguminAssemblerOptions, MeguminTurnResult } from "../megumin/resolve-slots.js";
 import { wrapContent, wrapGroup } from "./format-engine.js";
 import { sanitizePromptLeaf } from "./prompt-escaping.js";
 import { ensureLorebookScan, expandMarker, type MarkerContext } from "./marker-expander.js";
@@ -77,6 +83,8 @@ export interface AssemblerInput {
     parameters: string; // JSON string of GenerationParameters
     variableGroups: string;
     variableValues: string;
+    /** "megumin" marks a Megumin Suite preset. */
+    engineMode?: string;
   };
   /** All sections belonging to this preset (raw DB rows) */
   sections: Array<{
@@ -211,6 +219,10 @@ export interface AssemblerInput {
   decisions?: MacroDecisionAnswers;
   /** Answers lorebook entries' decision statements for activation (#6570). */
   lorebookDecisions?: LorebookDecisionResolver;
+  /** Turn sections on or off for this assembly only, keyed by section identifier. */
+  sectionEnabledOverrides?: Record<string, boolean>;
+  /** Megumin turn options; a Megumin preset fills its variables only when `enabled` marks a Megumin turn. */
+  megumin?: MeguminAssemblerOptions;
 }
 
 /** Output of the assembler. */
@@ -240,6 +252,8 @@ export interface AssemblerOutput {
   /** Agent types whose runtime data was consumed by enabled agent_data sections. */
   runtimeAgentTypesUsed?: string[];
   advancedMemoryPlacements?: AdvancedMemoryPlacement[];
+  /** Present on a Megumin turn: what the turn sent (dice, engine, reasoning, layout, payload size). */
+  megumin?: MeguminTurnResult;
 }
 
 export function parsePresetParameters(raw: string): GenerationParameters {
@@ -279,6 +293,31 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
   const parameters = parsePresetParameters(input.preset.parameters);
   const sectionOrder = JSON.parse(input.preset.sectionOrder) as string[];
   const variableValues = JSON.parse(input.preset.variableValues) as Record<string, string>;
+  // A Megumin preset on a Megumin turn (the caller decides, see resolveGenerationPromptPreset): its
+  // {{megumin_*}} slots become preset variables, so the macros inside them resolve with every other
+  // value below. The resolver and its content library load only for such a turn.
+  const megumin =
+    input.megumin?.enabled === true && isMeguminPreset(input.preset)
+      ? await (
+          await import("../megumin/resolve-slots.js")
+        ).resolveMeguminSlots({
+          db: input.db,
+          chatId: input.chatId,
+          chatMessages: input.chatMessages,
+          previewOnly: input.previewOnly,
+          presetParameters: parameters,
+          options: input.megumin,
+        })
+      : null;
+  if (megumin) {
+    Object.assign(variableValues, megumin.variables);
+    Object.assign(parameters, megumin.parameterPatch);
+  }
+  const sectionEnabledOverrides = megumin
+    ? { ...input.sectionEnabledOverrides, ...megumin.sectionEnabledOverrides }
+    : input.sectionEnabledOverrides;
+  const isSectionEnabled = (section: AssemblerInput["sections"][number]) =>
+    sectionEnabledOverrides?.[section.identifier] ?? section.enabled === "true";
   // Preset text can safely delay all character macros until the responder is known.
   // Lorebook content only delays names so field macros keep the same budgeting behavior.
   const deferAllMacroOptions: ResolveMacroOptions | undefined = input.deferCharacterMacros
@@ -315,7 +354,7 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
   }
   const enabledSectionContents = sectionOrder.flatMap((sectionId) => {
     const section = sectionMap.get(sectionId);
-    if (!section || section.enabled !== "true") return [];
+    if (!section || !isSectionEnabled(section)) return [];
     if (input.impersonate === true && input.preserveImpersonatePresetSections !== true && section.isMarker !== "true") {
       return [];
     }
@@ -552,7 +591,7 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
   for (const sectionId of sectionOrder) {
     const section = sectionMap.get(sectionId);
     if (!section) continue;
-    if (section.enabled !== "true") continue;
+    if (!isSectionEnabled(section)) continue;
     if (input.impersonate === true && input.preserveImpersonatePresetSections !== true && section.isMarker !== "true") {
       continue;
     }
@@ -841,6 +880,7 @@ export async function assemblePrompt(input: AssemblerInput): Promise<AssemblerOu
       : {}),
     ...(runtimeAgentTypesUsed.size > 0 ? { runtimeAgentTypesUsed: Array.from(runtimeAgentTypesUsed) } : {}),
     ...(input.advancedMemory ? { advancedMemoryPlacements } : {}),
+    ...(megumin ? { megumin: megumin.turn } : {}),
   };
 }
 

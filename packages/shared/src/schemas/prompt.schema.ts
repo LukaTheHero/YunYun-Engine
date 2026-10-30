@@ -2,6 +2,7 @@
 // Prompt Zod Schemas
 // ──────────────────────────────────────────────
 import { z } from "zod";
+import { PROMPT_PRESET_ENGINE_MODES } from "../features/megumin/mode.js";
 
 export const managedGenerationParameterValueSchema = z.object({
   enabled: z.boolean(),
@@ -189,6 +190,8 @@ export const updatePromptGroupSchema = createPromptGroupSchema.omit({ presetId: 
 
 // ── Presets ──
 
+export const promptPresetEngineModeSchema = z.enum(PROMPT_PRESET_ENGINE_MODES);
+
 export const createPromptPresetSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().default(""),
@@ -200,6 +203,7 @@ export const createPromptPresetSchema = z.object({
   parameters: generationParametersSchema.default({}),
   wrapFormat: wrapFormatSchema.default("xml"),
   scopedRegexMode: scopedRegexModeSchema.default("disabled"),
+  engineMode: promptPresetEngineModeSchema.default(""),
   isDefault: z.boolean().default(false),
   author: z.string().default(""),
 });
@@ -217,6 +221,7 @@ export const updatePromptPresetSchema = z.object({
   parameters: generationParametersSchema.partial().optional(),
   wrapFormat: wrapFormatSchema.optional(),
   scopedRegexMode: scopedRegexModeSchema.optional(),
+  engineMode: promptPresetEngineModeSchema.optional(),
   author: z.string().optional(),
   defaultChoices: z.record(z.union([z.string(), z.array(z.string())])).optional(),
 });

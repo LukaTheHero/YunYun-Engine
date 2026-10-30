@@ -57,6 +57,9 @@ function manualChunks(id: string) {
   // So is the world a game is set in (its kit, places, people, history and story), which grows with
   // every part of worldgen, rather than weight on the game tag parser's chunk.
   if (/\/shared\/(?:dist|src)\/features\/world\//u.test(id)) return "game-world";
+  // So is Megumin Mode's catalog, Story Config and profile schema, which load with its card and editor.
+  // Its mode constants stay out: the preset schema every page loads imports them.
+  if (/\/shared\/(?:dist|src)\/features\/megumin\/(?!mode\.)/u.test(id)) return "megumin-shared";
   // So is the sheet a ruleset builds (its fields, derived values and the math behind them), which grows
   // with every part of a sheet a ruleset can describe.
   if (/\/shared\/(?:dist|src)\/features\/rulesets\/(?:sheet-builder|sheet-math)\.(?:js|ts)$/u.test(id))

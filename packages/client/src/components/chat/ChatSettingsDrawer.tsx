@@ -292,6 +292,7 @@ import {
   MAX_ILLUSTRATOR_RUN_INTERVAL,
   chatFollowsChatPreset,
   customAgentHasCapability,
+  isStockMarinaraUniversalPreset,
   normalizeIllustratorImagesPerGeneration,
   normalizeIllustratorRunInterval,
   normalizeSpotifySourceType,
@@ -712,9 +713,6 @@ function isConversationCommandToggleEnabled(
 ): boolean {
   return toggles[command] !== false;
 }
-
-const MARINARA_UNIVERSAL_PRESET_NAME = "Marinara's Universal Preset";
-const MARINARA_UNIVERSAL_PRESET_AUTHOR = "Marinara";
 
 const CHAT_SETTINGS_ORDER = {
   settingsPresets: -1600,
@@ -1164,12 +1162,9 @@ export function ChatSettingsDrawer({
   const { data: currentPromptPresetFull } = usePresetFull(isRoleplayMode ? (chat.promptPresetId ?? null) : null);
   const promptPresetOptionsLoaded = Array.isArray(presets);
   const promptPresetOptions = useMemo(() => (presets ?? []) as PromptPreset[], [presets]);
+  // Conversation and Game fall back to the Universal preset only, never to another stock preset.
   const marinaraUniversalPromptPreset = useMemo(
-    () =>
-      promptPresetOptions.find(
-        (preset) =>
-          preset.name === MARINARA_UNIVERSAL_PRESET_NAME && preset.author === MARINARA_UNIVERSAL_PRESET_AUTHOR,
-      ) ?? null,
+    () => promptPresetOptions.find(isStockMarinaraUniversalPreset) ?? null,
     [promptPresetOptions],
   );
   const fallbackPromptPreset = useMemo(() => {

@@ -32,6 +32,7 @@ try {
 
   // ── the registry: exactly these switches, every one off by default ──
   assert.deepEqual([...FEATURE_SWITCH_NAMES].sort(), [
+    "meguminMode",
     "messageTrash",
     "providerRetry",
     "stableLorebookGroupPicks",

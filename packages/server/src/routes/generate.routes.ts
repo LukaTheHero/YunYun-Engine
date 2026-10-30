@@ -701,9 +701,12 @@ import { getCapabilityService } from "../services/capability-packages/capability
 import { normalizeContextInjections } from "./generate/agent-normalizers.js";
 import {
   buildGenerationPromptPresetCandidates,
+  resolveGenerationPromptPreset,
   resolveGenerationPromptPresetChoices,
-  type PromptPresetCandidateSource,
 } from "./generate/prompt-preset-selection.js";
+import { isFeatureEnabled } from "../services/features/feature-settings.js";
+import { cleanMeguminReply, cleanMeguminThinking } from "../services/megumin/reply-cleanup.js";
+import type { MeguminTurnResult } from "../services/megumin/resolve-slots.js";
 import {
   applyGenerationReplayToRegenerateInput,
   buildGenerationReplay,
@@ -2527,25 +2530,19 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
         impersonate: input.impersonate,
         impersonatePromptPresetId: input.impersonatePresetId,
       });
-      let presetId: string | undefined;
-      let resolvedPreset: Awaited<ReturnType<typeof presets.getById>> | null = null;
-      let presetSource: PromptPresetCandidateSource | null = null;
-      for (const candidate of presetCandidates) {
-        const candidatePreset = await presets.getById(candidate.id);
-        if (candidatePreset) {
-          presetId = candidate.id;
-          resolvedPreset = candidatePreset;
-          presetSource = candidate.source;
-          break;
-        }
-        if (candidate.source !== "chat") {
-          logger.warn(
-            "[generate] %s prompt preset override %s was not found; falling back to the next preset candidate",
-            candidate.source,
-            candidate.id,
-          );
-        }
-      }
+      const presetSelection = await resolveGenerationPromptPreset({
+        candidates: presetCandidates,
+        presetsStorage: presets,
+        meguminEnabled: isFeatureEnabled("meguminMode"),
+        chatMode,
+        impersonate: input.impersonate === true,
+        logLabel: "[generate]",
+      });
+      const presetId = presetSelection.presetId ?? undefined;
+      const resolvedPreset = presetSelection.preset;
+      const presetSource = presetSelection.source;
+      // Computed once for the turn; every Megumin step reads this.
+      const isMeguminTurn = presetSelection.isMeguminTurn;
       const selectedPresetDiffersFromChat = !!resolvedPreset && !!presetId && presetId !== chatPromptPresetId;
       const resolvedPresetDefaultChoices = resolvedPreset
         ? (parsePromptPresetChoices((resolvedPreset as { defaultChoices?: unknown }).defaultChoices) ?? {})
@@ -3032,6 +3029,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
         let assistantPrefill = "";
         let assistantReasoningPrefill = "";
         let customThinkingTags: ThinkingTagPair[] = [];
+        let meguminTurn: MeguminTurnResult | null = null;
         let customParameters: Record<string, unknown> = {};
         let enabledParameters: GenerationParameterSendMap | undefined;
         let stopSequences: string[] = [];
@@ -3776,9 +3774,11 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             deferCharacterMacros,
             decisions: promptMacroContext.decisions,
             lorebookDecisions,
+            megumin: { enabled: isMeguminTurn },
           };
 
           const assembled = await assemblePrompt(assemblerInput);
+          meguminTurn = assembled.megumin ?? null;
           for (const id of assembled.referencedCharacterIds) referencedCharacterIds.add(id);
           Object.assign(promptMacroContext.variables, assembled.macroVariables);
           // Preset values are available now, so deferred names resolve normally
@@ -9025,10 +9025,19 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
 
           // Some models inline reasoning blocks instead of using provider-native
           // thinking channels. Lift those blocks into message.extra.thinking.
-          const inlineThinking = extractLeadingThinkingBlocks(fullResponse, customThinkingTags);
+          // A Megumin turn that asked for reasoning also lifts reasoning whose opening tag the provider dropped.
+          const inlineThinking = extractLeadingThinkingBlocks(
+            fullResponse,
+            customThinkingTags,
+            meguminTurn?.cotId ? { allowLeadingUnopenedClose: true } : undefined,
+          );
           if (inlineThinking.stripped) {
-            if (inlineThinking.thinking) {
-              fullThinking = fullThinking ? fullThinking + "\n\n" + inlineThinking.thinking : inlineThinking.thinking;
+            // Megumin's reasoning prefill and Gemini wrapper repeat the opening tag; only the first is the block's.
+            const liftedThinking = meguminTurn
+              ? cleanMeguminThinking(inlineThinking.thinking)
+              : inlineThinking.thinking;
+            if (liftedThinking) {
+              fullThinking = fullThinking ? fullThinking + "\n\n" + liftedThinking : liftedThinking;
             }
             fullResponse = inlineThinking.content;
             contentReplaced = true;
@@ -9274,6 +9283,15 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             if (parsed.commands.length > 0) parsedCommands = [...parsedCommands, ...parsed.commands];
             fullResponse = parsed.text;
             if (parsed.changed) contentReplaced = true;
+          }
+
+          // A Megumin reply loses the tags Megumin Suite hid from the display and the prompt.
+          if (meguminTurn) {
+            const meguminReply = cleanMeguminReply(fullResponse);
+            if (meguminReply !== fullResponse) {
+              fullResponse = meguminReply;
+              contentReplaced = true;
+            }
           }
 
           // A defined intro was written, not cut off: it is kept whole.
@@ -10727,7 +10745,8 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
               reasoningDurationMs: streamOutput.reasoningDurationMs,
               finishReason,
               lastContextFit,
-              fullThinking,
+              // The Dialogue Colors add-on bleeds <font> tags into Megumin reasoning.
+              fullThinking: meguminTurn ? fullThinking.replace(/<\/?font[^>]*>/gi, "") : fullThinking,
               geminiResponseParts,
               chatCompletionsReasoning,
               encryptedReasoningItems,
@@ -10877,6 +10896,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             // reflects the last generation instead of a best-effort rescan.
             extraUpdate.lorebookScan = lorebookScanSnapshot;
             extraUpdate.chatSummaryFingerprint = fingerprintChatSummary(chatMeta.summary);
+            if (meguminTurn) extraUpdate.meguminTurn = meguminTurn;
             if (advancedMemoryReceipt) extraUpdate.advancedMemoryReceipt = advancedMemoryReceipt;
             // A continuation has its own prompt, but regenerating the whole message
             // must still reuse the memory from before that message first began.

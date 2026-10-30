@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isStockMarinaraUniversalPreset } from "../../packages/shared/src/types/prompt.js";
+import { isStockMarinaraUniversalPreset, isStockMeguminPreset } from "../../packages/shared/src/types/prompt.js";
 
 const dataDir = mkdtempSync(join(tmpdir(), "marinara-admin-preset-expunge-"));
 const previousDataDir = process.env.DATA_DIR;
@@ -39,9 +39,9 @@ try {
   const presets = createPromptsStorage(db);
   const folders = createLibraryFoldersStorage(db);
 
-  async function stockSnapshot() {
-    const stockPreset = (await presets.list()).find(isStockMarinaraUniversalPreset);
-    assert.ok(stockPreset, "startup must seed the stock Universal Preset");
+  async function stockSnapshot(isStock: (preset: { systemKey?: unknown }) => boolean = isStockMarinaraUniversalPreset) {
+    const stockPreset = (await presets.list()).find(isStock);
+    assert.ok(stockPreset, "startup must seed every stock preset");
     const [groups, sections, choiceBlocks] = await Promise.all([
       presets.listGroups(stockPreset.id),
       presets.listSections(stockPreset.id),
@@ -102,6 +102,7 @@ try {
 
   const scopedEditablePresetId = await createEditableFixture("scoped", true, true);
   const stockBeforeScopedExpunge = await stockSnapshot();
+  const meguminBeforeScopedExpunge = await stockSnapshot(isStockMeguminPreset);
   const scopedResponse = await app.inject({
     method: "POST",
     url: "/api/admin/expunge",
@@ -121,10 +122,16 @@ try {
     stockBeforeScopedExpunge.preset.id,
     "scoped preset expunge must restore the stock preset as default",
   );
+  assert.deepEqual(
+    await stockSnapshot(isStockMeguminPreset),
+    meguminBeforeScopedExpunge,
+    "scoped preset expunge keeps the stock Megumin Suite preset untouched and unstarred",
+  );
   await assertEditableFixtureDeleted(scopedEditablePresetId);
 
   const clearAllEditablePresetId = await createEditableFixture("clear_all", false);
   const stockBeforeClearAll = await stockSnapshot();
+  const meguminBeforeClearAll = await stockSnapshot(isStockMeguminPreset);
   const clearAllResponse = await app.inject({
     method: "POST",
     url: "/api/admin/clear-all",
@@ -146,10 +153,31 @@ try {
   );
   await assertEditableFixtureDeleted(clearAllEditablePresetId);
   assert.deepEqual(
-    (await presets.list()).map((preset) => preset.id),
-    [stockBeforeClearAll.preset.id],
-    "only the stock Universal Preset may remain after clear-all",
+    await stockSnapshot(isStockMeguminPreset),
+    meguminBeforeClearAll,
+    "clear-all keeps the stock Megumin Suite preset",
   );
+  assert.deepEqual(
+    (await presets.list()).map((preset) => preset.id).sort(),
+    [stockBeforeClearAll.preset.id, meguminBeforeClearAll.preset.id].sort(),
+    "only the stock presets may remain after clear-all",
+  );
+
+  // A starred stock preset keeps its star: only a deleted default hands it to the Universal preset.
+  await presets.setDefault(meguminBeforeClearAll.preset.id);
+  const starredStockFixtureId = await createEditableFixture("starred_stock", false);
+  const starredStockResponse = await app.inject({
+    method: "POST",
+    url: "/api/admin/expunge",
+    payload: { confirm: true, scopes: ["presets"] },
+  });
+  assert.equal(starredStockResponse.statusCode, 200, "expunge with a starred stock preset must succeed");
+  assert.deepEqual(
+    (await presets.list()).filter((preset) => preset.isDefault === "true").map((preset) => preset.id),
+    [meguminBeforeClearAll.preset.id],
+    "expunge keeps a starred Megumin Suite preset as the only default",
+  );
+  await assertEditableFixtureDeleted(starredStockFixtureId);
 } finally {
   await app?.close();
   if (previousDataDir === undefined) delete process.env.DATA_DIR;

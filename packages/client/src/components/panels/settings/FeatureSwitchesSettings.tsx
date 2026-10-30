@@ -1,13 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import {
-  FEATURE_SWITCH_DEFAULTS,
-  resolveFeatureEnabled,
-  type FeatureSettings,
-  type FeatureSwitchName,
-} from "@marinara-engine/shared";
+import { resolveFeatureEnabled, type FeatureSettings, type FeatureSwitchName } from "@marinara-engine/shared";
 import { getPrivilegedActionErrorMessage } from "../../../lib/api-client";
-import { useFeatureSettings, useSaveFeatureSettings } from "../../../hooks/use-feature-settings";
+import { mergeFeatureSettings, useFeatureSettings, useSaveFeatureSettings } from "../../../hooks/use-feature-settings";
 import { ToggleSetting } from "./SettingControls";
 
 export const FEATURE_SWITCHES_CONTROL_ID = "feature-switches";
@@ -18,6 +13,7 @@ const SERVER_SWITCHES: ReadonlyArray<FeatureSwitchName> = [
   "providerRetry",
   "usageAndActivationStats",
   "messageTrash",
+  "meguminMode",
 ];
 
 /**
@@ -34,12 +30,7 @@ export function FeatureSwitchesSettings({ anchorId }: { anchorId?: string }) {
   const disabled = !query.data || save.isPending;
 
   const update = (patch: FeatureSettings) => {
-    const next: FeatureSettings = { ...(settings ?? {}), ...patch };
-    // Store only what differs from the default so a later default change still reaches this install.
-    for (const key of Object.keys(next) as FeatureSwitchName[]) {
-      if (next[key] === FEATURE_SWITCH_DEFAULTS[key]) delete next[key];
-    }
-    save.mutate(next, {
+    save.mutate(mergeFeatureSettings(settings, patch), {
       onError: (error) => toast.error(getPrivilegedActionErrorMessage(error, t("settings.features.saveFailed"))),
     });
   };

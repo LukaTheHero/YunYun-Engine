@@ -343,6 +343,8 @@ export const CHAT_PROFILE_FOLLOWER_SYNC_KEYS: readonly string[] = [
   "translateInput", // Translate your messages
   "showInputTranslateButton", // Translate button in the message box
   "translationDisplayOnly", // Show only the translation once there is one
+  // Megumin Mode
+  "meguminProfile", // This chat's own Megumin Suite settings
   // Display and layout
   "windowLayout", // Window and button layout
   "chatSettingsHintDismissed", // Chat Settings tips hidden
