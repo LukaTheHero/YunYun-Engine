@@ -10,6 +10,11 @@
 export * from "./host.js";
 export * from "./yunyun.js";
 export * from "./turn.js";
+export * from "./actions.js";
+export * from "./catalog.js";
+export * from "./view.js";
+export { getContext, setMeguminLogger, toastr as meguminToastr } from "./vendor/src/st.js";
+export { localProfile } from "./vendor/src/core/state.js";
 
 export * as MeguminProfile from "./vendor/src/core/profile.js";
 export * as MeguminKeys from "./vendor/src/core/keys.js";

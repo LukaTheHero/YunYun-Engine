@@ -17,6 +17,7 @@ import { HEALTH_RATE_LIMIT, rateLimitHook } from "./middleware/rate-limit.js";
 import { securityHeadersHook } from "./middleware/security-headers.js";
 import { compressJsonHook } from "./middleware/compress-json.js";
 import { seedDefaultPreset } from "./db/seed.js";
+import { seedMeguminPresets } from "./services/megumin/megumin-presets.js";
 import { seedProfessorMari } from "./db/seed-mari.js";
 import { seedDefaultConnection } from "./db/seed-connection.js";
 import { seedDefaultBackgrounds } from "./db/seed-backgrounds.js";
@@ -221,6 +222,7 @@ export async function buildApp(https?: { cert: Buffer; key: Buffer }) {
 
   // ── Seed defaults ──
   await startup.phase("seed.preset", () => seedDefaultPreset(db));
+  await startup.phase("seed.megumin-presets", () => seedMeguminPresets(db));
   await startup.phase("seed.mari", () => seedProfessorMari(db));
   if (isAutoCreateDefaultConnectionDisabled()) {
     app.log.info("Skipping default OpenRouter Free connection seed because AUTO_CREATE_DEFAULT_CONNECTION is disabled");

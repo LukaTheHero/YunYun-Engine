@@ -1,6 +1,7 @@
 // ──────────────────────────────────────────────
 // Routes: Chats
 // ──────────────────────────────────────────────
+import { notifyMeguminChatEvent } from "../services/megumin/megumin-chat-events.js";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { logger } from "../lib/logger.js";
@@ -2738,6 +2739,7 @@ export async function chatsRoutes(app: FastifyInstance) {
         ? []
         : await messageTrashStore.trashMessages(req.params.chatId, [req.params.messageId]);
     if (trashed.length === 0) await storage.removeMessage(req.params.messageId);
+    notifyMeguminChatEvent(app.db, req.params.chatId, { kind: "deleted" });
     return reply.send({ trashed: trashed.length > 0, trashedCount: trashed.length });
   });
 
@@ -2752,6 +2754,7 @@ export async function chatsRoutes(app: FastifyInstance) {
       ? await messageTrashStore.trashMessages(req.params.chatId, ids)
       : [];
     if (trashed.length === 0) await storage.removeMessages(ids, req.params.chatId);
+    notifyMeguminChatEvent(app.db, req.params.chatId, { kind: "deleted" });
     return reply.send({ trashed: trashed.length > 0, trashedCount: trashed.length });
   });
 
@@ -2800,6 +2803,7 @@ export async function chatsRoutes(app: FastifyInstance) {
     if (typeof content !== "string") return reply.status(400).send({ error: "content is required" });
     const updated = await storage.updateMessageContent(req.params.messageId, content, { authored: true });
     if (!updated) return reply.status(404).send({ error: "Message not found" });
+    notifyMeguminChatEvent(app.db, req.params.chatId, { kind: "edited", messageId: req.params.messageId });
     return updated;
   });
 
@@ -3566,8 +3570,19 @@ export async function chatsRoutes(app: FastifyInstance) {
         const presetStore = createPromptsStorage(app.db);
         const charStore = createCharactersStorage(app.db);
 
-        const preset = presetId ? await presetStore.getById(presetId) : null;
+        let preset = presetId ? await presetStore.getById(presetId) : null;
         const chatMode = (chat.mode as string) ?? "roleplay";
+        // MEGUMINTOGGLE: the same preset swap and slot fill the generation does.
+        const { resolveMeguminPresetSwap } = await import("../services/megumin/megumin-presets.js");
+        const { prepareMeguminTurn } = await import("../services/megumin/megumin-generation.js");
+        const meguminSwap = await resolveMeguminPresetSwap(app.db, { chatMode, resolved: preset as never });
+        if (meguminSwap) preset = meguminSwap as unknown as typeof preset;
+        const meguminTurn = await prepareMeguminTurn(app.db, {
+          chatId: chat.id as string,
+          chatMode,
+          preset: preset as { systemKey?: unknown } | null,
+          dryRun: true,
+        });
         if (preset || chatMode === "conversation" || chatMode === "game" || chatMode === "roleplay") {
           // Apply conversation-start filter
           let scopedMessages = chatMessages;
@@ -4270,7 +4285,12 @@ export async function chatsRoutes(app: FastifyInstance) {
           }
 
           return {
-            messages: toPeekPromptMessages(injectOwnerSpatialPrompt(assembled.messages, ownerSpatialProjection)),
+            messages: toPeekPromptMessages(
+              injectOwnerSpatialPrompt(
+                meguminTurn ? await meguminTurn.apply(assembled.messages) : assembled.messages,
+                ownerSpatialProjection,
+              ),
+            ),
             chatMode,
             parameters: assembled.parameters,
             source: "live_preview",
@@ -4395,6 +4415,11 @@ export async function chatsRoutes(app: FastifyInstance) {
         if (!updated) {
           return reply.status(404).send({ error: "Message not found" });
         }
+        notifyMeguminChatEvent(app.db, req.params.chatId, {
+          kind: "swipeDeleted",
+          messageId: req.params.messageId,
+          swipeIndex: index,
+        });
 
         await forgetInventoryTelling(
           req.params.chatId,
@@ -4451,6 +4476,8 @@ export async function chatsRoutes(app: FastifyInstance) {
       return withChatSwipeSelectionQueue(req.params.chatId, async () => {
         const previous = await storage.getMessage(req.params.messageId);
         const updated = await storage.setActiveSwipe(req.params.messageId, index);
+        if (updated)
+          notifyMeguminChatEvent(app.db, req.params.chatId, { kind: "swiped", messageId: req.params.messageId });
         // A Game Mode inventory follows the telling that is shown, as long as nothing changed it since
         // the telling left it (#6774). Only a game that remembers a turn has anything to switch.
         if (updated && previous && (previous.activeSwipeIndex ?? 0) !== index) {

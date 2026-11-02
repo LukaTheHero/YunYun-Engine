@@ -18,6 +18,7 @@ import {
   MeguminProfile,
   createRunState,
   setMeguminChildRunner,
+  setMeguminLogger,
   setMeguminScopeProvider,
   type MeguminChatMessage,
   type MeguminChatScope,
@@ -45,6 +46,18 @@ import {
 import { createMeguminHostIo } from "./megumin-host-io.js";
 
 const als = new AsyncLocalStorage<MeguminScope>();
+// Megumin's own console lines, through Pino: its chatter at debug, its warnings and failures as such.
+setMeguminLogger((level, args) => {
+  const [first, ...rest] = args;
+  const err = rest.find((a) => a instanceof Error);
+  const text = [first, ...rest.filter((a) => !(a instanceof Error))]
+    .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+    .join(" ")
+    .slice(0, 4000);
+  if (level === "error") logger.error(err ?? {}, "[megumin] %s", text);
+  else if (level === "warn") logger.warn(err ?? {}, "[megumin] %s", text);
+  else logger.debug("[megumin] %s", text);
+});
 setMeguminScopeProvider(() => als.getStore());
 setMeguminChildRunner((run, fn) => {
   const current = als.getStore();
@@ -509,3 +522,35 @@ setInterval(() => {
     }
   }
 }, 60_000).unref();
+
+/** Megumin with no chat open: the panel edits the global default profile, as in SillyTavern. */
+export async function withMeguminGlobal<T>(db: DB, fn: () => Promise<T> | T): Promise<T> {
+  await ensureMeguminStore(db);
+  mirrorMeguminPowerSwitch();
+  const scope: MeguminChatScope = {
+    chatId: null,
+    chat: [],
+    metadata: {},
+    settings: meguminSettingsRoot(),
+    profile: {},
+    loadedProfileKey: null,
+    characters: [],
+    characterId: undefined,
+    groupId: null,
+    groups: [],
+    name1: "User",
+    name2: "",
+    substitute: (text) => text,
+    quiet: async () => "",
+    notify: () => {},
+    dirty: { metadata: false, settings: false, chat: false, profile: false },
+  };
+  try {
+    return await als.run({ chat: scope, run: createRunState() }, async () => {
+      MeguminProfile.initProfile();
+      return await fn();
+    });
+  } finally {
+    if (scope.dirty.settings || scope.dirty.profile) scheduleMeguminStoreSave(db);
+  }
+}
