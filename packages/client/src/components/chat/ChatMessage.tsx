@@ -3508,6 +3508,20 @@ export const ChatMessage = memo(function ChatMessage({
       isStreaming={!!isStreaming}
     />
   );
+  // Megumin's card, with the blocks stripped from the text above (a Visual Novel box draws it too).
+  const meguminCard =
+    meguminCards && meguminView && !isStreaming ? (
+      <Suspense fallback={null}>
+        <MeguminMessageCard
+          chatId={message.chatId}
+          messageId={message.id}
+          content={message.content}
+          msgIndex={messageOrderIndex ?? -1}
+          isLast={!!isLastAssistantMessage}
+          view={meguminView}
+        />
+      </Suspense>
+    ) : null;
   const roleplayBubbleContent = isHiddenCollapsed ? (
     <HiddenFromAIMessageSummary
       roleplay={isRoleplay}
@@ -3561,18 +3575,7 @@ export const ChatMessage = memo(function ChatMessage({
         )}
       </div>
       {roleplayCommandResults}
-      {meguminCards && meguminView && !isStreaming && !visualNovel ? (
-        <Suspense fallback={null}>
-          <MeguminMessageCard
-            chatId={message.chatId}
-            messageId={message.id}
-            content={message.content}
-            msgIndex={messageIndex ?? -1}
-            isLast={!!isLastAssistantMessage}
-            view={meguminView}
-          />
-        </Suspense>
-      ) : null}
+      {meguminCard}
       {(translatedText || isTranslating) && !showTranslationOnly && (
         <div className="mt-2 border-t border-white/10 pt-2">
           {isTranslating ? (
@@ -3766,6 +3769,10 @@ export const ChatMessage = memo(function ChatMessage({
                 </>
               )}
             </div>
+            {/* The card closes the reply: it shows under the last paragraph, kept out of the live region. */}
+            {meguminCard && activeVnParagraphIndex >= vnParagraphs.length - 1 ? (
+              <div className="mt-2 max-h-[min(30dvh,18rem)] overflow-y-auto overscroll-contain pr-1">{meguminCard}</div>
+            ) : null}
             {ttsEnabled && <div className="mt-2 flex flex-wrap items-center gap-2">{roleplayTtsControls}</div>}
           </div>
         </div>

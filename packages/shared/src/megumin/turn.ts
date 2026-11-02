@@ -62,6 +62,9 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
   if (!suiteEnabled()) return;
   const jobs: Array<Promise<unknown>> = [];
   const chatNow = () => (getContext().chat || []) as any[];
+  // The chat as it stood when this reply landed (SillyTavern fired MESSAGE_RECEIVED with the reply last).
+  // A group turn's replies are all saved before any is read, so a later member's reply must not stand in.
+  const chatAtReply = () => chatNow().slice(0, index + 1);
 
   const replyNow = chatNow()[index];
   const emptyReply = Boolean(
@@ -119,7 +122,7 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
   const sp = localProfile?.storyPlan;
   const spIdentity = meguminActiveDataIdentity();
   if (sp && sp.enabled) {
-    const chat = chatNow();
+    const chat = chatAtReply();
     const lastMsg = chat[chat.length - 1];
     if (lastMsg && !lastMsg.is_user && !lastMsg.is_system) {
       const match = String(lastMsg.mes || "").match(/<Story_Tracker[^>]*>([\s\S]*?)<\/Story_Tracker\s*>/i);
@@ -170,7 +173,7 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
   // ── Memory: the automatic scan ──
   const mem = localProfile?.memoryCore;
   if (mem && mem.enabled && (mem.triggerMode === "frequency" || mem.triggerMode === "every")) {
-    const chat = chatNow();
+    const chat = chatAtReply();
     const aiCount = chat.filter((m) => !m.is_user && !m.is_system).length;
     const freq = mem.triggerMode === "every" ? 1 : mem.autoFreq || 10;
     if (aiCount > 0 && aiCount % freq === 0) {
@@ -195,7 +198,7 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
   // ── NPC Bank: new dossiers and updates in the reply ──
   const npcBank = localProfile?.npcBank;
   if (npcBank && npcBank.enabled) {
-    const chat = chatNow();
+    const chat = chatAtReply();
     const lastMsg = chat[chat.length - 1];
     if (lastMsg && !lastMsg.is_user && !lastMsg.is_system) {
       let added = false;
@@ -238,7 +241,7 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
   // ── Images the story model wrote in its reply (<img prompt="…">) ──
   const ig = localProfile?.imageGen;
   if (ig && ig.enabled) {
-    const chat = chatNow();
+    const chat = chatAtReply();
     const msgIndex = chat.length - 1;
     const lastMsg = chat[msgIndex];
     if (lastMsg && !lastMsg.is_user && !lastMsg.is_system) {

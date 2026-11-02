@@ -2160,6 +2160,8 @@ export function ChatRoleplaySurface({
                               mergedGroupCharacterIds={activeChatCharacterIds}
                               expressionAvatarResolver={expressionAvatarResolver}
                               messageDepth={(messages?.length ?? 1) - 1 - (messages?.indexOf(activeVnMessage) ?? 0)}
+                              isLastAssistantMessage={activeVnMessage.id === lastAssistantMessageId}
+                              messageOrderIndex={loadedMessageOffset + (messages?.indexOf(activeVnMessage) ?? 0)}
                             />
                             {(vnParagraphCount > 1 || visibleVnMessages.length > 1 || hasNextPage) && (
                               <div

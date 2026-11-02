@@ -7,6 +7,7 @@
 import {
   MeguminInjection,
   MeguminWorker,
+  type MeguminChatMessage,
   type MeguminChatScope,
   type MeguminImageRequest,
   type MeguminImageRenderRequest,
@@ -158,14 +159,15 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
       }));
   }
 
-  async function embed(texts: string[]): Promise<number[][] | null> {
+  async function embed(texts: string[]): Promise<{ space: string; vectors: number[][] } | null> {
     try {
       const source = await resolveMemoryRecallEmbeddingSource(db, {
         chatMetadata: ctx.chatMetadata,
         connectionId: ctx.chatConnectionId,
       });
       if (!source) return null;
-      return await source.embed(texts);
+      const vectors = await source.embed(texts);
+      return vectors ? { space: source.spaceId ?? source.label, vectors } : null;
     } catch (err) {
       logger.warn(err, "[megumin] Embedding for the Semantic memory scanner failed; Megumin falls back to keywords");
       return null;
@@ -225,6 +227,8 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
   async function generateImage(request: MeguminImageRequest, scope: MeguminChatScope): Promise<void> {
     const notify: Notify = (level, message) => scope.notify({ level, message, title: "Megumin Suite" });
     try {
+      // The reply and swipe are fixed now: a regenerate or a swipe while the image draws must not move it.
+      const anchor = await imageAnchor(scope, request);
       const drawn = await render(request, notify);
       if (!drawn) return;
       const { saveImageToDisk } = await import("../image/image-generation.js");
@@ -240,7 +244,10 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
         width: drawn.width,
         height: drawn.height,
       });
-      placeImage(scope, request, url, (gallery as { id?: string } | null)?.id ?? null);
+      if (!(await placeImage(scope, request, anchor, url, (gallery as { id?: string } | null)?.id ?? null))) {
+        notify("warning", "The image was drawn, but its reply is gone, so it is only in the chat's gallery.");
+        return;
+      }
       notify(
         "success",
         request.target?.isInlineAuto && request.target.mode === "inline" ? "Image injected inline!" : "Image inserted!",
@@ -288,10 +295,43 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
     return `<!-- kazuma-inline-start:${id} --><div id="${id}" class="kazuma-img-wrapper">\n<img src="${url}" title="${safe}" alt="KazumaInline" data-kazumaid="${id}" style="max-width: 100%; border-radius: 8px; display: block;" />\n</div><!-- kazuma-inline-end:${id} -->`;
   }
 
-  function placeImage(scope: MeguminChatScope, request: MeguminImageRequest, url: string, galleryId: string | null) {
+  type ImageAnchor = { message: MeguminChatMessage; swipeIndex: number };
+
+  /**
+   * The message an image belongs to (the target, or the latest reply) and the swipe stored as shown when the
+   * image is asked for. Not the live message's swipe_id: a regenerate sets that to a swipe not saved yet.
+   */
+  async function imageAnchor(scope: MeguminChatScope, request: MeguminImageRequest): Promise<ImageAnchor | null> {
+    const id = request.target?.messageId;
+    // A named reply that is gone gets no image; only an image asked for no reply in particular goes on the latest.
+    const message = id
+      ? scope.chat.find((m) => m.id === id)
+      : [...scope.chat].reverse().find((m) => !m.is_user && !m.is_system);
+    if (!message) return null;
+    const row = await createChatsStorage(db).getMessage(message.id);
+    return row ? { message, swipeIndex: row.activeSwipeIndex ?? 0 } : null;
+  }
+
+  /** Puts the image on its message's swipe; false when that message or swipe is gone. */
+  async function placeImage(
+    scope: MeguminChatScope,
+    request: MeguminImageRequest,
+    anchor: ImageAnchor | null,
+    url: string,
+    galleryId: string | null,
+  ): Promise<boolean> {
+    if (!anchor) return false;
+    const { message, swipeIndex } = anchor;
     const target = request.target;
-    const message = target?.messageId ? scope.chat.find((m) => m.id === target.messageId) : null;
-    if (target?.isInlineAuto && target.mode === "inline" && message) {
+    // Inline only while the message is still in the chat and still shows that swipe: its text is the one the
+    // placeholder is in. A deleted reply falls through to the attachment path, which reports it is gone.
+    if (
+      target?.isInlineAuto &&
+      target.mode === "inline" &&
+      target.messageId === message.id &&
+      scope.chat.includes(message) &&
+      message.swipe_id === swipeIndex
+    ) {
       const id = target.placeholderId || `kazuma-img-${Date.now()}`;
       const tag = inlineTag(id, url, request.prompt);
       const specific = new RegExp(`<div id="${id}"[^>]*>[\\s\\S]*?<\\/div>`);
@@ -299,11 +339,9 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
         message.mes = message.mes.replace(specific, () => tag);
       else message.mes = `${message.mes}\n\n${tag}`;
       scope.dirty.chat = true;
-      return;
+      return true;
     }
-    // Anything else becomes an image on the message (or the latest reply): YunYun's attachment, its gallery viewer.
-    const host = message ?? [...scope.chat].reverse().find((m) => !m.is_user && !m.is_system) ?? null;
-    if (!host) return;
+    // Anything else becomes an image on the message: YunYun's attachment, its gallery viewer.
     const attachment = {
       type: "image",
       url,
@@ -313,13 +351,11 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
       source: "megumin",
     };
     const chats = createChatsStorage(db);
-    void (async () => {
-      await chats.appendSwipeAttachment(host.id, host.swipe_id, attachment);
-      const row = await chats.getMessage(host.id);
-      if (row && (row.activeSwipeIndex ?? 0) === host.swipe_id)
-        await chats.appendMessageAttachment(host.id, attachment);
-      scope.changed?.(`message:${host.id}`);
-    })().catch((err) => logger.warn(err, "[megumin] Attaching a Megumin image failed"));
+    // The swipe row is the lasting record; the message row mirrors it only while that swipe is shown.
+    if (!(await chats.appendSwipeAttachment(message.id, swipeIndex, attachment))) return false;
+    await chats.appendMessageAttachmentForActiveSwipe(message.id, swipeIndex, attachment);
+    scope.changed?.(`message:${message.id}`);
+    return true;
   }
 
   function markImageFailed(scope: MeguminChatScope, request: MeguminImageRequest) {

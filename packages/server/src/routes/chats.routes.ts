@@ -3613,6 +3613,7 @@ export async function chatsRoutes(app: FastifyInstance) {
             content: m.content as string,
             characterId: typeof m.characterId === "string" && m.characterId ? m.characterId : null,
           }));
+          meguminTurn?.filterArchived(mappedMessages);
 
           // Strip trailing assistant messages — peek should show only what we SEND to the model
           while (mappedMessages.length > 0 && mappedMessages[mappedMessages.length - 1]!.role === "assistant") {
@@ -4418,7 +4419,7 @@ export async function chatsRoutes(app: FastifyInstance) {
         notifyMeguminChatEvent(app.db, req.params.chatId, {
           kind: "swipeDeleted",
           messageId: req.params.messageId,
-          swipeIndex: index,
+          swipeIndexes: [index],
         });
 
         await forgetInventoryTelling(
@@ -4455,13 +4456,23 @@ export async function chatsRoutes(app: FastifyInstance) {
         // Descending indexes keep the selected swipe stable until lower rows are
         // removed, after which the existing removal path shifts it safely to 0.
         let shown = message.activeSwipeIndex ?? 0;
+        const removed: number[] = [];
         for (const swipe of [...swipes].sort((a: any, b: any) => b.index - a.index)) {
           if (swipe.index === keepIndex) continue;
           const updated = await storage.removeSwipe(req.params.messageId, swipe.index);
           if (!updated) continue;
+          removed.push(swipe.index);
           const wasShown = shown === swipe.index;
           shown = updated.activeSwipeIndex ?? 0;
           await forgetInventoryTelling(req.params.chatId, req.params.messageId, swipe.index, wasShown, shown);
+        }
+        // In removal order, so Megumin drops each telling's changes and shifts the later swipes' down as it went.
+        if (removed.length) {
+          notifyMeguminChatEvent(app.db, req.params.chatId, {
+            kind: "swipeDeleted",
+            messageId: req.params.messageId,
+            swipeIndexes: removed,
+          });
         }
         return storage.getMessage(req.params.messageId);
       });

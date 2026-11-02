@@ -312,7 +312,8 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
     generating: 0,
     version: 0,
     notices: [],
-    noticeSeq: 0,
+    // Rises across rebuilds and restarts, so a client's mark from an earlier scope never hides a new notice.
+    noticeSeq: Date.now(),
     scope: null as unknown as MeguminChatScope,
   };
 
@@ -503,6 +504,7 @@ export async function withMeguminChat<T>(
   if (options.refresh !== false) live = await refreshLiveChat(db, live);
   live.lastUsed = Date.now();
   live.running += 1;
+  let restorePendingSwipe: (() => void) | null = null;
   try {
     if (options.refresh !== false) {
       const names = (live as LiveChat & { names: Parameters<typeof readMessages>[2] }).names;
@@ -510,7 +512,15 @@ export async function withMeguminChat<T>(
     }
     if (options.pendingSwipeMessageId) {
       const msg = live.scope.chat.find((m) => m.id === options.pendingSwipeMessageId);
-      if (msg) msg.swipe_id = msg.swipes.length;
+      if (msg) {
+        // Only for this operation: the shared message goes back to the swipe storage shows when it ends.
+        const shown = msg.swipe_id;
+        const pending = msg.swipes.length;
+        msg.swipe_id = pending;
+        restorePendingSwipe = () => {
+          if (msg.swipe_id === pending) msg.swipe_id = shown;
+        };
+      }
     }
     mirrorMeguminPowerSwitch();
     const run: MeguminRunState = createRunState();
@@ -526,6 +536,7 @@ export async function withMeguminChat<T>(
       }
     });
   } finally {
+    restorePendingSwipe?.();
     live.running -= 1;
     await persist(live);
   }

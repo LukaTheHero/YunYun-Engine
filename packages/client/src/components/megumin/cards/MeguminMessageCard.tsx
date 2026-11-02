@@ -186,7 +186,15 @@ export function MeguminMessageCard({
   );
 
   return (
-    <div data-component="MeguminMessageCard" className="meg-card-host">
+    <div
+      data-component="MeguminMessageCard"
+      className="meg-card-host"
+      // The panes' editors open as modals, outside the card in the page but inside it for React: a
+      // double-click there must not reach the reply's quick edit, which would close the editor.
+      onDoubleClick={(e) => {
+        if (e.target instanceof Node && !e.currentTarget.contains(e.target)) e.stopPropagation();
+      }}
+    >
       <div ref={hostRef} />
       {panes.map((pane) =>
         MEGUMIN_DECORATED_BLOCKS.has(pane.blockId) ? (

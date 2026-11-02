@@ -255,11 +255,12 @@ export const PATCHES = [
     "if (extension_settings[extensionName]?.globalSettings?.promptPreview && !isBackgroundGen && !isSilentOrDry && !isSpam) {",
     "if (false && extension_settings[extensionName]?.globalSettings?.promptPreview && !isBackgroundGen && !isSilentOrDry && !isSpam) {",
   ],
-  // The review popup for changed looks needs a person at a screen: on YunYun the scan keeps every established look.
+  // The review popup for changed looks needs a person at a screen. On YunYun a person's rescan of named characters
+  // (the look editor's "Read the look again") applies what it found; a scan of everyone keeps every established look.
   [
     "src/features/imagegen/v2/looks.js",
-    "    if (!plan.change.length) return [];",
-    "    if (!plan.change.length) return [];\n    if (!$.isLive) return [];",
+    "    const accepted = interactive ? await reviewChanges(plan) : [];",
+    "    const accepted = !interactive ? [] : $.isLive ? await reviewChanges(plan) : targets.length ? plan.change : [];",
   ],
   [
     "src/features/imagegen/engineChoice.js",
@@ -270,6 +271,18 @@ export const PATCHES = [
     "src/state/index.js",
     "    getChat: () => getContext()?.chat || [],",
     '    getChat: () => getContext()?.chat || [],\n    getChatId: () => getContext()?.chatId || "",',
+  ],
+  // A group turn's replies are all read once the turn ends: "every N replies" counts up to the reply being read,
+  // not to the newest one (in SillyTavern the reply read is always the newest, so this changes nothing there).
+  [
+    "src/features/imagegen/auto.js",
+    "if (!dueNow(ig, chat)) return;",
+    "if (!dueNow(ig, chat.slice(0, index + 1))) return;",
+  ],
+  [
+    "src/features/imagegen/combinedTurn.js",
+    "const image = Boolean(ig && ig.enabled && imageViaChomusuke() && dueNow(ig, chat));",
+    "const image = Boolean(ig && ig.enabled && imageViaChomusuke() && dueNow(ig, chat.slice(0, index + 1)));",
   ],
 ];
 

@@ -140,7 +140,7 @@ try {
   const text = filled.map((m) => m.content).join("\n");
   assert.ok(!/\[\[[^\]\n]+\]\]/.test(text), "no slot reaches the model");
   assert.ok(text.includes("<role>"), "V11 Тайна's rules are in");
-  turn!.finish(false);
+  turn!.finish();
 
   // ── The panel: the chat's view, a profile save, an action ──
   const view = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/view` });
@@ -213,7 +213,7 @@ try {
   });
   const live = await prepareMeguminTurn(db, { chatId: chat.id, chatMode: "roleplay", preset: v11 });
   live!.noteSavedReply(reply.id);
-  live!.finish(true);
+  live!.finish();
   await until(async () => {
     const meta = JSON.parse(String((await chats.getById(chat.id))?.metadata ?? "{}"));
     return Boolean(meta.megumin_state?.journal?.length);

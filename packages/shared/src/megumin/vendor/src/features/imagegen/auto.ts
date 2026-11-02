@@ -93,7 +93,7 @@ export async function igAutoImageForReply(messageId, type, writePrompt, prepare 
     const index = typeof messageId === "number" ? messageId : chat.length - 1;
     const message = chat[index];
     if (!message || message.is_user || message.is_system) return;
-    if (!dueNow(ig, chat)) return;
+    if (!dueNow(ig, chat.slice(0, index + 1))) return;
 
     const inline = (ig.injectMode || "new_msg") === "inline";
     const id = `kazuma-img-${Date.now()}-auto`;

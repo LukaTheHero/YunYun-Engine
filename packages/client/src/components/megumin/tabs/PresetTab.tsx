@@ -165,12 +165,23 @@ function PresetPageView({
   const latest = official.filter((m) => LATEST_VERSIONS.includes(versionOf(m)));
   const list = filter === "mine" ? customModes : filter === "latest" ? latest : official;
   const toggles = (profile.toggles ?? {}) as Record<string, boolean>;
+  const isV7 = !!active && MeguminEngineFlags.isV7Engine(active);
+  const v7Unset = isV7 && V7_MODULES.some((mod) => toggles[mod.id] === undefined);
+
+  // The engine leaves an unset V7 module out of the prompt: Megumin turns them on when this card is drawn.
+  useEffect(() => {
+    if (!v7Unset) return;
+    update((p) => {
+      p.toggles = { ...(p.toggles ?? {}) };
+      for (const mod of V7_MODULES) p.toggles[mod.id] ??= true;
+    });
+  }, [update, v7Unset]);
 
   return (
     <div className="flex flex-col gap-3">
       <Callout tone="gold">{t("megumin.preset.proTip")}</Callout>
 
-      {active && MeguminEngineFlags.isV7Engine(active) ? (
+      {isV7 ? (
         <MeguminSection title={t("megumin.preset.v7.title")} description={t("megumin.preset.v7.description")}>
           {V7_MODULES.map((mod) => (
             <SwitchRow

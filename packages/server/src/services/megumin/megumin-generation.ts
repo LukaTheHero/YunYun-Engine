@@ -20,7 +20,7 @@ import { getContext, localProfile } from "@marinara-engine/shared/megumin";
 import type { DB } from "../../db/connection.js";
 import { logger } from "../../lib/logger.js";
 import { isMeguminEnabled } from "./megumin-store.js";
-import { isMeguminPreset } from "./megumin-presets.js";
+import { carriesMeguminSlots } from "./megumin-presets.js";
 import { markMeguminGenerating, withMeguminChat } from "./megumin-runtime.js";
 
 const SEND_GUARD_MS = 30_000;
@@ -32,18 +32,23 @@ export interface MeguminGenerationTurn {
   apply<T extends { role: string; content: unknown }>(messages: T[]): Promise<T[]>;
   /** A reply was saved; Megumin reads it once the generation is done. */
   noteSavedReply(messageId: string | null | undefined): void;
-  /** The generation ended: start the after-reply work for every saved reply. */
-  finish(succeeded: boolean): void;
+  /**
+   * The generation ended, finished or not: start the after-reply work for every reply it saved
+   * (a reply already in the chat is read even when a later one failed, as SillyTavern read it on arrival).
+   */
+  finish(): void;
 }
 
-export function isMeguminGeneration(args: {
-  chatMode: unknown;
-  preset: { systemKey?: unknown } | null | undefined;
-  impersonate?: boolean;
-}) {
-  return (
-    isMeguminEnabled() && args.chatMode === "roleplay" && isMeguminPreset(args.preset) && args.impersonate !== true
-  );
+export async function isMeguminGeneration(
+  db: DB,
+  args: {
+    chatMode: unknown;
+    preset: { id?: unknown; systemKey?: unknown } | null | undefined;
+    impersonate?: boolean;
+  },
+): Promise<boolean> {
+  if (!isMeguminEnabled() || args.chatMode !== "roleplay" || args.impersonate === true) return false;
+  return carriesMeguminSlots(db, args.preset);
 }
 
 export async function prepareMeguminTurn(
@@ -51,14 +56,14 @@ export async function prepareMeguminTurn(
   args: {
     chatId: string;
     chatMode: unknown;
-    preset: { systemKey?: unknown } | null | undefined;
+    preset: { id?: unknown; systemKey?: unknown } | null | undefined;
     impersonate?: boolean;
     regenerateMessageId?: string | null;
     continueMessageId?: string | null;
     dryRun?: boolean;
   },
 ): Promise<MeguminGenerationTurn | null> {
-  if (!isMeguminGeneration(args)) return null;
+  if (!(await isMeguminGeneration(db, args))) return null;
   const { chatId } = args;
   const pendingSwipeMessageId = args.regenerateMessageId ?? null;
   const replyType: MeguminReplyType = args.regenerateMessageId
@@ -132,11 +137,11 @@ export async function prepareMeguminTurn(
     noteSavedReply(messageId) {
       if (messageId) saved.push(messageId);
     },
-    finish(succeeded) {
+    finish() {
       if (finished) return;
       finished = true;
       if (!args.dryRun) void markMeguminGenerating(db, chatId, false);
-      if (!succeeded || !saved.length) return;
+      if (!saved.length) return;
       void withMeguminChat(db, chatId, async () => {
         for (const id of saved) {
           const index = (getContext().chat as Array<{ id: string }>).findIndex((m) => m.id === id);

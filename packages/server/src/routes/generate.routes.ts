@@ -2552,9 +2552,11 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
       }
       // MEGUMINTOGGLE: while it is on, a Roleplay chat on the stock preset runs on Megumin V11 Universal;
       // while it is off, a Megumin preset runs as the stock one. A person's own preset is never swapped.
-      const meguminPresetSwap = input.impersonate
-        ? null
-        : await resolveMeguminPresetSwap(app.db, { chatMode, resolved: resolvedPreset as never });
+      const meguminPresetSwap = await resolveMeguminPresetSwap(app.db, {
+        chatMode,
+        resolved: resolvedPreset as never,
+        impersonate: input.impersonate,
+      });
       if (meguminPresetSwap) {
         presetId = meguminPresetSwap.id;
         resolvedPreset = meguminPresetSwap as unknown as typeof resolvedPreset;
@@ -14788,7 +14790,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
       dispatchAutomaticTranslations();
 
       // Megumin reads the reply (blocks, Chomusuke jobs, images, Director, Memory, NPC Bank) in the background.
-      meguminTurn?.finish(true);
+      meguminTurn?.finish();
       // Signal completion before the slow illustration tail. The client keeps
       // listening until the HTTP stream closes, so late illustration events can
       // still arrive without holding the chat's generation lock hostage.
@@ -14826,7 +14828,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
           : "Generation failed";
       sendSseEvent(reply, { type: "error", data: message });
     } finally {
-      meguminTurn?.finish(false);
+      meguminTurn?.finish();
       dispatchAutomaticTranslations(translationAfterFailure);
       if (restoredRoleplayInterruption && input.regenerateMessageId) {
         try {

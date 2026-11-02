@@ -1065,10 +1065,9 @@ export async function registerDryRunRoute(app: FastifyInstance) {
     }
 
     // MEGUMINTOGGLE's preset swap and Megumin's slot fill, exactly as the generation will do them.
-    const meguminPresetSwap =
-      skipPreset || impersonate
-        ? null
-        : await resolveMeguminPresetSwap(app.db, { chatMode, resolved: effectivePreset as never });
+    const meguminPresetSwap = skipPreset
+      ? null
+      : await resolveMeguminPresetSwap(app.db, { chatMode, resolved: effectivePreset as never, impersonate });
     if (meguminPresetSwap) {
       effectivePresetId = meguminPresetSwap.id;
       effectivePreset = meguminPresetSwap as unknown as typeof effectivePreset;

@@ -18,6 +18,7 @@ import { isStockMarinaraUniversalPreset, type MarkerConfig } from "@marinara-eng
 import {
   MEGUMIN_DEFAULT_PRESET_SYSTEM_KEY,
   MEGUMIN_PRESETS,
+  MeguminSlots,
   isMeguminPresetSystemKey,
 } from "@marinara-engine/shared/megumin";
 import type { DB } from "../../db/connection.js";
@@ -144,18 +145,69 @@ function readBundled(file: string): { raw: STPreset; hash: string } {
   return { raw: JSON.parse(text) as STPreset, hash: createHash("sha256").update(text).digest("hex") };
 }
 
-function sectionsHash(rows: Array<Record<string, unknown>>): string {
-  const shape = rows
-    .map((s) => ({
-      identifier: s.identifier,
-      name: s.name,
-      content: s.content,
-      role: s.role,
-      enabled: String(s.enabled),
-      isMarker: String(s.isMarker),
-      markerConfig: s.markerConfig ?? null,
-    }))
-    .sort((a, b) => String(a.identifier).localeCompare(String(b.identifier)));
+// What a person can change in a preset, as the stock seeder snapshots it (db/seed.ts buildPresetSnapshot). Row ids
+// only change when the rows are recreated, which is an edit too, so they stand in for section and group identity.
+const PRESET_FIELDS = [
+  "name",
+  "description",
+  "conversationPrompt",
+  "gamePrompt",
+  "variableGroups",
+  "variableValues",
+  "parameters",
+  "wrapFormat",
+  "author",
+  "defaultChoices",
+  "sectionOrder",
+  "groupOrder",
+];
+const SECTION_FIELDS = [
+  "id",
+  "identifier",
+  "name",
+  "content",
+  "role",
+  "enabled",
+  "isMarker",
+  "groupId",
+  "markerConfig",
+  "injectionPosition",
+  "injectionDepth",
+  "injectionOrder",
+  "forbidOverrides",
+  "skipWrap",
+];
+const GROUP_FIELDS = ["id", "name", "parentGroupId", "order", "enabled"];
+const CHOICE_FIELDS = [
+  "id",
+  "variableName",
+  "question",
+  "options",
+  "multiSelect",
+  "separator",
+  "randomPick",
+  "displayMode",
+  "optionSort",
+  "sortOrder",
+];
+
+/** A fingerprint of everything a person can edit in the preset: a change means the preset is theirs now. */
+async function presetHash(db: DB, presetId: string): Promise<string> {
+  const storage = createPromptsStorage(db);
+  const [preset, sections, groups, choices] = await Promise.all([
+    storage.getById(presetId),
+    storage.listSections(presetId),
+    storage.listGroups(presetId),
+    storage.listChoiceBlocksForPreset(presetId),
+  ]);
+  const pick = (fields: string[]) => (row: Record<string, unknown>) => fields.map((f) => row[f] ?? null);
+  const byId = (a: Record<string, unknown>, b: Record<string, unknown>) => String(a.id).localeCompare(String(b.id));
+  const shape = {
+    preset: preset ? pick(PRESET_FIELDS)(preset) : null,
+    sections: [...sections].sort(byId).map(pick(SECTION_FIELDS)),
+    groups: [...groups].sort(byId).map(pick(GROUP_FIELDS)),
+    choices: [...choices].sort(byId).map(pick(CHOICE_FIELDS)),
+  };
   return createHash("sha256").update(JSON.stringify(shape)).digest("hex");
 }
 
@@ -194,13 +246,13 @@ export async function seedMeguminPresets(db: DB): Promise<void> {
         await storage.setSystemKey(created.id, def.systemKey);
         await writeSections(db, created.id, converted);
         await appSettings.set(seedKey, hash);
-        await appSettings.set(snapshotKey, sectionsHash(await storage.listSections(created.id)));
+        await appSettings.set(snapshotKey, await presetHash(db, created.id));
         logger.info("[seed] Added the %s preset", def.name);
         continue;
       }
       if ((await appSettings.get(seedKey)) === hash) continue;
       const snapshot = await appSettings.get(snapshotKey);
-      const current = sectionsHash(await storage.listSections(found.id));
+      const current = await presetHash(db, found.id);
       if (snapshot && current !== snapshot) {
         // Edited by the person: their version stays, and the new one is not forced on them.
         await appSettings.set(seedKey, hash);
@@ -210,7 +262,7 @@ export async function seedMeguminPresets(db: DB): Promise<void> {
       await storage.update(found.id, { parameters: converted.parameters as never, description: def.description });
       await writeSections(db, found.id, converted);
       await appSettings.set(seedKey, hash);
-      await appSettings.set(snapshotKey, sectionsHash(await storage.listSections(found.id)));
+      await appSettings.set(snapshotKey, await presetHash(db, found.id));
       logger.info("[seed] Refreshed the %s preset", def.name);
     } catch (err) {
       logger.error(err, "[seed] Could not seed the %s preset", def.name);
@@ -225,19 +277,41 @@ export function isMeguminPreset(preset: { systemKey?: unknown } | null | undefin
 }
 
 /**
+ * A preset Megumin fills: one of its own, or a copy of one (duplicated or imported, so without the
+ * reserved key) whose enabled sections carry Megumin's [[slots]], as SillyTavern fills them in any preset.
+ */
+export async function carriesMeguminSlots(
+  db: DB,
+  preset: { id?: unknown; systemKey?: unknown } | null | undefined,
+): Promise<boolean> {
+  if (!preset) return false;
+  if (isMeguminPreset(preset)) return true;
+  if (typeof preset.id !== "string") return false;
+  const triggers = MeguminSlots.meguminAllSlotTriggers()
+    .map(String)
+    .filter((t) => t.startsWith("[["));
+  const sections = await createPromptsStorage(db).listSections(preset.id);
+  return sections.some(
+    (s) => s.enabled === "true" && s.isMarker !== "true" && triggers.some((t) => s.content.includes(t)),
+  );
+}
+
+/**
  * MEGUMINTOGGLE's preset swap for one Roleplay generation. Returns the preset to
  * use instead of `resolved`, or null to keep it.
  */
 export async function resolveMeguminPresetSwap(
   db: DB,
-  args: { chatMode: unknown; resolved: PresetRow | null },
+  args: { chatMode: unknown; resolved: PresetRow | null; impersonate?: boolean },
 ): Promise<PresetRow | null> {
   if (args.chatMode !== "roleplay") return null;
   const storage = createPromptsStorage(db);
   const enabled = isMeguminEnabled();
   const resolved = args.resolved;
   // Only the stock preset is swapped: "None" is the person's own choice, like any preset they pick.
-  if (enabled && resolved && isStockMarinaraUniversalPreset(resolved)) {
+  // Megumin never writes the person's own line, so an impersonation keeps the stock preset; switched
+  // off, though, a Megumin preset is never used, impersonation included.
+  if (enabled && !args.impersonate && resolved && isStockMarinaraUniversalPreset(resolved)) {
     const all = (await storage.list()) as PresetRow[];
     return all.find((p) => p.systemKey === MEGUMIN_DEFAULT_PRESET_SYSTEM_KEY) ?? null;
   }

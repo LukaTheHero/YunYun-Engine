@@ -347,6 +347,30 @@ const NOTICE_TOAST = {
 } as const;
 
 /**
+ * Reads one activity answer against the poll's mark: the notices to show and where the mark moves. The first
+ * answer for a chat only sets the mark (notices from before it was opened are not replayed). A lower version
+ * than the last means the server rebuilt the chat's scope (a restart, an idle eviction), whose notices count
+ * from 1 again: the mark starts over, and the answer, cut at the old mark, has to be asked again.
+ */
+export function readMeguminNotices(
+  mark: { after: number; version: number | null },
+  data: Pick<MeguminActivity, "version" | "notices">,
+): { after: number; show: MeguminActivity["notices"]; restarted: boolean } {
+  if (mark.version === null) {
+    return { after: Math.max(mark.after, ...data.notices.map((n) => n.seq)), show: [], restarted: false };
+  }
+  if (data.version < mark.version) return { after: 0, show: [], restarted: true };
+  let after = mark.after;
+  const show: MeguminActivity["notices"] = [];
+  for (const notice of data.notices) {
+    if (notice.seq <= after) continue;
+    after = notice.seq;
+    show.push(notice);
+  }
+  return { after, show, restarted: false };
+}
+
+/**
  * Follows a Roleplay chat's Megumin activity: Megumin's own notices become toasts, and the chat's view is
  * re-read whenever the after-reply work changed something. Fast while work is running, slow when idle.
  */
@@ -377,17 +401,13 @@ export function useMeguminActivity(chatId: string | null, enabled: boolean) {
   const data = query.data;
   useEffect(() => {
     if (!data || !chatId) return;
-    // The first answer for a chat only sets the mark: notices from before it was opened are not replayed.
-    if (version.current === null) {
-      after.current = Math.max(after.current, ...data.notices.map((n) => n.seq));
-      version.current = data.version;
-      return;
-    }
-    for (const notice of data.notices) {
-      if (notice.seq <= after.current) continue;
-      after.current = notice.seq;
+    const step = readMeguminNotices({ after: after.current, version: version.current }, data);
+    after.current = step.after;
+    for (const notice of step.show) {
       NOTICE_TOAST[notice.level]?.(notice.title ? `${notice.title}: ${notice.message}` : notice.message);
     }
+    // This answer was cut at the old mark: ask again from the new one.
+    if (step.restarted) void qc.invalidateQueries({ queryKey: meguminKeys.activity(chatId) });
     if (version.current !== null && version.current !== data.version) {
       void qc.invalidateQueries({ queryKey: meguminKeys.viewsOf({ kind: "chat", chatId }) });
       // Megumin also changes messages (an image placed in a reply, a placeholder filled): re-read them,

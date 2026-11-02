@@ -89,7 +89,6 @@ function writeLook(looks, item, source) {
 
 async function reviewChanges(plan) {
     if (!plan.change.length) return [];
-    if (!$.isLive) return [];
     const rows = plan.change.map((c, i) => `
         <div class="ig2-review-row">
             <div class="ig2-review-name"><b>${esc(c.key)}</b></div>
@@ -157,7 +156,7 @@ export async function scanLooks({ from, targets = [], interactive = true }) {
     const plan = planLookUpdates(looks, scanned);
     const src = item => from === "auto" ? autoSource(item) : from === "sheet" ? "sheet" : "chat";
     for (const item of plan.add) writeLook(looks, item, src(item));
-    const accepted = interactive ? await reviewChanges(plan) : [];
+    const accepted = !interactive ? [] : $.isLive ? await reviewChanges(plan) : targets.length ? plan.change : [];
     for (const item of accepted) writeLook(looks, item, src(item));
     // Nicknames the scan found are worth keeping even where the tags were not.
     for (const item of [...plan.same, ...plan.locked, ...plan.change]) {

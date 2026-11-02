@@ -79,7 +79,7 @@ export function combinedTurnWanted(messageId, type) {
     const ig = localProfile && localProfile.imageGen;
     // A reply that wrote its own World block is filed from it: no read to combine.
     const world = worldEnabled() && worldUpdateMode() === "sidemodel" && !worldModule.parse(text);
-    const image = Boolean(ig && ig.enabled && imageViaChomusuke() && dueNow(ig, chat));
+    const image = Boolean(ig && ig.enabled && imageViaChomusuke() && dueNow(ig, chat.slice(0, index + 1)));
     const blocks = routedBlockIds().some(id => !statsModuleParses(id, text));
     // Live truths to read against, or (plan 018) the setup the reply didn't write.
     const notebook = Boolean(notebookReadKind(index));

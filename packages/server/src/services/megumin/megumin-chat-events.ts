@@ -22,7 +22,8 @@ import { withMeguminChat } from "./megumin-runtime.js";
 export type MeguminChatEvent =
   | { kind: "swiped"; messageId: string }
   | { kind: "edited"; messageId: string }
-  | { kind: "swipeDeleted"; messageId: string; swipeIndex: number }
+  /** Swipes removed one after another, in the order they went (each index as it was at its removal). */
+  | { kind: "swipeDeleted"; messageId: string; swipeIndexes: number[] }
   | { kind: "deleted" };
 
 async function meguminWorksIn(db: DB, chatId: string): Promise<boolean> {
@@ -44,7 +45,7 @@ export function notifyMeguminChatEvent(db: DB, chatId: string, event: MeguminCha
       if (index < 0) return false;
       if (event.kind === "swiped") return meguminOnSwiped(index);
       if (event.kind === "edited") return meguminOnEdited(index);
-      return meguminOnSwipeDeleted(index, event.swipeIndex);
+      return event.swipeIndexes.map((swipeIndex) => meguminOnSwipeDeleted(index, swipeIndex)).some(Boolean);
     });
   })().catch((err) => logger.warn(err, "[megumin] Could not bring Megumin's state in step with chat %s", chatId));
 }

@@ -19,6 +19,7 @@ import {
   resolveStoredModelContextLimit,
 } from "../../services/generation/model-access-policy.js";
 import { sentOutputBudget } from "../../services/generation/empty-response-reason.js";
+import { resolveMeguminPresetSwap } from "../../services/megumin/megumin-presets.js";
 import { buildGenerationPromptPresetCandidates } from "./prompt-preset-selection.js";
 import { resolveBaseUrl, parseExtra, parseStoredGenerationParameters } from "./generate-route-utils.js";
 
@@ -44,6 +45,9 @@ export async function registerParameterPreviewRoute(app: FastifyInstance) {
       preset = await presets.getById(candidate.id);
       if (preset) break;
     }
+    // MEGUMINTOGGLE swaps the preset before generation reads its parameters, so the preview does too.
+    preset =
+      ((await resolveMeguminPresetSwap(app.db, { chatMode, resolved: preset as never })) as typeof preset) ?? preset;
     const presetParams = preset ? parsePresetParameters(preset.parameters) : { ...DEFAULT_GENERATION_PARAMS };
     const storedPresetParams = parseStoredGenerationParameters(preset?.parameters);
     const policy = resolveModelAccessPolicy(connection);

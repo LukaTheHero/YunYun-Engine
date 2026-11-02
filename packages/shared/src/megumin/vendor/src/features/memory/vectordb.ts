@@ -17,10 +17,12 @@ import { maybeMeguminScope } from "../../../../host.js";
 
 type VaultEntry = { id: string; text?: string; summary?: string; [k: string]: unknown };
 
+type PieceVectors = Map<string, { textHash: string; vector: number[] }>;
+
 const matchesByChat = new Map<string, VaultEntry[]>();
 const queryTextByChat = new Map<string, string | null>();
-/** chatId → piece hash → { text hash, vector } */
-const vectors = new Map<string, Map<string, { textHash: string; vector: number[] }>>();
+/** chatId → the embedding space its vectors are in, and piece hash → { text hash, vector } */
+const vectors = new Map<string, { space: string; pieces: PieceVectors }>();
 
 function chatKey(): string {
   return maybeMeguminScope()?.chat.chatId ?? "";
@@ -73,30 +75,37 @@ export function memEmbedPieces(chunk: VaultEntry): Array<{ id: string; text: str
   return pieces;
 }
 
-function chatVectors(): Map<string, { textHash: string; vector: number[] }> {
+/** The chat's vectors in this embedding space. Vectors from another space (the embedding model changed) are dropped. */
+function chatVectors(space: string): PieceVectors {
   const key = chatKey();
-  let map = vectors.get(key);
-  if (!map) {
-    map = new Map();
-    vectors.set(key, map);
+  let entry = vectors.get(key);
+  if (!entry || entry.space !== space) {
+    entry = { space, pieces: new Map() };
+    vectors.set(key, entry);
   }
-  return map;
+  return entry.pieces;
 }
 
-/** Embeds whatever pieces are missing or changed. False when there is no embedding source. */
-async function ensureVectors(pieces: Array<{ id: string; text: string }>): Promise<boolean> {
+/**
+ * Embeds whatever pieces are missing or changed. False when there is no embedding source, or when `space` is given
+ * and the source answered from another one (it changed meanwhile).
+ */
+async function ensureVectors(pieces: Array<{ id: string; text: string }>, space?: string): Promise<boolean> {
   const scope = maybeMeguminScope();
   if (!scope?.chat.embed) return false;
-  const map = chatVectors();
+  const cached = vectors.get(chatKey());
+  const have = cached && (space === undefined || cached.space === space) ? cached.pieces : undefined;
   const missing = pieces.filter((p) => {
-    const have = map.get(hashOf(p.id));
-    return !have || have.textHash !== hashOf(p.text);
+    const v = have?.get(hashOf(p.id));
+    return !v || v.textHash !== hashOf(p.text);
   });
   for (let i = 0; i < missing.length; i += 50) {
     const batch = missing.slice(i, i + 50);
     const out = await scope.chat.embed(batch.map((p) => p.text));
-    if (!out || out.length !== batch.length) return false;
-    batch.forEach((p, n) => map.set(hashOf(p.id), { textHash: hashOf(p.text), vector: out[n] as number[] }));
+    if (!out || out.vectors.length !== batch.length) return false;
+    if (space !== undefined && out.space !== space) return false;
+    const map = chatVectors(out.space);
+    batch.forEach((p, n) => map.set(hashOf(p.id), { textHash: hashOf(p.text), vector: out.vectors[n] as number[] }));
   }
   return true;
 }
@@ -109,7 +118,8 @@ export async function memInsertToVectorDB(chunks: VaultEntry[], _expectIdentity?
 
 export async function memDeleteFromVectorDB(ids: string[], _expectIdentity?: string): Promise<void> {
   if (!ids || ids.length === 0) return;
-  const map = chatVectors();
+  const map = vectors.get(chatKey())?.pieces;
+  if (!map) return;
   for (const id of ids) {
     map.delete(hashOf(id));
     for (let n = 0; n < MAX_EMBED_PIECES; n++) map.delete(hashOf(id + "#" + n));
@@ -139,11 +149,12 @@ export function memBuildQueryText(): string {
 }
 
 function cosine(a: number[], b: number[]): number {
+  // Vectors of different lengths come from different models: they share no meaning.
+  if (a.length !== b.length) return 0;
   let dot = 0;
   let na = 0;
   let nb = 0;
-  const n = Math.min(a.length, b.length);
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < a.length; i++) {
     dot += a[i]! * b[i]!;
     na += a[i]! * a[i]!;
     nb += b[i]! * b[i]!;
@@ -169,17 +180,14 @@ export async function memUpdateSemanticQuery(): Promise<void> {
   try {
     const vault: VaultEntry[] = mem.longTermVault;
     const pieces = vault.flatMap((v) => memEmbedPieces(v).map((p) => ({ ...p, entry: v })));
-    if (!(await ensureVectors(pieces))) {
+    // The query first: its space is the one the vault must be in (re-embedded when the source changed).
+    const asked = await maybeMeguminScope()?.chat.embed?.([query]);
+    const queryVector = asked?.vectors[0];
+    if (!asked || !queryVector || !(await ensureVectors(pieces, asked.space))) {
       setMatches([]);
       return;
     }
-    const scope = maybeMeguminScope();
-    const [queryVector] = (await scope?.chat.embed?.([query])) ?? [];
-    if (!queryVector) {
-      setMatches([]);
-      return;
-    }
-    const map = chatVectors();
+    const map = chatVectors(asked.space);
     const ranked = pieces
       .map((p) => ({ p, score: cosine(queryVector, map.get(hashOf(p.id))?.vector ?? []) }))
       .filter((r) => r.score >= 0.2)

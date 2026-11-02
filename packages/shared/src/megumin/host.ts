@@ -114,8 +114,11 @@ export interface MeguminChatScope {
   worldInfo?(chatLines: string[]): Promise<{ before: string; after: string; depth: string[] }>;
   /** SillyTavern's getSortedEntries: every enabled lorebook entry this chat can use, in order. */
   loreEntries?(): Promise<MeguminLoreEntry[]>;
-  /** Embeds texts with YunYun's embedding source (Memory's Semantic scanner). */
-  embed?(texts: string[]): Promise<number[][] | null>;
+  /**
+   * Embeds texts with YunYun's embedding source (Memory's Semantic scanner). `space` names the source's vector
+   * space: vectors from different spaces (another embedding model) must never be compared.
+   */
+  embed?(texts: string[]): Promise<{ space: string; vectors: number[][] } | null>;
   /** Draws an image for Megumin (its ComfyUI call) through YunYun's image generation and places it. */
   generateImage?(request: MeguminImageRequest): Promise<void>;
   /** Draws an image and hands it back instead of placing it (NPC portraits). */
