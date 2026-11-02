@@ -192,6 +192,86 @@ try {
   });
   assert.equal(bad.statusCode, 400, "an unknown action is refused");
 
+  // ── The panel's other reads and switches ──
+  const act = async (action: string, args: Record<string, unknown> = {}) =>
+    (await ok({ method: "POST", url: `/api/megumin/chats/${chat.id}/actions`, payload: { action, args } })).result;
+  assert.ok(Array.isArray(await act("bonds.overview")));
+  assert.equal(await act("world.rewrite", { on: true }), true);
+  const queued = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/view` });
+  assert.equal(queued.world.pendingFullRewrite, true, "the full rewrite shows as queued");
+  assert.equal(await act("world.rewrite", { on: false }), false);
+  const banList = await act("banlist.builtInList");
+  assert.equal(banList.key, "banlistBuiltInV11", "V11 Тайна has its own ban list");
+  assert.ok(banList.original.length > 100);
+  const scanner = await act("memory.testScanner");
+  assert.equal(scanner.engine, "tfidf");
+  assert.ok(Array.isArray(scanner.matches));
+  assert.equal(await act("prompts.sync", { module: "storyPlan", key: "customPromptsEnabled", value: false }), true);
+  const badSync = await app.inject({
+    method: "POST",
+    url: `/api/megumin/chats/${chat.id}/actions`,
+    payload: { action: "prompts.sync", args: { module: "profiles", key: "x", value: 1 } },
+  });
+  assert.equal(badSync.statusCode, 400, "only the three prompt editors sync");
+  assert.ok(typeof queued.memory.realMessages === "number" && queued.notebook.turns);
+
+  // ── The per-tab Global switch: a synced tab is copied into every stored profile ──
+  // Save per chat, so this chat's profile is its own and the default is another.
+  const before = await ok({ method: "GET", url: "/api/megumin/global/view" });
+  await ok({
+    method: "PUT",
+    url: "/api/megumin/global",
+    payload: { globalSettings: { ...before.globalSettings, saveMode: "chat" } },
+  });
+  const chatProfileView = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/view` });
+  assert.equal(chatProfileView.profileLevel, "chat");
+  await ok({
+    method: "PUT",
+    url: `/api/megumin/chats/${chat.id}/profile`,
+    payload: { profile: { ...chatProfileView.profile, userLanguage: "GERMAN" } },
+  });
+  const synced = await ok({
+    method: "POST",
+    url: `/api/megumin/chats/${chat.id}/actions`,
+    payload: { action: "sync.tab", args: { title: "Language & Add-ons", on: true } },
+  });
+  assert.equal(synced.result, true);
+  await until(async () => {
+    const store = JSON.parse(String((await appSettings.get("megumin")) ?? "{}"));
+    const profiles = Object.values(store.profiles ?? {}) as Array<{ userLanguage?: string }>;
+    return profiles.length > 1 && profiles.every((p) => p.userLanguage === "GERMAN");
+  }, "the synced tab in every profile");
+  const unsynced = await ok({
+    method: "POST",
+    url: "/api/megumin/global/actions",
+    payload: { action: "sync.tab", args: { title: "Language & Add-ons", on: false } },
+  });
+  assert.equal(unsynced.result, false);
+  const refused = await app.inject({
+    method: "POST",
+    url: "/api/megumin/global/actions",
+    payload: { action: "sync.tab", args: { title: "Settings", on: true } },
+  });
+  assert.equal(refused.statusCode, 400, "a tab stored globally already has nothing to sync");
+
+  // ── Dev Mode: slots resolved against the profile, the skeleton, a clone of a shipped engine ──
+  const dev = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/devmode` });
+  assert.ok(dev.slots.length > 10 && dev.slots.every((x: any) => typeof x.builtin === "string"));
+  assert.ok(
+    dev.skeleton.some((c: any) => c.content.includes("[[")),
+    "the skeleton keeps its slots",
+  );
+  const clone = await ok({ method: "GET", url: "/api/megumin/global/devmode/clone/v11-voice" });
+  assert.equal(clone.parentId, "v11-voice");
+  assert.ok(String(clone.id).startsWith("custom_") && clone.isCoreClone === true);
+  const missing = await app.inject({ method: "GET", url: "/api/megumin/global/devmode/clone/nope" });
+  assert.equal(missing.statusCode, 404);
+
+  // ── Reset: the global default goes back to Megumin's template ──
+  const reset = await ok({ method: "POST", url: "/api/megumin/global/profile/reset" });
+  assert.equal(reset.profile.mode, "v11-voice");
+  assert.notEqual(reset.profile.userLanguage, "GERMAN");
+
   console.log("megumin-routes regression passed");
 } finally {
   await app.close();

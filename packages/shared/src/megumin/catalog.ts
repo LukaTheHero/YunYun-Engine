@@ -16,7 +16,12 @@ import {
   STAT_FIELD_PACKS,
   STAT_FIELD_TYPES,
 } from "./vendor/src/features/blocks/registry.js";
-import { storyConfigFields, CONFIG_PREAMBLE } from "./vendor/src/features/storyconfig/config.js";
+import {
+  storyConfigFields,
+  CONFIG_PREAMBLE,
+  builtInConfigPresets,
+  STORY_CONFIG_DEFAULTS,
+} from "./vendor/src/features/storyconfig/config.js";
 import { LOADOUTS, COMING_SOON } from "./vendor/src/features/modelsetup/loadouts.js";
 import { SD_GENRES, SD_FLAVORS } from "./vendor/src/features/storyplan/ui.js";
 import { NPC_DEFAULT_FIELDS } from "./vendor/src/features/npc/fields.js";
@@ -52,11 +57,19 @@ function plain<T>(value: T): T {
 export function meguminCatalog() {
   const lib = hardcodedLogic as Record<string, any>;
   return {
-    engines: (lib.modes as unknown[]).map(meta),
+    // `filled`: the engine's prompt parts that carry text (its own thinking, an MVU override…), known
+    // here even though the long texts themselves are left out.
+    engines: (lib.modes as Array<Record<string, unknown>>).map((m) => ({
+      ...meta(m),
+      filled: Object.entries(m)
+        .filter(([, v]) => typeof v === "string" && v.trim())
+        .map(([k]) => k),
+    })),
     chainsOfThought: (lib.models as unknown[]).map(meta),
     personalities: (lib.personalities as unknown[]).map(meta),
     toggles: Object.entries(lib.toggles as Record<string, unknown>).map(([id, t]) => ({ id, ...meta(t) })),
-    styles: (lib.styles as unknown[]).map((s) => ({ ...meta(s) })),
+    // Whole: the style editor's tag picker reads each category's tags.
+    styles: plain(lib.styles),
     directStyles: (lib.directStyles as unknown[]).map((s) => ({
       ...meta(s),
       rule: (s as { rule?: string }).rule ?? "",
@@ -69,6 +82,10 @@ export function meguminCatalog() {
     statFieldTypes: plain(STAT_FIELD_TYPES),
     storyConfigFields: plain(storyConfigFields),
     storyConfigPreamble: CONFIG_PREAMBLE,
+    storyConfigPresets: plain(builtInConfigPresets),
+    storyConfigDefaults: plain(STORY_CONFIG_DEFAULTS),
+    // The old block list (hardcodedLogic.blocks), which holds MVU; not the block registry.
+    formatBlocks: (lib.blocks as unknown[]).map(meta),
     slots: MEGUMIN_SLOT_REGISTRY.map(meta),
     slotGroups: plain(SLOT_GROUPS),
     loadouts: plain(LOADOUTS),

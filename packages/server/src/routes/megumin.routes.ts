@@ -15,11 +15,20 @@ import {
   MeguminSync,
   MeguminTasks,
   MeguminMemory,
+  MeguminMemoryVectors,
+  MeguminMemoryKeywords,
+  MeguminChatText,
+  MeguminLibrary,
+  MEGUMIN_BUILTIN_BAN_LIST,
+  MEGUMIN_V11_BAN_LIST,
+  meguminToastr,
   localProfile,
   meguminApplyLoadout,
   meguminBanListScan,
   meguminCatalog,
   meguminChatView,
+  meguminCloneEngine,
+  meguminDevModeData,
   meguminChomusukeTest,
   meguminCotById,
   meguminEngineById,
@@ -27,7 +36,12 @@ import {
   meguminGenerateTemplateStyle,
   meguminMemoryProcess,
   meguminNpcAdd,
-  meguminNpcPortrait,
+  meguminNpcPortraitPrompt,
+  meguminNpcPortraitRender,
+  MeguminDict,
+  MeguminBlocks,
+  MeguminImagesV2,
+  MeguminImagesLooks,
   meguminNpcScanStory,
   meguminNpcUndo,
   meguminNpcUpdateNow,
@@ -38,12 +52,14 @@ import {
   meguminStyleRule,
   getContext,
 } from "@marinara-engine/shared/megumin";
+import { isStockMarinaraUniversalPreset } from "@marinara-engine/shared";
 import { createPromptsStorage } from "../services/storage/prompts.storage.js";
 import { createChatsStorage } from "../services/storage/chats.storage.js";
 import {
   ensureMeguminStore,
   isMeguminEnabled,
   meguminStoreObject,
+  mirrorMeguminPowerSwitch,
   scheduleMeguminStoreSave,
 } from "../services/megumin/megumin-store.js";
 import {
@@ -57,6 +73,7 @@ const GLOBAL_KEYS = [
   "globalSettings",
   "chomusuke",
   "sidePanel",
+  "presentBar",
   "sharedFragments",
   "customModes",
   "configPresets",
@@ -86,7 +103,10 @@ function replaceInPlace(target: Record<string, unknown>, next: Record<string, un
 function saveEditedProfile(next: unknown) {
   if (!next || typeof next !== "object" || Array.isArray(next)) throw new Error("A profile object is required.");
   const live = localProfile as Record<string, unknown>;
-  replaceInPlace(live, JSON.parse(JSON.stringify(next)) as Record<string, unknown>);
+  const incoming = JSON.parse(JSON.stringify(next)) as Record<string, any>;
+  // Memory's archived-message Set is a runtime cache: it reaches the client as {} and must be rebuilt here.
+  if (incoming.memoryCore && typeof incoming.memoryCore === "object") delete incoming.memoryCore._archivedSet;
+  replaceInPlace(live, incoming);
   MeguminProfile.saveProfileToMemory();
   // A tab set to Global copies itself to every profile on each save (Megumin's TAB_PROPAGATE).
   const synced = (meguminStoreObject().globalSyncTabs || {}) as Record<string, boolean>;
@@ -116,15 +136,57 @@ async function runAction(action: string, args: Record<string, unknown>): Promise
     case "world.reset":
       MeguminState.stateStore.reset("world");
       return true;
+    case "world.rewritePending":
+      return MeguminState.stateStore.isPendingFullRewrite("world");
+    // History › "Rewrite the full state next reply"
+    case "world.rewrite":
+      MeguminState.stateStore.setPendingFullRewrite("world", args.on === true);
+      return MeguminState.stateStore.isPendingFullRewrite("world");
     // Bonds, Character Sheet, Inner Chatter, Story Tracker
     case "stats.edit":
       return MeguminState.statsEdit(str("moduleId"), args.parsed);
     case "stats.reset":
       MeguminState.stateStore.reset(str("moduleId"));
       return true;
+    // Every character's bonds on file, marked when they are in the last few messages (bonds/overview.js)
+    case "bonds.overview": {
+      const chat = (getContext().chat || []) as Array<{ is_system?: boolean; mes?: string }>;
+      const parts: string[] = [];
+      for (let i = chat.length - 1; i >= 0 && parts.length < 3; i--) {
+        const m = chat[i];
+        if (!m || m.is_system) continue;
+        parts.push(MeguminChatText.meguminCleanChatHistoryText(String(m.mes || "")));
+      }
+      return MeguminState.bondsOverview({ recentText: parts.join("\n") });
+    }
     case "state.disableEntry":
       return MeguminState.stateStore.setDisabled(str("entryId"), args.disabled === true);
     // The Notebook
+    // A clue's turn number → the reply it came from, "user" (your edit) or "deleted" (state/index.js notebookTurnLabel)
+    case "notebook.turnLabels": {
+      const chat = getContext().chat as Array<{ is_user?: boolean; extra?: Record<string, any> }>;
+      const seqToIndex = new Map<number, number>();
+      chat.forEach((m, i) => {
+        if (m && !m.is_user && typeof m.extra?.megumin_seq === "number") seqToIndex.set(m.extra.megumin_seq, i);
+      });
+      const userSeqs = new Set(
+        ((MeguminState.stateStore.listEntries("notebook") || []) as Array<{ entry: { source?: string; seq: number } }>)
+          .filter((x) => x.entry.source === "user")
+          .map((x) => x.entry.seq),
+      );
+      const state = (MeguminState.notebookState() || { truths: {} }) as { truths?: Record<string, any> };
+      const out: Record<string, number | "user" | "deleted"> = {};
+      const add = (seq: unknown) => {
+        if (typeof seq !== "number") return;
+        out[seq] = seqToIndex.has(seq) ? seqToIndex.get(seq)! : userSeqs.has(seq) ? "user" : "deleted";
+      };
+      for (const t of Object.values(state.truths || {})) {
+        add(t.createdSeq);
+        add(t.revealedSeq);
+        for (const c of t.clues || []) add(c.seq);
+      }
+      return out;
+    }
     case "notebook.edit":
       return MeguminState.notebookEdit(args.op);
     case "notebook.disable":
@@ -147,8 +209,52 @@ async function runAction(action: string, args: Record<string, unknown>): Promise
       return meguminNpcUpdateNow(num("index"));
     case "npc.undo":
       return meguminNpcUndo(str("entryId"));
-    case "npc.portrait":
-      return meguminNpcPortrait(str("name"));
+    // NPC portrait in two steps: the prompt (reviewed in the panel), then the drawing
+    case "npc.portraitPrompt":
+      return meguminNpcPortraitPrompt(str("name"));
+    case "npc.portraitRender":
+      return meguminNpcPortraitRender(str("name"), str("prompt"));
+    // Blocks tab preview (features/blocks/ui.js renderBlocksPreview): the templates the AI fills, as one envelope
+    case "blocks.preview": {
+      let dict: Record<string, string> = {};
+      try {
+        dict = (MeguminDict.buildBaseDict(true) || {}) as Record<string, string>;
+      } catch {
+        dict = {};
+      }
+      const active = MeguminBlocks.meguminActiveBlocks() as Array<Record<string, any>>;
+      const parts = active.map((b) => {
+        let raw: unknown;
+        if (b.slot) raw = "[Only appears when the story introduces a new NPC.]";
+        else if (typeof b.build === "function") raw = b.build();
+        else if (b.source) raw = dict[b.source] || "";
+        else raw = b.content || "";
+        const body = b.slot
+          ? String(raw)
+          : MeguminBlocks.normalizeBlockBody(
+              String(raw).replace(/^#{1,3}\s*At the end of your response[^\n]*\n?/i, ""),
+              b.tag,
+            );
+        return body ? `<${b.tag}>\n${body}\n</${b.tag}>` : "";
+      });
+      return `<Blocks>\n${parts.filter(Boolean).join("\n")}\n</Blocks>`;
+    }
+    // Images › Version 2 › Characters
+    case "images.cast":
+      return { cast: MeguminImagesV2.currentImageCast(), hasCard: Boolean(MeguminImagesLooks.sheetSource()) };
+    case "images.scanLooks": {
+      const from = str("from") === "sheet" ? "sheet" : "chat";
+      const targets = Array.isArray(args.targets)
+        ? (args.targets as Array<{ name?: unknown; aliases?: unknown }>)
+            .filter((x) => typeof x?.name === "string")
+            .map((x) => ({ name: String(x.name), aliases: Array.isArray(x.aliases) ? x.aliases.map(String) : [] }))
+        : [];
+      return (await MeguminImagesLooks.scanLooks({ from, targets: targets as never[] })) ?? null;
+    }
+    case "images.describeLooks": {
+      const names = Array.isArray(args.names) ? (args.names as unknown[]).map(String) : null;
+      return (await MeguminImagesLooks.describeLooks(names as never)) ?? null;
+    }
     // Banned Phrases
     case "banlist.scan":
       return meguminBanListScan();
@@ -171,6 +277,78 @@ async function runAction(action: string, args: Record<string, unknown>): Promise
       return MeguminMemory.memRunVaultMigration();
     case "memory.scrub":
       return MeguminMemory.memScrubOverlappingArchives({ notify: true });
+    // "Apply & Extract Pending": new limits, then extraction when the chat is already past them
+    case "memory.applyLimits": {
+      MeguminMemory.memSyncLimits();
+      const mem = (localProfile as Record<string, any>).memoryCore || {};
+      const real = (getContext().chat as Array<{ is_system?: boolean }>).filter((m) => !m.is_system).length;
+      if (real > (mem.workingLimit || 30)) {
+        meguminToastr.info("Starting automatic extraction to fill new limits...");
+        await MeguminMemory.memProcessPendingChunks();
+      }
+      return true;
+    }
+    // Picking Semantic: the vault is embedded, then the current query is matched
+    case "memory.vectorSync": {
+      const vault = ((localProfile as Record<string, any>).memoryCore?.longTermVault || []) as unknown[];
+      if (!vault.length) return { count: 0, inserted: false };
+      const inserted = await MeguminMemoryVectors.memInsertToVectorDB(vault as never);
+      await MeguminMemoryVectors.memUpdateSemanticQuery();
+      return { count: vault.length, inserted };
+    }
+    case "memory.vectorInsert": {
+      const ids = new Set(Array.isArray(args.ids) ? (args.ids as string[]) : []);
+      const vault = ((localProfile as Record<string, any>).memoryCore?.longTermVault || []) as Array<{ id: string }>;
+      return MeguminMemoryVectors.memInsertToVectorDB(vault.filter((v) => ids.has(v.id)) as never);
+    }
+    case "memory.vectorDelete":
+      await MeguminMemoryVectors.memDeleteFromVectorDB(Array.isArray(args.ids) ? (args.ids as string[]) : []);
+      return true;
+    // "Test Scanner": what retrieval would pick right now
+    case "memory.testScanner": {
+      const mem = (localProfile as Record<string, any>).memoryCore || {};
+      const engine = mem.scannerEngine || "tfidf";
+      if (engine === "semantic") await MeguminMemoryVectors.memUpdateSemanticQuery();
+      const semanticCount = MeguminMemoryVectors.currentSemanticMatches.length;
+      const keywords =
+        engine === "tfidf" || semanticCount === 0
+          ? MeguminMemoryKeywords.memGetCachedKeywords(getContext().chat, 4).keywords
+          : [];
+      const matches = (MeguminMemory.memGetRelevantVaultEntries() as Array<Record<string, any>>).map((m) => ({
+        id: m.id,
+        score: m.score,
+        matchedWords: m.matchedWords || [],
+        text: m.text || m.summary || "",
+      }));
+      return { engine, vaultCount: (mem.longTermVault || []).length, semanticCount, keywords, matches };
+    }
+    // The three prompt editors' "use these prompts everywhere" (core/sync.js syncPromptsGlobally)
+    case "prompts.sync":
+    case "prompts.syncGlobal": {
+      const module = str("module");
+      const key = str("key");
+      const keys: Record<string, string[]> = {
+        storyPlan: ["customPrompts", "customPromptsEnabled"],
+        memoryCore: ["customPrompts", "customPromptsEnabled"],
+        imageGen: ["customPrompts", "customPromptsEnabled"],
+        npcBank: ["customPrompts", "customPromptsEnabled"],
+        banList: ["banListCustomPrompts", "banListCustomPromptsEnabled"],
+      };
+      if (!keys[module]?.includes(key)) throw new Error("Unknown prompt setting.");
+      MeguminSync.syncPromptsGlobally(module, key, args.value);
+      return true;
+    }
+    // The built-in ban list the "Edit the full list" popup edits (banlist/ui.js fullList)
+    case "banlist.builtInList": {
+      const store = meguminStoreObject();
+      const modes = [...(MeguminLibrary.modes as unknown[]), ...((store.customModes as unknown[]) || [])] as Array<
+        Record<string, any>
+      >;
+      const engine = modes.find((m) => m.id === (localProfile as Record<string, any>).mode);
+      return engine?.turnFrame === "v11"
+        ? { key: "banlistBuiltInV11", original: MEGUMIN_V11_BAN_LIST, name: engine.label ?? "" }
+        : { key: "banlistBuiltIn", original: MEGUMIN_BUILTIN_BAN_LIST, name: "" };
+    }
     // Model Setup
     case "loadout.apply":
       return meguminApplyLoadout(str("id"), {
@@ -188,6 +366,29 @@ async function runAction(action: string, args: Record<string, unknown>): Promise
     // Images
     case "image.generate":
       return meguminGenerateImage(str("extra"));
+    // The panel's per-tab Global switch (ui/tabs.js toggleTabGlobalSync)
+    case "sync.tab": {
+      const title = str("title");
+      if (!MeguminSync.meguminTabSyncKeys(title)?.length) throw new Error("This tab has nothing to sync.");
+      const map = MeguminSync.meguminGlobalSyncMap() as Record<string, boolean>;
+      map[title] = args.on === true;
+      if (map[title] && !MeguminSync.applyTabKeysToAllProfiles(title)) {
+        map[title] = false;
+        throw new Error("The settings could not be copied to every character.");
+      }
+      return map[title];
+    }
+    // Story Config's own opt-out from the Preset & Thinking tab's Global switch
+    case "sync.storyConfig": {
+      const on = args.on === true;
+      MeguminSync.meguminSetStoryConfigSyncs(on);
+      // Turned back on: the current values go out again (storyconfig/ui.js buildConfigSyncRow).
+      if (on && MeguminSync.meguminIsTabSynced("Preset & Thinking")) {
+        MeguminSync.applyTabKeysToAllProfiles("Preset & Thinking");
+      }
+      MeguminProfile.saveProfileToMemory();
+      return MeguminSync.meguminStoryConfigSyncs();
+    }
     default:
       throw new Error(`Unknown Megumin action: ${action}`);
   }
@@ -197,12 +398,19 @@ export async function meguminRoutes(app: FastifyInstance) {
   const presets = createPromptsStorage(app.db);
   const chats = createChatsStorage(app.db);
 
+  const requireChat = async (chatId: string) => {
+    const chat = await chats.getById(chatId);
+    return chat ?? null;
+  };
+
   /** MEGUMINTOGGLE and the bundled presets. */
   app.get("/status", async () => {
     const all = (await presets.list()) as Array<{ id: string; name: string; systemKey?: string }>;
     return {
       enabled: isMeguminEnabled(),
       defaultPresetSystemKey: MEGUMIN_DEFAULT_PRESET_SYSTEM_KEY,
+      // The preset MEGUMINTOGGLE swaps for Megumin's (and back to, when off).
+      stockPresetId: all.find((p) => isStockMarinaraUniversalPreset(p as never))?.id ?? null,
       presets: MEGUMIN_PRESETS.map((def) => {
         const row = all.find((p) => p.systemKey === def.systemKey);
         return { systemKey: def.systemKey, name: def.name, description: def.description, id: row?.id ?? null };
@@ -236,6 +444,8 @@ export async function meguminRoutes(app: FastifyInstance) {
       if (value === undefined) continue;
       store[key] = JSON.parse(JSON.stringify(value)) as unknown;
     }
+    // A globalSettings write never carries the power switch: put MEGUMINTOGGLE's mirror back at once.
+    mirrorMeguminPowerSwitch();
     scheduleMeguminStoreSave(app.db, 50);
     reloadMeguminProfiles();
     return { ok: true };
@@ -251,10 +461,56 @@ export async function meguminRoutes(app: FastifyInstance) {
     }),
   );
 
-  const requireChat = async (chatId: string) => {
-    const chat = await chats.getById(chatId);
-    return chat ?? null;
-  };
+  /** "Reset" on the global default profile. */
+  app.post("/global/profile/reset", async () =>
+    withMeguminGlobal(app.db, () => {
+      const store = meguminStoreObject();
+      if (store.profiles && typeof store.profiles === "object")
+        delete (store.profiles as Record<string, unknown>).default;
+      scheduleMeguminStoreSave(app.db, 50);
+      MeguminProfile.initProfile();
+      return meguminChatView();
+    }),
+  );
+
+  /** Dev Mode: the slot registry and the preset skeleton, resolved against the profile in effect. */
+  app.get("/global/devmode", async () => withMeguminGlobal(app.db, () => meguminDevModeData()));
+
+  app.get<{ Params: { chatId: string } }>("/chats/:chatId/devmode", async (req, reply) => {
+    const chat = await requireChat(req.params.chatId);
+    if (!chat) return reply.status(404).send({ error: "Chat not found" });
+    const presetId = (chat as { promptPresetId?: string | null }).promptPresetId;
+    const preset = presetId ? ((await presets.getById(presetId)) as { name?: string } | null) : null;
+    return withMeguminChat(app.db, req.params.chatId, () => meguminDevModeData({ presetName: preset?.name ?? "" }));
+  });
+
+  /** Dev Mode's "Clone" on a shipped engine. */
+  app.get<{ Params: { engineId: string } }>("/global/devmode/clone/:engineId", async (req, reply) => {
+    const copy = await withMeguminGlobal(app.db, () => meguminCloneEngine(req.params.engineId));
+    return copy ?? reply.status(404).send({ error: "Engine not found" });
+  });
+
+  app.get<{ Params: { chatId: string; engineId: string } }>(
+    "/chats/:chatId/devmode/clone/:engineId",
+    async (req, reply) => {
+      if (!(await requireChat(req.params.chatId))) return reply.status(404).send({ error: "Chat not found" });
+      const copy = await withMeguminChat(app.db, req.params.chatId, () => meguminCloneEngine(req.params.engineId));
+      return copy ?? reply.status(404).send({ error: "Engine not found" });
+    },
+  );
+
+  /** A panel button with no Roleplay chat open (the Global switch, Story Config's sync). */
+  app.post("/global/actions", async (req, reply) => {
+    const parsed = actionSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: "An action name is required" });
+    try {
+      const result = await withMeguminGlobal(app.db, () => runAction(parsed.data.action, parsed.data.args));
+      scheduleMeguminStoreSave(app.db, 50);
+      return { ok: true, result: result === undefined ? null : JSON.parse(JSON.stringify(result)) };
+    } catch (err) {
+      return reply.status(400).send({ error: err instanceof Error ? err.message : "The action failed" });
+    }
+  });
 
   /** Everything the panel and the cards draw for a chat. */
   app.get<{ Params: { chatId: string }; Querystring: { history?: string } }>(
@@ -301,6 +557,8 @@ export async function meguminRoutes(app: FastifyInstance) {
       const result = await withMeguminChat(app.db, req.params.chatId, () =>
         runAction(parsed.data.action, parsed.data.args),
       );
+      // Some actions change the suite's store without saving it (the Global switch writes profiles directly).
+      scheduleMeguminStoreSave(app.db, 50);
       return { ok: true, result: result === undefined ? null : JSON.parse(JSON.stringify(result)) };
     } catch (err) {
       return reply.status(400).send({ error: err instanceof Error ? err.message : "The action failed" });

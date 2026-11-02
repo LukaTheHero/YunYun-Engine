@@ -70,6 +70,15 @@ export interface MeguminImageRequest {
 
 export type MeguminNoticeLevel = "info" | "success" | "warning" | "error";
 
+export interface MeguminImageRenderRequest {
+  prompt: string;
+  negative: string;
+  /** imageGen as Megumin keeps it (the connection id, sizes, ComfyUI placeholders). */
+  settings: Record<string, unknown>;
+  width?: number;
+  height?: number;
+}
+
 export interface MeguminNotice {
   level: MeguminNoticeLevel;
   message: string;
@@ -109,6 +118,8 @@ export interface MeguminChatScope {
   embed?(texts: string[]): Promise<number[][] | null>;
   /** Draws an image for Megumin (its ComfyUI call) through YunYun's image generation and places it. */
   generateImage?(request: MeguminImageRequest): Promise<void>;
+  /** Draws an image and hands it back instead of placing it (NPC portraits). */
+  renderImage?(request: MeguminImageRenderRequest): Promise<{ base64: string; mime: string } | null>;
   /** Is the story model generating right now? */
   isGenerating?(): boolean;
   /** Something the open client should redraw (blocks, state, profile…). */

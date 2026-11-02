@@ -9,6 +9,7 @@ import {
   MeguminWorker,
   type MeguminChatScope,
   type MeguminImageRequest,
+  type MeguminImageRenderRequest,
   type MeguminLoreEntry,
   type MeguminRunState,
 } from "@marinara-engine/shared/megumin";
@@ -180,23 +181,22 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
     return all.find((c) => c.provider === "image_generation")?.id ?? null;
   }
 
-  /** Megumin's ComfyUI call, through YunYun's image generation, placed where Megumin places it. */
-  async function generateImage(request: MeguminImageRequest, scope: MeguminChatScope): Promise<void> {
+  type Notify = (level: "info" | "success" | "warning" | "error", message: string) => void;
+
+  /** Megumin's ComfyUI call, through YunYun's image generation connection. Null when it could not run. */
+  async function render(request: MeguminImageRenderRequest, notify: Notify) {
     const settings = request.settings as Record<string, any>;
-    const connections = createConnectionsStorage(db);
     const connectionId = await imageConnectionId(settings);
-    const notify = (level: "info" | "success" | "warning" | "error", message: string) =>
-      scope.notify({ level, message, title: "Megumin Suite" });
     if (!connectionId) {
       notify("warning", "Pick an image connection in Megumin's Images tab before drawing.");
-      return;
+      return null;
     }
-    const conn = (await connections.getWithKey(connectionId)) as Record<string, any> | null;
+    const conn = (await createConnectionsStorage(db).getWithKey(connectionId)) as Record<string, any> | null;
     if (!conn) {
       notify("warning", "The image connection Megumin uses no longer exists.");
-      return;
+      return null;
     }
-    const { generateImage: generate, saveImageToDisk } = await import("../image/image-generation.js");
+    const { generateImage: generate } = await import("../image/image-generation.js");
     const baseUrl = conn.baseUrl || "https://image.pollinations.ai";
     const model = String(conn.model || "");
     const serviceHint = String(conn.imageService || conn.imageGenerationSource || model);
@@ -204,32 +204,41 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
       typeof conn.comfyuiWorkflow === "string" && conn.comfyuiWorkflow.trim()
         ? applyMeguminComfyPlaceholders(conn.comfyuiWorkflow, settings)
         : undefined;
-    const width = Number(settings.imgWidth) || 1024;
-    const height = Number(settings.imgHeight) || 1024;
+    const width = request.width ?? (Number(settings.imgWidth) || 1024);
+    const height = request.height ?? (Number(settings.imgHeight) || 1024);
+    const result = await generate(model, baseUrl, String(conn.apiKey || ""), serviceHint, {
+      prompt: request.prompt,
+      negativePrompt: request.negative || undefined,
+      model,
+      width,
+      height,
+      imageEndpointId: conn.imageEndpointId || undefined,
+      comfyWorkflow: workflow,
+      imageDefaults: resolveConnectionImageDefaults(conn as never),
+      debugMode: isDebugAgentsEnabled(),
+      admissionMode: { kind: "background" },
+    });
+    return { result, conn, model, width, height };
+  }
+
+  /** An image for the story, placed where Megumin places it. */
+  async function generateImage(request: MeguminImageRequest, scope: MeguminChatScope): Promise<void> {
+    const notify: Notify = (level, message) => scope.notify({ level, message, title: "Megumin Suite" });
     try {
-      const result = await generate(model, baseUrl, String(conn.apiKey || ""), serviceHint, {
-        prompt: request.prompt,
-        negativePrompt: request.negative || undefined,
-        model,
-        width,
-        height,
-        imageEndpointId: conn.imageEndpointId || undefined,
-        comfyWorkflow: workflow,
-        imageDefaults: resolveConnectionImageDefaults(conn as never),
-        debugMode: isDebugAgentsEnabled(),
-        admissionMode: { kind: "background" },
-      });
-      const filePath = saveImageToDisk(ctx.chatId, result.base64, result.ext);
+      const drawn = await render(request, notify);
+      if (!drawn) return;
+      const { saveImageToDisk } = await import("../image/image-generation.js");
+      const filePath = saveImageToDisk(ctx.chatId, drawn.result.base64, drawn.result.ext);
       const filename = filePath.split("/").pop()!;
       const url = `/api/gallery/file/${ctx.chatId}/${encodeURIComponent(filename)}`;
       const gallery = await createGalleryStorage(db).create({
         chatId: ctx.chatId,
         filePath,
         prompt: request.prompt,
-        provider: String(conn.provider || ""),
-        model,
-        width,
-        height,
+        provider: String(drawn.conn.provider || ""),
+        model: drawn.model,
+        width: drawn.width,
+        height: drawn.height,
       });
       placeImage(scope, request, url, (gallery as { id?: string } | null)?.id ?? null);
       notify(
@@ -240,6 +249,25 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
       logger.warn(err, "[megumin] Image generation failed");
       markImageFailed(scope, request);
       notify("error", `Image generation failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /** An image handed back as data (an NPC portrait), never placed in the chat. */
+  async function renderImage(
+    request: MeguminImageRenderRequest,
+    scope: MeguminChatScope,
+  ): Promise<{ base64: string; mime: string } | null> {
+    const notify: Notify = (level, message) => scope.notify({ level, message, title: "Megumin Suite" });
+    try {
+      const drawn = await render(request, notify);
+      if (!drawn) return null;
+      const ext = String(drawn.result.ext || "png").toLowerCase();
+      const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
+      return { base64: drawn.result.base64, mime };
+    } catch (err) {
+      logger.warn(err, "[megumin] Portrait generation failed");
+      notify("error", `Image generation failed: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
     }
   }
 
@@ -296,5 +324,5 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
     scope.dirty.chat = true;
   }
 
-  return { quiet, worldInfo, loreEntries, embed, generateImage };
+  return { quiet, worldInfo, loreEntries, embed, generateImage, renderImage };
 }

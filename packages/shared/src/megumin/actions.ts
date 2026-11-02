@@ -8,12 +8,23 @@
 // wording, and returns what happened instead of redrawing jQuery.
 // Derived from Megumin Suite (CC BY-NC 4.0, see LICENSE.md).
 // ──────────────────────────────────────────────────────────────────────────────
-import { generateQuietPrompt, getContext, extension_settings, toastr } from "./vendor/src/st.js";
+import {
+  generateQuietPrompt,
+  getContext,
+  extension_settings,
+  toastr,
+  saveSettingsDebounced,
+  meguminConsole,
+} from "./vendor/src/st.js";
 import { localProfile } from "./vendor/src/core/state.js";
 import { extensionName } from "./vendor/src/core/constants.js";
 import { meguminActiveDataIdentity } from "./vendor/src/core/keys.js";
 import { saveProfileToMemory } from "./vendor/src/core/profile.js";
-import { setActiveNpcScanRequest, setActiveNpcUpdateRequest } from "./vendor/src/core/activeRequests.js";
+import {
+  setActiveNpcScanRequest,
+  setActiveNpcUpdateRequest,
+  setActiveNpcPfpRequest,
+} from "./vendor/src/core/activeRequests.js";
 import {
   getChatForNpcScan,
   getCleanedChatHistory,
@@ -30,11 +41,12 @@ import {
 } from "./vendor/src/features/npc/data.js";
 import { npcBuildUpdatePrompt } from "./vendor/src/features/npc/fields.js";
 import { npcParseUpdateBlocks, npcApplyUpdates, npcUndoHistoryEntry } from "./vendor/src/features/npc/updates.js";
-import { npcGeneratePfp } from "./vendor/src/features/npc/pfp.js";
+import { maybeMeguminScope } from "./host.js";
 import { generateStoryPlanLogic } from "./vendor/src/features/storyplan/ui.js";
 import { memProcessPendingChunks } from "./vendor/src/features/memory/index.js";
 import { storyConfigFields, upgradeConfigValue } from "./vendor/src/features/storyconfig/config.js";
-import { LOADOUTS, applyLoadout, loadoutById } from "./vendor/src/features/modelsetup/loadouts.js";
+import { LOADOUTS, applyLoadout, loadoutById, settingFor } from "./vendor/src/features/modelsetup/loadouts.js";
+import { applyTabKeysToAllProfiles, meguminIsTabSynced } from "./vendor/src/core/sync.js";
 import { hardcodedLogic } from "./vendor/data/database.js";
 import { igManualGenerate } from "./vendor/src/features/imagegen/index.js";
 import { blocksReadForReply } from "./vendor/src/features/blocks/worker.js";
@@ -172,9 +184,106 @@ export function meguminNpcUndo(entryId: string): { npc: string; label: string; a
 }
 
 /** The portrait button: a picture of this NPC drawn from their dossier. */
-export async function meguminNpcPortrait(name: string): Promise<void> {
-  await npcGeneratePfp(name);
+/**
+ * An NPC portrait, step 1 (features/npc/pfp.js npcGeneratePfp): the model writes the portrait prompt, which
+ * the panel shows for review before anything is drawn. Megumin asks for a ComfyUI workflow file here;
+ * YunYun's image connection holds the workflow, so only Images being on is required.
+ */
+export async function meguminNpcPortraitPrompt(npcName: string): Promise<{ prompt: string }> {
+  const s = (localProfile as any).imageGen;
+  if (!s || !s.enabled) {
+    toastr.warning("Turn on Images and pick an image connection in the Images tab first.");
+    return { prompt: "" };
+  }
+  const npc = ((localProfile as any).npcBank?.npcs || []).find((n: any) => n.name === npcName);
+  if (!npc) return { prompt: "" };
+  const styleStr =
+    s.promptStyle === "illustrious"
+      ? "Use Danbooru-style tags separated by commas. Focus on anime art style."
+      : s.promptStyle === "sdxl"
+        ? "Use natural, descriptive prose and full sentences. Focus on photorealism."
+        : "Use a comma-separated list of detailed keywords and visual descriptors.";
+  const perspStr =
+    "This is a CHARACTER PORTRAIT. Frame it as an upper-body/bust shot focused on the character's face and shoulders. Soft, flattering lighting. Clean or simple background. Capture their personality through expression and posture.";
+  setActiveNpcPfpRequest({
+    npcName,
+    npcText: npcBuildTextFromData(npc),
+    styleStr,
+    perspStr,
+    extraStr: s.promptExtra || "None",
+  });
+  try {
+    const raw = String((await generateQuietPrompt({ prompt: "___PS_NPC_PFP___" })) || "");
+    let prompt = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    const match = prompt.match(/<img[^>]*?prompt=(["']?)([\s\S]*?)(?:\1\s*\/?>|\1\s*>|\1\s+[a-zA-Z]+=| \/>|>|$)/i);
+    if (match) prompt = match[2] ?? "";
+    if (!prompt || prompt.length < 5) {
+      toastr.error("AI returned an empty prompt.");
+      return { prompt: "" };
+    }
+    return { prompt };
+  } catch (e) {
+    meguminConsole.error("NPC PFP prompt generation failed:", e);
+    toastr.error("Failed to generate portrait prompt.");
+    return { prompt: "" };
+  } finally {
+    setActiveNpcPfpRequest(null);
+  }
+}
+
+/** An NPC portrait, step 2: the reviewed prompt drawn at 512×512 and stored on the dossier. */
+export async function meguminNpcPortraitRender(npcName: string, prompt: string): Promise<{ ok: boolean }> {
+  const s = ((localProfile as any).imageGen || {}) as Record<string, any>;
+  const text = String(prompt || "").trim();
+  if (!text) {
+    toastr.warning("Prompt cannot be empty.");
+    return { ok: false };
+  }
+  const scope = maybeMeguminScope();
+  if (!scope?.chat.renderImage) {
+    toastr.warning("Images are not available here.", "Megumin Suite");
+    return { ok: false };
+  }
+  const identity = meguminActiveDataIdentity();
+  const loraTriggers = [
+    [s.selectedLora, s.loraTrigger1],
+    [s.selectedLora2, s.loraTrigger2],
+    [s.selectedLora3, s.loraTrigger3],
+    [s.selectedLora4, s.loraTrigger4],
+  ]
+    .filter(([lora, trigger]) => lora && String(lora).trim() && trigger)
+    .map(([, trigger]) => String(trigger).trim());
+  let finalPrompt = text;
+  if (loraTriggers.length) {
+    let combined = loraTriggers.join(", ");
+    if (!combined.endsWith(",")) combined += ",";
+    if (!finalPrompt.includes(combined)) finalPrompt = `${combined} ${finalPrompt}`;
+  }
+  if (s.promptPrefix && String(s.promptPrefix).trim()) {
+    let prefix = String(s.promptPrefix).trim();
+    if (!prefix.endsWith(",")) prefix += ",";
+    if (!finalPrompt.startsWith(prefix)) finalPrompt = `${prefix} ${finalPrompt}`;
+  }
+  toastr.info("Rendering the portrait...", "NPC Bank");
+  const image = await scope.chat.renderImage({
+    prompt: finalPrompt,
+    negative: String(s.customNegative || ""),
+    settings: JSON.parse(JSON.stringify(s)),
+    width: 512,
+    height: 512,
+  });
+  if (!image) return { ok: false };
+  // The chat may have changed while it drew: the portrait belongs to the chat it was asked for in.
+  if (meguminActiveDataIdentity() !== identity) {
+    toastr.warning("The chat changed while the portrait was drawn, so it was not saved.", "NPC Bank");
+    return { ok: false };
+  }
+  const npc = ((localProfile as any).npcBank?.npcs || []).find((n: any) => n.name === npcName);
+  if (!npc) return { ok: false };
+  npc.pfp = `data:${image.mime};base64,${image.base64}`;
   saveProfileToMemory();
+  toastr.success(`Portrait for ${npcName} is ready!`, "NPC Bank");
+  return { ok: true };
 }
 
 // ── Banned Phrases ────────────────────────────────────────────────────────
@@ -334,27 +443,48 @@ export function meguminLoadouts(): unknown[] {
 }
 
 /** "Use this loadout": every character (default), or only this one. */
+/** The tab each loadout setting lives on (features/modelsetup/ui.js TABS). */
+const LOADOUT_TABS: Record<string, string> = {
+  preset: "Preset & Thinking",
+  banlist: "Banned Phrases",
+  addons: "Language & Add-ons",
+  chomusuke: "Chomusuke",
+  style: "Writing Style",
+};
+
+/**
+ * "Use this loadout" (features/modelsetup/ui.js): on every character, or on this one only, in which case
+ * the touched tabs that are set to Global still go to every character, as an edit there would. The panel
+ * shows the result itself. Returns the tabs that went everywhere.
+ */
 export function meguminApplyLoadout(
   id: string,
   opts: { onlyThisCharacter?: boolean; settings?: Record<string, unknown> } = {},
-): boolean {
+): { applied: boolean; sent: string[] } {
   const loadout = loadoutById(id);
-  if (!loadout) return false;
+  if (!loadout) return { applied: false, sent: [] };
   const settings = opts.settings || loadout.settings;
   if (!opts.onlyThisCharacter) {
     Object.values(extension_settings[extensionName].profiles || {}).forEach((p: any) =>
       applyLoadout(p, loadout, LOADOUT_CTX, settings, { skipGlobal: true }),
     );
+    saveSettingsDebounced();
   }
+  const styleBefore = (localProfile as any).activeStyleId;
   applyLoadout(localProfile, loadout, LOADOUT_CTX, settings);
   saveProfileToMemory();
-  toastr.success(
-    opts.onlyThisCharacter
-      ? `${loadout.name} is in use on this character.`
-      : `${loadout.name} is in use on every character.`,
-    "Megumin Suite",
+  if (!opts.onlyThisCharacter) return { applied: true, sent: [] };
+  const tabs = new Set(
+    Object.keys(settings)
+      .map((key) => settingFor(key) as { global?: boolean; tab?: string } | null)
+      .filter((s) => s && !s.global && s.tab)
+      .map((s) => s!.tab as string),
   );
-  return true;
+  if ((localProfile as any).activeStyleId !== styleBefore) tabs.add("style");
+  const sent = [...tabs]
+    .map((tab) => LOADOUT_TABS[tab])
+    .filter((title): title is string => !!title && meguminIsTabSynced(title) && applyTabKeysToAllProfiles(title));
+  return { applied: true, sent };
 }
 
 // ── Chomusuke ─────────────────────────────────────────────────────────────

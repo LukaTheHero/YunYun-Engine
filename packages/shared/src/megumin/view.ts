@@ -32,6 +32,7 @@ import {
   notebookState,
   notebookCurrentPhase,
   statsState,
+  stateStore,
 } from "./vendor/src/state/index.js";
 import { chomusukeStatusFor } from "./vendor/src/engine/tasks.js";
 import { memCalculateTokensSaved } from "./vendor/src/features/memory/index.js";
@@ -42,7 +43,12 @@ export const MEGUMIN_NOTEBOOK_CARD_DEFS = [
   { id: "notebookUpdate", tag: "Notebook_Update", label: "Notebook", emoji: "📓", visibility: "open" },
 ];
 
+/** How many of the newest replies the view carries card inputs for. */
+export const MEGUMIN_VIEW_CARD_LIMIT = 200;
+
 export interface MeguminCardInputs {
+  /** The reply's index in the chat as Megumin counts it (its msgIndex). */
+  index: number;
   worldStateText: string;
   storeBlocks: Record<string, string>;
   /** Chomusuke is still writing one of this reply's blocks. */
@@ -95,6 +101,7 @@ function cardInputsAt(index: number): MeguminCardInputs {
   const nbText = String(notebookCardTextAt(index) || "");
   if (nbText) storeBlocks.Notebook_Update = nbText;
   return {
+    index,
     worldStateText,
     storeBlocks,
     pending,
@@ -103,19 +110,41 @@ function cardInputsAt(index: number): MeguminCardInputs {
   };
 }
 
+function notebookTurns(chat: Array<{ is_user: boolean; extra?: Record<string, unknown> }>) {
+  const seqToIndex: Array<[number, number]> = [];
+  chat.forEach((m, i) => {
+    const seq = m?.extra?.megumin_seq;
+    if (m && !m.is_user && typeof seq === "number") seqToIndex.push([seq, i]);
+  });
+  const entries = (stateStore.listEntries("notebook") || []) as Array<{ entry: { source?: string; seq: number } }>;
+  const userSeqs = entries.filter((x) => x.entry.source === "user").map((x) => x.entry.seq);
+  return { seqToIndex, userSeqs };
+}
+
 export interface MeguminChatViewOptions {
   /** Include the World State history (the editor's list). */
   history?: boolean;
 }
 
 export function meguminChatView(options: MeguminChatViewOptions = {}) {
-  const chat = (getContext().chat || []) as Array<{ id: string; is_user: boolean; is_system: boolean }>;
+  const chat = (getContext().chat || []) as Array<{
+    id: string;
+    is_user: boolean;
+    is_system: boolean;
+    extra?: Record<string, unknown>;
+  }>;
   const store = (extension_settings[extensionName] || {}) as Record<string, any>;
   const cards: Record<string, MeguminCardInputs> = {};
-  chat.forEach((m, index) => {
-    if (!m || m.is_user || m.is_system) return;
+  // ponytail: the newest replies only, so a long chat's view stays small. Older replies still get their
+  // card from their own text; what they lose is the stored World State board. Upgrade path: a per-page
+  // cards route keyed by the message ids the client has on screen.
+  let left = MEGUMIN_VIEW_CARD_LIMIT;
+  for (let index = chat.length - 1; index >= 0 && left > 0; index--) {
+    const m = chat[index];
+    if (!m || m.is_user || m.is_system) continue;
     cards[m.id] = cardInputsAt(index);
-  });
+    left--;
+  }
   return {
     enabled: suiteEnabled(),
     profileKey: getCharacterKey() || "default",
@@ -124,10 +153,13 @@ export function meguminChatView(options: MeguminChatViewOptions = {}) {
     globalSettings: plain(store.globalSettings || {}),
     chomusuke: plain(store.chomusuke || localProfile.chomusuke || {}),
     sidePanel: plain(getSidePanelSettings()),
+    presentBar: plain(store.presentBar || {}),
     customModes: plain(store.customModes || []),
     sharedFragments: plain(store.sharedFragments || {}),
     configPresets: plain(store.configPresets || []),
     globalSyncTabs: plain(store.globalSyncTabs || {}),
+    // Story Config rides on the Preset & Thinking tab's Global switch unless this is off (core/sync.js).
+    storyConfigGlobalSync: store.storyConfigGlobalSync !== false,
     registry: renderDefs(),
     activeBlocks: meguminActiveBlocks().map((b: { id: string }) => b.id),
     omit: meguminBlocksTakenByPanel(),
@@ -138,6 +170,7 @@ export function meguminChatView(options: MeguminChatViewOptions = {}) {
       mode: worldUpdateMode(),
       state: plain(getWorldState()),
       history: options.history ? plain(worldHistory()) : undefined,
+      pendingFullRewrite: Boolean(stateStore.isPendingFullRewrite("world")),
     },
     stats: {
       bonds: plain(statsState("bonds")),
@@ -150,9 +183,14 @@ export function meguminChatView(options: MeguminChatViewOptions = {}) {
       enabled: notebookEnabled(),
       phase: notebookCurrentPhase(),
       state: plain(notebookState()),
+      // notebookTurnLabel's maps: a clue's stored turn number → "#15", "your edit", "a deleted message".
+      turns: notebookTurns(chat),
     },
     chomusukeStatus: chomusukeStatusFor(getContext().chatId ?? null),
-    memory: { tokensSaved: Number(memCalculateTokensSaved()) || 0 },
+    memory: {
+      tokensSaved: Number(memCalculateTokensSaved()) || 0,
+      realMessages: chat.filter((m) => m && !m.is_system).length,
+    },
   };
 }
 

@@ -13,6 +13,7 @@ export * from "./turn.js";
 export * from "./actions.js";
 export * from "./catalog.js";
 export * from "./view.js";
+export * from "./devmode.js";
 export { getContext, setMeguminLogger, toastr as meguminToastr } from "./vendor/src/st.js";
 export { localProfile } from "./vendor/src/core/state.js";
 
@@ -39,6 +40,9 @@ export * as MeguminNpcUi from "./vendor/src/features/npc/ui.js";
 export * as MeguminNpcPfp from "./vendor/src/features/npc/pfp.js";
 export * as MeguminMemory from "./vendor/src/features/memory/index.js";
 export * as MeguminMemoryVectors from "./vendor/src/features/memory/vectordb.js";
+export * as MeguminMemoryKeywords from "./vendor/src/features/memory/keywords.js";
+export { V11_BAN_LIST as MEGUMIN_V11_BAN_LIST } from "./vendor/data/modes/v11taina.js";
+export { BUILTIN_BAN_LIST as MEGUMIN_BUILTIN_BAN_LIST } from "./vendor/src/prompts/presetFrame.js";
 export * as MeguminStoryPlan from "./vendor/src/features/storyplan/ui.js";
 export * as MeguminStoryConfig from "./vendor/src/features/storyconfig/config.js";
 export * as MeguminStoryConfigUi from "./vendor/src/features/storyconfig/ui.js";

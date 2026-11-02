@@ -17,6 +17,10 @@
     "./megumin/client": {
       "import": "./dist/megumin/client.js",
       "types": "./dist/megumin/client.d.ts"
+    },
+    "./megumin/strip": {
+      "import": "./dist/megumin/strip.js",
+      "types": "./dist/megumin/strip.d.ts"
     }
   },
   "scripts": {

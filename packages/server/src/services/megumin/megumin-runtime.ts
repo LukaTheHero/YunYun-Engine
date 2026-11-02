@@ -332,6 +332,7 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
     loreEntries: () => io.loreEntries(),
     embed: (texts) => io.embed(texts),
     generateImage: (request) => io.generateImage(request, live.scope),
+    renderImage: (request) => io.renderImage(request, live.scope),
     isGenerating: () => live.generating > 0,
     changed: () => {
       live.version += 1;
