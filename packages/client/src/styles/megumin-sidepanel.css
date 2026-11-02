@@ -1458,7 +1458,7 @@ body.meg-sp-panel-open #meg-sp-panel[data-mode="floating"] #meg-sp-fab:hover {
   bottom: 0;
   width: 100vw;
   height: 100dvh;
-  z-index: 105000;
+  z-index: var(--meg-sp-z-sheet);
   display: flex;
   align-items: center;
   justify-content: center;

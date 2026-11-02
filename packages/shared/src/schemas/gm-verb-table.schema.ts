@@ -220,8 +220,11 @@ export const ENGINE_OWNED_METADATA_KEY_PREFIXES = Object.freeze([
   "last",
   "lorebook",
   "macro",
+  // Megumin Suite reads SillyTavern's main_chat (a branch's parent) and keeps its state under megumin_*.
+  "main",
   "manual",
   "mari",
+  "megumin",
   "metadata",
   "multiplayer",
   "narrative",
