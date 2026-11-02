@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/storyplan/ui.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr, $ } from "../../st.js";
+import { meguminConsole, toastr, $ } from "../../st.js";
 // ──────────────────────────────────────────────────────────────────────────────
 // Story Director — the tab, the genre/flavour vocabulary, and the generation call.
 // ──────────────────────────────────────────────────────────────────────────────
@@ -451,7 +451,7 @@ export async function handleDirectiveGeneration(sp, btn, isEvolve) {
             // Writing now would put this chat's directive into the old one, and
             // planMessageIndex would be counted against the wrong chat's length.
             if (meguminActiveDataIdentity() !== sdIdentity) {
-                console.debug(`[Megumin-Suite] Story Director ${isEvolve ? 'evolve' : 'generate'} declined: it started on "${sdIdentity}" but "${meguminActiveDataIdentity()}" is active now. The new directive was discarded, not applied.`);
+                meguminConsole.debug(`[Megumin-Suite] Story Director ${isEvolve ? 'evolve' : 'generate'} declined: it started on "${sdIdentity}" but "${meguminActiveDataIdentity()}" is active now. The new directive was discarded, not applied.`);
                 toastr.info("Chat changed while the directive was generating. It was discarded.", "Story Director");
                 return;
             }
@@ -470,7 +470,7 @@ export async function handleDirectiveGeneration(sp, btn, isEvolve) {
         }
     } catch (e) {
         toastr.error("Failed to generate directive.");
-        console.error("[Megumin Suite] Story Director error:", e);
+        meguminConsole.error("[Megumin Suite] Story Director error:", e);
     } finally {
         btn.prop("disabled", false).html(originalHtml);
     }

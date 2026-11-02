@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/prompts/storage.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // -------------------------------------------------------------
 // CUSTOM PROMPT STORAGE (diff against DEFAULT_PROMPTS)
 // -------------------------------------------------------------
@@ -119,7 +120,7 @@ export function meguminCompactStoredPrompts() {
 
     if (touched > 0) {
         saveSettingsDebounced();
-        console.log(`[Megumin Suite] Compacted duplicated prompt text across ${touched} profiles: `
+        meguminConsole.log(`[Megumin Suite] Compacted duplicated prompt text across ${touched} profiles: `
             + `${(before / 1024).toFixed(0)}KB -> ${(after / 1024).toFixed(0)}KB in settings.json.`);
     }
 }

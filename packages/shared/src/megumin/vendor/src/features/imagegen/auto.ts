@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/imagegen/auto.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr } from "../../st.js";
+import { meguminConsole, toastr } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Automatic images written by Chomusuke.
 //
@@ -121,7 +121,7 @@ export async function igAutoImageForReply(messageId, type, writePrompt, prepare 
         if (tag) prompt = tag[2];
         prompt = prompt.trim();
     } catch (e) {
-        console.error("[Megumin-Suite] Automatic image prompt failed", e);
+        meguminConsole.error("[Megumin-Suite] Automatic image prompt failed", e);
         failure = e;
     } finally {
         setActiveImageGenRequest(null);

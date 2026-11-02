@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/imagegen/v2/index.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr } from "../../../st.js";
+import { meguminConsole, toastr } from "../../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Image Gen V2 ↔ SillyTavern.
 //
@@ -237,7 +237,7 @@ async function waitForImageInputs() {
         ? `Waiting for ${[...new Set(who)].join(", ")}'s look before drawing…`
         : "Waiting for World State before drawing…", "Megumin Suite", { timeOut: 4000 });
     if (await waitUnlessStuck(work, { limitMs: 60000, isPaused: bgPreviewOpen }) === "gave-up") {
-        console.warn("[Megumin-Suite] Image V2: still waiting for World State or a look after 60s; drawing without it.");
+        meguminConsole.warn("[Megumin-Suite] Image V2: still waiting for World State or a look after 60s; drawing without it.");
     }
 }
 
@@ -253,7 +253,7 @@ export async function v2ResolveForComfy(prompt) {
     // to Reference starts from the last real image.
     setLastImagePrompt(r.prompt);
     if (r.filled.length || r.unknown.length) {
-        console.debug("[Megumin-Suite] Image V2 resolved:", { filled: r.filled, unknown: r.unknown, noLook: r.noLook });
+        meguminConsole.debug("[Megumin-Suite] Image V2 resolved:", { filled: r.filled, unknown: r.unknown, noLook: r.noLook });
     }
     if (r.unknown.length) {
         toastr.info(`No saved look for: ${[...new Set(r.unknown)].join(", ")}. Used the name as written.`, "Megumin Suite", { timeOut: 5000 });

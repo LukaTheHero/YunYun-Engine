@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/engine/buildBaseDict.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Assembling the placeholder dictionary the preset is filled from.
 //
@@ -924,11 +925,11 @@ function recentStoryText(count = 3) {
 function buildCurrentInfo(worldNotes) {
     let parts = { bonds: "", sheet: "", chatter: "", tracker: "" };
     try { parts = statsPromptParts({ recentText: recentStoryText() }); } catch (e) {
-        console.warn("[Megumin Suite] Current Info: could not read the kept blocks.", e);
+        meguminConsole.warn("[Megumin Suite] Current Info: could not read the kept blocks.", e);
     }
     let notebook = "";
     try { notebook = notebookPromptBlock(); } catch (e) {
-        console.warn("[Megumin Suite] Current Info: could not read the notebook.", e);
+        meguminConsole.warn("[Megumin Suite] Current Info: could not read the notebook.", e);
     }
     const sections = [];
     if (worldNotes) sections.push(worldNotes);

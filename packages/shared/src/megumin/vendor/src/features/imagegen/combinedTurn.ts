@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/imagegen/combinedTurn.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr } from "../../st.js";
+import { meguminConsole, toastr } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Everything a reply needs from Chomusuke in ONE call (Chomusuke tab →
 // Combine calls). Plan 009 widened it from "World State + image" to any of:
@@ -183,7 +183,7 @@ export async function runCombinedTurn(messageId, type, plan) {
             }
         }, { jobs: parts });
     } catch (e) {
-        console.error("[Megumin-Suite] Combined Chomusuke call failed", e);
+        meguminConsole.error("[Megumin-Suite] Combined Chomusuke call failed", e);
         failure = e;
     }
     // null without an error: the worker failed and has said so already.

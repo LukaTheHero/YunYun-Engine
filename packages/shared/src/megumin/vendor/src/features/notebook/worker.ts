@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/features/notebook/worker.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // The notebook read by Chomusuke (plan 010, phase 5).
 //
@@ -72,7 +73,7 @@ export function notebookReadForReply(index, { force = false } = {}) {
                 }
             });
         } catch (e) {
-            console.error("[Megumin-Suite] Notebook read failed", e);
+            meguminConsole.error("[Megumin-Suite] Notebook read failed", e);
             warnChomusuke("failed", ["notebook"], { error: e });
             notebookAbandonRead(token);
             meguminScheduleBlocksRefresh();

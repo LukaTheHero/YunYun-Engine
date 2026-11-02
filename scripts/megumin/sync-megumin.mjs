@@ -29,7 +29,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -301,13 +301,19 @@ function rewriteInjectionMarkers(source) {
 
 /** A relative import of vendor/src/st.ts from `path`. */
 function stImportPath(path) {
-  const depth = path.split("/").length - 2;
-  return depth <= 0 ? "./st.js" : `${"../".repeat(depth)}st.js`;
+  const rel = posix.relative(posix.dirname(path), "src/st.js");
+  return rel.startsWith(".") ? rel : `./${rel}`;
+}
+
+/** Megumin logs with console; YunYun's server logs through Pino, so every call goes to the host's logger. */
+function routeConsole(source) {
+  return source.replace(/(?<![\w$.])console\.(log|debug|info|warn|error|group|groupEnd)\(/g, "meguminConsole.$1(");
 }
 
 /** Imports for SillyTavern globals the module uses but never imports: toastr everywhere, the DOM stubs where listed. */
 function addGlobalImports(path, source) {
   const names = [];
+  if (/(?<![\w$.])meguminConsole\./.test(source)) names.push("meguminConsole");
   const importsName = (n) => new RegExp(`import\\s*\\{[^}]*\\b${n}\\b[^}]*\\}\\s*from`).test(source);
   if (/\btoastr\s*[.[]/.test(source) && !importsName("toastr")) names.push("toastr");
   if (DOM_STUBBED.includes(path)) {
@@ -352,6 +358,7 @@ function buildOutputs(src) {
     const raw = readFileSync(from, "utf8");
     let body = applyPatches(path, raw.replace(/\r+\n/g, "\n"));
     if (path === "src/engine/injection.js") body = rewriteInjectionMarkers(body);
+    body = routeConsole(body);
     body = addGlobalImports(path, body);
     const target = join(VENDOR_DIR, path.replace(/\.js$/, ".ts"));
     outputs.set(target, headerFor(path, commit) + body);

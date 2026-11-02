@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/engine/injection.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr, $, window } from "../st.js";
+import { meguminConsole, toastr, $, window } from "../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // The prompt interceptor — the last thing to touch the messages before they go.
 //
@@ -108,7 +108,7 @@ async function buildPromptInjection(data, type) {
             });
         }
 
-        console.log(`[${extensionName}] 🎯 Injected Story Director array in memory.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected Story Director array in memory.`);
         return;
     }
 
@@ -141,7 +141,7 @@ async function buildPromptInjection(data, type) {
                 "content": "<think>\nScanning for missing significant NPCs...\n"
             });
         }
-        console.log(`[${extensionName}] 🎯 Injected NPC Scan array in memory.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected NPC Scan array in memory.`);
         return;
     }
 
@@ -155,7 +155,7 @@ async function buildPromptInjection(data, type) {
         if (!disablePrefill && r.prefill) {
             messages.push({ "role": "assistant", "content": r.prefill });
         }
-        console.log(`[${extensionName}] 🎯 Injected World State extraction prompt.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected World State extraction prompt.`);
         return;
     }
 
@@ -187,7 +187,7 @@ async function buildPromptInjection(data, type) {
             });
         }
 
-        console.log(`[${extensionName}] 🎯 Injected forced NPC Update array in memory.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected forced NPC Update array in memory.`);
         return;
     }
 
@@ -218,7 +218,7 @@ async function buildPromptInjection(data, type) {
         if (!disablePrefill && getActiveImageGenRequest().v2.prefill) {
             messages.push({ "role": "assistant", "content": getActiveImageGenRequest().v2.prefill });
         }
-        console.log(`[${extensionName}] 🎯 Injected Image Gen V2 prompt.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected Image Gen V2 prompt.`);
         return;
     }
 
@@ -272,7 +272,7 @@ async function buildPromptInjection(data, type) {
             });
         }
 
-        console.log(`[${extensionName}] 🎯 Injected Image Gen array in memory.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected Image Gen array in memory.`);
         return;
     }
 
@@ -308,7 +308,7 @@ async function buildPromptInjection(data, type) {
             });
         }
 
-        console.log(`[${extensionName}] 🎯 Injected NPC Portrait Prompt array in memory.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected NPC Portrait Prompt array in memory.`);
         return;
     }
 
@@ -341,7 +341,7 @@ async function buildPromptInjection(data, type) {
             });
         }
 
-        console.log(`[${extensionName}] 🎯 Injected Memory Summarization array in memory.`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected Memory Summarization array in memory.`);
         return;
     }
 
@@ -362,7 +362,7 @@ async function buildPromptInjection(data, type) {
         messages.push({ "role": "user", "content": getActiveGenerationOrder() });
         messages.push({ "role": "system", "content": E.thinking });
         if (!disablePrefill) messages.push({ "role": "assistant", "content": E.prefill });
-        console.log(`[${extensionName}] 🎯 Injected Megumin Engine prompt (Writing Style).`);
+        meguminConsole.log(`[${extensionName}] 🎯 Injected Megumin Engine prompt (Writing Style).`);
         return;
     }
 
@@ -377,7 +377,7 @@ async function buildPromptInjection(data, type) {
     // do not pay for it. Only on the real generation path — the token counter and
     // the prompt preview call buildBaseDict(true) and never reach this line.
     try { await memEnsureSemanticQueryFresh(); } catch (e) {
-        console.warn("[Megumin Suite] Semantic refresh before prompt build failed; using what is in hand.", e);
+        meguminConsole.warn("[Megumin Suite] Semantic refresh before prompt build failed; using what is in hand.", e);
     }
 
     const dict = buildBaseDict();
@@ -404,7 +404,7 @@ async function buildPromptInjection(data, type) {
     // carries is never touched — only the replies already in the chat.
     if (localProfile.hideBlocksFromAI !== false) {
         const hidden = hideBlocksInMessages(messages, meguminAllBlockTags());
-        if (hidden) console.debug(`[${extensionName}] Hid the blocks in ${hidden} earlier repl${hidden === 1 ? "y" : "ies"} from the model.`);
+        if (hidden) meguminConsole.debug(`[${extensionName}] Hid the blocks in ${hidden} earlier repl${hidden === 1 ? "y" : "ies"} from the model.`);
     }
 
     let replacementsMade = 0;
@@ -461,7 +461,7 @@ async function buildPromptInjection(data, type) {
 
     // Thinking Cap: its rules again as the last thing the model reads.
     if (addThinkingNudge(messages, localProfile.model)) {
-        console.debug(`[${extensionName}] Added the Thinking Cap's rules at the end of the prompt.`);
+        meguminConsole.debug(`[${extensionName}] Added the Thinking Cap's rules at the end of the prompt.`);
     }
 
     // --- INJECT NPC PORTRAITS AS MULTIMODAL IMAGES ---
@@ -482,7 +482,7 @@ async function buildPromptInjection(data, type) {
     }
 
     if (replacementsMade > 0 && !getActiveGenerationOrder()) {
-        console.log(`[${extensionName}] ✅ Executed ${replacementsMade} block replacements.`);
+        meguminConsole.log(`[${extensionName}] ✅ Executed ${replacementsMade} block replacements.`);
     }
 
     // --- PROMPT PREVIEW ---

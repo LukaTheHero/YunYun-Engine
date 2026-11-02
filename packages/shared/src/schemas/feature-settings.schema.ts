@@ -6,8 +6,10 @@ import { z } from "zod";
  * switch and its default live here.
  *
  * Every switch defaults OFF, so an install that never opens the Features section
- * behaves exactly as before. An absent key means "use the default"; the client
- * only stores values that differ from it.
+ * behaves exactly as before, except `megumin` (MEGUMINTOGGLE): Megumin Suite is
+ * YunYun's default engine, so it ships on, and switching it off returns every
+ * chat to the prompts YunYun built before it. An absent key means "use the
+ * default"; the client only stores values that differ from it.
  */
 export const FEATURE_SETTINGS_KEY = "features";
 
@@ -16,6 +18,7 @@ export const FEATURE_SWITCH_NAMES = [
   "providerRetry",
   "usageAndActivationStats",
   "messageTrash",
+  "megumin",
 ] as const;
 export type FeatureSwitchName = (typeof FEATURE_SWITCH_NAMES)[number];
 
@@ -25,6 +28,7 @@ export const FEATURE_SWITCH_DEFAULTS: Readonly<Record<FeatureSwitchName, boolean
   providerRetry: false,
   usageAndActivationStats: false,
   messageTrash: false,
+  megumin: true,
 };
 
 export type FeatureSettings = Partial<Record<FeatureSwitchName, boolean>>;
@@ -35,6 +39,7 @@ export const featureSettingsSchema = z
     providerRetry: z.boolean().optional(),
     usageAndActivationStats: z.boolean().optional(),
     messageTrash: z.boolean().optional(),
+    megumin: z.boolean().optional(),
   })
   .strict();
 

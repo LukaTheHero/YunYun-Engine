@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/features/imagegen/comfyProgress.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../../st.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // Real generation progress from ComfyUI.
 //
@@ -65,7 +66,7 @@ export function openComfyProgressSocket(comfyUrl, clientId, { onProgress, onNode
         // more, and ComfyUI setups behind proxies that block websockets are common.
         ws.onerror = () => { };
     } catch (e) {
-        console.debug("[Megumin Suite] ComfyUI progress socket unavailable; using the indeterminate bar.", e);
+        meguminConsole.debug("[Megumin Suite] ComfyUI progress socket unavailable; using the indeterminate bar.", e);
         ws = null;
     }
 

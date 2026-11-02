@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/npc/ui.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr, $, document } from "../../st.js";
+import { meguminConsole, toastr, $, document } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // The NPC Bank tab and the NPC list.
 // ────────────────────────────────────────────────────────────────────────────
@@ -745,7 +745,7 @@ export function renderNpcList() {
                 const cleaned = String(raw || "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 
                 if (meguminActiveDataIdentity() !== identity) {
-                    console.debug(`[Megumin-Suite] Forced NPC update discarded: it was requested in "${identity}" but "${meguminActiveDataIdentity()}" is active now.`);
+                    meguminConsole.debug(`[Megumin-Suite] Forced NPC update discarded: it was requested in "${identity}" but "${meguminActiveDataIdentity()}" is active now.`);
                     return;
                 }
 
@@ -763,7 +763,7 @@ export function renderNpcList() {
                 const { applied, refused } = npcApplyUpdates(parsedUpdates, {
                     messageIndex: (chat && chat.length > 0) ? chat.length - 1 : 0
                 });
-                refused.forEach(r => console.debug(`[Megumin-Suite] Forced NPC update declined: ${r.reason}.`));
+                refused.forEach(r => meguminConsole.debug(`[Megumin-Suite] Forced NPC update declined: ${r.reason}.`));
 
                 if (applied.length) {
                     saveProfileToMemory();
@@ -776,7 +776,7 @@ export function renderNpcList() {
                     toastr.info(`Nothing on ${target.name}'s record has changed.`, "Megumin Suite");
                 }
             } catch (err) {
-                console.error("[Megumin Suite] Forced NPC update failed", err);
+                meguminConsole.error("[Megumin Suite] Forced NPC update failed", err);
                 toastr.error(`Could not update ${target.name}.`);
             } finally {
                 setActiveNpcUpdateRequest(null);

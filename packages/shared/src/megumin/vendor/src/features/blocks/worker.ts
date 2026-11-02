@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/features/blocks/worker.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Blocks written by Chomusuke (plan 009).
 //
@@ -53,7 +54,7 @@ export function earlierText(index, count = 4) {
 /** Each routed block's template, as the story model would have been given it. */
 export function blocksTasksFor(ids) {
     let dict = {};
-    try { dict = buildBaseDict(true); } catch (e) { console.warn("[Megumin-Suite] Blocks read: templates unavailable.", e); }
+    try { dict = buildBaseDict(true); } catch (e) { meguminConsole.warn("[Megumin-Suite] Blocks read: templates unavailable.", e); }
     return ids.map(id => {
         const def = meguminBlockById(id);
         return { tag: BLOCK_ROUTE_TAGS[id], body: def ? sub(meguminBlockTemplateBody(def, dict)) : "" };
@@ -94,7 +95,7 @@ export function blocksReadForReply(index, { force = false } = {}) {
                 }
             });
         } catch (e) {
-            console.error("[Megumin-Suite] Blocks read failed", e);
+            meguminConsole.error("[Megumin-Suite] Blocks read failed", e);
             warnChomusuke("failed", ["blocks"], { error: e });
             blocksAbandonRead(token);
             meguminScheduleBlocksRefresh();

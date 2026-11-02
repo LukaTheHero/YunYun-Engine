@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/core/lore.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Lorebook entries for background calls.
 //
@@ -44,7 +45,7 @@ export async function loreForChat() {
             .map(t => String(t || "").trim()).filter(Boolean);
         return sub([...new Set(parts)].join("\n\n"));
     } catch (e) {
-        console.warn(`[${extensionName}] Lorebook read failed; going on without it.`, e);
+        meguminConsole.warn(`[${extensionName}] Lorebook read failed; going on without it.`, e);
         return "";
     }
 }
@@ -70,7 +71,7 @@ export async function loreForNames(names, { maxChars = 6000 } = {}) {
         }
         return sub(out.join("\n\n"));
     } catch (e) {
-        console.warn(`[${extensionName}] Lorebook read failed; going on without it.`, e);
+        meguminConsole.warn(`[${extensionName}] Lorebook read failed; going on without it.`, e);
         return "";
     }
 }

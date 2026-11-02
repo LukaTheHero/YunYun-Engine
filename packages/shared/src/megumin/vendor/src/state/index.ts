@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/state/index.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // State store ↔ SillyTavern.
 //
@@ -401,7 +402,7 @@ export function worldExtractMessage(index, { force = false } = {}) {
                 }
             });
         } catch (e) {
-            console.error("[Megumin-Suite] World State side-model read failed", e);
+            meguminConsole.error("[Megumin-Suite] World State side-model read failed", e);
             failure = e;
         } finally {
             setActiveWorldExtractRequest(null);
@@ -414,7 +415,7 @@ export function worldExtractMessage(index, { force = false } = {}) {
         const at = chatNow.findIndex(m => m?.extra?.megumin_uid === uid);
         const textNow = at >= 0 ? swipeText(chatNow[at], swipe) : null;
         if (getContext()?.chatId !== chatId || at < 0 || textNow == null || hashText(textNow) !== hash) {
-            console.debug("[Megumin-Suite] World State side-model result dropped: the reply changed or is gone.");
+            meguminConsole.debug("[Megumin-Suite] World State side-model result dropped: the reply changed or is gone.");
             stateChangedHook();
             return false;
         }
@@ -428,7 +429,7 @@ export function worldExtractMessage(index, { force = false } = {}) {
             if (failure) warnChomusuke("failed", ["worldState"], { error: failure });
             else if (out !== null) warnChomusuke(answerKind(out), ["worldState"]);
         } else if (parsed.skipped.length) {
-            console.debug(`[Megumin-Suite] World State (side model): lines not understood in message ${at}:`, parsed.skipped);
+            meguminConsole.debug(`[Megumin-Suite] World State (side model): lines not understood in message ${at}:`, parsed.skipped);
         }
         stateChangedHook();
         return true;
@@ -513,7 +514,7 @@ function finishExternalRead(token, raw, prefill) {
     pendingExtract.delete(token.key);
     const at = findTokenMessage(token);
     if (at < 0) {
-        console.debug("[Megumin-Suite] Combined read dropped: the reply changed or is gone.");
+        meguminConsole.debug("[Megumin-Suite] Combined read dropped: the reply changed or is gone.");
         stateChangedHook();
         return { ok: false, dropped: true };
     }
@@ -523,7 +524,7 @@ function finishExternalRead(token, raw, prefill) {
     const parsed = cleaned ? worldModule.parse(cleaned) : null;
     if (!parsed) { stateChangedHook(); return { ok: false, dropped: false }; }
     stateStore.recordMessage(at, { source: "sidemodel", expect: true, moduleIds: ["world"], swipe: token.swipe, parsed, raw: cleaned });
-    if (parsed.skipped.length) console.debug(`[Megumin-Suite] World State (combined): lines not understood in message ${at}:`, parsed.skipped);
+    if (parsed.skipped.length) meguminConsole.debug(`[Megumin-Suite] World State (combined): lines not understood in message ${at}:`, parsed.skipped);
     stateChangedHook();
     return { ok: true, dropped: false };
 }
@@ -796,7 +797,7 @@ export function notebookFinishRead(token, raw) {
     pendingNotebook.delete(token.key);
     const at = findTokenMessage(token);
     if (at < 0) {
-        console.debug("[Megumin-Suite] Notebook read dropped: the reply changed or is gone.");
+        meguminConsole.debug("[Megumin-Suite] Notebook read dropped: the reply changed or is gone.");
         stateChangedHook();
         return { ok: false, dropped: true };
     }
@@ -902,7 +903,7 @@ function statsOnChatLoaded() {
             if (n > 0) imported.push(`${id} (${n})`);
         }
     }
-    if (imported.length) console.log(`[Megumin-Suite] Picked up from this chat's existing messages: ${imported.join(", ")}.`);
+    if (imported.length) meguminConsole.log(`[Megumin-Suite] Picked up from this chat's existing messages: ${imported.join(", ")}.`);
 }
 
 // Whose bonds the story is handed right now (record keys).
@@ -996,7 +997,7 @@ export function blocksFinishRead(token, raw) {
     pendingBlocks.delete(token.key);
     const at = findTokenMessage(token);
     if (at < 0) {
-        console.debug("[Megumin-Suite] Blocks read dropped: the reply changed or is gone.");
+        meguminConsole.debug("[Megumin-Suite] Blocks read dropped: the reply changed or is gone.");
         stateChangedHook();
         return { ok: false, dropped: true, found: [] };
     }
@@ -1112,7 +1113,7 @@ export function stateOnMessageReceived(messageId, type, { skipSideRead = false }
     const expect = mode === "inline" && !NOT_A_REPLY.has(type);
     const { recorded } = stateStore.recordMessage(index, { expect, moduleIds: ["world"] });
     for (const e of recorded) {
-        if (e.parsed.skipped.length) console.debug(`[Megumin-Suite] World State: lines not understood in message ${index}:`, e.parsed.skipped);
+        if (e.parsed.skipped.length) meguminConsole.debug(`[Megumin-Suite] World State: lines not understood in message ${index}:`, e.parsed.skipped);
     }
     return recorded.length > 0;
 }
@@ -1180,7 +1181,7 @@ export function stateOnChatLoaded() {
     if (worldEnabled()) stateStore.stampAll();
     stateStore.reconcile();
     const redone = stateStore.reparseStale("world");
-    if (redone) console.log(`[Megumin-Suite] World State: re-read ${redone} entr${redone === 1 ? "y" : "ies"} with the improved parser.`);
+    if (redone) meguminConsole.log(`[Megumin-Suite] World State: re-read ${redone} entr${redone === 1 ? "y" : "ies"} with the improved parser.`);
     if (worldEnabled() && !stateStore.root()?.imported?.world) {
         const n = stateStore.importFromChat("world");
         if (n > 0) {

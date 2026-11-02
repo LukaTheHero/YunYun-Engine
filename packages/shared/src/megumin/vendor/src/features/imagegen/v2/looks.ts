@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/imagegen/v2/looks.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr, $ } from "../../../st.js";
+import { meguminConsole, toastr, $ } from "../../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Image Gen V2 — looks: scans, the review popup, natural descriptions, and the
 // automatic look for a character who just arrived (+ Name in World State).
@@ -297,7 +297,7 @@ export function v2LooksForArrivals() {
         })
         .catch(e => {
             releaseLookAttempts(chatId, missing);
-            console.error("[Megumin-Suite] Automatic look scan failed", e);
+            meguminConsole.error("[Megumin-Suite] Automatic look scan failed", e);
         });
     read.names = missing.map(m => m.name);
     lookReads.add(read);
@@ -357,7 +357,7 @@ export function refreshOutfitTags() {
         const raw = await ask(OUTFIT_SYSTEM, renderOutfitTagsPrompt(stale.map(m => ({ name: m.name, outfit: m.outfitText }))));
         if (getContext()?.chatId !== chatAtStart) return 0;
         return storeOutfitTags(stale, raw);
-    })().catch(e => { console.error("[Megumin-Suite] Outfit tags failed", e); return 0; })
+    })().catch(e => { meguminConsole.error("[Megumin-Suite] Outfit tags failed", e); return 0; })
         .finally(() => { outfitRefresh = null; });
     return outfitRefresh;
 }

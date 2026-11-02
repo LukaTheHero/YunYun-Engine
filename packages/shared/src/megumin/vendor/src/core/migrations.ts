@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/core/migrations.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // One-time repairs to stored settings.
 //
@@ -96,7 +97,7 @@ export function dropLookResidue() {
         }
     }
     if (dropped) {
-        console.log(`[${extensionName}] Removed stale image looks from ${dropped} profile(s) in settings.`);
+        meguminConsole.log(`[${extensionName}] Removed stale image looks from ${dropped} profile(s) in settings.`);
         saveSettingsDebounced();
     }
 }

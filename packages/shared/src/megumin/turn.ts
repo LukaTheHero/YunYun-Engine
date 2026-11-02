@@ -7,7 +7,7 @@
 // is returned so the operation is written back once they have all settled.
 // Derived from Megumin Suite (CC BY-NC 4.0, see LICENSE.md).
 // ──────────────────────────────────────────────────────────────────────────────
-import { getContext, toastr } from "./vendor/src/st.js";
+import { getContext, meguminConsole, toastr } from "./vendor/src/st.js";
 import { localProfile } from "./vendor/src/core/state.js";
 import { suiteEnabled } from "./vendor/src/core/power.js";
 import { meguminActiveDataIdentity } from "./vendor/src/core/keys.js";
@@ -77,14 +77,14 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
     stateOnMessageReceived(index, type, { skipSideRead: emptyReply || Boolean(combinedTurn && combinedTurn.world) });
     v2LooksForArrivals();
   } catch (e) {
-    console.error("[Megumin Suite] World State update failed", e);
+    meguminConsole.error("[Megumin Suite] World State update failed", e);
   }
 
   // ── Blocks by Chomusuke ──
   if (!emptyReply && !BLOCKS_NOT_A_REPLY.has(type) && !(combinedTurn && combinedTurn.blocks)) {
     jobs.push(
       blocksReadForReply(index, { force: type === "continue" }).catch((e: unknown) =>
-        console.error("[Megumin Suite] Blocks read failed", e),
+        meguminConsole.error("[Megumin Suite] Blocks read failed", e),
       ),
     );
   }
@@ -93,7 +93,7 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
   if (!emptyReply && !BLOCKS_NOT_A_REPLY.has(type) && !(combinedTurn && combinedTurn.notebook)) {
     jobs.push(
       notebookReadForReply(index, { force: type === "continue" }).catch((e: unknown) =>
-        console.error("[Megumin Suite] Notebook read failed", e),
+        meguminConsole.error("[Megumin Suite] Notebook read failed", e),
       ),
     );
   }
@@ -104,13 +104,13 @@ export async function meguminOnReplyReceived(index: number, type: MeguminReplyTy
       (combinedTurn
         ? runCombinedTurn(index, type, combinedTurn)
         : igAutoImageForReply(index, type, generateImagePromptText, prepareImagePrompt)
-      ).catch((e: unknown) => console.error("[Megumin Suite] Automatic image failed", e)),
+      ).catch((e: unknown) => meguminConsole.error("[Megumin Suite] Automatic image failed", e)),
     );
   }
   if (combinedTurn && !combinedTurn.image) {
     jobs.push(
       igAutoImageForReply(index, type, generateImagePromptText, prepareImagePrompt).catch((e: unknown) =>
-        console.error("[Megumin Suite] Automatic image failed", e),
+        meguminConsole.error("[Megumin Suite] Automatic image failed", e),
       ),
     );
   }

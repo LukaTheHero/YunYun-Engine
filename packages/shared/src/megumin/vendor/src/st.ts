@@ -266,3 +266,26 @@ export function updateMessageBlock(_index: number, message: any): void {
   scope.chat.dirty.chat = true;
   scope.chat.changed?.(`message:${message?.id ?? ""}`);
 }
+
+// ── Logging ──────────────────────────────────────────────────────────────
+// Megumin's console calls (rewritten by the sync script) reach the host's
+// logger: Pino on the server, the browser console in the client.
+type MeguminLogLevel = "debug" | "info" | "warn" | "error";
+let meguminLogger: (level: MeguminLogLevel, args: unknown[]) => void = (level, args) => {
+  const target = level === "debug" ? console.debug : level === "info" ? console.info : level === "warn" ? console.warn : console.error;
+  target(...args);
+};
+
+export function setMeguminLogger(next: (level: MeguminLogLevel, args: unknown[]) => void): void {
+  meguminLogger = next;
+}
+
+export const meguminConsole = {
+  log: (...args: unknown[]) => meguminLogger("debug", args),
+  debug: (...args: unknown[]) => meguminLogger("debug", args),
+  info: (...args: unknown[]) => meguminLogger("info", args),
+  warn: (...args: unknown[]) => meguminLogger("warn", args),
+  error: (...args: unknown[]) => meguminLogger("error", args),
+  group: (...args: unknown[]) => meguminLogger("debug", args),
+  groupEnd: () => {},
+};

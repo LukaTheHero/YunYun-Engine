@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/features/blocks/registry.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../../st.js";
 // ──────────────────────────────────────────────────────────────────────────────
 // Block definitions and everything derived from them.
 //
@@ -257,7 +258,7 @@ export function blocksEnvelopeParts(dict) {
     // Plan 010: the Author's Notebook is not a block in the stack; it rides in
     // the envelope whenever it is on, even with no other block.
     let notebook = null;
-    try { notebook = notebookBlockRequest(); } catch (e) { console.warn("[Megumin Suite] Notebook: could not build its request.", e); }
+    try { notebook = notebookBlockRequest(); } catch (e) { meguminConsole.warn("[Megumin Suite] Notebook: could not build its request.", e); }
     if (!active.length && !notebook) return { rules: [], parts: [], splitRules: [], splitParts: [] };
 
     const parts = [];

@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/npc/pfp.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr, $, document } from "../../st.js";
+import { meguminConsole, toastr, $, document } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // NPC portrait generation via ComfyUI.
 //
@@ -62,7 +62,7 @@ export async function npcGeneratePfp(npcName) {
         const match = promptText.match(imgRegex);
         if (match) promptText = match[2];
     } catch (e) {
-        console.error("NPC PFP prompt generation failed:", e);
+        meguminConsole.error("NPC PFP prompt generation failed:", e);
         $("#kazuma_progress_overlay").hide();
         toastr.error("Failed to generate portrait prompt.");
         setActiveNpcPfpRequest(null);
@@ -77,7 +77,7 @@ export async function npcGeneratePfp(npcName) {
         return null;
     }
 
-    console.log(`[Megumin-Suite] NPC PFP prompt for ${npcName}: ${promptText}`);
+    meguminConsole.log(`[Megumin-Suite] NPC PFP prompt for ${npcName}: ${promptText}`);
     
     // --- ALWAYS ON PROMPT PREVIEW / EDIT FOR NPC PORTRAITS ---
     $("#kazuma_progress_overlay").hide(); // Hide progress bar temporarily
@@ -186,7 +186,7 @@ export async function npcGeneratePfp(npcName) {
                             // portrait would vanish with it, and renderNpcList() would
                             // repaint the panel with the wrong chat's bank.
                             if (meguminActiveDataIdentity() !== pfpIdentity) {
-                                console.debug(`[Megumin-Suite] NPC portrait declined: it was generated for "${pfpIdentity}" but "${meguminActiveDataIdentity()}" is active now. The image was dropped rather than attached to a stale NPC record.`);
+                                meguminConsole.debug(`[Megumin-Suite] NPC portrait declined: it was generated for "${pfpIdentity}" but "${meguminActiveDataIdentity()}" is active now. The image was dropped rather than attached to a stale NPC record.`);
                                 $("#kazuma_progress_overlay").hide();
                                 resolve(null);
                                 return;

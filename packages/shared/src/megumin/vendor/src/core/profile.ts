@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/core/profile.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr, $, window } from "../st.js";
+import { meguminConsole, toastr, $, window } from "../st.js";
 // ──────────────────────────────────────────────────────────────────────────────
 // Loading, saving and pruning the active profile.
 //
@@ -466,7 +466,7 @@ export function initProfile() {
                 // Restored at the front so name and vitals stay ahead of the body
                 // rows, which is the order the template's header line needs.
                 localProfile.npcBank.fields.unshift(...JSON.parse(JSON.stringify(restored)));
-                console.debug(`[Megumin-Suite] NPC field list was missing its "${role}" field; the default was restored.`);
+                meguminConsole.debug(`[Megumin-Suite] NPC field list was missing its "${role}" field; the default was restored.`);
             });
         }
 
@@ -565,7 +565,7 @@ export function initProfile() {
         && !extension_settings[extensionName].globalSettings.npcTemplateNoticeShown) {
         extension_settings[extensionName].globalSettings.npcTemplateNoticeShown = true;
         saveSettingsDebounced();
-        console.log("[Megumin Suite] A hand-edited NPC dossier template was found. The template is generated from the NPC Bank's field list now, so that edit is no longer applied — rebuild it as fields in the NPCs Bank tab.");
+        meguminConsole.log("[Megumin Suite] A hand-edited NPC dossier template was found. The template is generated from the NPC Bank's field list now, so that edit is no longer applied — rebuild it as fields in the NPCs Bank tab.");
         if (typeof toastr !== "undefined") {
             toastr.info(
                 "Your edited NPC dossier template is no longer used — the dossier is built from the field list in the NPC Bank tab now. Your old text is still stored, nothing was deleted.",
@@ -891,7 +891,7 @@ export function pruneFutureData() {
 
     if (changesMade) {
         saveProfileToMemory();
-        console.log(`[Megumin Suite] Pruned/Adjusted out-of-bounds future data (chat length: ${chatLength})`);
+        meguminConsole.log(`[Megumin Suite] Pruned/Adjusted out-of-bounds future data (chat length: ${chatLength})`);
         
         fireRefreshHook(REFRESH.MEMORY_ACCORDION);
         fireRefreshHook(REFRESH.MEMORY_VAULT, $("#mem_vault_search").val() || "");
@@ -938,7 +938,7 @@ export function saveProfileToMemory() {
     // the data actually belongs to; initProfile clears the flag when the next profile
     // loads, so it cannot leak into an untouched chat.
     if (_loadedProfileKey && key !== _loadedProfileKey) {
-        console.debug(`[Megumin-Suite] saveProfileToMemory declined: the profile in memory belongs to "${_loadedProfileKey}" but the active chat is now "${key}". Skipping the chat_metadata blocks and the settings write so this chat's data is not saved into another chat.`);
+        meguminConsole.debug(`[Megumin-Suite] saveProfileToMemory declined: the profile in memory belongs to "${_loadedProfileKey}" but the active chat is now "${key}". Skipping the chat_metadata blocks and the settings write so this chat's data is not saved into another chat.`);
         return;
     }
 

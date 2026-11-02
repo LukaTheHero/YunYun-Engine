@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/core/keys.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile identity — which chat/character the settings on screen belong to.
 //
@@ -86,23 +87,23 @@ export function debugProfileState() {
     const avatar = getRawAvatar();
     const chatId = getRawChatId();
     const settings = extension_settings?.[extensionName]?.profiles || {};
-    console.group('🔍 Megumin Profile Debug');
-    console.log('context.chatId:', chatId);
-    console.log('context.characterId:', context.characterId);
-    console.log('context.groupId:', context.groupId);
-    console.log('context.chat (messages count):', context.chat ? context.chat.length : 'null');
-    console.log('context.characters count:', context.characters ? Object.keys(context.characters).length : 'null');
-    console.log('getCharacterKey():', key);
-    console.log('getRawAvatar():', avatar);
-    console.log('isChatLevelProfile():', isChatLevelProfile());
-    console.log('getProfileLevel():', getProfileLevel());
-    console.log('\n📦 All profile keys in storage:');
-    Object.keys(settings).forEach(k => console.log(`  [${k}]`));
-    console.log('\n📊 Profile for key "' + key + '":', key ? (settings[key] ? 'FOUND' : 'NOT FOUND') : 'N/A');
+    meguminConsole.group('🔍 Megumin Profile Debug');
+    meguminConsole.log('context.chatId:', chatId);
+    meguminConsole.log('context.characterId:', context.characterId);
+    meguminConsole.log('context.groupId:', context.groupId);
+    meguminConsole.log('context.chat (messages count):', context.chat ? context.chat.length : 'null');
+    meguminConsole.log('context.characters count:', context.characters ? Object.keys(context.characters).length : 'null');
+    meguminConsole.log('getCharacterKey():', key);
+    meguminConsole.log('getRawAvatar():', avatar);
+    meguminConsole.log('isChatLevelProfile():', isChatLevelProfile());
+    meguminConsole.log('getProfileLevel():', getProfileLevel());
+    meguminConsole.log('\n📦 All profile keys in storage:');
+    Object.keys(settings).forEach(k => meguminConsole.log(`  [${k}]`));
+    meguminConsole.log('\n📊 Profile for key "' + key + '":', key ? (settings[key] ? 'FOUND' : 'NOT FOUND') : 'N/A');
     if (avatar && avatar !== key) {
-        console.log('📊 Profile for key "' + avatar + '":', settings[avatar] ? 'FOUND' : 'NOT FOUND');
+        meguminConsole.log('📊 Profile for key "' + avatar + '":', settings[avatar] ? 'FOUND' : 'NOT FOUND');
     }
-    console.groupEnd();
+    meguminConsole.groupEnd();
 }
 
 // Returns true if the current profile is a chat-level profile
@@ -164,7 +165,7 @@ export function cleanGhostProfiles() {
     // the other way is losing live group configs, which is not recoverable.
     const groupsLoaded = Array.isArray(context.groups) && context.groups.length > 0;
     if (!groupsLoaded && Object.keys(extension_settings[extensionName].profiles).some(k => k.startsWith('group_'))) {
-        console.debug("[Megumin-Suite] Ghost profile cleanup skipped every group_* profile this pass: SillyTavern reports no groups, which cannot be told apart from groups not having loaded yet. They will be reconsidered on a later startup once at least one group is visible.");
+        meguminConsole.debug("[Megumin-Suite] Ghost profile cleanup skipped every group_* profile this pass: SillyTavern reports no groups, which cannot be told apart from groups not having loaded yet. They will be reconsidered on a later startup once at least one group is visible.");
     }
 
     let deletedCount = 0;
@@ -184,6 +185,6 @@ export function cleanGhostProfiles() {
 
     if (deletedCount > 0) {
         saveSettingsDebounced();
-        console.log(`[Megumin Suite] Garbage Collection: Cleaned up ${deletedCount} ghost profiles.`);
+        meguminConsole.log(`[Megumin Suite] Garbage Collection: Cleaned up ${deletedCount} ghost profiles.`);
     }
 }

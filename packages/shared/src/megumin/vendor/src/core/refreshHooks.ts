@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/core/refreshHooks.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // UI refresh hooks.
 //
@@ -48,7 +49,7 @@ export function fireRefreshHook(name, ...args) {
     try {
         return fn(...args);
     } catch (e) {
-        console.error(`[Megumin Suite] Refresh hook "${name}" failed:`, e);
+        meguminConsole.error(`[Megumin Suite] Refresh hook "${name}" failed:`, e);
     }
 }
 

@@ -2,7 +2,7 @@
 // Vendored from Megumin Suite src/features/memory/index.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
-import { toastr, $, window, document } from "../../st.js";
+import { meguminConsole, toastr, $, window, document } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 // Memory Core — tiering, the vault, the archived-message visuals, and the tab.
 //
@@ -974,7 +974,7 @@ export async function memProcessPendingChunks(isAuto = false) {
 
         for (let idx = 0; idx < totalChunks; idx++) {
             if (runIdentityLost()) {
-                console.debug(`[Megumin-Suite] memProcessPendingChunks stopped at chunk ${idx + 1}/${totalChunks}: the profile this run started on ("${runIdentity}") is no longer the active one ("${meguminActiveDataIdentity()}"). Nothing was saved; run the archive again on the chat you want.`);
+                meguminConsole.debug(`[Megumin-Suite] memProcessPendingChunks stopped at chunk ${idx + 1}/${totalChunks}: the profile this run started on ("${runIdentity}") is no longer the active one ("${meguminActiveDataIdentity()}"). Nothing was saved; run the archive again on the chat you want.`);
                 return;
             }
 
@@ -1050,7 +1050,7 @@ export async function memProcessPendingChunks(isAuto = false) {
             // The last chunk's await can still have crossed a chat switch after the
             // loop's own check, so the final save is guarded too.
             if (runIdentityLost()) {
-                console.debug(`[Megumin-Suite] memProcessPendingChunks declined its final save: the run belonged to "${runIdentity}" but "${meguminActiveDataIdentity()}" is active now. The finished summaries were dropped rather than written into the wrong chat.`);
+                meguminConsole.debug(`[Megumin-Suite] memProcessPendingChunks declined its final save: the run belonged to "${runIdentity}" but "${meguminActiveDataIdentity()}" is active now. The finished summaries were dropped rather than written into the wrong chat.`);
                 return;
             }
 
@@ -1094,11 +1094,11 @@ export async function memProcessPendingChunks(isAuto = false) {
         toastr.success("Archive Extraction Complete!");
 
     } catch (err) {
-        console.error("Memory Extraction Error:", err);
+        meguminConsole.error("Memory Extraction Error:", err);
         // Fix 4 removed the in-loop saves and the end-of-run save is unreachable from
         // here, so without this every chunk finished before the failure is lost.
         if (changesMade && runIdentityLost()) {
-            console.debug(`[Megumin-Suite] memProcessPendingChunks declined its error-path save: the run belonged to "${runIdentity}" but "${meguminActiveDataIdentity()}" is active now. The partial results were dropped rather than written into the wrong chat.`);
+            meguminConsole.debug(`[Megumin-Suite] memProcessPendingChunks declined its error-path save: the run belonged to "${runIdentity}" but "${meguminActiveDataIdentity()}" is active now. The partial results were dropped rather than written into the wrong chat.`);
         } else if (changesMade) {
             delete mem._archivedSet;
             mem._tokensDirty = true;
@@ -1125,7 +1125,7 @@ export function memRunVaultMigration() {
     // async and can outlive this function.
     const runIdentity = meguminActiveDataIdentity();
     if (_loadedProfileKey && (getCharacterKey() || "default") !== _loadedProfileKey) {
-        console.debug(`[Megumin-Suite] memRunVaultMigration declined: the profile in memory belongs to "${_loadedProfileKey}" but the active chat is now "${getCharacterKey() || "default"}". No chunks were migrated.`);
+        meguminConsole.debug(`[Megumin-Suite] memRunVaultMigration declined: the profile in memory belongs to "${_loadedProfileKey}" but the active chat is now "${getCharacterKey() || "default"}". No chunks were migrated.`);
         return;
     }
 
@@ -1323,7 +1323,7 @@ export function memScrubOverlappingArchives({ notify = false } = {}) {
     // are exactly the orphans that resurface if the engine is switched again.
     if (removedVaultIds.length > 0) {
         Promise.resolve(memDeleteFromVectorDB(removedVaultIds)).catch(e =>
-            console.error("[Megumin Suite] Vector cleanup after rebalance failed:", e));
+            meguminConsole.error("[Megumin Suite] Vector cleanup after rebalance failed:", e));
     }
 
     if (changesMade) {
@@ -1421,7 +1421,7 @@ export function memGetRelevantVaultEntries() {
             : "the vector store returned no matches (it may be empty, still indexing, or unreachable)";
         if (_lastSemanticFallbackReason !== why) {
             _lastSemanticFallbackReason = why;
-            console.warn(`[Megumin Suite] Semantic search is selected but ${why}. Falling back to keyword (TF-IDF) matching. Re-index from Memory Core → Scanner Engine if this is unexpected.`);
+            meguminConsole.warn(`[Megumin Suite] Semantic search is selected but ${why}. Falling back to keyword (TF-IDF) matching. Re-index from Memory Core → Scanner Engine if this is unexpected.`);
         }
     } else {
         _lastSemanticFallbackReason = null;

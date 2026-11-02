@@ -2,6 +2,7 @@
 // Vendored from Megumin Suite src/core/sync.js @ b3656d12a39a — https://github.com/Arif-salah/Megumin-Suite
 // © KazumaONIISAN, licensed CC BY-NC 4.0 (packages/shared/src/megumin/LICENSE.md). Changes: see
 // scripts/megumin/sync-megumin.mjs. Generated — edit the sync script's patches, not this file.
+import { meguminConsole } from "../st.js";
 // ─────────────────────────────────────────────────────────────────────────────
 // Global tab sync — copying one tab's settings into every stored profile.
 //
@@ -113,7 +114,7 @@ export function applyTabKeysToAllProfiles(title) {
     // nothing to recover from. Runs in one tick, so one check at the top covers it.
     const liveKey = getCharacterKey() || "default";
     if (_loadedProfileKey && liveKey !== _loadedProfileKey) {
-        console.debug(`[Megumin-Suite] Global tab sync declined: the settings on screen belong to "${_loadedProfileKey}" but the active chat is now "${liveKey}". Nothing was broadcast.`);
+        meguminConsole.debug(`[Megumin-Suite] Global tab sync declined: the settings on screen belong to "${_loadedProfileKey}" but the active chat is now "${liveKey}". Nothing was broadcast.`);
         return false;
     }
 
@@ -172,7 +173,7 @@ export function syncPromptsGlobally(moduleName, dataKey, dataValue) {
     // single synchronous UI edit, so checking once on entry covers the whole broadcast.
     const liveKey = getCharacterKey() || "default";
     if (_loadedProfileKey && liveKey !== _loadedProfileKey) {
-        console.debug(`[Megumin-Suite] Global prompt sync of ${moduleName}.${dataKey} declined: the value came from "${_loadedProfileKey}" but the active chat is now "${liveKey}". No profiles were changed.`);
+        meguminConsole.debug(`[Megumin-Suite] Global prompt sync of ${moduleName}.${dataKey} declined: the value came from "${_loadedProfileKey}" but the active chat is now "${liveKey}". No profiles were changed.`);
         return;
     }
     // This is the write path that made settings.json grow: one edited prompt block fans
