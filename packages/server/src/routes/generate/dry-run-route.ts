@@ -180,6 +180,8 @@ import {
   type PromptAttachment,
 } from "../generate/generate-route-utils.js";
 import { buildGenerationPromptPresetCandidates, type PromptPresetCandidateSource } from "./prompt-preset-selection.js";
+import { prepareMeguminTurn } from "../../services/megumin/megumin-generation.js";
+import { resolveMeguminPresetSwap } from "../../services/megumin/megumin-presets.js";
 import {
   CONVERSATION_NO_REPEAT_INSTRUCTION,
   conversationPromptHistoryContent,
@@ -1062,6 +1064,25 @@ export async function registerDryRunRoute(app: FastifyInstance) {
       }
     }
 
+    // MEGUMINTOGGLE's preset swap and Megumin's slot fill, exactly as the generation will do them.
+    const meguminPresetSwap = skipPreset
+      ? null
+      : await resolveMeguminPresetSwap(app.db, { chatMode, resolved: effectivePreset as never, impersonate });
+    if (meguminPresetSwap) {
+      effectivePresetId = meguminPresetSwap.id;
+      effectivePreset = meguminPresetSwap as unknown as typeof effectivePreset;
+      effectivePresetSource ??= "chat";
+    }
+    const meguminTurn = await prepareMeguminTurn(app.db, {
+      chatId: chat.id as string,
+      chatMode,
+      preset: effectivePreset as { systemKey?: unknown } | null,
+      impersonate,
+      regenerateMessageId,
+      dryRun: true,
+    });
+    meguminTurn?.filterArchived(mappedMessages);
+
     // Choice selections are stored per-chat (chat metadata), not per prompt preset.
     // If a request or connection overrides the prompt preset, reusing the chat's stored selections can make it
     // *look* like the wrong preset is being used (because variables like {{role}} resolve to values
@@ -1870,6 +1891,7 @@ export async function registerDryRunRoute(app: FastifyInstance) {
         ...assembled.macroAgentData,
       };
       finalMessages = assembled.messages;
+      if (meguminTurn) finalMessages = await meguminTurn.apply(finalMessages);
       lorebookImageEntries = assembled.lorebookScanResult?.imageEntries ?? [];
       advancedMemoryPlacements = assembled.advancedMemoryPlacements ?? [];
       temperature = assembled.parameters.temperature;

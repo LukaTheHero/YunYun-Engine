@@ -53,6 +53,7 @@ import {
   PersonalExtensionContributionsMenu,
   PersonalExtensionTopbarButtons,
 } from "./PersonalExtensionContributionsMenu";
+import { MeguminPowerSwitch } from "../megumin/MeguminPowerSwitch";
 
 // English source text for `localize()` - the lookup matches on the literal string, not the key.
 const MARI_EDGE_GLOW_LABEL: Record<Exclude<MariEdgeGlow, null>, string> = {
@@ -499,6 +500,14 @@ export function TopBar({ mobileTopbarNavigation }: { mobileTopbarNavigation: boo
         aria-label={localize("Panel navigation")}
         className="mari-topbar-panel-nav mari-rgb-icon-scope flex shrink-0 items-center justify-end gap-0.5 rounded-xl p-1 max-sm:gap-0 max-sm:p-0.5"
       >
+        {/* MEGUMINTOGGLE: kept on phones too, it is the one switch for Megumin mode. */}
+        <div className="mr-1 flex shrink-0 items-center max-sm:mr-0.5">
+          <MeguminPowerSwitch
+            size="compact"
+            onOpenPanel={() => handleRightPanelClick("megumin")}
+            panelOpen={rightPanelOpen && rightPanel === "megumin"}
+          />
+        </div>
         <button
           onClick={() => handleRightPanelClick("characters")}
           aria-pressed={isCharactersPanelActive}

@@ -1,0 +1,1525 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Megumin Suite: the block card under a Roleplay reply, and MEGUMINTOGGLE.
+   The card rules are Megumin Suite's own (style.css, "MASTER BLOCK CARD" to the
+   World State strip) by KazumaONIISAN, CC BY-NC 4.0 — see
+   packages/shared/src/megumin/LICENSE.md. Changes: Megumin's colour variables
+   are mapped onto YunYun's theme tokens below; the Chomusuke indicator keys on a
+   class the card carries instead of SillyTavern's #chat markup; Font Awesome
+   glyphs (YunYun ships none) are drawn as text.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* MEGUMINTOGGLE on: Megumin's crimson-to-amber, the same in both themes. */
+.mari-megumin-toggle--on {
+  background: linear-gradient(120deg, #be123c 0%, #e11d48 45%, #f59e0b 100%);
+  color: #fff;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.12) inset,
+    0 4px 14px -6px rgba(225, 29, 72, 0.7);
+}
+
+[data-meg-blocks],
+.meg-pane-scope {
+  --text-main: var(--foreground);
+  --text-muted: var(--muted-foreground);
+  --text-color: var(--foreground);
+  --border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  --gold: #f59e0b;
+}
+
+/* Font Awesome stand-ins */
+[data-meg-blocks] i.fa-solid {
+  font-style: normal;
+  display: inline-block;
+  line-height: 1;
+}
+[data-meg-blocks] .fa-chevron-down::before {
+  content: "\25BE";
+}
+[data-meg-blocks] .fa-cat::before {
+  content: "\1F408";
+}
+[data-meg-blocks] .fa-stop::before {
+  content: "\25A0";
+}
+[data-meg-blocks] .fa-arrow-right::before {
+  content: "\2192";
+}
+[data-meg-blocks] .fa-rotate::before {
+  content: "\21BB";
+}
+[data-meg-blocks] .fa-spinner::before {
+  content: "\25CC";
+}
+[data-meg-blocks] .fa-spin {
+  animation: meg-spin 1s linear infinite;
+}
+@keyframes meg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- MASTER BLOCK CARD (in chat + BLOCKS tab preview) ---- */
+.meg-blocks {
+  margin: 14px 0 4px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.meg-blocks.meg-blocks-empty {
+  display: none;
+}
+
+/* Tab strip */
+.meg-blocks-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: rgba(0, 0, 0, 0.28);
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.meg-blocks-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  cursor: pointer;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted, #9aa0a6);
+  font-size: 0.74rem;
+  font-weight: 600;
+  font-family: inherit;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.meg-blocks-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main, #e8e8e8);
+}
+.meg-blocks-tab.active {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--text-main, #e8e8e8);
+  border-bottom-color: #f59e0b;
+}
+.meg-blocks-tab-emoji {
+  font-size: 0.85rem;
+}
+.meg-blocks-tab-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meg-blocks-collapse {
+  margin-left: auto;
+  padding: 9px 14px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  color: var(--text-muted, #9aa0a6);
+  font-size: 0.7rem;
+}
+.meg-blocks-collapse:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main, #e8e8e8);
+}
+.meg-blocks-collapse i {
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+.meg-blocks.meg-blocks-shut .meg-blocks-collapse i {
+  transform: rotate(-90deg);
+}
+
+/* Chomusuke at work (plan 019): on the last message's card, while a job runs */
+.meg-chomu {
+  display: none;
+}
+[data-meg-blocks].meg-chomu-busy .meg-chomu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 0 10px;
+  white-space: nowrap;
+  color: #fda4af;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+[data-meg-blocks].meg-chomu-busy .meg-chomu + .meg-blocks-collapse {
+  margin-left: 0;
+}
+.meg-chomu-cat {
+  color: #f43f5e;
+  animation: meg-chomu-pulse 1.2s ease-in-out infinite;
+}
+@keyframes meg-chomu-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.meg-chomu-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.68rem;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  color: #fda4af;
+}
+.meg-chomu-stop:hover {
+  background: rgba(244, 63, 94, 0.25);
+  color: #fff;
+}
+/* Nothing open: the strip alone, no empty panel under it */
+.meg-blocks.meg-blocks-shut .meg-blocks-panel {
+  display: none;
+}
+.meg-blocks.meg-blocks-shut .meg-blocks-tabs {
+  border-bottom: 0;
+}
+
+.meg-blocks-panel {
+  padding: 12px 14px;
+}
+.meg-block-body.meg-block-truncated {
+  opacity: 0.85;
+}
+
+.meg-block-flag {
+  font-size: 0.52rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.meg-block-body p {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.meg-block-body p:last-child {
+  margin-bottom: 0;
+}
+.meg-block-body ul {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.meg-block-body li {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-bottom: 3px;
+}
+.meg-block-body hr {
+  border: 0;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  margin: 8px 0;
+}
+.meg-block-body code {
+  font-size: 0.75rem;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Narrow screens: the tab strip goes emoji-only.
+   The strip scrolls horizontally, and a horizontal drag on a message is the
+   gesture SillyTavern reads as a swipe - so the two fight on a phone. Fitting
+   the tabs in the width available means there is nothing to drag and nothing
+   to fight over.
+
+   Three kinds of tab keep their label, because an emoji alone cannot identify
+   them: the open one, a repeating block's named instance (every New NPC is the
+   same emoji, so the name is all that separates two of them), and any block
+   whose emoji field is empty. Flex gap is not drawn for a display:none child,
+   so the spacing needs no separate rule. */
+@media (max-width: 560px) {
+  .meg-blocks-tab {
+    padding: 10px 13px;
+  }
+  .meg-blocks-tab-emoji {
+    font-size: 1.05rem;
+  }
+  .meg-blocks-tab-label {
+    display: none;
+  }
+  .meg-blocks-tab.active .meg-blocks-tab-label,
+  .meg-blocks-tab-named .meg-blocks-tab-label,
+  .meg-blocks-tab:has(.meg-blocks-tab-emoji:empty) .meg-blocks-tab-label {
+    display: inline;
+  }
+  .meg-blocks-tab-named .meg-blocks-tab-label {
+    max-width: 110px;
+  }
+  .meg-blocks-collapse {
+    padding: 10px 13px;
+  }
+}
+
+/* ---- CYOA CHOICES (clickable) ---- */
+/* The choices pane is the only one the reader acts on, so it gets more room
+   than the text panes and its own hit targets. */
+.meg-choices-pane {
+  padding: 2px 0;
+}
+.meg-choices-intro {
+  margin-bottom: 10px;
+}
+.meg-choices-intro p {
+  color: var(--text-muted, #9aa0a6);
+  font-style: italic;
+}
+
+.meg-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.meg-choice {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.13));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-main, #e8e8e8);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+.meg-choice:hover {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+.meg-choice:active {
+  transform: scale(0.99);
+}
+.meg-choice:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.7);
+  outline-offset: 2px;
+}
+
+.meg-choice-num {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.66rem;
+  font-weight: 800;
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.meg-choice:hover .meg-choice-num {
+  background: #38bdf8;
+  color: #06202e;
+}
+
+.meg-choice-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.meg-choice-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.meg-choice-detail {
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-muted, #9aa0a6);
+}
+
+/* The arrow only appears on hover — four permanent arrows down the right edge
+   is noise, and the row is already obviously a button. */
+.meg-choice-go {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: #38bdf8;
+  opacity: 0;
+  transform: translateX(-3px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.meg-choice:hover .meg-choice-go {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.meg-choices-hint {
+  margin-top: 9px;
+  font-size: 0.6rem;
+  line-height: 1.4;
+  color: var(--text-muted, #9aa0a6);
+  opacity: 0.75;
+  text-align: center;
+}
+
+/* The BLOCKS tab preview passes no click handler, so nothing here is live. */
+.meg-choices-static .meg-choice {
+  cursor: default;
+}
+.meg-choices-static .meg-choice:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-color, rgba(255, 255, 255, 0.13));
+}
+.meg-choices-static .meg-choice:hover .meg-choice-num {
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+}
+.meg-choices-static .meg-choice:hover .meg-choice-go {
+  opacity: 0;
+}
+
+/* An option the model never filled in. Shown so the shape of the block is
+   honest, but dead — see parseChoices. */
+.meg-choice-placeholder {
+  cursor: default;
+  opacity: 0.45;
+  font-style: italic;
+}
+.meg-choice-placeholder:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-color, rgba(255, 255, 255, 0.13));
+}
+.meg-choice-placeholder:hover .meg-choice-num {
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+}
+.meg-choice-placeholder:hover .meg-choice-go {
+  opacity: 0;
+}
+
+@media (max-width: 560px) {
+  .meg-choice {
+    padding: 12px 11px;
+  }
+  .meg-choice-go {
+    display: none;
+  }
+}
+
+/* ---- DICE - the roll, written before the scene ---- */
+/* Outcome drives one token set, so the face, the total and the pill agree
+   without three separate rules per outcome. */
+/* A turn can carry several rolls when everyone is rolling, so the pane is a
+   stack rather than a single readout. */
+.meg-dice-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meg-dice {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--meg-d-line, rgba(255, 255, 255, 0.12));
+  background: var(--meg-d-bg, rgba(255, 255, 255, 0.03));
+}
+.meg-dice-success {
+  --meg-d-line: rgba(16, 185, 129, 0.34);
+  --meg-d-bg: rgba(16, 185, 129, 0.06);
+  --meg-d-ink: #6ee7b7;
+}
+.meg-dice-cost {
+  --meg-d-line: rgba(245, 158, 11, 0.34);
+  --meg-d-bg: rgba(245, 158, 11, 0.06);
+  --meg-d-ink: #fcd34d;
+}
+.meg-dice-fail {
+  --meg-d-line: rgba(148, 163, 184, 0.3);
+  --meg-d-bg: rgba(148, 163, 184, 0.05);
+  --meg-d-ink: #cbd5e1;
+}
+.meg-dice-crit {
+  --meg-d-line: rgba(34, 211, 238, 0.45);
+  --meg-d-bg: rgba(34, 211, 238, 0.09);
+  --meg-d-ink: #67e8f9;
+}
+.meg-dice-critfail {
+  --meg-d-line: rgba(239, 68, 68, 0.4);
+  --meg-d-bg: rgba(239, 68, 68, 0.07);
+  --meg-d-ink: #fca5a5;
+}
+
+/* The raw die, before any modifier - the only number that was actually rolled,
+   so it gets the weight. */
+.meg-dice-face {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--meg-d-line, rgba(255, 255, 255, 0.14));
+  background: rgba(0, 0, 0, 0.28);
+}
+.meg-dice-roll {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--meg-d-ink, #e8e8e8);
+  font-variant-numeric: tabular-nums;
+}
+.meg-dice-die {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0a6);
+  margin-top: 2px;
+}
+
+/* The reel: the number spins past a few decoys once, on arrival.
+   ---------------------------------------------------------------------------
+   The strip's RESTING transform already shows the last row, and the animation
+   supplies only a `from`. So the landed number is what the CSS says with no
+   animation at all — reduced motion, a stylesheet that half-loaded, an engine
+   that dislikes the keyframes. The motion decorates a correct readout rather
+   than producing one, which is the same rule the treatments follow: the
+   degraded state has to be right, not just non-crashing.
+
+   Whether it plays is decided in chat.js, not here. A rebuilt card gets the
+   resting markup, so the die never re-rolls while the reader is looking at it. */
+.meg-dice-reel {
+  height: var(--meg-reel-row, 22px);
+  overflow: hidden;
+}
+.meg-dice-strip {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(calc(-1 * var(--meg-reel-row, 22px) * var(--meg-decoys, 5)));
+}
+.meg-dice-strip span {
+  height: var(--meg-reel-row, 22px);
+  line-height: var(--meg-reel-row, 22px);
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--meg-d-ink, #e8e8e8);
+}
+/* The decoys never were the result, so they never read as it. */
+.meg-dice-strip span:not(:last-child) {
+  color: var(--text-muted, #9aa0a6);
+  opacity: 0.6;
+}
+
+.meg-dice-animate .meg-dice-strip {
+  animation: meg-dice-reel 900ms cubic-bezier(0.16, 0.86, 0.24, 1);
+}
+@keyframes meg-dice-reel {
+  from {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meg-dice-animate .meg-dice-strip {
+    animation: none;
+  }
+}
+/* A natural 20 or a natural 1 is the whole story of the roll, so the face says
+   so rather than leaving it to the verdict alone. */
+.meg-dice-crit .meg-dice-face {
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.35),
+    0 0 14px rgba(34, 211, 238, 0.3);
+}
+.meg-dice-critfail .meg-dice-face {
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.32),
+    0 0 14px rgba(239, 68, 68, 0.25);
+}
+
+.meg-dice-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.meg-dice-attempt {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-main, #e8e8e8);
+  margin-bottom: 4px;
+}
+.meg-dice-sum {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+.meg-dice-total {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--meg-d-ink, #e8e8e8);
+}
+.meg-dice-mod {
+  font-size: 0.64rem;
+  color: var(--text-muted, #9aa0a6);
+}
+.meg-dice-vs {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0a6);
+}
+.meg-dice-dc {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--text-main, #e8e8e8);
+  opacity: 0.8;
+}
+
+/* What the model wrote past the bare outcome word - "fail, the screen wakes at
+   maximum brightness". The pill keeps the outcome so the five verdicts always
+   read the same width; the consequence gets its own line. */
+.meg-dice-note {
+  font-size: 0.68rem;
+  line-height: 1.45;
+  margin-top: 4px;
+  color: var(--text-muted, #9aa0a6);
+}
+
+.meg-dice-verdict {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--meg-d-line, rgba(255, 255, 255, 0.14));
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--meg-d-ink, #e8e8e8);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .meg-dice {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .meg-dice-verdict {
+    order: 3;
+    width: 100%;
+  }
+}
+
+/* ---- WORLD STATE - Scene Board ---- */
+/* Treatment classes are only put on the pane when the treatment actually
+   drew something, so everything below can assume parsed structure. A block
+   that fell back to prose never gets .meg-ws-pane. */
+.meg-ws-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.meg-ws-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.meg-ws-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.032);
+  font-size: 0.74rem;
+}
+.meg-ws-ic {
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+.meg-ws-lb {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0a6);
+}
+.meg-ws-vl {
+  color: var(--text-main, #e8e8e8);
+  font-weight: 550;
+}
+
+.meg-ws-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(228px, 1fr));
+  gap: 10px;
+}
+.meg-ws-person {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.026);
+  overflow: hidden;
+}
+.meg-ws-person.meg-ws-pc {
+  border-color: rgba(245, 158, 11, 0.36);
+  background: rgba(245, 158, 11, 0.055);
+}
+.meg-ws-person-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.meg-ws-av {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 0.68rem;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted, #9aa0a6);
+}
+.meg-ws-pc .meg-ws-av {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fcd34d;
+}
+.meg-ws-nm {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meg-ws-mood {
+  flex: 0 0 auto;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.15);
+  color: #c99cf7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+.meg-ws-mood.meg-ws-you {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fcd34d;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.meg-ws-rows {
+  padding: 8px 11px 10px;
+  display: grid;
+  gap: 5px;
+}
+.meg-ws-row {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 9px;
+  font-size: 0.755rem;
+  line-height: 1.5;
+}
+.meg-ws-k {
+  font-size: 0.58rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0a6);
+  padding-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meg-ws-v {
+  color: var(--text-main, #e8e8e8);
+  opacity: 0.82;
+  min-width: 0;
+}
+
+/* A Secret is something the PC does not know. Blurred until the reader asks
+   for it - hover, or focus, which is also what a tap does since the value
+   carries tabindex. */
+.meg-ws-secret .meg-ws-k {
+  color: #f43f5e;
+}
+.meg-ws-secret .meg-ws-v {
+  cursor: help;
+  outline: none;
+}
+.meg-ws-secret .meg-ws-v > span {
+  display: inline-block;
+  filter: blur(4.2px);
+  opacity: 0.7;
+  transition:
+    filter 0.18s ease,
+    opacity 0.18s ease;
+}
+.meg-ws-secret .meg-ws-v:hover > span,
+.meg-ws-secret .meg-ws-v:focus > span,
+.meg-ws-secret .meg-ws-v:focus-visible > span {
+  filter: none;
+  opacity: 1;
+}
+.meg-ws-secret .meg-ws-v:focus-visible {
+  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.5);
+  border-radius: 3px;
+}
+
+/* An unfilled [placeholder]. Only ever drawn in the BLOCKS tab preview, which
+   is fed the templates rather than a real reply - dimmed so the reader can see
+   the shape of the card without mistaking the template text for their data. */
+.meg-ws-ph {
+  opacity: 0.5;
+  font-style: italic;
+}
+.meg-ws-ph .meg-ws-lb,
+.meg-ws-ph .meg-ws-k {
+  font-style: normal;
+}
+
+.meg-ws-foot {
+  display: grid;
+  gap: 10px;
+}
+.meg-ws-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.022);
+  padding: 10px 12px;
+}
+.meg-ws-sub {
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0a6);
+  margin-bottom: 8px;
+}
+.meg-ws-off {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 0.765rem;
+  padding: 3px 0;
+}
+.meg-ws-off-nm {
+  font-weight: 650;
+  color: var(--text-main, #e8e8e8);
+}
+.meg-ws-off-tx {
+  color: var(--text-muted, #9aa0a6);
+}
+
+.meg-ws-thread {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.775rem;
+  padding: 3px 0;
+  color: var(--text-main, #e8e8e8);
+  opacity: 0.86;
+}
+.meg-ws-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 8px;
+  background: var(--text-muted, #9aa0a6);
+}
+.meg-ws-dot.meg-ws-hot {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.16);
+}
+.meg-ws-dot.meg-ws-warm {
+  background: #f59e0b;
+}
+.meg-ws-dot.meg-ws-soft {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.meg-ws-phases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.meg-ws-phase {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.022);
+  padding: 10px 12px;
+}
+.meg-ws-phase-nm {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--text-main, #e8e8e8);
+}
+.meg-ws-seg {
+  display: flex;
+  gap: 3px;
+  margin-top: 7px;
+}
+.meg-ws-seg i {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+}
+.meg-ws-seg i.meg-done {
+  background: rgba(245, 158, 11, 0.42);
+}
+.meg-ws-seg i.meg-now {
+  background: #f59e0b;
+  box-shadow: 0 0 9px rgba(245, 158, 11, 0.55);
+}
+
+/* ---- NPC INNER CHATTER - Whisper Thread / Interior ---- */
+.meg-chat-pane {
+  display: block;
+}
+.meg-chat-lead {
+  margin-bottom: 10px;
+}
+.meg-chat-lead p {
+  color: var(--text-muted, #9aa0a6);
+  font-style: italic;
+}
+
+.meg-chat-thread {
+  display: grid;
+  gap: 11px;
+}
+.meg-chat-b {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+}
+.meg-chat-av {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  background: var(--meg-tint-bg, rgba(168, 85, 247, 0.18));
+  color: var(--meg-tint-ink, #cba6f7);
+  border: 1px solid var(--meg-tint-line, rgba(168, 85, 247, 0.3));
+}
+.meg-chat-bub {
+  padding: 9px 13px;
+  border-radius: 3px 12px 12px 12px;
+  background: var(--meg-tint-soft, rgba(168, 85, 247, 0.085));
+  border: 1px solid var(--meg-tint-line, rgba(168, 85, 247, 0.2));
+  min-width: 0;
+}
+.meg-chat-nm {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--meg-tint-ink, #c99cf7);
+  margin-bottom: 4px;
+}
+.meg-chat-tx {
+  font-size: 0.805rem;
+  line-height: 1.55;
+  font-style: italic;
+  color: var(--text-main, #e8e8e8);
+}
+
+/* One tint per speaker, held for the whole card so you track who is talking
+   without re-reading the name. Four is enough - a scene with five NPCs all
+   whispering at once has a bigger problem than colour reuse. */
+.meg-chat-t0 {
+  --meg-tint-bg: rgba(168, 85, 247, 0.18);
+  --meg-tint-ink: #c99cf7;
+  --meg-tint-line: rgba(168, 85, 247, 0.28);
+  --meg-tint-soft: rgba(168, 85, 247, 0.085);
+}
+.meg-chat-t1 {
+  --meg-tint-bg: rgba(56, 189, 248, 0.16);
+  --meg-tint-ink: #7dd3fc;
+  --meg-tint-line: rgba(56, 189, 248, 0.28);
+  --meg-tint-soft: rgba(56, 189, 248, 0.07);
+}
+.meg-chat-t2 {
+  --meg-tint-bg: rgba(244, 63, 94, 0.16);
+  --meg-tint-ink: #fda4af;
+  --meg-tint-line: rgba(244, 63, 94, 0.28);
+  --meg-tint-soft: rgba(244, 63, 94, 0.07);
+}
+.meg-chat-t3 {
+  --meg-tint-bg: rgba(16, 185, 129, 0.16);
+  --meg-tint-ink: #6ee7b7;
+  --meg-tint-line: rgba(16, 185, 129, 0.28);
+  --meg-tint-soft: rgba(16, 185, 129, 0.07);
+}
+
+.meg-chat-note {
+  text-align: center;
+  font-size: 0.6rem;
+  padding-top: 3px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0a6);
+  opacity: 0.7;
+}
+
+.meg-chat-interior {
+  position: relative;
+  padding: 18px 20px 16px 50px;
+  border-radius: 10px;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.075), rgba(168, 85, 247, 0.02));
+}
+.meg-chat-interior::before {
+  content: "\201C";
+  position: absolute;
+  left: 14px;
+  top: 0;
+  font-size: 3.4rem;
+  line-height: 1;
+  color: rgba(168, 85, 247, 0.34);
+  font-family: Georgia, "Times New Roman", serif;
+}
+.meg-chat-im-tx {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  font-style: italic;
+  color: #ece4f6;
+}
+.meg-chat-im-who {
+  margin-top: 11px;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c99cf7;
+}
+.meg-chat-im-who::before {
+  content: "\2014 ";
+}
+
+/* ---- CHARACTER SHEET - Rank Chips + Pack List ---- */
+/* The sheet pane still draws its meter line through the stat renderer; only
+   the list fields are treated. So .meg-stat-* rules above still apply here. */
+.meg-sheet-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.meg-sheet-field {
+  min-width: 0;
+}
+.meg-sk-nm {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.meg-iv-none {
+  font-size: 0.765rem;
+  color: var(--text-muted, #9aa0a6);
+  font-style: italic;
+}
+
+.meg-sk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.meg-sk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 11px;
+  border-radius: 999px;
+  font-size: 0.775rem;
+  color: var(--text-main, #e8e8e8);
+  border: 1px solid var(--meg-tier-line, rgba(255, 255, 255, 0.11));
+  background: var(--meg-tier-bg, rgba(255, 255, 255, 0.03));
+}
+/* A chip with no rank keeps its padding symmetrical - otherwise a rankless
+   list field sits with a gap where the badge would have been. */
+.meg-sk-chip:not(:has(.meg-sk-rk)) {
+  padding-right: 11px;
+}
+.meg-sk-rk {
+  font-size: 0.585rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--meg-tier-pill, rgba(255, 255, 255, 0.09));
+  color: var(--meg-tier-ink, #9aa0a6);
+}
+.meg-t-novice {
+  --meg-tier-line: rgba(255, 255, 255, 0.11);
+  --meg-tier-bg: rgba(255, 255, 255, 0.03);
+  --meg-tier-pill: rgba(255, 255, 255, 0.09);
+  --meg-tier-ink: #9fadbc;
+}
+.meg-t-adept {
+  --meg-tier-line: rgba(56, 189, 248, 0.28);
+  --meg-tier-bg: rgba(56, 189, 248, 0.07);
+  --meg-tier-pill: rgba(56, 189, 248, 0.2);
+  --meg-tier-ink: #7dd3fc;
+}
+.meg-t-expert {
+  --meg-tier-line: rgba(168, 85, 247, 0.3);
+  --meg-tier-bg: rgba(168, 85, 247, 0.075);
+  --meg-tier-pill: rgba(168, 85, 247, 0.22);
+  --meg-tier-ink: #c99cf7;
+}
+.meg-t-master {
+  --meg-tier-line: rgba(245, 158, 11, 0.36);
+  --meg-tier-bg: rgba(245, 158, 11, 0.09);
+  --meg-tier-pill: rgba(245, 158, 11, 0.25);
+  --meg-tier-ink: #fcd34d;
+}
+
+.meg-iv-pack {
+  display: grid;
+  gap: 10px;
+}
+.meg-iv-band {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.022);
+  padding: 10px 12px;
+}
+.meg-iv-band.meg-iv-held {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(16, 185, 129, 0.05);
+}
+.meg-iv-band-h {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.6rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-muted, #9aa0a6);
+  margin-bottom: 8px;
+}
+.meg-iv-held .meg-iv-band-h {
+  color: #6ee7b7;
+}
+.meg-iv-band-h::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.meg-iv-line {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  padding: 4px 0;
+  font-size: 0.785rem;
+}
+.meg-iv-g {
+  flex: 0 0 auto;
+  width: 20px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.meg-iv-n {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-main, #e8e8e8);
+}
+.meg-iv-n small {
+  color: var(--text-muted, #9aa0a6);
+  font-size: 0.78em;
+  margin-left: 6px;
+}
+.meg-iv-q {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  color: var(--text-muted, #9aa0a6);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .meg-ws-grid {
+    grid-template-columns: 1fr;
+  }
+  .meg-ws-row {
+    grid-template-columns: 56px 1fr;
+  }
+}
+
+/* ---- STAT LINES (Bonds, Character Sheet) ---- */
+.meg-stat-row {
+  margin-bottom: 12px;
+}
+.meg-stat-row:last-child {
+  margin-bottom: 0;
+}
+.meg-stat-subject {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main, #e8e8e8);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+.meg-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 14px;
+}
+.meg-stat-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.meg-stat-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted, #9aa0a6);
+}
+.meg-stat-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main, #e8e8e8);
+}
+.meg-stat-max {
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--text-muted, #9aa0a6);
+}
+.meg-stat-bar {
+  height: 5px;
+  margin-top: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.meg-stat-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f43f5e, #fb7185);
+  transition: width 0.3s ease;
+}
+.meg-stat-note {
+  font-size: 0.62rem;
+  margin-top: 3px;
+  color: var(--text-muted, #9aa0a6);
+  line-height: 1.35;
+}
+.meg-stat-note.meg-stat-up {
+  color: #10b981;
+}
+.meg-stat-note.meg-stat-down {
+  color: #ef4444;
+}
+.meg-stat-plain .meg-stat-top {
+  padding-bottom: 2px;
+}
+
+/* ── NPC Update tab ─────────────────────────────────────────────────────────
+   The pane the block card draws for <NPC_Update>, redrawn from the changelog
+   so each line is a change that actually applied and can be taken back. */
+.meg-npcupd {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.meg-npcupd-row {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+.meg-npcupd-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.72rem;
+  flex-wrap: wrap;
+}
+.meg-npcupd-head b {
+  color: var(--gold);
+  font-weight: 700;
+}
+.meg-npcupd-field {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+}
+.meg-npcupd-op {
+  font-weight: 700;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.meg-npcupd-text {
+  margin-top: 5px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-color);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.meg-npcupd-undo,
+.meg-npcupd-undo-all {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.meg-npcupd-undo:hover,
+.meg-npcupd-undo-all:hover {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.meg-npcupd-undo-all {
+  margin-left: 0;
+  align-self: flex-start;
+}
+.meg-npcupd-empty {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+/* ── World State "what changed" strip ───────────────────────────────────────
+   Sits at the top of the World State pane: this reply's changes, lines the
+   parser skipped, and the switch that turns the reply's changes off. */
+.meg-wsdiff {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 3px solid #f59e0b;
+  border-radius: 8px;
+  padding: 7px 9px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.meg-wsdiff.is-quiet {
+  border-left-color: rgba(255, 255, 255, 0.15);
+  opacity: 0.8;
+}
+.meg-wsdiff.is-off {
+  border-left-color: #64748b;
+  opacity: 0.75;
+}
+.meg-wsdiff-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+}
+/* Folded "Changed in this reply": the header is the summary. */
+.meg-wsdiff.is-foldable > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.meg-wsdiff.is-foldable > summary::-webkit-details-marker {
+  display: none;
+}
+.meg-wsdiff-caret {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+.meg-wsdiff[open] .meg-wsdiff-caret {
+  transform: rotate(180deg);
+}
+.meg-wsdiff-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.meg-wsdiff-title {
+  color: var(--text-muted);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.meg-wsdiff-count {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+.meg-wsdiff-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 5px;
+}
+.meg-wsdiff-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.meg-wsdiff-btn:hover {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.meg-wsdiff-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+.meg-wsdiff-row b {
+  color: var(--gold);
+  font-weight: 700;
+}
+.meg-wsdiff-field {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+}
+.meg-wsdiff-before {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: rgba(239, 68, 68, 0.55);
+  word-break: break-word;
+}
+.meg-wsdiff-arrow {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+}
+.meg-wsdiff-after {
+  color: var(--text-color);
+  word-break: break-word;
+}
+.meg-wsdiff-more {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.meg-wsdiff-warn {
+  font-size: 0.7rem;
+  color: #f59e0b;
+}
+.meg-wsdiff-warn summary {
+  cursor: pointer;
+}
+.meg-wsdiff-issue {
+  margin: 3px 0 0 16px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+.meg-wsdiff-issue code {
+  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.meg-wsdiff-issue.note {
+  font-style: italic;
+}
+/* "Emma is new in this reply. Same person as [Uncle Emma] [Same person]" */
+.meg-wsnew {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 3px solid #38bdf8;
+  border-radius: 8px;
+  padding: 6px 9px;
+  margin: -4px 0 10px;
+  font-size: 0.72rem;
+}
+.meg-wsnew-text {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.meg-wsnew-text b {
+  color: var(--gold);
+}
+.meg-wsnew-pick {
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text-color);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  max-width: 100%;
+}
+.meg-wsnew-same:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.meg-wsnew-same:not(:disabled):hover {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.45);
+}

@@ -925,6 +925,8 @@ import {
   shouldDeferExpressionAgentEvent,
 } from "../services/generation/agent-event-dispatcher.js";
 import { findLastUserMessageIdBefore } from "../services/generation/message-history.js";
+import { prepareMeguminTurn, type MeguminGenerationTurn } from "../services/megumin/megumin-generation.js";
+import { resolveMeguminPresetSwap } from "../services/megumin/megumin-presets.js";
 import {
   explicitlyRequestsTextRewrite,
   getTextRewritePendingState,
@@ -1766,6 +1768,8 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
     const outputTranslationConfig =
       chatMeta.autoTranslate === true ? getChatTranslationConfig(input.chatId, chatMeta) : null;
     let translationAfterFailure = false;
+    // Megumin Suite (MEGUMINTOGGLE): set when this Roleplay generation runs on a Megumin preset.
+    let meguminTurn: MeguminGenerationTurn | null = null;
     const dispatchAutomaticTranslations = (afterGenerationFailure = false) => {
       // Translation survives a passive disconnect but owns no SSE or generation
       // lock: a slow translation must not prevent the user from sending again.
@@ -2546,6 +2550,27 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
           );
         }
       }
+      // MEGUMINTOGGLE: while it is on, a Roleplay chat on the stock preset runs on Megumin V11 Universal;
+      // while it is off, a Megumin preset runs as the stock one. A person's own preset is never swapped.
+      const meguminPresetSwap = await resolveMeguminPresetSwap(app.db, {
+        chatMode,
+        resolved: resolvedPreset as never,
+        impersonate: input.impersonate,
+      });
+      if (meguminPresetSwap) {
+        presetId = meguminPresetSwap.id;
+        resolvedPreset = meguminPresetSwap as unknown as typeof resolvedPreset;
+        presetSource ??= "chat";
+      }
+      meguminTurn = await prepareMeguminTurn(app.db, {
+        chatId: input.chatId,
+        chatMode,
+        preset: resolvedPreset as { systemKey?: unknown } | null,
+        impersonate: input.impersonate,
+        regenerateMessageId: input.regenerateMessageId,
+        continueMessageId: input.continueMessageId,
+      });
+      meguminTurn?.filterArchived(mappedMessages);
       const selectedPresetDiffersFromChat = !!resolvedPreset && !!presetId && presetId !== chatPromptPresetId;
       const resolvedPresetDefaultChoices = resolvedPreset
         ? (parsePromptPresetChoices((resolvedPreset as { defaultChoices?: unknown }).defaultChoices) ?? {})
@@ -3827,6 +3852,8 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
           finalMessages = assembled.messages;
           // Agent previews are built before the provider-boundary pass.
           decodeDeferredPresetConditionals(finalMessages, promptMacroContext);
+          // Megumin Suite fills its preset's [[slots]] for this turn (its CHAT_COMPLETION_PROMPT_READY).
+          if (meguminTurn) finalMessages = await meguminTurn.apply(finalMessages);
           advancedMemoryPlacements = assembled.advancedMemoryPlacements ?? [];
           presetOwnsAgentPlacement = true;
           characterAdvancedPromptsInjected = true;
@@ -10186,6 +10213,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             fullResponse,
           );
           let savedMsg = savedReply.savedMsg;
+          meguminTurn?.noteSavedReply(savedMsg?.id);
           const savedSwipeIndex = savedReply.savedSwipeIndex;
           const replyParts = savedReply.replyParts;
           fullResponse = savedReply.fullResponse;
@@ -14761,6 +14789,8 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
 
       dispatchAutomaticTranslations();
 
+      // Megumin reads the reply (blocks, Chomusuke jobs, images, Director, Memory, NPC Bank) in the background.
+      meguminTurn?.finish();
       // Signal completion before the slow illustration tail. The client keeps
       // listening until the HTTP stream closes, so late illustration events can
       // still arrive without holding the chat's generation lock hostage.
@@ -14798,6 +14828,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
           : "Generation failed";
       sendSseEvent(reply, { type: "error", data: message });
     } finally {
+      meguminTurn?.finish();
       dispatchAutomaticTranslations(translationAfterFailure);
       if (restoredRoleplayInterruption && input.regenerateMessageId) {
         try {

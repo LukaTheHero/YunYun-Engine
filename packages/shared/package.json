@@ -9,6 +9,22 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./megumin": {
+      "import": "./dist/megumin/index.js",
+      "types": "./dist/megumin/index.d.ts"
+    },
+    "./megumin/client": {
+      "import": "./dist/megumin/client.js",
+      "types": "./dist/megumin/client.d.ts"
+    },
+    "./megumin/strip": {
+      "import": "./dist/megumin/strip.js",
+      "types": "./dist/megumin/strip.d.ts"
+    },
+    "./megumin/patch": {
+      "import": "./dist/megumin/patch.js",
+      "types": "./dist/megumin/patch.d.ts"
     }
   },
   "scripts": {

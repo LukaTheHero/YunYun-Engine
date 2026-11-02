@@ -1,6 +1,7 @@
 // ──────────────────────────────────────────────
 // Route Registration
 // ──────────────────────────────────────────────
+import { meguminRoutes } from "./megumin.routes.js";
 import type { FastifyInstance } from "fastify";
 import { chatsRoutes } from "./chats.routes.js";
 import { chatInsightsRoutes } from "./chat-insights.routes.js";
@@ -101,6 +102,7 @@ export async function registerRoutes(app: FastifyInstance) {
   app.addHook("onClose", () => multiplayer.close());
   await app.register(androidLocalAuthRoutes, { prefix: "/api/android-auth" });
   await app.register(chatsRoutes, { prefix: "/api/chats" });
+  await app.register(meguminRoutes, { prefix: "/api/megumin" });
   await app.register(advancedMemoryRoutes, { prefix: "/api/chats" });
   await app.register(chatInsightsRoutes, { prefix: "/api/chat-insights" });
   await app.register(chatFoldersRoutes, { prefix: "/api/chat-folders" });

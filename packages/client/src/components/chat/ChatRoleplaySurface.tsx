@@ -69,6 +69,7 @@ import { useInstalledCapabilityPackages } from "../../hooks/use-capability-packa
 import { CapabilityElement } from "../capabilities/CapabilityElement";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
+import { MeguminPresentBarMount } from "../megumin/MeguminMounts";
 import { CyoaChoices } from "./CyoaChoices";
 import { CHAT_CONTROL_WINDOW_IDS, ChatConnectedChatWindow, ChatControlWindow } from "./ChatControlWindow";
 import { TrackerPanelBubble } from "./TrackerPanelBubble";
@@ -2159,6 +2160,8 @@ export function ChatRoleplaySurface({
                               mergedGroupCharacterIds={activeChatCharacterIds}
                               expressionAvatarResolver={expressionAvatarResolver}
                               messageDepth={(messages?.length ?? 1) - 1 - (messages?.indexOf(activeVnMessage) ?? 0)}
+                              isLastAssistantMessage={activeVnMessage.id === lastAssistantMessageId}
+                              messageOrderIndex={loadedMessageOffset + (messages?.indexOf(activeVnMessage) ?? 0)}
                             />
                             {(vnParagraphCount > 1 || visibleVnMessages.length > 1 || hasNextPage) && (
                               <div
@@ -2217,6 +2220,7 @@ export function ChatRoleplaySurface({
                     isForking={isForkingScene}
                   />
                 )}
+                {isRoleplay ? <MeguminPresentBarMount placement="above" /> : null}
                 <ChatInput
                   key={activeChatId}
                   mode={isRoleplay ? "roleplay" : "conversation"}
@@ -2244,6 +2248,7 @@ export function ChatRoleplaySurface({
                   onIllustrate={onIllustrate}
                   interactionsLocked={agentProcessing}
                 />
+                {isRoleplay ? <MeguminPresentBarMount placement="below" /> : null}
               </div>
             </div>
           </div>
