@@ -58,7 +58,14 @@ export function isMeguminEnabled(): boolean {
 /** Megumin's power switch reads globalSettings.suiteEnabled; YunYun's feature switch is the one source. */
 export function mirrorMeguminPowerSwitch(): void {
   const store = meguminStoreObject();
-  if (!store.globalSettings || typeof store.globalSettings !== "object") store.globalSettings = {};
+  // Megumin's own first-run defaults (core/profile.js), set before any profile is loaded: its key for a
+  // profile depends on saveMode, so a profile loaded before saveMode exists is keyed differently from
+  // every later save of it, and Megumin declines those saves.
+  if (!store.globalSettings || typeof store.globalSettings !== "object") {
+    store.globalSettings = { promptPreview: false, enableUtilityPrefill: false, saveMode: "character" };
+  } else if (!store.globalSettings.saveMode) {
+    store.globalSettings.saveMode = "character";
+  }
   store.globalSettings.suiteEnabled = isMeguminEnabled();
 }
 

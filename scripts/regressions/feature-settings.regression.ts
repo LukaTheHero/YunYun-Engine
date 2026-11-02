@@ -30,14 +30,21 @@ try {
   const features = await import("../../packages/server/src/services/features/feature-settings.js");
   const { isFeatureEnabled, resetFeatureSettingsForTests, onFeatureSettingsChange } = features;
 
-  // ── the registry: exactly these switches, every one off by default ──
+  // ── the registry: exactly these switches, every one off by default except MEGUMINTOGGLE ──
   assert.deepEqual([...FEATURE_SWITCH_NAMES].sort(), [
+    "megumin",
     "messageTrash",
     "providerRetry",
     "stableLorebookGroupPicks",
     "usageAndActivationStats",
   ]);
-  for (const name of FEATURE_SWITCH_NAMES) assert.equal(FEATURE_SWITCH_DEFAULTS[name], false, `${name} defaults off`);
+  for (const name of FEATURE_SWITCH_NAMES) {
+    assert.equal(
+      FEATURE_SWITCH_DEFAULTS[name],
+      name === "megumin",
+      `${name} defaults ${name === "megumin" ? "on" : "off"}`,
+    );
+  }
 
   // ── shared normalization: bad values fall back to the default ──
   assert.deepEqual(normalizeFeatureSettings(null), {});
@@ -48,9 +55,15 @@ try {
     "only well-formed known keys survive",
   );
 
-  // ── absent = OFF ──
+  // ── absent = the default (OFF, and ON for Megumin Suite) ──
   resetFeatureSettingsForTests();
-  for (const name of FEATURE_SWITCH_NAMES) assert.equal(isFeatureEnabled(name), false, `${name} is off by default`);
+  for (const name of FEATURE_SWITCH_NAMES) {
+    assert.equal(
+      isFeatureEnabled(name),
+      name === "megumin",
+      `${name} is ${name === "megumin" ? "on" : "off"} by default`,
+    );
+  }
   assert.equal(isFeatureEnabled("usageAndActivationStats"), false, "lorebook activation collection is opt-in");
 
   // ── env precedence: set wins both ways, unset or blank falls through ──
@@ -159,7 +172,9 @@ try {
   await storage.remove(FEATURE_SETTINGS_KEY);
   assert.equal(isFeatureEnabled("providerRetry"), false);
   await storage.set(FEATURE_SETTINGS_KEY, "{}");
-  for (const name of FEATURE_SWITCH_NAMES) assert.equal(isFeatureEnabled(name), false, `${name}: empty object is off`);
+  for (const name of FEATURE_SWITCH_NAMES) {
+    assert.equal(isFeatureEnabled(name), FEATURE_SWITCH_DEFAULTS[name], `${name}: an empty object is the default`);
+  }
 
   // A raw row write that bypasses app-settings storage (Professor YunYun's generic DB commands) is
   // picked up by reloadFeatureSettingsIfTouched; unrelated rows leave the cache alone.
