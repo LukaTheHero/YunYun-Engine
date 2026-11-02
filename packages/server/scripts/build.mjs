@@ -45,6 +45,10 @@ async function buildLowMemoryServer() {
 function copyRuntimeAssets() {
   mkdirSync(resolve(DIST_DIR, "db"), { recursive: true });
   cpSync(resolve(SRC_DIR, "db", "default-preset.json"), resolve(DIST_DIR, "db", "default-preset.json"));
+  // Megumin Suite's bundled presets, seeded on startup (services/megumin/megumin-presets.ts).
+  if (existsSync(resolve(SRC_DIR, "db", "megumin-presets"))) {
+    cpSync(resolve(SRC_DIR, "db", "megumin-presets"), resolve(DIST_DIR, "db", "megumin-presets"), { recursive: true });
+  }
   if (existsSync(resolve(SRC_DIR, "assets"))) {
     cpSync(resolve(SRC_DIR, "assets"), resolve(DIST_DIR, "assets"), { recursive: true });
   }
