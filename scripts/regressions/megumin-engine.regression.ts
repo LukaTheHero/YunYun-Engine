@@ -164,4 +164,23 @@ chatScope.chat[2].mes = "Aqua ignores you.";
 MeguminState.stateOnSwiped(2);
 assert.notEqual(MeguminState.getWorldState().scene.location, "Axel fountain", "the swiped-away reply no longer counts");
 
+// ── The reply drawn above its card: only the block regions leave, nothing else changes ──
+const { stripBlocksForDisplay } = await import("../../packages/shared/src/megumin/strip.js");
+const tags = ["World_State", "CYOA", "Dice"];
+const prose = "**Before.**\n\n\n> Extra blank lines stay.\n\n<details><summary>World State</summary>kept</details>";
+assert.equal(stripBlocksForDisplay(prose, tags), prose, "a reply without blocks is drawn exactly as written");
+assert.equal(
+  stripBlocksForDisplay(
+    "<Dice>d20: 14</Dice>\nAqua waves.\n\n\nShe grins.\n<Blocks>\n<CYOA>\n1. Go\n</CYOA>\n</Blocks>",
+    tags,
+  ),
+  "Aqua waves.\n\n\nShe grins.",
+  "lead and envelope blocks leave; the prose's own blank lines stay",
+);
+assert.equal(
+  stripBlocksForDisplay("Aqua waves.\n\n<World_State>\nTime: Morning", tags),
+  "Aqua waves.",
+  "a block cut off at the end leaves too",
+);
+
 console.log("megumin-engine regression passed");

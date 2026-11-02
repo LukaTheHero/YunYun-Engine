@@ -137,7 +137,7 @@ import { MessageThinkingModal } from "./MessageThinkingModal";
 import { MESSAGE_ACTION_ICON_SIZE, MessageActionButton } from "./MessageActionButton";
 import { MessageMarkIndicators, MessageMarksAction, type MessageNoteSharing } from "./MessageMarks";
 import { RoleplayStoryboardMessageMedia } from "./RoleplayStoryboardMessageMedia";
-import { meguminBlockTags, stripBlocksForModel } from "@marinara-engine/shared/megumin/strip";
+import { meguminBlockTags, stripBlocksForDisplay } from "@marinara-engine/shared/megumin/strip";
 import { useMeguminEnabled, useMeguminView } from "../../hooks/use-megumin";
 
 // Megumin Suite's block card carries Megumin's renderer: its own chunk, loaded with the first card.
@@ -2740,7 +2740,7 @@ export const ChatMessage = memo(function ChatMessage({
   const formatDisplayContent = useCallback(
     (rawContent: string) => {
       // Megumin's blocks are drawn in its card, not in the prose.
-      const content = meguminTags ? stripBlocksForModel(rawContent, meguminTags) : rawContent;
+      const content = meguminTags ? stripBlocksForDisplay(rawContent, meguminTags) : rawContent;
       const macroContext = {
         variables: presetVariables,
         userName,
