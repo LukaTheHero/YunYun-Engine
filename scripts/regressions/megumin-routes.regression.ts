@@ -182,6 +182,24 @@ try {
     afterSave.profile.npcBank.npcs.some((n: { name: string }) => n.name === "Darkness"),
     "an NPC banked after the view was read survives a panel save",
   );
+  // A list edited on a stale copy is refused instead of dropping what Megumin added to it meanwhile.
+  const staleNpcs = view.profile.npcBank?.npcs ?? [];
+  const conflict = await app.inject({
+    method: "PUT",
+    url: patchUrl(chat.id),
+    payload: { patch: [{ op: "set", path: ["npcBank", "npcs"], value: [], base: staleNpcs }] },
+  });
+  assert.equal(conflict.statusCode, 409, "a list changed since the panel read it is a conflict");
+  const kept = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/view` });
+  assert.ok(kept.profile.npcBank.npcs.some((n: { name: string }) => n.name === "Darkness"));
+  const current = kept.profile.npcBank.npcs;
+  const renamed = current.map((n: { name: string }) => (n.name === "Darkness" ? { ...n, name: "Lalatina" } : n));
+  const applied = await ok({
+    method: "PUT",
+    url: patchUrl(chat.id),
+    payload: { patch: [{ op: "set", path: ["npcBank", "npcs"], value: renamed, base: current }] },
+  });
+  assert.ok(applied.profile.npcBank.npcs.some((n: { name: string }) => n.name === "Lalatina"));
 
   // Another chat on the same profile sees the change (both chats have no character: the default key).
   const twin = await ok({

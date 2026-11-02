@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   appendMeguminProfileOps,
+  applyMeguminProfileOps,
   diffMeguminProfile,
   type MeguminProfileOp,
 } from "@marinara-engine/shared/megumin/patch";
@@ -87,6 +88,8 @@ export type MeguminCatalog = Record<string, any>;
 
 export interface MeguminActivity {
   version: number;
+  /** Changes only when Megumin changed a message (the chat's messages are re-read on it). */
+  messagesVersion?: number;
   notices: Array<{
     seq: number;
     at: number;
@@ -204,6 +207,8 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
   const editSeq = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<{ scope: MeguminScope; ops: MeguminProfileOp[] } | null>(null);
+  // The save on its way: a view read can land without it, so edits are diffed against the cache plus it.
+  const inFlight = useRef<{ scope: MeguminScope; ops: MeguminProfileOp[] } | null>(null);
 
   const flush = useCallback(async () => {
     if (timer.current) {
@@ -213,6 +218,7 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
     const job = pending.current;
     if (!job) return;
     pending.current = null;
+    inFlight.current = job;
     const seq = editSeq.current;
     try {
       const view = await api.put<MeguminView>(profilePath(job.scope), { patch: job.ops });
@@ -223,6 +229,8 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));
       void qc.invalidateQueries({ queryKey: meguminKeys.viewsOf(job.scope), exact: false });
+    } finally {
+      if (inFlight.current === job) inFlight.current = null;
     }
   }, [qc]);
 
@@ -243,9 +251,16 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
       if (pending.current && meguminScopeId(pending.current.scope) !== meguminScopeId(current)) void flush();
       const view = qc.getQueryData<MeguminView>(meguminKeys.view(current));
       if (!view) return;
-      const draft = structuredClone(view.profile) as MeguminProfile;
+      // What the person sees includes their edits not saved yet, even when a view read landed without them.
+      const base = structuredClone(view.profile) as MeguminProfile;
+      const unsaved = [inFlight.current, pending.current].filter(
+        (job): job is { scope: MeguminScope; ops: MeguminProfileOp[] } =>
+          !!job && meguminScopeId(job.scope) === meguminScopeId(current),
+      );
+      for (const job of unsaved) applyMeguminProfileOps(base, job.ops, { checkBase: false });
+      const draft = structuredClone(base) as MeguminProfile;
       const next = (change(draft) ?? draft) as MeguminProfile;
-      const ops = diffMeguminProfile(view.profile, next);
+      const ops = diffMeguminProfile(base, next);
       if (!ops.length) return;
       editSeq.current += 1;
       // A view read already on its way would land without this edit.
@@ -378,6 +393,7 @@ export function useMeguminActivity(chatId: string | null, enabled: boolean) {
   const qc = useQueryClient();
   const after = useRef(0);
   const version = useRef<number | null>(null);
+  const messagesVersion = useRef<number | null>(null);
   const streaming = useChatStore((s) => !!chatId && s.streamingChatId === chatId);
   const streamingRef = useRef(streaming);
   streamingRef.current = streaming;
@@ -385,6 +401,7 @@ export function useMeguminActivity(chatId: string | null, enabled: boolean) {
   useEffect(() => {
     after.current = 0;
     version.current = null;
+    messagesVersion.current = null;
   }, [chatId]);
 
   const query = useQuery<MeguminActivity>({
@@ -410,10 +427,14 @@ export function useMeguminActivity(chatId: string | null, enabled: boolean) {
     if (step.restarted) void qc.invalidateQueries({ queryKey: meguminKeys.activity(chatId) });
     if (version.current !== null && version.current !== data.version) {
       void qc.invalidateQueries({ queryKey: meguminKeys.viewsOf({ kind: "chat", chatId }) });
-      // Megumin also changes messages (an image placed in a reply, a placeholder filled): re-read them,
-      // unless a reply is streaming in, whose end re-reads them anyway.
-      if (!streamingRef.current) void qc.invalidateQueries({ queryKey: chatKeys.messages(chatId) });
     }
+    // Megumin changed a message (an image placed in a reply, a placeholder filled): re-read the messages,
+    // unless a reply is streaming in, whose end re-reads them anyway.
+    const mv = data.messagesVersion ?? 0;
+    if (messagesVersion.current !== null && messagesVersion.current !== mv && !streamingRef.current) {
+      void qc.invalidateQueries({ queryKey: chatKeys.messages(chatId) });
+    }
+    messagesVersion.current = mv;
     version.current = data.version;
   }, [chatId, data, qc]);
 

@@ -31,6 +31,7 @@ import {
   meguminDevModeData,
   applyMeguminProfileOps,
   isSafeMeguminProfilePath,
+  MeguminProfileConflictError,
   type MeguminProfileOp,
   meguminChomusukeTest,
   meguminCotById,
@@ -68,6 +69,7 @@ import {
 import {
   meguminChatActivity,
   reloadMeguminProfiles,
+  shareMeguminProfileOps,
   withMeguminChat,
   withMeguminGlobal,
 } from "../services/megumin/megumin-runtime.js";
@@ -101,7 +103,7 @@ const profilePatchSchema = z.object({
   patch: z
     .array(
       z.union([
-        z.object({ op: z.literal("set"), path: z.array(z.string()), value: z.unknown() }),
+        z.object({ op: z.literal("set"), path: z.array(z.string()), value: z.unknown(), base: z.unknown().optional() }),
         z.object({ op: z.literal("unset"), path: z.array(z.string()) }),
       ]),
     )
@@ -121,6 +123,9 @@ function saveEditedProfile(body: unknown) {
   if (!ops.length) return;
   applyMeguminProfileOps(localProfile as Record<string, unknown>, ops);
   MeguminProfile.saveProfileToMemory();
+  // Other open chats on this profile (same character, or the default) take the change now, so one still
+  // working cannot save its older copy over it.
+  shareMeguminProfileOps(getContext().chatId ?? null, MeguminKeys.getCharacterKey() || "default", ops);
   // A tab set to Global copies its keys to every profile when it is edited (Megumin's TAB_PROPAGATE).
   const touched = new Set(ops.map((op) => op.path[0]));
   const synced = (meguminStoreObject().globalSyncTabs || {}) as Record<string, boolean>;
@@ -129,6 +134,9 @@ function saveEditedProfile(body: unknown) {
     if (on && keys.some((key) => touched.has(key))) MeguminSync.applyTabKeysToAllProfiles(title);
   }
 }
+
+const isProfileConflict = (err: unknown) =>
+  err instanceof MeguminProfileConflictError || (err as { conflict?: unknown } | null)?.conflict === true;
 
 function messageIndex(messageId: unknown): number {
   const chat = getContext().chat as Array<{ id: string }>;
@@ -478,7 +486,9 @@ export async function meguminRoutes(app: FastifyInstance) {
         return meguminChatView();
       });
     } catch (err) {
-      return reply.status(400).send({ error: err instanceof Error ? err.message : "Invalid profile changes" });
+      return reply
+        .status(isProfileConflict(err) ? 409 : 400)
+        .send({ error: err instanceof Error ? err.message : "Invalid profile changes" });
     }
   });
 
@@ -551,7 +561,9 @@ export async function meguminRoutes(app: FastifyInstance) {
         return meguminChatView();
       });
     } catch (err) {
-      return reply.status(400).send({ error: err instanceof Error ? err.message : "Invalid profile" });
+      return reply
+        .status(isProfileConflict(err) ? 409 : 400)
+        .send({ error: err instanceof Error ? err.message : "Invalid profile" });
     }
   });
 

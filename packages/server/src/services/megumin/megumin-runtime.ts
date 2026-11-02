@@ -17,6 +17,7 @@ import {
   MEGUMIN_METADATA_PREFIX,
   MeguminProfile,
   MeguminTasks,
+  applyMeguminProfileOps,
   createRunState,
   setMeguminChildRunner,
   setMeguminLogger,
@@ -24,6 +25,7 @@ import {
   type MeguminChatMessage,
   type MeguminChatScope,
   type MeguminNotice,
+  type MeguminProfileOp,
   type MeguminRunState,
   type MeguminScope,
 } from "@marinara-engine/shared/megumin";
@@ -100,6 +102,8 @@ interface LiveChat {
   identity: string;
   /** The suite store's revision this chat's profile was loaded at (megumin-store.ts). */
   profileRevision: number;
+  /** Bumped only when Megumin changed a message (the client re-reads messages on it, the view on `version`). */
+  messagesVersion: number;
 }
 
 const liveChats = new Map<string, LiveChat>();
@@ -303,6 +307,7 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
     ioCtx,
     identity: identityOf(chat),
     profileRevision: 0,
+    messagesVersion: 0,
     snapshots: new Map(),
     metadataSnapshot: JSON.stringify(meguminKeysOf(meta)),
     persisting: Promise.resolve(),
@@ -356,11 +361,14 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
     worldInfo: (lines) => io.worldInfo(lines),
     loreEntries: () => io.loreEntries(),
     embed: (texts) => io.embed(texts),
-    generateImage: (request) => io.generateImage(request, live.scope),
-    renderImage: (request) => io.renderImage(request, live.scope),
+    // A render runs past the operation that asked for it (Megumin does not wait for it): it counts as work in
+    // the chat, so the scope is not rebuilt or evicted under it, and what it changed is saved when it lands.
+    generateImage: (request) => trackImageWork(live, () => io.generateImage(request, live.scope)),
+    renderImage: (request) => trackImageWork(live, () => io.renderImage(request, live.scope)),
     isGenerating: () => live.generating > 0,
-    changed: () => {
+    changed: (what) => {
       live.version += 1;
+      if (String(what ?? "").startsWith("message:")) live.messagesVersion += 1;
     },
     dirty: { metadata: false, settings: false, chat: false, profile: false },
   };
@@ -381,8 +389,18 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
 }
 
 /** Who is in a chat: a change of characters or persona means another profile key, names and lore. */
-function identityOf(chat: { characterIds?: unknown; personaId?: unknown }): string {
-  return JSON.stringify([String(chat.characterIds ?? "[]"), chat.personaId ?? null]);
+function identityOf(chat: { characterIds?: unknown; personaId?: unknown; personaCharacterId?: unknown }): string {
+  return JSON.stringify([String(chat.characterIds ?? "[]"), chat.personaId ?? null, chat.personaCharacterId ?? null]);
+}
+
+async function trackImageWork<T>(live: LiveChat, work: () => Promise<T>): Promise<T> {
+  live.running += 1;
+  try {
+    return await work();
+  } finally {
+    live.running -= 1;
+    schedulePersist(live);
+  }
 }
 
 /** Loads this chat's profile from the suite store (Megumin's initProfile) and records the store's revision. */
@@ -438,14 +456,20 @@ async function persist(live: LiveChat): Promise<void> {
       // It is only written over the swipe it was read from (a regenerate's pending swipe is not in storage).
       let savedMes = snapshot.mes;
       if (message.mes !== snapshot.mes && message.swipe_id === snapshot.swipeId) {
-        savedMes = message.mes;
-        await chats.updateMessageContent(message.id, savedMes);
-        wroteMessages = true;
+        // Storage, not the live copy, decides: a regenerate or continue may have moved on since the last read,
+        // and the write lands on whatever swipe storage shows.
+        const row = await chats.getMessage(message.id);
+        if (row && (row.activeSwipeIndex ?? 0) === snapshot.swipeId && (row.content ?? "") === snapshot.mes) {
+          savedMes = message.mes;
+          await chats.updateMessageContent(message.id, savedMes);
+          wroteMessages = true;
+        }
       }
       const stamps = stampsOf(message);
       if (stamps !== snapshot.stamps) {
+        // The shown swipe's stamps go on that swipe (and on the message only while it is the active one).
         if (message.extra.megumin_uid) {
-          await chats.updateMessageExtra(message.id, {
+          await chats.updateMessageExtraForSwipe(message.id, message.swipe_id, {
             megumin_uid: message.extra.megumin_uid,
             megumin_seq: message.extra.megumin_seq,
           });
@@ -464,11 +488,16 @@ async function persist(live: LiveChat): Promise<void> {
       live.snapshots.set(message.id, { mes: savedMes, swipeId: snapshot.swipeId, stamps });
     }
     // The client re-reads the chat's messages when this changes (an image placed, a placeholder filled).
-    if (wroteMessages) live.version += 1;
+    if (wroteMessages) {
+      live.version += 1;
+      live.messagesVersion += 1;
+    }
     if (scope.dirty.settings || scope.dirty.profile) {
+      // This chat's own save is already in its profile: only another chat's change should reload it. A change
+      // from another chat that this one has not loaded yet still does.
+      const upToDate = live.profileRevision === meguminStoreRevision();
       scheduleMeguminStoreSave(db);
-      // This chat's own save is already in its profile: only another chat's change should reload it.
-      live.profileRevision = meguminStoreRevision();
+      if (upToDate) live.profileRevision = meguminStoreRevision();
     }
     scope.dirty = { metadata: false, settings: false, chat: false, profile: false };
   };
@@ -574,12 +603,40 @@ export async function markMeguminGenerating(db: DB, chatId: string, on: boolean)
 /** Notices since `afterSeq` and the chat's change counter, for the client's poll. */
 export function meguminChatActivity(chatId: string, afterSeq = 0) {
   const live = liveChats.get(chatId);
-  if (!live) return { version: 0, notices: [] as MeguminNoticeRecord[], running: false };
+  if (!live) return { version: 0, messagesVersion: 0, notices: [] as MeguminNoticeRecord[], running: false };
   return {
     version: live.version,
+    messagesVersion: live.messagesVersion,
     notices: live.notices.filter((n) => n.seq > afterSeq),
     running: live.running > 0,
   };
+}
+
+/** What a profile keeps per chat (in the chat's metadata): never copied to another chat on the same profile. */
+const CHAT_HELD_PATHS = [
+  ["memoryCore", "shortTermChunks"],
+  ["memoryCore", "longTermVault"],
+  ["storyPlan", "currentPlan"],
+  ["storyPlan", "lastTrackerState"],
+  ["storyPlan", "planMessageIndex"],
+  ["npcBank", "npcs"],
+  ["imageGen", "characterTags"],
+];
+
+/** A panel edit saved under `key`: the other live chats on that profile take it in place now. */
+export function shareMeguminProfileOps(fromChatId: string | null, key: string, ops: MeguminProfileOp[]): void {
+  const shared = ops.filter(
+    (op) => !CHAT_HELD_PATHS.some((held) => held.every((segment, i) => op.path[i] === segment)),
+  );
+  if (!shared.length) return;
+  for (const live of liveChats.values()) {
+    if (live.chatId === fromChatId || live.scope.loadedProfileKey !== key) continue;
+    try {
+      applyMeguminProfileOps(live.scope.profile as Record<string, unknown>, shared, { checkBase: false });
+    } catch (err) {
+      logger.warn(err, "[megumin] Could not pass a profile change to chat %s", live.chatId);
+    }
+  }
 }
 
 /** Drops the cached scope (chat deleted, or settings replaced wholesale). */

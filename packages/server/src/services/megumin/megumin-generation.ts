@@ -82,7 +82,6 @@ export async function prepareMeguminTurn(
         MeguminTasks.setReplyHeld(false);
       }
     }
-    await markMeguminGenerating(db, chatId, true);
   }
 
   let archived = new Set<string>();
@@ -105,6 +104,10 @@ export async function prepareMeguminTurn(
   } catch (err) {
     logger.warn(err, "[megumin] Could not read the Memory archive for chat %s", chatId);
   }
+
+  // Marked after the first operation, which brought the scope up to date (a persona or member change since
+  // the last reply rebuilds it): a chat marked generating keeps its scope as it is.
+  if (!args.dryRun) await markMeguminGenerating(db, chatId, true);
 
   const saved: string[] = [];
   let finished = false;

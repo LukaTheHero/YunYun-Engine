@@ -51,3 +51,37 @@ assert.match(
 );
 
 console.log("megumin-client regression passed");
+
+// ── The panel's profile edits: a list edited twice keeps the base the server still holds ──
+const { appendMeguminProfileOps, applyMeguminProfileOps, diffMeguminProfile, MeguminProfileConflictError } =
+  await import("../../packages/shared/src/megumin/patch.ts");
+const serverNpcs = [{ name: "Aqua" }];
+const first = diffMeguminProfile(
+  { npcBank: { npcs: serverNpcs } },
+  { npcBank: { npcs: [{ name: "Aqua (goddess)" }] } },
+);
+const second = diffMeguminProfile(
+  { npcBank: { npcs: [{ name: "Aqua (goddess)" }] } },
+  { npcBank: { npcs: [{ name: "Aqua (useless goddess)" }] } },
+);
+const merged = appendMeguminProfileOps(first, second);
+assert.equal(merged.length, 1);
+assert.deepEqual((merged[0] as { base?: unknown }).base, serverNpcs, "the server's list stays the base");
+const live = { npcBank: { npcs: [{ name: "Aqua" }] } };
+applyMeguminProfileOps(live, merged);
+assert.equal(live.npcBank.npcs[0]!.name, "Aqua (useless goddess)");
+// Megumin added an NPC meanwhile: the stale list is refused, nothing is written.
+const grown = { npcBank: { npcs: [{ name: "Aqua" }, { name: "Darkness" }] } };
+assert.throws(() => applyMeguminProfileOps(grown, merged), MeguminProfileConflictError);
+assert.equal(grown.npcBank.npcs.length, 2);
+// Without a base check (the client rebuilding what it shows), the ops simply apply.
+applyMeguminProfileOps(grown, merged, { checkBase: false });
+assert.equal(grown.npcBank.npcs.length, 1);
+// A nested object keeps its identity and its other fields.
+const profile = { worldState: { enabled: true, mode: "update" } };
+const nested = profile.worldState;
+applyMeguminProfileOps(profile, diffMeguminProfile(profile, { worldState: { enabled: false, mode: "update" } }));
+assert.equal(profile.worldState, nested);
+assert.deepEqual(profile.worldState, { enabled: false, mode: "update" });
+
+console.log("megumin-client profile patch cases passed");
