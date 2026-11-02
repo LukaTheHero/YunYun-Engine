@@ -40,8 +40,9 @@ Thumbs.db
 
 # User data — uploaded avatars, backgrounds, sprites, and runtime files
 data/
-# The in-app documentation category folder is not user data
+# The in-app documentation category folder and vendored Megumin data are not user data
 !docs/data/
+!packages/shared/src/megumin/vendor/data/
 packages/server/data/
 
 # Logs
