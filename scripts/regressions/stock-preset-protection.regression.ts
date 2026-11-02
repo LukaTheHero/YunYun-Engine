@@ -56,7 +56,7 @@ try {
   const matchingUserPreset = await storage.create(
     {
       name: "Marinara's Universal Preset",
-      author: "YunYun",
+      author: "Marinara",
       description: "User-owned matching preset",
     },
     { createdAt: "2026-03-04T14:46:18.499Z", updatedAt: "2026-03-04T14:46:18.499Z" },

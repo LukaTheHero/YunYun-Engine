@@ -67,7 +67,7 @@ try {
   // ── Prompt regex scripts on short messages ──
   const scripts = [
     ...SLOW_PATTERNS.map((pattern, index) => script(`slow-${index}`, pattern, "[cut]")),
-    script("name", String.raw`\bMari\b`, "{{char}}"),
+    script("name", String.raw`\bYunYun\b`, "{{char}}"),
     script("ooc", String.raw`\(OOC: ([^)]*)\)`, "[$1]", { flags: "gi", trimStrings: '["!!"]' }),
   ];
   const resolveMacros = (value: string) => value.replaceAll("{{char}}", "Professor YunYun");

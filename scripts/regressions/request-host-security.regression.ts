@@ -31,7 +31,7 @@ delete process.env.CSRF_TRUSTED_ORIGINS;
 
 assert.equal(parseRequestHostname("192.168.1.50:7860"), "192.168.1.50");
 assert.equal(parseRequestHostname("[fd7a:115c:a1e0::1]:7860"), "fd7a:115c:a1e0::1");
-assert.equal(parseRequestHostname("YunYun-Box.local.:7860"), "mari-box.local");
+assert.equal(parseRequestHostname("YunYun-Box.local.:7860"), "yunyun-box.local");
 assert.equal(parseRequestHostname("attacker.example/path"), null);
 assert.equal(parseRequestHostname("attacker.example:0"), null);
 assert.equal(parseRequestHostname("attacker.example:99999"), null);
@@ -98,7 +98,7 @@ try {
     "192.168.1.50:7860",
     "100.101.102.103:7860",
     "[fd7a:115c:a1e0::1]:7860",
-    "mari-box.local:7860",
+    "yunyun-box.local:7860",
     "marinara:7860",
   ]) {
     const origin = `http://${host}`;

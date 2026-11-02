@@ -6899,13 +6899,13 @@ assert.match(
   "LinkAPI actions must share the available banner width instead of overflowing it",
 );
 assert.equal(
-  resolvePresetArtwork({ name: "Marinara's Universal Preset", author: "YunYun" }),
+  resolvePresetArtwork({ name: "Marinara's Universal Preset", author: "Marinara" }),
   MARINARA_UNIVERSAL_PRESET_ARTWORK,
 );
 assert.equal(
   resolvePresetArtwork({
     name: "Marinara's Universal Preset",
-    author: "YunYun",
+    author: "Marinara",
     imagePath: "/api/prompts/images/file/custom.png",
   }),
   "/api/prompts/images/file/custom.png",

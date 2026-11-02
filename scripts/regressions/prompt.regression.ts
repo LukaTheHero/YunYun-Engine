@@ -1620,7 +1620,8 @@ const cases: RegressionCase[] = [
       const frontendAgentCatalog = frontendArchitecture.match(
         /### First-party downloadable agents([\s\S]*?)### Agent result types/u,
       );
-      const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+      // README.md is YunYun's own and lists only what this edition changes, so
+      // the public reference above is the catalog YunYun ships (also in-app).
       const seededMariSource = readFileSync(
         new URL("../../packages/server/src/db/seed-mari.ts", import.meta.url),
         "utf8",
@@ -1666,7 +1667,6 @@ const cases: RegressionCase[] = [
           `Professor YunYun knowledge is missing ${entry.name}`,
         );
         assert.ok(publicReferenceLines.has(`### ${entry.name}`), `Public agent reference is missing ${entry.name}`);
-        assert.ok(readme.includes(entry.name), `README agent catalog is missing ${entry.name}`);
       }
 
       assert.match(seededMariSource, /\$\{PROFESSOR_MARI_AGENT_CATALOG_KNOWLEDGE\}/u);

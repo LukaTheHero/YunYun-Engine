@@ -380,7 +380,7 @@ assert.equal(
 assert.equal(
   isStockMarinaraUniversalPreset({
     name: "Marinara's Universal Preset",
-    author: "YunYun",
+    author: "Marinara",
     systemKey: "",
   }),
   false,

@@ -26,6 +26,11 @@
 // must keep returning no icon for them (capability-package-lifecycle pins it),
 // and nothing else may build that artwork URL.
 //
+// README.md is the fork's own, hand-written, and lists only what this edition
+// changes, so it has none of upstream's feature catalogs. A regression a merge
+// brings in that searches README.md for upstream content must check the shipped
+// docs/ guide instead, as the agent-catalog case in prompt.regression.ts does.
+//
 // Usage:  node scripts/yunyun-rebrand.mjs [--dry] [--list]
 // ──────────────────────────────────────────────
 import { execSync } from "node:child_process";
@@ -148,13 +153,18 @@ const RULES = [
   // guard passing vacuously. Rewrite the lookalikes to match.
   [/Ma(\\u[0-9A-Fa-f]{4})ri/g, "Yun$1Yun"],
 
-  // A literal \n / \r / \t escape inside a string makes the character before
-  // the name a word character, so rules 2 and 3 find no \b boundary and skip it
-  // — which silently desynchronised a regression's expected output from its
-  // already-rebranded input. The trailing \b is kept so this still cannot touch
-  // longer names that merely start with it, such as the character "Marisol".
-  [/(\\[nrt])Marinara\b(?!-)/g, "$1YunYun"],
-  [/(\\[nrt])Mari\b/g, "$1YunYun"],
+  // A backslash escape in front of the name, such as \n inside a string or \b
+  // inside a regex, makes the character before it a word character, so rules
+  // 2 and 3 find no \b boundary and skip it — which silently desynchronised a
+  // regression's expected output from its already-rebranded input (a /\bMari\b/
+  // prompt script that no longer matched its rebranded messages). The trailing
+  // \b is kept so this still cannot touch longer names that merely start with
+  // it, such as the character "Marisol".
+  [/(\\[A-Za-z])Marinara\b(?!-)/g, "$1YunYun"],
+  [/(\\[A-Za-z])Mari\b/g, "$1YunYun"],
+  // Rule 3 rebrands the mixed-case "Mari-Box" host in the request-host fixture,
+  // but not the lowercase "mari-box" it must normalise to, so rename that too.
+  [/\bmari-box\b/g, "yunyun-box"],
   [/\/illustrations\/professor-mari-whats-new\.webp/g, "/illustrations/yunyun-whats-new.webp"],
   [/"\/logo\.png"/g, '"/yunyun-logo.png"'],
   [/"\/logo-splash\.gif"/g, '"/yunyun-logo-splash.gif"'],
@@ -216,6 +226,12 @@ const PROTECT = [
   // stock presets on name+author, so renaming either orphans users' presets
   // and seeds a duplicate.
   `MARINARA_UNIVERSAL_PRESET_NAME = "${OLD_NAME}'s Universal Preset"`,
+  // An `author: "Marinara"` field credits upstream (the stock preset, an
+  // official agent), mostly in regression fixtures that stand in for the stock
+  // preset. Rebranded, resolvePresetArtwork no longer recognises it, and the
+  // checks that matching name+author fields never make a user preset stock pass
+  // vacuously.
+  `author: "${OLD_NAME}"`,
   // The workspace CLI binary is literally `mari`; describing it as anything
   // else in an agent prompt makes the model invoke a command that does not exist.
   `${OLD_ASSISTANT} CLI`,
