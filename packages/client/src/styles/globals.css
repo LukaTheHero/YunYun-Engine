@@ -57,6 +57,7 @@
    19.  SillyTavern Visual Theme .......... (separate file import)
    20.  Accessibility — Reduced Motion .... prefers-reduced-motion
    21.  Performance — GPU Hints ........... will-change compositing
+   23.  Megumin Suite ..................... @import ./megumin.css, ./megumin-sidepanel.css (block cards, side panel)
 
    QUICK CUSTOMIZATION GUIDE
    ─────────────────────────
@@ -8658,3 +8659,9 @@ html[data-marinara-reduced-effects="true"] .mari-window {
 [data-drag-source="true"] {
   opacity: 0.5;
 }
+
+/* ═══════════════════════════════════════════════
+   23. Megumin Suite — block cards, MEGUMINTOGGLE, side panel
+   ═══════════════════════════════════════════════ */
+@import "./megumin.css";
+@import "./megumin-sidepanel.css";

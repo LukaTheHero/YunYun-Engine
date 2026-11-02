@@ -181,6 +181,7 @@ import { ChatResourceDropOverlay } from "./ChatResourceDropOverlay";
 import { ChatHelpOverlay } from "./ChatHelpOverlay";
 import { CHAT_SETTINGS_WINDOW_ID, useFloatingWindowStore } from "../../stores/floating-window.store";
 import { readChatHelpMode } from "../../lib/chat-help-events";
+import { MeguminChatWatcher } from "../megumin/MeguminChatWatcher";
 
 export type { CharacterMap };
 
@@ -3908,6 +3909,7 @@ const LocalChatArea = memo(function LocalChatArea({
       {cardCssInjector}
       {scheduleModal}
       {resourceDropOverlay}
+      {chatMode === "roleplay" && activeChatId ? <MeguminChatWatcher chatId={activeChatId} /> : null}
       <Suspense fallback={surfaceFallback}>
         <ChatRoleplaySurface
           activeChatId={activeChatId}

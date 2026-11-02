@@ -4,6 +4,7 @@ import { useTranslation, useTranslation as useUiTranslation } from "react-i18nex
 import { cn } from "../../../lib/utils";
 import { useUIStore } from "../../../stores/ui.store";
 import { ChatSettingsSection } from "../ChatSettingsSection";
+import { MeguminPresetNote } from "../../../components/megumin/MeguminPresetNote";
 
 interface PromptPresetOption {
   id: string;
@@ -81,6 +82,7 @@ export function PromptPresetSection({
           </button>
         )}
       </div>
+      <MeguminPresetNote promptPresetId={promptPresetId} />
       {showLorebookMarkerWarning && (
         <div className="mt-2 flex items-start gap-2 rounded-lg bg-amber-400/10 px-3 py-2 text-[0.6875rem] text-amber-200 ring-1 ring-amber-400/25">
           <AlertTriangle size="0.75rem" className="mt-[0.125rem] shrink-0" />

@@ -1,0 +1,175 @@
+// ──────────────────────────────────────────────
+// Megumin panel: "Advanced: Edit Prompts"
+// ──────────────────────────────────────────────
+// Megumin's reusable prompt-editing card (src/ui/promptEditor.js), used by the
+// Story Director, Memory, Banned Phrases, NPC Bank and Images tabs. An override switch, one box
+// per prompt with its own Reset, and Reset All. Like Megumin, every edit is
+// pushed to every stored profile (core/sync.js syncPromptsGlobally), so a
+// prompt rewrite follows the reader to every character.
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { ChevronDown, Code, RotateCcw } from "lucide-react";
+import { cn } from "../../../lib/utils";
+import { useMeguminPanel } from "../megumin-panel-context";
+import { MeguminButton, MeguminText, MeguminToggle } from "../MeguminControls";
+
+/** The prompt modules Megumin keeps overrides for (prompts/defaults.js). */
+export type MeguminPromptModule = "storyPlan" | "memoryCore" | "banList" | "imageGen" | "npcBank";
+
+export interface MeguminPromptField {
+  key: string;
+  /** Translated label. */
+  label: string;
+  /** Translated hint, shown under the box. */
+  hint?: string;
+  /** Macro tokens the prompt understands, shown as code (data, not copy). */
+  tokens?: string[];
+}
+
+/** Where a module keeps its overrides in the profile: storyPlan/memoryCore nest them, banList does not. */
+function holderKeys(module: MeguminPromptModule) {
+  return module === "banList"
+    ? { prompts: "banListCustomPrompts", enabled: "banListCustomPromptsEnabled" }
+    : { prompts: "customPrompts", enabled: "customPromptsEnabled" };
+}
+
+function holderOf(profile: Record<string, any>, module: MeguminPromptModule): Record<string, any> {
+  if (module === "banList") return profile;
+  if (!profile[module] || typeof profile[module] !== "object") profile[module] = {};
+  return profile[module];
+}
+
+export function MeguminPromptOverrides({
+  module,
+  fields,
+  title,
+}: {
+  module: MeguminPromptModule;
+  fields: MeguminPromptField[];
+  /** Translated card title; "Advanced: Edit Prompts" when left out. */
+  title?: string;
+}) {
+  const { t } = useTranslation();
+  const { profile, catalog, update, flush, run } = useMeguminPanel();
+  const [open, setOpen] = useState(false);
+  const keys = holderKeys(module);
+  const defaults = ((catalog.defaultPrompts as Record<string, Record<string, string>> | undefined)?.[module] ??
+    {}) as Record<string, string>;
+  const holder = module === "banList" ? profile : ((profile[module] ?? {}) as Record<string, any>);
+  const current = (
+    holder[keys.prompts] && typeof holder[keys.prompts] === "object" ? holder[keys.prompts] : null
+  ) as Record<string, string> | null;
+  const enabled = holder[keys.enabled] === true;
+
+  /** Megumin's syncPromptsGlobally: the value lands in every stored profile. */
+  const syncEverywhere = (dataKey: string, value: unknown) => {
+    flush()
+      .then(() => run("prompts.sync", { module, key: dataKey, value }))
+      .catch(() => {
+        /* the action reports its own failure */
+      });
+  };
+
+  const valueOf = (key: string) => {
+    const v = current?.[key];
+    return v === undefined || v === null || String(v).trim() === "" ? (defaults[key] ?? "") : String(v);
+  };
+
+  const saveField = (key: string, value: string) => {
+    const next = { ...(current ?? structuredClone(defaults)), [key]: value };
+    update((draft) => {
+      holderOf(draft, module)[keys.prompts] = next;
+    });
+    syncEverywhere(keys.prompts, next);
+  };
+
+  const toggle = (on: boolean) => {
+    update((draft) => {
+      holderOf(draft, module)[keys.enabled] = on;
+    });
+    syncEverywhere(keys.enabled, on);
+  };
+
+  const resetAll = () => {
+    update((draft) => {
+      holderOf(draft, module)[keys.prompts] = null;
+    });
+    syncEverywhere(keys.prompts, null);
+  };
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/35">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]"
+        >
+          <Code size="0.75rem" className="shrink-0" />
+          <span className="truncate">{title ?? t("megumin.promptOverrides.title")}</span>
+          <ChevronDown size="0.75rem" className={cn("ml-auto shrink-0 transition-transform", open && "rotate-180")} />
+        </button>
+      </div>
+      {open ? (
+        <div className="flex flex-col gap-3 border-t border-[var(--border)]/60 px-3 pb-3 pt-2.5">
+          <MeguminToggle
+            label={t("megumin.promptOverrides.enable")}
+            help={t("megumin.promptOverrides.enableHelp")}
+            checked={enabled}
+            onChange={toggle}
+          />
+          <div className={cn("flex flex-col gap-3", !enabled && "pointer-events-none opacity-50")}>
+            {fields.map((field) => (
+              <div key={field.key} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+                    {field.label}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!enabled}
+                    onClick={() => saveField(field.key, defaults[field.key] ?? "")}
+                    title={t("megumin.promptOverrides.resetField")}
+                    className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1 text-[0.625rem]"
+                  >
+                    <RotateCcw size="0.625rem" />
+                    {t("megumin.promptOverrides.reset")}
+                  </button>
+                </div>
+                <MeguminText
+                  multiline
+                  mono
+                  rows={8}
+                  disabled={!enabled}
+                  value={valueOf(field.key)}
+                  onChange={(value) => saveField(field.key, value)}
+                />
+                {field.hint || field.tokens?.length ? (
+                  <div className="flex flex-wrap items-center gap-1 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+                    {field.hint ? <span>{field.hint}</span> : null}
+                    {field.tokens?.length ? (
+                      <>
+                        <span>{t("megumin.promptOverrides.tokens")}</span>
+                        {field.tokens.map((token) => (
+                          <code key={token} className="rounded bg-[var(--secondary)]/70 px-1 font-mono text-[0.625rem]">
+                            {token}
+                          </code>
+                        ))}
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+            <div className="flex justify-end">
+              <MeguminButton onClick={resetAll} disabled={!enabled} icon={<RotateCcw size="0.75rem" />}>
+                {t("megumin.promptOverrides.resetAll")}
+              </MeguminButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

@@ -83,6 +83,8 @@ import {
   useCallback,
   cloneElement,
   type ReactNode,
+  lazy,
+  Suspense,
 } from "react";
 import { useTranslation, useTranslation as useUiTranslation } from "react-i18next";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -135,6 +137,13 @@ import { MessageThinkingModal } from "./MessageThinkingModal";
 import { MESSAGE_ACTION_ICON_SIZE, MessageActionButton } from "./MessageActionButton";
 import { MessageMarkIndicators, MessageMarksAction, type MessageNoteSharing } from "./MessageMarks";
 import { RoleplayStoryboardMessageMedia } from "./RoleplayStoryboardMessageMedia";
+import { meguminBlockTags, stripBlocksForModel } from "@marinara-engine/shared/megumin/strip";
+import { useMeguminEnabled, useMeguminView } from "../../hooks/use-megumin";
+
+// Megumin Suite's block card carries Megumin's renderer: its own chunk, loaded with the first card.
+const MeguminMessageCard = lazy(() =>
+  import("../megumin/cards/MeguminMessageCard").then((module) => ({ default: module.MeguminMessageCard })),
+);
 
 const MESSAGE_DOUBLE_TAP_MS = 320;
 const MESSAGE_DOUBLE_TAP_DISTANCE_PX = 26;
@@ -1942,6 +1951,17 @@ export const ChatMessage = memo(function ChatMessage({
   const isSystem = message.role === "system";
   const isNarrator = message.role === "narrator";
   const isRoleplay = chatMode === "roleplay";
+  // Megumin Suite (MEGUMINTOGGLE on, Roleplay): a reply's blocks are drawn as Megumin's card under it.
+  const meguminCards = useMeguminEnabled() && isRoleplay && !isUser && !isSystem && !isNarrator;
+  const { data: meguminView } = useMeguminView(
+    { kind: "chat", chatId: message.chatId },
+    { enabled: meguminCards && !!message.chatId },
+  );
+  const meguminRegistry = meguminView?.registry;
+  const meguminTags = useMemo(
+    () => (meguminCards && meguminRegistry ? meguminBlockTags(meguminRegistry) : null),
+    [meguminCards, meguminRegistry],
+  );
   const vnPortraitScale = useUIStore((state) => (visualNovel ? state.roleplayVnPortraitScale : 1));
   const alwaysDisplaySwipeMenu = useUIStore((state) =>
     isRoleplay
@@ -2718,7 +2738,9 @@ export const ChatMessage = memo(function ChatMessage({
   }, [charName, scopedCharacterMap]);
 
   const formatDisplayContent = useCallback(
-    (content: string) => {
+    (rawContent: string) => {
+      // Megumin's blocks are drawn in its card, not in the prose.
+      const content = meguminTags ? stripBlocksForModel(rawContent, meguminTags) : rawContent;
       const macroContext = {
         variables: presetVariables,
         userName,
@@ -2750,6 +2772,7 @@ export const ChatMessage = memo(function ChatMessage({
       return resolveDisplayMacros(text);
     },
     [
+      meguminTags,
       applyToAIOutput,
       scopedRegexMode,
       presetVariables,
@@ -3538,6 +3561,18 @@ export const ChatMessage = memo(function ChatMessage({
         )}
       </div>
       {roleplayCommandResults}
+      {meguminCards && meguminView && !isStreaming && !visualNovel ? (
+        <Suspense fallback={null}>
+          <MeguminMessageCard
+            chatId={message.chatId}
+            messageId={message.id}
+            content={message.content}
+            msgIndex={messageIndex ?? -1}
+            isLast={!!isLastAssistantMessage}
+            view={meguminView}
+          />
+        </Suspense>
+      ) : null}
       {(translatedText || isTranslating) && !showTranslationOnly && (
         <div className="mt-2 border-t border-white/10 pt-2">
           {isTranslating ? (

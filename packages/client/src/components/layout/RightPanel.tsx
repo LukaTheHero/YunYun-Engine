@@ -11,7 +11,19 @@ import {
   type LazyExoticComponent,
   type ReactNode,
 } from "react";
-import { X, Users, BookOpen, FileText, Link, Sparkles, Settings, VenetianMask, Bot, Puzzle } from "lucide-react";
+import {
+  X,
+  Users,
+  BookOpen,
+  FileText,
+  Link,
+  Sparkles,
+  Settings,
+  VenetianMask,
+  Bot,
+  Puzzle,
+  WandSparkles,
+} from "lucide-react";
 import { useUIStore } from "../../stores/ui.store";
 import { cn } from "../../lib/utils";
 import { usePersonalExtensionContributions } from "../../lib/personal-extension-contributions";
@@ -43,6 +55,7 @@ const SettingsPanel = lazy(() =>
 const BotBrowserPanel = lazy(() =>
   import("../panels/BotBrowserPanel").then((module) => ({ default: module.BotBrowserPanel })),
 );
+const MeguminPanel = lazy(() => import("../megumin/MeguminPanel").then((module) => ({ default: module.MeguminPanel })));
 const PersonalExtensionPanel = lazy(() =>
   import("../panels/PersonalExtensionPanel").then((module) => ({ default: module.PersonalExtensionPanel })),
 );
@@ -98,6 +111,11 @@ const PANEL_CONFIG: Record<string, PanelConfig> = {
     helpKey: "navigation.sidebarHelp.settings",
   },
   extensions: { title: "Extensions", icon: <Puzzle size="0.875rem" /> },
+  megumin: {
+    title: "Megumin Suite",
+    icon: <WandSparkles size="0.875rem" />,
+    gradientClass: "mari-megumin-toggle--on",
+  },
 };
 
 const PANELS: Record<string, LazyExoticComponent<ComponentType>> = {
@@ -110,6 +128,7 @@ const PANELS: Record<string, LazyExoticComponent<ComponentType>> = {
   personas: PersonasPanel,
   settings: SettingsPanel,
   extensions: PersonalExtensionPanel,
+  megumin: MeguminPanel,
 };
 
 const PANEL_CONTRIBUTION_SURFACES: Partial<Record<string, Exclude<PersonalExtensionContributionSurface, "top-bar">>> = {

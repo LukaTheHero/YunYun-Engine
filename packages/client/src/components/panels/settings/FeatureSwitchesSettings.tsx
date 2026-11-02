@@ -14,6 +14,7 @@ export const FEATURE_SWITCHES_CONTROL_ID = "feature-switches";
 
 /** Server switches in display order. */
 const SERVER_SWITCHES: ReadonlyArray<FeatureSwitchName> = [
+  "megumin",
   "stableLorebookGroupPicks",
   "providerRetry",
   "usageAndActivationStats",
@@ -21,8 +22,8 @@ const SERVER_SWITCHES: ReadonlyArray<FeatureSwitchName> = [
 ];
 
 /**
- * Settings > Advanced > Features: optional server behaviours. Every switch starts off, which keeps
- * the standard behaviour; a switch pinned by a server environment variable is shown locked.
+ * Settings > Advanced > Features: optional server behaviours. Every switch but MEGUMINTOGGLE starts off,
+ * which keeps the standard behaviour; a switch pinned by a server environment variable is shown locked.
  */
 export function FeatureSwitchesSettings({ anchorId }: { anchorId?: string }) {
   const { t } = useTranslation();

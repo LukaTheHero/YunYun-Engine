@@ -54,7 +54,8 @@ export type Panel =
   | "personas"
   | "settings"
   | "bot-browser"
-  | "extensions";
+  | "extensions"
+  | "megumin";
 export type ChatModeShortcut = "conversation" | "roleplay" | "game";
 
 /** Not saved: a Home surface the omnibar or a Command Center row asks Home to open. */
