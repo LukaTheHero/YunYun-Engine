@@ -261,6 +261,18 @@ export function createMeguminHostIo(db: DB, ctx: HostIoContext) {
     try {
       const drawn = await render(request, notify);
       if (!drawn) return null;
+      // A portrait is kept inside the profile, so it is shrunk the way Megumin shrinks one (256 px).
+      try {
+        const { getSharp } = await import("../image/sharp-runtime.js");
+        const sharp = await getSharp();
+        const small = await sharp(Buffer.from(drawn.result.base64, "base64"))
+          .resize(256, 256, { fit: "cover" })
+          .webp({ quality: 85 })
+          .toBuffer();
+        return { base64: small.toString("base64"), mime: "image/webp" };
+      } catch (err) {
+        logger.warn(err, "[megumin] Could not shrink an NPC portrait; keeping it at full size");
+      }
       const ext = String(drawn.result.ext || "png").toLowerCase();
       const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
       return { base64: drawn.result.base64, mime };

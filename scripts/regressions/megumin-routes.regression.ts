@@ -77,6 +77,11 @@ try {
   assert.equal((await resolveMeguminPresetSwap(db, { chatMode: "roleplay", resolved: stock }))?.id, v11.id);
   assert.equal(await resolveMeguminPresetSwap(db, { chatMode: "roleplay", resolved: v11 }), null, "already Megumin");
   assert.equal(
+    await resolveMeguminPresetSwap(db, { chatMode: "roleplay", resolved: null }),
+    null,
+    "no preset (None) is the person's choice",
+  );
+  assert.equal(
     await resolveMeguminPresetSwap(db, { chatMode: "conversation", resolved: stock }),
     null,
     "Roleplay only",

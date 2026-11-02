@@ -112,6 +112,8 @@ export async function prepareMeguminTurn(
       }
     },
     async apply(messages) {
+      // Injection edits the messages in place: a failure part-way must not send half-filled slots.
+      const asBuilt = structuredClone(messages);
       try {
         return await withMeguminChat(
           db,
@@ -124,7 +126,7 @@ export async function prepareMeguminTurn(
         );
       } catch (err) {
         logger.error(err, "[megumin] Filling the Megumin preset failed; the prompt goes out as built");
-        return messages;
+        return asBuilt;
       }
     },
     noteSavedReply(messageId) {

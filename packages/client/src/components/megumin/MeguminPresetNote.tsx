@@ -16,7 +16,7 @@ export function MeguminPresetNote({ promptPresetId }: { promptPresetId: string |
   if (!status) return null;
   const meguminIds = new Set(status.presets.map((p) => p.id).filter(Boolean));
   const defaultName = status.presets.find((p) => p.systemKey === status.defaultPresetSystemKey)?.name ?? "";
-  const onStock = !promptPresetId || promptPresetId === status.stockPresetId;
+  const onStock = !!promptPresetId && promptPresetId === status.stockPresetId;
   const onMegumin = !!promptPresetId && meguminIds.has(promptPresetId);
 
   const message =

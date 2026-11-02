@@ -205,7 +205,9 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
     const seq = editSeq.current;
     try {
       const view = await api.put<MeguminView>(profilePath(job.scope), { profile: job.profile });
-      if (seq === editSeq.current) qc.setQueryData(meguminKeys.view(job.scope), view);
+      // A newer edit is on its way: neither this answer nor a refetch may replace it in the cache.
+      if (seq !== editSeq.current) return;
+      qc.setQueryData(meguminKeys.view(job.scope), view);
       void qc.invalidateQueries({ queryKey: meguminKeys.viewsOf(job.scope), exact: false });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error));

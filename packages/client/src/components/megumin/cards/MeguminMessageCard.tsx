@@ -162,11 +162,12 @@ export function MeguminMessageCard({
     card?.classList.toggle("meg-chomu-busy", busy);
   }, [busy, panes]);
 
+  const runAction = action.mutate;
   useEffect(() => {
     if (!isLast) return;
     setChomusukeStatus(view.chomusukeStatus ?? { running: null, waiting: 0 });
-    setChomusukeStopHandler(() => action.mutate({ action: "chomusuke.stop" }));
-  }, [action, isLast, view.chomusukeStatus]);
+    setChomusukeStopHandler(() => runAction({ action: "chomusuke.stop" }));
+  }, [runAction, isLast, view.chomusukeStatus]);
 
   const readAgain = (pending: boolean) => (
     <button

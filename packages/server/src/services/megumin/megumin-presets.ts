@@ -236,7 +236,8 @@ export async function resolveMeguminPresetSwap(
   const storage = createPromptsStorage(db);
   const enabled = isMeguminEnabled();
   const resolved = args.resolved;
-  if (enabled && (!resolved || isStockMarinaraUniversalPreset(resolved))) {
+  // Only the stock preset is swapped: "None" is the person's own choice, like any preset they pick.
+  if (enabled && resolved && isStockMarinaraUniversalPreset(resolved)) {
     const all = (await storage.list()) as PresetRow[];
     return all.find((p) => p.systemKey === MEGUMIN_DEFAULT_PRESET_SYSTEM_KEY) ?? null;
   }
