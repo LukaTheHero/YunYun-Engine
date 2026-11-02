@@ -299,6 +299,24 @@ function rewriteInjectionMarkers(source) {
   return head + body;
 }
 
+/**
+ * The profile key Megumin's save guards compare against is one module global in SillyTavern (one chat at a
+ * time); on a server every chat has its own, so the guards read the current scope's (core/state.ts).
+ */
+function rewriteLoadedProfileKey(path, source) {
+  const importRe = /import \{([^}]*)\b_loadedProfileKey\b([^}]*)\} from "((?:\.\.?\/)+(?:core\/)?state\.js)";/;
+  const match = source.match(importRe);
+  if (!match) {
+    if (/\b_loadedProfileKey\b/.test(source)) throw new Error(`${path}: _loadedProfileKey is used without its import`);
+    return source;
+  }
+  const withImport = source.replace(
+    importRe,
+    (_m, before, after, from) => `import {${before}loadedProfileKeyNow${after}} from "${from}";`,
+  );
+  return withImport.replace(/(?<![\w$.])_loadedProfileKey(?![\w$])/g, "loadedProfileKeyNow()");
+}
+
 /** A relative import of vendor/src/st.ts from `path`. */
 function stImportPath(path) {
   const rel = posix.relative(posix.dirname(path), "src/st.js");
@@ -358,6 +376,7 @@ function buildOutputs(src) {
     const raw = readFileSync(from, "utf8");
     let body = applyPatches(path, raw.replace(/\r+\n/g, "\n"));
     if (path === "src/engine/injection.js") body = rewriteInjectionMarkers(body);
+    body = rewriteLoadedProfileKey(path, body);
     body = routeConsole(body);
     body = addGlobalImports(path, body);
     const target = join(VENDOR_DIR, path.replace(/\.js$/, ".ts"));

@@ -8,9 +8,14 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import {
+  appendMeguminProfileOps,
+  diffMeguminProfile,
+  type MeguminProfileOp,
+} from "@marinara-engine/shared/megumin/patch";
 import { api } from "../lib/api-client";
 import { useChatStore } from "../stores/chat.store";
-import { useChat } from "./use-chats";
+import { chatKeys, useChat } from "./use-chats";
 import { useFeatureEnabled } from "./use-feature-settings";
 
 export type MeguminProfile = Record<string, any>;
@@ -116,6 +121,10 @@ export const meguminKeys = {
   activity: (chatId: string) => [...meguminKeys.all, "activity", chatId] as const,
 };
 
+function meguminScopeId(scope: MeguminScope) {
+  return scope.kind === "chat" ? scope.chatId : "global";
+}
+
 function viewPath(scope: MeguminScope) {
   return scope.kind === "chat" ? `/megumin/chats/${scope.chatId}/view` : "/megumin/global/view";
 }
@@ -183,8 +192,10 @@ export function useMeguminView(scope: MeguminScope, options: { history?: boolean
 }
 
 /**
- * The profile editor: edits land in the cached view at once and are saved, coalesced, a moment later.
- * A save's answer only replaces the cache when no newer edit was made while it was on its way.
+ * The profile editor: edits land in the cached view at once and are saved, coalesced, a moment later. Only
+ * what changed is sent (path-level operations), so a save never writes back the parts of the profile that
+ * Megumin's background work changed since the view was read. A save's answer only replaces the cache when
+ * no newer edit was made while it was on its way.
  */
 export function useMeguminProfileEditor(scope: MeguminScope) {
   const qc = useQueryClient();
@@ -192,7 +203,7 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
   scopeRef.current = scope;
   const editSeq = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<{ scope: MeguminScope; profile: MeguminProfile } | null>(null);
+  const pending = useRef<{ scope: MeguminScope; ops: MeguminProfileOp[] } | null>(null);
 
   const flush = useCallback(async () => {
     if (timer.current) {
@@ -204,7 +215,7 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
     pending.current = null;
     const seq = editSeq.current;
     try {
-      const view = await api.put<MeguminView>(profilePath(job.scope), { profile: job.profile });
+      const view = await api.put<MeguminView>(profilePath(job.scope), { patch: job.ops });
       // A newer edit is on its way: neither this answer nor a refetch may replace it in the cache.
       if (seq !== editSeq.current) return;
       qc.setQueryData(meguminKeys.view(job.scope), view);
@@ -216,7 +227,7 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
   }, [qc]);
 
   // Leaving a chat (or the panel) saves what was typed for it.
-  const scopeId = scope.kind === "chat" ? scope.chatId : "global";
+  const scopeId = meguminScopeId(scope);
   useEffect(
     () => () => {
       void flush();
@@ -228,13 +239,19 @@ export function useMeguminProfileEditor(scope: MeguminScope) {
   const update = useCallback(
     (change: (draft: MeguminProfile) => MeguminProfile | void) => {
       const current = scopeRef.current;
+      // Edits for another chat's profile go out before this one's start.
+      if (pending.current && meguminScopeId(pending.current.scope) !== meguminScopeId(current)) void flush();
       const view = qc.getQueryData<MeguminView>(meguminKeys.view(current));
       if (!view) return;
       const draft = structuredClone(view.profile) as MeguminProfile;
       const next = (change(draft) ?? draft) as MeguminProfile;
+      const ops = diffMeguminProfile(view.profile, next);
+      if (!ops.length) return;
       editSeq.current += 1;
+      // A view read already on its way would land without this edit.
+      void qc.cancelQueries({ queryKey: meguminKeys.viewsOf(current) });
       qc.setQueryData<MeguminView>(meguminKeys.view(current), { ...view, profile: next });
-      pending.current = { scope: current, profile: next };
+      pending.current = { scope: current, ops: appendMeguminProfileOps(pending.current?.ops ?? [], ops) };
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), 450);
     },
@@ -338,6 +355,8 @@ export function useMeguminActivity(chatId: string | null, enabled: boolean) {
   const after = useRef(0);
   const version = useRef<number | null>(null);
   const streaming = useChatStore((s) => !!chatId && s.streamingChatId === chatId);
+  const streamingRef = useRef(streaming);
+  streamingRef.current = streaming;
 
   useEffect(() => {
     after.current = 0;
@@ -371,6 +390,9 @@ export function useMeguminActivity(chatId: string | null, enabled: boolean) {
     }
     if (version.current !== null && version.current !== data.version) {
       void qc.invalidateQueries({ queryKey: meguminKeys.viewsOf({ kind: "chat", chatId }) });
+      // Megumin also changes messages (an image placed in a reply, a placeholder filled): re-read them,
+      // unless a reply is streaming in, whose end re-reads them anyway.
+      if (!streamingRef.current) void qc.invalidateQueries({ queryKey: chatKeys.messages(chatId) });
     }
     version.current = data.version;
   }, [chatId, data, qc]);

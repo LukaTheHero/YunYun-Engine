@@ -16,6 +16,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import {
   MEGUMIN_METADATA_PREFIX,
   MeguminProfile,
+  MeguminTasks,
   createRunState,
   setMeguminChildRunner,
   setMeguminLogger,
@@ -38,12 +39,14 @@ import { createChatsStorage } from "../storage/chats.storage.js";
 import { createCharactersStorage } from "../storage/characters.storage.js";
 import { resolveChatUserIdentity } from "../chat-user-identity.js";
 import {
+  bumpMeguminStoreRevision,
   ensureMeguminStore,
   meguminSettingsRoot,
+  meguminStoreRevision,
   mirrorMeguminPowerSwitch,
   scheduleMeguminStoreSave,
 } from "./megumin-store.js";
-import { createMeguminHostIo } from "./megumin-host-io.js";
+import { createMeguminHostIo, type HostIoContext } from "./megumin-host-io.js";
 
 const als = new AsyncLocalStorage<MeguminScope>();
 // Megumin's own console lines, through Pino: its chatter at debug, its warnings and failures as such.
@@ -65,7 +68,12 @@ setMeguminChildRunner((run, fn) => {
   return als.run({ chat: current.chat, run }, fn);
 });
 
-type MessageSnapshot = { mes: string; stamps: string };
+/** What storage held for a message when Megumin last read or wrote it: its text, which swipe, its stamps. */
+type MessageSnapshot = { mes: string; swipeId: number; stamps: string };
+
+function snapshotOf(message: MeguminChatMessage): MessageSnapshot {
+  return { mes: message.mes, swipeId: message.swipe_id, stamps: stampsOf(message) };
+}
 
 export interface MeguminNoticeRecord extends MeguminNotice {
   seq: number;
@@ -86,6 +94,12 @@ interface LiveChat {
   notices: MeguminNoticeRecord[];
   noticeSeq: number;
   db: DB;
+  /** The host I/O's context: refreshed from the chat row on every operation (connection, metadata). */
+  ioCtx: HostIoContext;
+  /** Who is in the chat (characters, persona): a change rebuilds the scope. */
+  identity: string;
+  /** The suite store's revision this chat's profile was loaded at (megumin-store.ts). */
+  profileRevision: number;
 }
 
 const liveChats = new Map<string, LiveChat>();
@@ -192,7 +206,7 @@ function mergeMessages(live: LiveChat, fresh: MeguminChatMessage[]) {
     const snapshot = live.snapshots.get(incoming.id);
     if (!existing) {
       next.push(incoming);
-      live.snapshots.set(incoming.id, { mes: incoming.mes, stamps: stampsOf(incoming) });
+      live.snapshots.set(incoming.id, snapshotOf(incoming));
       continue;
     }
     // A stamp Megumin wrote but has not saved yet survives the reload.
@@ -206,7 +220,13 @@ function mergeMessages(live: LiveChat, fresh: MeguminChatMessage[]) {
     incoming.swipe_info.forEach(
       (info, i) => existing.swipe_info[i] && pendingStamp(existing.swipe_info[i]!.extra, info.extra),
     );
-    const textPending = snapshot && existing.mes !== snapshot.mes;
+    // Megumin's unsaved edit of the text survives only while storage still holds what it edited: the same
+    // text on the same swipe. A swipe switch, a person's edit or a new swipe wins, and the stale edit is dropped.
+    const textPending =
+      !!snapshot &&
+      existing.mes !== snapshot.mes &&
+      incoming.mes === snapshot.mes &&
+      incoming.swipe_id === snapshot.swipeId;
     Object.assign(existing, {
       role: incoming.role,
       characterId: incoming.characterId,
@@ -220,7 +240,7 @@ function mergeMessages(live: LiveChat, fresh: MeguminChatMessage[]) {
       send_date: incoming.send_date,
       mes: textPending ? existing.mes : incoming.mes,
     });
-    if (!textPending) live.snapshots.set(incoming.id, { mes: incoming.mes, stamps: stampsOf(incoming) });
+    if (!textPending) live.snapshots.set(incoming.id, snapshotOf(incoming));
     next.push(existing);
   }
   for (const id of [...live.snapshots.keys()]) if (!fresh.some((m) => m.id === id)) live.snapshots.delete(id);
@@ -270,9 +290,19 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
       : undefined,
   });
 
+  const ioCtx: HostIoContext = {
+    chatId,
+    chatConnectionId: (chat.connectionId as string | null) ?? null,
+    chatMetadata: meta,
+    characterIds,
+    personaId: identity?.source === "persona" ? identity.id : null,
+  };
   const live: LiveChat = {
     chatId,
     db,
+    ioCtx,
+    identity: identityOf(chat),
+    profileRevision: 0,
     snapshots: new Map(),
     metadataSnapshot: JSON.stringify(meguminKeysOf(meta)),
     persisting: Promise.resolve(),
@@ -286,13 +316,7 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
     scope: null as unknown as MeguminChatScope,
   };
 
-  const io = createMeguminHostIo(db, {
-    chatId,
-    chatConnectionId: (chat.connectionId as string | null) ?? null,
-    chatMetadata: meta,
-    characterIds,
-    personaId: identity?.source === "persona" ? identity.id : null,
-  });
+  const io = createMeguminHostIo(db, ioCtx);
 
   live.scope = {
     chatId,
@@ -347,14 +371,25 @@ async function buildLiveChat(db: DB, chatId: string): Promise<LiveChat> {
   };
   (live as LiveChat & { names: typeof names }).names = names;
   live.scope.chat = await readMessages(db, chatId, names);
-  for (const m of live.scope.chat) live.snapshots.set(m.id, { mes: m.mes, stamps: stampsOf(m) });
+  for (const m of live.scope.chat) live.snapshots.set(m.id, snapshotOf(m));
 
   // SillyTavern's CHAT_CHANGED: the profile for this chat, then the state store squared with the chat.
   mirrorMeguminPowerSwitch();
+  await loadProfile(live);
+  return live;
+}
+
+/** Who is in a chat: a change of characters or persona means another profile key, names and lore. */
+function identityOf(chat: { characterIds?: unknown; personaId?: unknown }): string {
+  return JSON.stringify([String(chat.characterIds ?? "[]"), chat.personaId ?? null]);
+}
+
+/** Loads this chat's profile from the suite store (Megumin's initProfile) and records the store's revision. */
+async function loadProfile(live: LiveChat): Promise<void> {
+  live.profileRevision = meguminStoreRevision();
   await als.run({ chat: live.scope, run: createRunState() }, async () => {
     MeguminProfile.initProfile();
   });
-  return live;
 }
 
 async function getLiveChat(db: DB, chatId: string): Promise<LiveChat> {
@@ -394,11 +429,17 @@ async function persist(live: LiveChat): Promise<void> {
       live.metadataSnapshot = nextMetaJson;
     }
     // Messages: text Megumin rewrote, and its stamps.
+    let wroteMessages = false;
     for (const message of scope.chat) {
       const snapshot = live.snapshots.get(message.id);
       if (!snapshot) continue;
-      if (message.mes !== snapshot.mes) {
-        await chats.updateMessageContent(message.id, message.mes);
+      // The text that is written is the text recorded as saved, even if Megumin edits it again meanwhile.
+      // It is only written over the swipe it was read from (a regenerate's pending swipe is not in storage).
+      let savedMes = snapshot.mes;
+      if (message.mes !== snapshot.mes && message.swipe_id === snapshot.swipeId) {
+        savedMes = message.mes;
+        await chats.updateMessageContent(message.id, savedMes);
+        wroteMessages = true;
       }
       const stamps = stampsOf(message);
       if (stamps !== snapshot.stamps) {
@@ -419,9 +460,15 @@ async function persist(live: LiveChat): Promise<void> {
           }
         }
       }
-      live.snapshots.set(message.id, { mes: message.mes, stamps });
+      live.snapshots.set(message.id, { mes: savedMes, swipeId: snapshot.swipeId, stamps });
     }
-    if (scope.dirty.settings || scope.dirty.profile) scheduleMeguminStoreSave(db);
+    // The client re-reads the chat's messages when this changes (an image placed, a placeholder filled).
+    if (wroteMessages) live.version += 1;
+    if (scope.dirty.settings || scope.dirty.profile) {
+      scheduleMeguminStoreSave(db);
+      // This chat's own save is already in its profile: only another chat's change should reload it.
+      live.profileRevision = meguminStoreRevision();
+    }
     scope.dirty = { metadata: false, settings: false, chat: false, profile: false };
   };
   live.persisting = live.persisting
@@ -452,7 +499,8 @@ export async function withMeguminChat<T>(
   fn: () => Promise<T> | T,
   options: MeguminOperationOptions = {},
 ): Promise<T> {
-  const live = await getLiveChat(db, chatId);
+  let live = await getLiveChat(db, chatId);
+  if (options.refresh !== false) live = await refreshLiveChat(db, live);
   live.lastUsed = Date.now();
   live.running += 1;
   try {
@@ -483,6 +531,28 @@ export async function withMeguminChat<T>(
   }
 }
 
+/**
+ * Brings an idle live chat up to date with what changed outside Megumin: the chat's connection and metadata
+ * (read by the host I/O on every call), who is in it (a new scope), and the suite store (another chat or the
+ * panel saved a profile this one shares: Megumin's profile is loaded again). A chat with work running keeps
+ * what it has until the work ends, so no job sees its profile swapped underneath it.
+ */
+async function refreshLiveChat(db: DB, live: LiveChat): Promise<LiveChat> {
+  const row = await createChatsStorage(db).getById(live.chatId);
+  if (!row) return live;
+  live.ioCtx.chatConnectionId = (row.connectionId as string | null) ?? null;
+  live.ioCtx.chatMetadata = parseRecord(row.metadata);
+  const idle = live.running === 0 && live.generating === 0 && !MeguminTasks.chomusukeStatusFor(live.chatId).running;
+  if (!idle) return live;
+  if (identityOf(row) !== live.identity) {
+    await persist(live);
+    if (liveChats.get(live.chatId) === live) liveChats.delete(live.chatId);
+    return getLiveChat(db, live.chatId);
+  }
+  if (live.profileRevision !== meguminStoreRevision()) await loadProfile(live);
+  return live;
+}
+
 /** The story model is writing in this chat (Chomusuke's traffic guard waits for it). */
 export async function markMeguminGenerating(db: DB, chatId: string, on: boolean): Promise<void> {
   const live = liveChats.get(chatId) ?? (on ? await getLiveChat(db, chatId).catch(() => null) : null);
@@ -506,13 +576,9 @@ export function forgetMeguminChat(chatId: string): void {
   liveChats.delete(chatId);
 }
 
-/** Every chat's profile is re-read on its next operation (the suite store was replaced). */
+/** Every chat's profile is re-read on its next idle operation (the suite store was changed from the panel). */
 export function reloadMeguminProfiles(): void {
-  for (const live of liveChats.values()) {
-    void als.run({ chat: live.scope, run: createRunState() }, async () => {
-      MeguminProfile.initProfile();
-    });
-  }
+  bumpMeguminStoreRevision();
 }
 
 setInterval(() => {
@@ -542,7 +608,15 @@ export async function withMeguminGlobal<T>(db: DB, fn: () => Promise<T> | T): Pr
     name1: "User",
     name2: "",
     substitute: (text) => text,
-    quiet: async () => "",
+    // A Chomusuke Test with no chat open still reaches the chosen connection.
+    quiet: (text, run) =>
+      createMeguminHostIo(db, {
+        chatId: "",
+        chatConnectionId: null,
+        chatMetadata: {},
+        characterIds: [],
+        personaId: null,
+      }).quiet(text, run),
     notify: () => {},
     dirty: { metadata: false, settings: false, chat: false, profile: false },
   };

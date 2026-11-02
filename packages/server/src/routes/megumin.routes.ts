@@ -29,6 +29,9 @@ import {
   meguminChatView,
   meguminCloneEngine,
   meguminDevModeData,
+  applyMeguminProfileOps,
+  isSafeMeguminProfilePath,
+  type MeguminProfileOp,
   meguminChomusukeTest,
   meguminCotById,
   meguminEngineById,
@@ -94,23 +97,37 @@ const actionSchema = z.object({
   args: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
-function replaceInPlace(target: Record<string, unknown>, next: Record<string, unknown>) {
-  for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
-  Object.assign(target, next);
-}
+const profilePatchSchema = z.object({
+  patch: z
+    .array(
+      z.union([
+        z.object({ op: z.literal("set"), path: z.array(z.string()), value: z.unknown() }),
+        z.object({ op: z.literal("unset"), path: z.array(z.string()) }),
+      ]),
+    )
+    .max(2000),
+});
 
-/** Writes a profile edited in the panel into the scope's live profile, then saves it the way Megumin does. */
-function saveEditedProfile(next: unknown) {
-  if (!next || typeof next !== "object" || Array.isArray(next)) throw new Error("A profile object is required.");
-  const live = localProfile as Record<string, unknown>;
-  const incoming = JSON.parse(JSON.stringify(next)) as Record<string, any>;
-  // Memory's archived-message Set is a runtime cache: it reaches the client as {} and must be rebuilt here.
-  if (incoming.memoryCore && typeof incoming.memoryCore === "object") delete incoming.memoryCore._archivedSet;
-  replaceInPlace(live, incoming);
+/**
+ * Applies what the panel changed to the scope's live profile, then saves it the way Megumin does. Only the
+ * changed leaves are written: the rest of the profile (what Megumin's background work wrote meanwhile) and
+ * every nested object's identity (which running jobs hold) are kept.
+ */
+function saveEditedProfile(body: unknown) {
+  const parsed = profilePatchSchema.safeParse(body ?? {});
+  if (!parsed.success) throw new Error("A list of profile changes is required.");
+  const ops = parsed.data.patch as MeguminProfileOp[];
+  if (!ops.every((op) => isSafeMeguminProfilePath(op.path))) throw new Error("A profile change has an invalid path.");
+  if (!ops.length) return;
+  applyMeguminProfileOps(localProfile as Record<string, unknown>, ops);
   MeguminProfile.saveProfileToMemory();
-  // A tab set to Global copies itself to every profile on each save (Megumin's TAB_PROPAGATE).
+  // A tab set to Global copies its keys to every profile when it is edited (Megumin's TAB_PROPAGATE).
+  const touched = new Set(ops.map((op) => op.path[0]));
   const synced = (meguminStoreObject().globalSyncTabs || {}) as Record<string, boolean>;
-  for (const [title, on] of Object.entries(synced)) if (on) MeguminSync.applyTabKeysToAllProfiles(title);
+  for (const [title, on] of Object.entries(synced)) {
+    const keys = (MeguminSync.meguminTabSyncKeys(title) || []) as string[];
+    if (on && keys.some((key) => touched.has(key))) MeguminSync.applyTabKeysToAllProfiles(title);
+  }
 }
 
 function messageIndex(messageId: unknown): number {
@@ -454,12 +471,16 @@ export async function meguminRoutes(app: FastifyInstance) {
   /** The global default profile (the panel with no chat open). */
   app.get("/global/view", async () => withMeguminGlobal(app.db, () => meguminChatView()));
 
-  app.put("/global/profile", async (req) =>
-    withMeguminGlobal(app.db, () => {
-      saveEditedProfile((req.body as { profile?: unknown })?.profile);
-      return meguminChatView();
-    }),
-  );
+  app.put("/global/profile", async (req, reply) => {
+    try {
+      return await withMeguminGlobal(app.db, () => {
+        saveEditedProfile(req.body);
+        return meguminChatView();
+      });
+    } catch (err) {
+      return reply.status(400).send({ error: err instanceof Error ? err.message : "Invalid profile changes" });
+    }
+  });
 
   /** "Reset" on the global default profile. */
   app.post("/global/profile/reset", async () =>
@@ -526,7 +547,7 @@ export async function meguminRoutes(app: FastifyInstance) {
     if (!(await requireChat(req.params.chatId))) return reply.status(404).send({ error: "Chat not found" });
     try {
       return await withMeguminChat(app.db, req.params.chatId, () => {
-        saveEditedProfile((req.body as { profile?: unknown })?.profile);
+        saveEditedProfile(req.body);
         return meguminChatView();
       });
     } catch (err) {

@@ -14,6 +14,7 @@ export * from "./actions.js";
 export * from "./catalog.js";
 export * from "./view.js";
 export * from "./devmode.js";
+export * from "./patch.js";
 export { getContext, setMeguminLogger, toastr as meguminToastr } from "./vendor/src/st.js";
 export { localProfile } from "./vendor/src/core/state.js";
 

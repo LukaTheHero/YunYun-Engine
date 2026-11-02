@@ -21,6 +21,10 @@
     "./megumin/strip": {
       "import": "./dist/megumin/strip.js",
       "types": "./dist/megumin/strip.d.ts"
+    },
+    "./megumin/patch": {
+      "import": "./dist/megumin/patch.js",
+      "types": "./dist/megumin/patch.d.ts"
     }
   },
   "scripts": {

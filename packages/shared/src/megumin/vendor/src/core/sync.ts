@@ -14,7 +14,7 @@ import { meguminConsole } from "../st.js";
 
 import { extension_settings, saveSettingsDebounced } from "../st.js";
 import { extensionName } from "./constants.js";
-import { localProfile, _loadedProfileKey } from "./state.js";
+import { localProfile, loadedProfileKeyNow } from "./state.js";
 import { getCharacterKey } from "./keys.js";
 import { meguminDiffPrompts } from "../prompts/storage.js";
 
@@ -113,8 +113,8 @@ export function applyTabKeysToAllProfiles(title) {
     // does not corrupt one save file, it corrupts all of them at once and there is
     // nothing to recover from. Runs in one tick, so one check at the top covers it.
     const liveKey = getCharacterKey() || "default";
-    if (_loadedProfileKey && liveKey !== _loadedProfileKey) {
-        meguminConsole.debug(`[Megumin-Suite] Global tab sync declined: the settings on screen belong to "${_loadedProfileKey}" but the active chat is now "${liveKey}". Nothing was broadcast.`);
+    if (loadedProfileKeyNow() && liveKey !== loadedProfileKeyNow()) {
+        meguminConsole.debug(`[Megumin-Suite] Global tab sync declined: the settings on screen belong to "${loadedProfileKeyNow()}" but the active chat is now "${liveKey}". Nothing was broadcast.`);
         return false;
     }
 
@@ -172,8 +172,8 @@ export function syncPromptsGlobally(moduleName, dataKey, dataValue) {
     // all ~15 of those sites from broadcasting the wrong chat's prompt text. Each call is a
     // single synchronous UI edit, so checking once on entry covers the whole broadcast.
     const liveKey = getCharacterKey() || "default";
-    if (_loadedProfileKey && liveKey !== _loadedProfileKey) {
-        meguminConsole.debug(`[Megumin-Suite] Global prompt sync of ${moduleName}.${dataKey} declined: the value came from "${_loadedProfileKey}" but the active chat is now "${liveKey}". No profiles were changed.`);
+    if (loadedProfileKeyNow() && liveKey !== loadedProfileKeyNow()) {
+        meguminConsole.debug(`[Megumin-Suite] Global prompt sync of ${moduleName}.${dataKey} declined: the value came from "${loadedProfileKeyNow()}" but the active chat is now "${liveKey}". No profiles were changed.`);
         return;
     }
     // This is the write path that made settings.json grow: one edited prompt block fans

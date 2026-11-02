@@ -19,7 +19,7 @@ import {
     debounce, humanizedDateTime, isGenerating,
 } from "../st.js";
 import { extensionName } from "./constants.js";
-import { localProfile, setLocalProfile, _loadedProfileKey, setLoadedProfileKey } from "./state.js";
+import { localProfile, setLocalProfile, loadedProfileKeyNow, setLoadedProfileKey } from "./state.js";
 import { getCharacterKey, getRawAvatar, getAvatarKey, getParentChatKey, getProfileLevel } from "./keys.js";
 import { fireRefreshHook, REFRESH } from "./refreshHooks.js";
 import { meguminSparsifyProfilePrompts, meguminRehydrateProfilePrompts } from "../prompts/storage.js";
@@ -927,18 +927,18 @@ function saveGlobalChomusuke(profileToSave) {
 export function saveProfileToMemory() {
     const key = getCharacterKey() || "default";
 
-    // `key` is the live truth; localProfile belongs to _loadedProfileKey, which is set in
+    // `key` is the live truth; localProfile belongs to loadedProfileKeyNow(), which is set in
     // the same synchronous block as localProfile itself. They disagree whenever the chat
     // has moved on but the profile has not caught up yet (initProfile runs 200ms after
     // CHAT_CHANGED) or when a long await outlived a chat switch. Decline the whole save
-    // instead of quietly redirecting it to _loadedProfileKey: that is the kind of guesswork
+    // instead of quietly redirecting it to loadedProfileKeyNow(): that is the kind of guesswork
     // that caused the earlier flush bug, and the caller may be holding data that is stale
     // in its own right. _profileSavePending is deliberately left alone so
     // flushProfileSettingsToLoadedKey() can still write the settings half under the key
     // the data actually belongs to; initProfile clears the flag when the next profile
     // loads, so it cannot leak into an untouched chat.
-    if (_loadedProfileKey && key !== _loadedProfileKey) {
-        meguminConsole.debug(`[Megumin-Suite] saveProfileToMemory declined: the profile in memory belongs to "${_loadedProfileKey}" but the active chat is now "${key}". Skipping the chat_metadata blocks and the settings write so this chat's data is not saved into another chat.`);
+    if (loadedProfileKeyNow() && key !== loadedProfileKeyNow()) {
+        meguminConsole.debug(`[Megumin-Suite] saveProfileToMemory declined: the profile in memory belongs to "${loadedProfileKeyNow()}" but the active chat is now "${key}". Skipping the chat_metadata blocks and the settings write so this chat's data is not saved into another chat.`);
         return;
     }
 
@@ -1074,7 +1074,7 @@ export function flushProfileSettingsToLoadedKey() {
     // would write a chat-level profile for a chat that was merely inheriting the
     // character-level one, and that inheritance would be gone for good.
     if (!_profileSavePending) return;
-    if (!_loadedProfileKey) return;
+    if (!loadedProfileKeyNow()) return;
     if (!localProfile || !extension_settings[extensionName]?.profiles) return;
 
     const ruleBox = $("#ps_main_current_rule");
@@ -1111,7 +1111,7 @@ export function flushProfileSettingsToLoadedKey() {
     meguminSparsifyProfilePrompts(profileToSave);
     saveGlobalChomusuke(profileToSave);
 
-    extension_settings[extensionName].profiles[_loadedProfileKey] = profileToSave;
+    extension_settings[extensionName].profiles[loadedProfileKeyNow()] = profileToSave;
     saveSettingsDebounced();
     _profileSavePending = false;
 }

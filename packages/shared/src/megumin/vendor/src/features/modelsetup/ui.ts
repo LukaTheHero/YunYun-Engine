@@ -16,7 +16,7 @@ import { toastr, $ } from "../../st.js";
 
 import { extension_settings, saveSettingsDebounced } from "../../st.js";
 import { extensionName } from "../../core/constants.js";
-import { localProfile, _loadedProfileKey } from "../../core/state.js";
+import { localProfile, loadedProfileKeyNow } from "../../core/state.js";
 import { getCharacterKey } from "../../core/keys.js";
 import { saveProfileToMemory } from "../../core/profile.js";
 import { meguminIsTabSynced, applyTabKeysToAllProfiles } from "../../core/sync.js";
@@ -260,7 +260,7 @@ function useLoadout(l, draft, rerender) {
     // Same guard as Global sync: the page must belong to the chat that's open,
     // or this character's settings land on another one.
     const liveKey = getCharacterKey() || "default";
-    if (_loadedProfileKey && liveKey !== _loadedProfileKey) {
+    if (loadedProfileKeyNow() && liveKey !== loadedProfileKeyNow()) {
         toastr.warning("The panel is still showing the previous chat's settings. Reopen it and try again.", "Megumin Suite");
         return;
     }

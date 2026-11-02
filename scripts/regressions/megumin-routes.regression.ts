@@ -146,16 +146,56 @@ try {
   const view = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/view` });
   assert.equal(view.profile.mode, "v11-voice");
   assert.equal(view.enabled, true);
-  const profile = {
-    ...view.profile,
-    userLanguage: "FRENCH",
-    blockStack: { ...view.profile.blockStack, order: ["world"] },
-    blocks: ["info"],
-  };
-  const saved = await ok({ method: "PUT", url: `/api/megumin/chats/${chat.id}/profile`, payload: { profile } });
+  const patchUrl = (id: string) => `/api/megumin/chats/${id}/profile`;
+  const setOps = (changes: Record<string, unknown>) =>
+    Object.entries(changes).map(([path, value]) => ({ op: "set", path: path.split("."), value }));
+  const saved = await ok({
+    method: "PUT",
+    url: patchUrl(chat.id),
+    payload: { patch: setOps({ userLanguage: "FRENCH", "blockStack.order": ["world"], blocks: ["info"] }) },
+  });
   assert.equal(saved.profile.userLanguage, "FRENCH");
+  assert.deepEqual(saved.profile.blockStack.order, ["world"]);
+  assert.ok(Array.isArray(saved.profile.blockStack.custom), "a nested save keeps the object's other fields");
+  for (const bad of [
+    { patch: [{ op: "set", path: ["__proto__", "polluted"], value: 1 }] },
+    { patch: [{ op: "set", path: [], value: 1 }] },
+    { profile: { ...view.profile } },
+  ]) {
+    const res = await app.inject({ method: "PUT", url: patchUrl(chat.id), payload: bad });
+    assert.equal(res.statusCode, 400, `refused: ${JSON.stringify(bad).slice(0, 60)}`);
+  }
+  assert.equal(({} as Record<string, unknown>).polluted, undefined);
+
+  // A save carries only what the panel changed: what Megumin's own work wrote meanwhile is kept.
+  await ok({
+    method: "POST",
+    url: `/api/megumin/chats/${chat.id}/actions`,
+    payload: { action: "npc.add", args: { name: "Darkness" } },
+  });
+  const afterSave = await ok({
+    method: "PUT",
+    url: patchUrl(chat.id),
+    payload: { patch: setOps({ userPronouns: "she/her" }) },
+  });
+  assert.ok(
+    afterSave.profile.npcBank.npcs.some((n: { name: string }) => n.name === "Darkness"),
+    "an NPC banked after the view was read survives a panel save",
+  );
+
+  // Another chat on the same profile sees the change (both chats have no character: the default key).
+  const twin = await ok({
+    method: "POST",
+    url: "/api/chats",
+    payload: { name: "Twin", mode: "roleplay", characterIds: [], promptPresetId: stock.id },
+  });
+  const twinView = await ok({ method: "GET", url: `/api/megumin/chats/${twin.id}/view` });
+  assert.equal(twinView.profile.userPronouns, "she/her", "a profile shared by two chats is the same in both");
+  await ok({ method: "PUT", url: patchUrl(twin.id), payload: { patch: setOps({ userLanguage: "SPANISH" }) } });
+  const backInFirst = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/view` });
+  assert.equal(backInFirst.profile.userLanguage, "SPANISH", "an idle chat loads the shared profile again");
   const appSettings = createAppSettingsStorage(db);
-  await until(async () => String(await appSettings.get("megumin")).includes("FRENCH"), "the store to be written");
+  await until(async () => String(await appSettings.get("megumin")).includes("SPANISH"), "the store to be written");
 
   const catalog = await ok({ method: "GET", url: "/api/megumin/catalog" });
   assert.ok(catalog.engines.some((e: any) => e.id === "v11-voice"));
@@ -230,11 +270,15 @@ try {
   });
   const chatProfileView = await ok({ method: "GET", url: `/api/megumin/chats/${chat.id}/view` });
   assert.equal(chatProfileView.profileLevel, "chat");
-  await ok({
-    method: "PUT",
-    url: `/api/megumin/chats/${chat.id}/profile`,
-    payload: { profile: { ...chatProfileView.profile, userLanguage: "GERMAN" } },
-  });
+  // Each chat keeps saving its own profile after another chat loaded a different one.
+  const twinPerChat = await ok({ method: "GET", url: `/api/megumin/chats/${twin.id}/view` });
+  assert.equal(twinPerChat.profileLevel, "chat");
+  await ok({ method: "GET", url: "/api/megumin/global/view" });
+  await ok({ method: "PUT", url: patchUrl(chat.id), payload: { patch: setOps({ userLanguage: "GERMAN" }) } });
+  await until(async () => {
+    const store = JSON.parse(String((await appSettings.get("megumin")) ?? "{}"));
+    return store.profiles?.[`chat::${chat.id}`]?.userLanguage === "GERMAN";
+  }, "the first chat's own profile to be saved after other chats loaded theirs");
   const synced = await ok({
     method: "POST",
     url: `/api/megumin/chats/${chat.id}/actions`,

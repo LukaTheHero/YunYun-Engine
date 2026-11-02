@@ -18,6 +18,16 @@ const settingsRoot: Record<string, unknown> = {};
 let loaded: Promise<void> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let saving: Promise<void> = Promise.resolve();
+/** Bumped whenever the store changes, so live chats sharing a profile load it again when idle. */
+let revision = 0;
+
+export function meguminStoreRevision(): number {
+  return revision;
+}
+
+export function bumpMeguminStoreRevision(): void {
+  revision += 1;
+}
 
 function parseStore(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
@@ -81,6 +91,7 @@ function serializeStore(): string {
 
 /** Writes the store back, coalescing bursts (a reply can save the profile several times). */
 export function scheduleMeguminStoreSave(db: DB, delayMs = 400): void {
+  revision += 1;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
@@ -104,6 +115,7 @@ export async function flushMeguminStore(db: DB): Promise<void> {
 
 /** Replaces the whole store (the panel's import, or a reset). */
 export function replaceMeguminStore(next: Record<string, unknown>): void {
+  revision += 1;
   const store = meguminStoreObject();
   for (const key of Object.keys(store)) delete store[key];
   Object.assign(store, next);

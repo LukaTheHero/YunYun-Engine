@@ -22,7 +22,7 @@ import { meguminConsole, toastr, $, window, document } from "../../st.js";
 // ────────────────────────────────────────────────────────────────────────────
 
 import { getContext, generateQuietPrompt, Popup, POPUP_TYPE } from "../../st.js";
-import { localProfile, _loadedProfileKey } from "../../core/state.js";
+import { localProfile, loadedProfileKeyNow } from "../../core/state.js";
 import { getCharacterKey, meguminActiveDataIdentity, setCollectionIdProvider } from "../../core/keys.js";
 import { saveProfileToMemory, saveProfileDebounced } from "../../core/profile.js";
 import { syncPromptsGlobally } from "../../core/sync.js";
@@ -1124,8 +1124,8 @@ export function memRunVaultMigration() {
     // message list. The identity is also handed to the vector insert below, which is
     // async and can outlive this function.
     const runIdentity = meguminActiveDataIdentity();
-    if (_loadedProfileKey && (getCharacterKey() || "default") !== _loadedProfileKey) {
-        meguminConsole.debug(`[Megumin-Suite] memRunVaultMigration declined: the profile in memory belongs to "${_loadedProfileKey}" but the active chat is now "${getCharacterKey() || "default"}". No chunks were migrated.`);
+    if (loadedProfileKeyNow() && (getCharacterKey() || "default") !== loadedProfileKeyNow()) {
+        meguminConsole.debug(`[Megumin-Suite] memRunVaultMigration declined: the profile in memory belongs to "${loadedProfileKeyNow()}" but the active chat is now "${getCharacterKey() || "default"}". No chunks were migrated.`);
         return;
     }
 

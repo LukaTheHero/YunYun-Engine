@@ -24,7 +24,7 @@ import { createGalleryStorage } from "../storage/gallery.storage.js";
 import { resolveMemoryRecallEmbeddingSource } from "../memory-recall-embedding.js";
 import { resolveConnectionImageDefaults } from "../image/image-generation-defaults.js";
 
-interface HostIoContext {
+export interface HostIoContext {
   chatId: string;
   chatConnectionId: string | null;
   chatMetadata: Record<string, unknown>;

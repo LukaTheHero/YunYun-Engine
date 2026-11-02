@@ -40,11 +40,15 @@ export function getLocalProfileObject(): Record<string, any> {
   return profileNow();
 }
 
-export let _loadedProfileKey: string | null = null;
+// The key of the profile this chat's scope loaded. SillyTavern keeps one global (one open chat); every chat
+// here has its own, so Megumin's save guards (rewritten by the sync script to call loadedProfileKeyNow())
+// compare a chat's live key with the profile that chat loaded, never with another chat's.
+export function loadedProfileKeyNow(): string | null {
+  return maybeMeguminScope()?.chat.loadedProfileKey ?? null;
+}
 export function setLoadedProfileKey(key: string | null): void {
   const scope = maybeMeguminScope();
   if (scope) scope.chat.loadedProfileKey = key;
-  _loadedProfileKey = key;
 }
 
 // UI-only state in SillyTavern (the open settings tab, the Dev Mode dirty flag).
