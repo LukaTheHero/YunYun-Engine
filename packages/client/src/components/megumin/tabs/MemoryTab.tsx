@@ -30,6 +30,7 @@ import {
   Save,
   Settings2,
   Trash2,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
@@ -40,15 +41,17 @@ import { useMeguminPanel } from "../megumin-panel-context";
 import {
   MEGUMIN_INPUT_CLASS,
   MeguminButton,
+  MeguminFeatureBar,
+  MeguminGrid,
   MeguminHint,
   MeguminNeedsChat,
   MeguminRow,
   MeguminSection,
   MeguminSelect,
-  MeguminToggle,
   useDraftText,
 } from "../MeguminControls";
 import { MeguminPromptOverrides } from "./MeguminPromptOverrides";
+import { Badge, Callout } from "./presetControls";
 
 interface MemoryChunk {
   id: string;
@@ -123,10 +126,10 @@ function LimitSlider({
   onSettle?: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">{label}</span>
-        <span className="font-mono text-[0.6875rem] font-bold">{value}</span>
+        <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">{label}</span>
+        <span className="font-mono text-[0.8125rem] font-bold">{value}</span>
       </div>
       <input
         type="range"
@@ -160,7 +163,7 @@ function ChunkEditor({
   const { draft, change, flush } = useDraftText(value, onSave, 800);
   return (
     <textarea
-      className={cn(MEGUMIN_INPUT_CLASS, "resize-y font-mono text-[0.6875rem] leading-relaxed")}
+      className={cn(MEGUMIN_INPUT_CLASS, "resize-y font-mono text-[0.8125rem] leading-relaxed")}
       rows={rows}
       value={draft}
       aria-label={ariaLabel}
@@ -442,34 +445,32 @@ export function MemoryTab() {
   const newestFirstChunks = useMemo(() => [...shortChunks].reverse(), [shortChunks]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold ring-1",
-            mem.enabled
-              ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/25"
-              : "bg-[var(--secondary)]/50 text-[var(--muted-foreground)] ring-[var(--border)]",
-          )}
-        >
-          {mem.enabled ? <CircleCheck size="0.625rem" /> : <CircleX size="0.625rem" />}
-          {mem.enabled ? t("megumin.memory.enabled") : t("megumin.memory.disabled")}
-        </span>
-      </div>
+    <div className="flex flex-col gap-4">
+      <Callout tone="gold" icon={<TriangleAlert size="0.9375rem" className="text-amber-500" />}>
+        <div className="font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+          {t("megumin.memory.calloutTitle")}
+        </div>
+        <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4">
+          <li>{t("megumin.memory.calloutCache")}</li>
+          <li>{t("megumin.memory.calloutSemantic")}</li>
+        </ul>
+      </Callout>
 
-      <MeguminHint tone="warning">
-        <span className="font-semibold">{t("megumin.memory.calloutTitle")}</span> {t("megumin.memory.calloutCache")}{" "}
-        {t("megumin.memory.calloutSemantic")}
-      </MeguminHint>
-
-      <MeguminToggle
-        label={
-          <span className="inline-flex items-center gap-1.5">
-            <Cpu size="0.75rem" className="text-emerald-500" />
+      {/* Megumin's "Turn on Memory" bar, with the tab's Enabled/Disabled badge beside its name. */}
+      <MeguminFeatureBar
+        icon={<Cpu size="1rem" className="shrink-0 text-emerald-500" />}
+        title={
+          <>
             {t("megumin.memory.enable")}
-          </span>
+            <Badge
+              tone={mem.enabled ? "active" : "muted"}
+              icon={mem.enabled ? <CircleCheck size="0.6875rem" /> : <CircleX size="0.6875rem" />}
+            >
+              {mem.enabled ? t("megumin.memory.enabled") : t("megumin.memory.disabled")}
+            </Badge>
+          </>
         }
-        help={t("megumin.memory.enableHelp")}
+        description={t("megumin.memory.enableHelp")}
         checked={mem.enabled === true}
         onChange={toggleEnabled}
       />
@@ -480,178 +481,234 @@ export function MemoryTab() {
 
           <MeguminSection
             title={t("megumin.memory.dashboard")}
-            icon={<ChartGantt size="0.875rem" />}
+            icon={<ChartGantt size="0.9375rem" />}
             headerAction={
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[0.625rem] font-bold text-emerald-500 ring-1 ring-emerald-500/30">
-                <Save size="0.625rem" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-500 ring-1 ring-emerald-500/30">
+                <Save size="0.75rem" />
                 {t("megumin.memory.tokensSaved", { count: view.memory?.tokensSaved ?? 0 })}
               </span>
             }
           >
-            <MeguminRow>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (file) void importMemory(file);
-                }}
-              />
-              <MeguminButton
-                icon={<FileUp size="0.75rem" />}
-                title={t("megumin.memory.import")}
-                onClick={() => fileRef.current?.click()}
-              >
-                {t("megumin.memory.import")}
-              </MeguminButton>
-              <MeguminButton
-                icon={<Download size="0.75rem" />}
-                title={t("megumin.memory.export")}
-                onClick={exportMemory}
-              >
-                {t("megumin.memory.export")}
-              </MeguminButton>
-            </MeguminRow>
-            <div className="flex flex-wrap justify-between gap-1 text-[0.625rem] text-[var(--muted-foreground)]">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            {/* The legend is spread over the bar, oldest on the left to newest on the right, like its segments. */}
+            <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
                 {t("megumin.memory.legendVault")}
               </span>
               {!isRawLong ? (
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
                   {t("megumin.memory.legendShort")}
                 </span>
               ) : null}
-              <span className="inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-700" />
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-700" />
                 {t("megumin.memory.legendPending")}
               </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 {t("megumin.memory.legendWorking")}
               </span>
             </div>
-            <div className="flex h-3 w-full overflow-hidden rounded-full bg-black/50">
-              <div
-                className="bg-blue-500 transition-[width]"
-                style={{ width: `${dash.pVault}%` }}
-                title={t("megumin.memory.barVault")}
-              />
-              {!isRawLong ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-black/50">
                 <div
-                  className="bg-amber-500 transition-[width]"
-                  style={{ width: `${dash.pShort}%` }}
-                  title={t("megumin.memory.barShort")}
+                  className="bg-blue-500 transition-[width]"
+                  style={{ width: `${dash.pVault}%` }}
+                  title={t("megumin.memory.barVault")}
                 />
-              ) : null}
-              <div
-                className="transition-[width] [background:repeating-linear-gradient(45deg,#047857,#047857_10px,#10b981_10px,#10b981_20px)]"
-                style={{ width: `${dash.pPend}%` }}
-                title={t("megumin.memory.barPending")}
-              />
-              <div
-                className="bg-emerald-500 transition-[width]"
-                style={{ width: `${dash.pWork}%` }}
-                title={t("megumin.memory.barWorking")}
-              />
+                {!isRawLong ? (
+                  <div
+                    className="bg-amber-500 transition-[width]"
+                    style={{ width: `${dash.pShort}%` }}
+                    title={t("megumin.memory.barShort")}
+                  />
+                ) : null}
+                <div
+                  className="transition-[width] [background:repeating-linear-gradient(45deg,#047857,#047857_10px,#10b981_10px,#10b981_20px)]"
+                  style={{ width: `${dash.pPend}%` }}
+                  title={t("megumin.memory.barPending")}
+                />
+                <div
+                  className="bg-emerald-500 transition-[width]"
+                  style={{ width: `${dash.pWork}%` }}
+                  title={t("megumin.memory.barWorking")}
+                />
+              </div>
+              <div className="flex justify-between gap-3 text-xs font-semibold text-[var(--muted-foreground)] opacity-80">
+                <span>{t("megumin.memory.oldest")}</span>
+                <span className="text-right">{t("megumin.memory.newest")}</span>
+              </div>
             </div>
-            <div className="flex justify-between text-[0.5625rem] font-bold text-[var(--muted-foreground)] opacity-70">
-              <span>{t("megumin.memory.oldest")}</span>
-              <span>{t("megumin.memory.newest")}</span>
-            </div>
-            <div className="text-center text-[0.625rem] text-[var(--muted-foreground)]">
-              {isRawLong
-                ? t("megumin.memory.statusRawLong", {
-                    total: realMessages,
-                    vault: dash.vaultSize,
-                    pending: dash.pending,
-                    working: dash.working,
-                  })
-                : t("megumin.memory.status", {
-                    total: realMessages,
-                    vault: dash.vaultSize,
-                    short: dash.shortSize,
-                    pending: dash.pending,
-                    working: dash.working,
-                  })}
+            {/* The counts, and the file actions for what the chat has archived. */}
+            <div className="flex flex-col items-center gap-3 border-t border-dashed border-[var(--border)]/70 pt-3 @2xl:flex-row @2xl:justify-between">
+              <div className="text-center text-xs text-[var(--muted-foreground)] @2xl:text-left">
+                {isRawLong
+                  ? t("megumin.memory.statusRawLong", {
+                      total: realMessages,
+                      vault: dash.vaultSize,
+                      pending: dash.pending,
+                      working: dash.working,
+                    })
+                  : t("megumin.memory.status", {
+                      total: realMessages,
+                      vault: dash.vaultSize,
+                      short: dash.shortSize,
+                      pending: dash.pending,
+                      working: dash.working,
+                    })}
+              </div>
+              <MeguminRow className="shrink-0">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void importMemory(file);
+                  }}
+                />
+                <MeguminButton
+                  icon={<FileUp size="0.75rem" />}
+                  title={t("megumin.memory.import")}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {t("megumin.memory.import")}
+                </MeguminButton>
+                <MeguminButton
+                  icon={<Download size="0.75rem" />}
+                  title={t("megumin.memory.export")}
+                  onClick={exportMemory}
+                >
+                  {t("megumin.memory.export")}
+                </MeguminButton>
+              </MeguminRow>
             </div>
           </MeguminSection>
 
-          <MeguminSection title={t("megumin.memory.engineSettings")} icon={<Settings2 size="0.875rem" />}>
-            <div className="rounded-md border-l-2 border-amber-500 bg-amber-500/10 p-2 text-[0.625rem] leading-relaxed">
-              <div className="mb-1 inline-flex items-center gap-1 font-bold text-amber-500">
-                <Info size="0.625rem" />
-                {t("megumin.memory.howToTitle")}
-              </div>
-              <ol className="ml-3 list-decimal text-[var(--marinara-chat-chrome-panel-muted)]">
+          <MeguminSection
+            title={t("megumin.memory.engineSettings")}
+            icon={<Settings2 size="0.9375rem" />}
+            contentClassName="gap-4"
+          >
+            <Callout tone="gold" icon={<Info size="0.9375rem" className="text-amber-500" />}>
+              <div className="mb-1 font-semibold text-amber-500">{t("megumin.memory.howToTitle")}</div>
+              <ol className="flex list-decimal flex-col gap-0.5 pl-4">
                 <li>{t("megumin.memory.howTo1")}</li>
                 <li>{t("megumin.memory.howTo2")}</li>
                 <li>{t("megumin.memory.howTo3")}</li>
               </ol>
-            </div>
+            </Callout>
 
-            <MeguminSelect
-              label={t("megumin.memory.architecture")}
-              help={t("megumin.memory.architectureHelp")}
-              value={mem.architecture || "raw_short_long"}
-              options={[
-                { value: "raw_short_long", label: t("megumin.memory.architectureFull") },
-                { value: "raw_long", label: t("megumin.memory.architectureRawLong") },
-              ]}
-              onChange={(v) => {
-                setMem((m) => {
-                  m.architecture = v;
-                });
-                migrateSoon();
-              }}
-            />
+            {/* The four choices side by side, then the tier sizes, then who does the summarising. */}
+            <MeguminGrid layout="fields" className="gap-x-4 gap-y-4">
+              <MeguminSelect
+                label={t("megumin.memory.architecture")}
+                help={t("megumin.memory.architectureHelp")}
+                value={mem.architecture || "raw_short_long"}
+                options={[
+                  { value: "raw_short_long", label: t("megumin.memory.architectureFull") },
+                  { value: "raw_long", label: t("megumin.memory.architectureRawLong") },
+                ]}
+                onChange={(v) => {
+                  setMem((m) => {
+                    m.architecture = v;
+                  });
+                  migrateSoon();
+                }}
+              />
 
-            <div className="flex flex-col gap-3 rounded-md border border-[var(--border)] bg-[var(--background)]/40 p-2.5">
-              <LimitSlider
-                label={t("megumin.memory.workingLimit")}
-                hint={t("megumin.memory.workingLimitHint")}
-                value={workingLimit}
-                min={chunkSize}
-                max={300}
-                step={chunkSize}
+              <MeguminSelect
+                label={t("megumin.memory.scannerEngine")}
+                help={t("megumin.memory.scannerEngineHelp")}
+                value={mem.scannerEngine || "tfidf"}
+                options={[
+                  { value: "tfidf", label: t("megumin.memory.scannerTfidf") },
+                  { value: "semantic", label: t("megumin.memory.scannerSemantic") },
+                ]}
+                onChange={(v) => void changeScanner(v)}
+              />
+
+              <MeguminSelect
+                label={t("megumin.memory.triggerMode")}
+                help={t("megumin.memory.triggerModeHelp")}
+                value={mem.triggerMode || "frequency"}
+                options={[
+                  { value: "manual", label: t("megumin.memory.triggerManual") },
+                  { value: "every", label: t("megumin.memory.triggerEvery") },
+                  { value: "frequency", label: t("megumin.memory.triggerFrequency") },
+                ]}
                 onChange={(v) =>
                   setMem((m) => {
-                    m.workingLimit = v;
+                    m.triggerMode = v;
                   })
                 }
-                onSettle={migrateSoon}
               />
-              {!isRawLong ? (
+              {mem.triggerMode === "frequency" ? (
+                <MeguminSelect
+                  label={t("megumin.memory.frequency")}
+                  value={String(mem.autoFreq || 10)}
+                  options={FREQUENCIES.map((n) => ({ value: String(n), label: String(n) }))}
+                  onChange={(v) =>
+                    setMem((m) => {
+                      m.autoFreq = parseInt(v, 10);
+                    })
+                  }
+                />
+              ) : null}
+            </MeguminGrid>
+
+            <div className="flex flex-col gap-4 rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/40 p-4">
+              <div
+                className={cn(
+                  "grid grid-cols-1 items-start gap-x-6 gap-y-4 @lg:grid-cols-2",
+                  !isRawLong && "@3xl:grid-cols-3",
+                )}
+              >
                 <LimitSlider
-                  label={t("megumin.memory.shortTermLimit")}
-                  hint={t("megumin.memory.shortTermLimitHint")}
-                  value={shortTermLimit}
+                  label={t("megumin.memory.workingLimit")}
+                  hint={t("megumin.memory.workingLimitHint")}
+                  value={workingLimit}
                   min={chunkSize}
-                  max={1000}
+                  max={300}
                   step={chunkSize}
                   onChange={(v) =>
                     setMem((m) => {
-                      m.shortTermLimit = v;
+                      m.workingLimit = v;
                     })
                   }
                   onSettle={migrateSoon}
                 />
-              ) : null}
-              <LimitSlider
-                label={t("megumin.memory.chunkSize")}
-                hint={t("megumin.memory.chunkSizeHint")}
-                value={chunkSize}
-                min={10}
-                max={40}
-                step={10}
-                onChange={changeChunkSize}
-                onSettle={migrateSoon}
-              />
-              <div className="flex justify-end border-t border-dashed border-[var(--border)] pt-2.5">
+                {!isRawLong ? (
+                  <LimitSlider
+                    label={t("megumin.memory.shortTermLimit")}
+                    hint={t("megumin.memory.shortTermLimitHint")}
+                    value={shortTermLimit}
+                    min={chunkSize}
+                    max={1000}
+                    step={chunkSize}
+                    onChange={(v) =>
+                      setMem((m) => {
+                        m.shortTermLimit = v;
+                      })
+                    }
+                    onSettle={migrateSoon}
+                  />
+                ) : null}
+                <LimitSlider
+                  label={t("megumin.memory.chunkSize")}
+                  hint={t("megumin.memory.chunkSizeHint")}
+                  value={chunkSize}
+                  min={10}
+                  max={40}
+                  step={10}
+                  onChange={changeChunkSize}
+                  onSettle={migrateSoon}
+                />
+              </div>
+              <div className="flex justify-end border-t border-dashed border-[var(--border)]/70 pt-3">
                 <MeguminButton
                   icon={<RefreshCw size="0.75rem" />}
                   pending={running("memory.applyLimits")}
@@ -663,69 +720,33 @@ export function MemoryTab() {
               </div>
             </div>
 
-            <div className="flex items-start gap-2">
-              <Cat size="0.875rem" className="mt-0.5 shrink-0 text-rose-500" />
-              <div className="flex flex-col gap-1">
-                <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
-                  {t("megumin.memory.backgroundWorker")}
-                </span>
-                <MeguminHint>{t("megumin.memory.backgroundWorkerDesc")}</MeguminHint>
-                <div>
-                  <MeguminButton onClick={() => openTab("chomusuke")} icon={<Cat size="0.75rem" />}>
-                    {t("megumin.memory.openChomusuke")}
-                  </MeguminButton>
+            <div className="flex flex-col gap-3 border-t border-[var(--border)]/50 pt-4 @xl:flex-row @xl:items-center">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <Cat size="1rem" className="mt-0.5 shrink-0 text-rose-500" />
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+                    {t("megumin.memory.backgroundWorker")}
+                  </span>
+                  <MeguminHint>{t("megumin.memory.backgroundWorkerDesc")}</MeguminHint>
                 </div>
               </div>
+              <div className="shrink-0 pl-7 @xl:pl-0">
+                <MeguminButton onClick={() => openTab("chomusuke")} icon={<Cat size="0.75rem" />}>
+                  {t("megumin.memory.openChomusuke")}
+                </MeguminButton>
+              </div>
             </div>
-
-            <MeguminSelect
-              label={t("megumin.memory.scannerEngine")}
-              help={t("megumin.memory.scannerEngineHelp")}
-              value={mem.scannerEngine || "tfidf"}
-              options={[
-                { value: "tfidf", label: t("megumin.memory.scannerTfidf") },
-                { value: "semantic", label: t("megumin.memory.scannerSemantic") },
-              ]}
-              onChange={(v) => void changeScanner(v)}
-            />
-
-            <MeguminSelect
-              label={t("megumin.memory.triggerMode")}
-              help={t("megumin.memory.triggerModeHelp")}
-              value={mem.triggerMode || "frequency"}
-              options={[
-                { value: "manual", label: t("megumin.memory.triggerManual") },
-                { value: "every", label: t("megumin.memory.triggerEvery") },
-                { value: "frequency", label: t("megumin.memory.triggerFrequency") },
-              ]}
-              onChange={(v) =>
-                setMem((m) => {
-                  m.triggerMode = v;
-                })
-              }
-            />
-            {mem.triggerMode === "frequency" ? (
-              <MeguminSelect
-                label={t("megumin.memory.frequency")}
-                value={String(mem.autoFreq || 10)}
-                options={FREQUENCIES.map((n) => ({ value: String(n), label: String(n) }))}
-                onChange={(v) =>
-                  setMem((m) => {
-                    m.autoFreq = parseInt(v, 10);
-                  })
-                }
-              />
-            ) : null}
           </MeguminSection>
 
           <MeguminSection
             title={t("megumin.memory.shortTerm")}
-            icon={<Archive size="0.875rem" />}
+            icon={<Archive size="0.9375rem" />}
             headerAction={
               <MeguminButton variant="danger" icon={<Trash2 size="0.75rem" />} onClick={() => void clearShort()}>
                 {t("megumin.memory.clearAll")}
               </MeguminButton>
             }
+            contentClassName="gap-2"
           >
             {newestFirstChunks.length === 0 ? (
               <MeguminHint>{t("megumin.memory.shortEmpty")}</MeguminHint>
@@ -733,7 +754,10 @@ export function MemoryTab() {
               newestFirstChunks.slice(0, shortShown).map((chunk) => {
                 const open = openChunks.has(chunk.id);
                 return (
-                  <div key={chunk.id} className="overflow-hidden rounded-md border border-[var(--border)]/70">
+                  <div
+                    key={chunk.id}
+                    className="overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/30"
+                  >
                     <button
                       type="button"
                       aria-expanded={open}
@@ -745,30 +769,30 @@ export function MemoryTab() {
                           return next;
                         })
                       }
-                      className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-[0.6875rem] font-semibold hover:bg-[var(--accent)]/50"
+                      className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2.5 text-left text-[0.8125rem] font-semibold hover:bg-[var(--accent)]/50"
                     >
-                      <span className="inline-flex items-center gap-1.5">
-                        <Layers size="0.75rem" className="text-amber-500" />
+                      <span className="inline-flex items-center gap-2">
+                        <Layers size="0.875rem" className="text-amber-500" />
                         {t("megumin.memory.chunkMessages", { range: chunk.id })}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-[0.5625rem] font-normal text-[var(--muted-foreground)]">
-                        <Clock size="0.5625rem" />
+                      <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-normal text-[var(--muted-foreground)]">
+                        <Clock size="0.75rem" />
                         {chunk.timestamp ? new Date(chunk.timestamp).toLocaleString() : ""}
-                        <ChevronDown size="0.625rem" className={cn("transition-transform", open && "rotate-180")} />
+                        <ChevronDown size="0.875rem" className={cn("transition-transform", open && "rotate-180")} />
                       </span>
                     </button>
                     {open ? (
-                      <div className="flex flex-col gap-1.5 border-t border-[var(--border)]/60 p-2">
-                        <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col gap-2 border-t border-[var(--border)]/60 p-3">
+                        <div className="flex items-center justify-between gap-3">
                           <MeguminHint>{t("megumin.memory.chunkEditHint")}</MeguminHint>
                           <button
                             type="button"
                             onClick={() => void deleteChunk(chunk)}
                             title={t("megumin.memory.deleteChunk")}
                             aria-label={t("megumin.memory.deleteChunk")}
-                            className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
+                            className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger shrink-0"
                           >
-                            <Trash2 size="0.75rem" />
+                            <Trash2 size="0.875rem" />
                           </button>
                         </div>
                         <ChunkEditor
@@ -792,46 +816,51 @@ export function MemoryTab() {
 
           <MeguminSection
             title={t("megumin.memory.vault")}
-            icon={<Database size="0.875rem" />}
+            icon={<Database size="0.9375rem" />}
             headerAction={
-              <span className="text-[0.625rem] text-[var(--muted-foreground)]">
+              <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-2.5 py-1 text-xs text-[var(--muted-foreground)]">
                 {t("megumin.memory.vaultCount", { count: vault.length })}
               </span>
             }
           >
-            <input
-              className={MEGUMIN_INPUT_CLASS}
-              value={search}
-              placeholder={t("megumin.memory.vaultSearch")}
-              aria-label={t("megumin.memory.vaultSearch")}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setVaultShown(PAGE_SIZE);
-              }}
-            />
-            <MeguminRow>
-              <MeguminButton
-                icon={<Radar size="0.75rem" />}
-                title={t("megumin.memory.testScannerTitle")}
-                pending={running("memory.testScanner")}
-                disabled={!chatId}
-                onClick={() => void testScanner()}
-              >
-                {t("megumin.memory.testScanner")}
-              </MeguminButton>
-              <MeguminButton
-                variant="danger"
-                icon={<Trash2 size="0.75rem" />}
-                title={t("megumin.memory.clearVaultTitle")}
-                onClick={() => void clearVault()}
-              >
-                {t("megumin.memory.clearAll")}
-              </MeguminButton>
-            </MeguminRow>
+            {/* Search, then the scanner and the wipe, on one line when there is room (Megumin's vault bar). */}
+            <div className="flex flex-col gap-2 @xl:flex-row @xl:items-center">
+              <div className="min-w-0 flex-1">
+                <input
+                  className={MEGUMIN_INPUT_CLASS}
+                  value={search}
+                  placeholder={t("megumin.memory.vaultSearch")}
+                  aria-label={t("megumin.memory.vaultSearch")}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setVaultShown(PAGE_SIZE);
+                  }}
+                />
+              </div>
+              <MeguminRow className="shrink-0">
+                <MeguminButton
+                  icon={<Radar size="0.75rem" />}
+                  title={t("megumin.memory.testScannerTitle")}
+                  pending={running("memory.testScanner")}
+                  disabled={!chatId}
+                  onClick={() => void testScanner()}
+                >
+                  {t("megumin.memory.testScanner")}
+                </MeguminButton>
+                <MeguminButton
+                  variant="danger"
+                  icon={<Trash2 size="0.75rem" />}
+                  title={t("megumin.memory.clearVaultTitle")}
+                  onClick={() => void clearVault()}
+                >
+                  {t("megumin.memory.clearAll")}
+                </MeguminButton>
+              </MeguminRow>
+            </div>
 
             {scanner ? (
-              <div className="flex flex-col gap-2 rounded-md border border-[var(--border)] bg-[var(--background)]/50 p-2">
-                <div className="flex items-center justify-between gap-2 text-[0.6875rem] font-semibold">
+              <div className="flex flex-col gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/50 p-3">
+                <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
                   <span>{t("megumin.memory.scannerResults")}</span>
                   <button
                     type="button"
@@ -840,18 +869,22 @@ export function MemoryTab() {
                     aria-label={t("megumin.memory.scannerClose")}
                     className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
                   >
-                    <X size="0.75rem" />
+                    <X size="0.875rem" />
                   </button>
                 </div>
                 {scanner.engine === "semantic" && scanner.semanticCount > 0 ? (
-                  <div className="rounded border-l-2 border-purple-500 bg-purple-500/10 p-2 text-[0.625rem]">
-                    <div className="font-bold text-purple-400">{t("megumin.memory.scannerSemanticActive")}</div>
+                  <div className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2.5 text-xs leading-relaxed">
+                    <div className="text-[0.8125rem] font-bold text-purple-400">
+                      {t("megumin.memory.scannerSemanticActive")}
+                    </div>
                     <div className="text-[var(--muted-foreground)]">{t("megumin.memory.scannerSemanticDesc")}</div>
                   </div>
                 ) : null}
                 {scanner.engine === "tfidf" || scanner.semanticCount === 0 ? (
-                  <div className="rounded border-l-2 border-emerald-500 bg-emerald-500/10 p-2 text-[0.625rem]">
-                    <div className="font-bold text-emerald-500">{t("megumin.memory.scannerKeywords")}</div>
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-xs leading-relaxed">
+                    <div className="text-[0.8125rem] font-bold text-emerald-500">
+                      {t("megumin.memory.scannerKeywords")}
+                    </div>
                     <div className="text-[var(--muted-foreground)]">
                       {scanner.keywords.length ? scanner.keywords.join(", ") : t("megumin.memory.scannerNone")}
                     </div>
@@ -866,24 +899,24 @@ export function MemoryTab() {
                       <div
                         key={m.id}
                         className={cn(
-                          "rounded border-l-2 bg-black/20 p-2",
-                          scanner.engine === "semantic" ? "border-purple-500" : "border-blue-500",
+                          "flex flex-col gap-1 rounded-lg border bg-black/20 p-3",
+                          scanner.engine === "semantic" ? "border-purple-500/35" : "border-blue-500/35",
                         )}
                       >
                         <div
                           className={cn(
-                            "text-[0.625rem] font-bold",
+                            "text-xs font-bold",
                             scanner.engine === "semantic" ? "text-purple-400" : "text-blue-400",
                           )}
                         >
                           {t("megumin.memory.scannerMatch", { score: m.score, id: m.id })}
                         </div>
                         {m.matchedWords?.length ? (
-                          <div className="text-[0.5625rem] font-bold text-amber-500">
+                          <div className="text-xs font-bold text-amber-500">
                             {t("megumin.memory.scannerTriggers", { words: m.matchedWords.join(", ") })}
                           </div>
                         ) : null}
-                        <div className="mt-1 max-h-36 overflow-y-auto whitespace-pre-wrap rounded bg-black/20 p-1.5 text-[0.6875rem]">
+                        <div className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md bg-black/20 px-3 py-2 text-[0.8125rem] leading-relaxed">
                           {m.text || m.summary}
                         </div>
                       </div>
@@ -896,15 +929,15 @@ export function MemoryTab() {
             {vault.length === 0 ? (
               <MeguminHint>{t("megumin.memory.vaultEmpty", { count: workingLimit + shortTermLimit })}</MeguminHint>
             ) : (
-              <div className="flex max-h-[32rem] flex-col gap-2 overflow-y-auto">
+              <div className="flex max-h-[36rem] flex-col gap-2 overflow-y-auto">
                 {filteredVault.slice(0, vaultShown).map((chunk) => (
                   <div
                     key={chunk.id}
-                    className="flex flex-col gap-1 rounded-md border border-[var(--border)]/70 bg-black/10 p-2"
+                    className="flex flex-col gap-2 rounded-lg border border-[var(--border)]/70 bg-black/10 p-3"
                   >
-                    <div className="flex items-center justify-between gap-2 text-[0.5625rem] font-bold text-blue-400">
+                    <div className="flex items-center justify-between gap-2 text-xs font-bold tracking-wide text-blue-400">
                       <span>{t("megumin.memory.archiveLabel", { id: chunk.id })}</span>
-                      <span className="inline-flex items-center gap-1">
+                      <span className="inline-flex items-center gap-2">
                         {chunk.timestamp ? new Date(chunk.timestamp).toLocaleDateString() : ""}
                         <button
                           type="button"
@@ -913,7 +946,7 @@ export function MemoryTab() {
                           aria-label={t("megumin.memory.deleteArchive")}
                           className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
                         >
-                          <Trash2 size="0.6875rem" />
+                          <Trash2 size="0.875rem" />
                         </button>
                       </span>
                     </div>

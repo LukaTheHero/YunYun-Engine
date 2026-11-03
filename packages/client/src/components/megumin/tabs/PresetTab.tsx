@@ -30,7 +30,15 @@ import { MeguminEngineFlags } from "@marinara-engine/shared/megumin/client";
 import { cn } from "../../../lib/utils";
 import { showConfirmDialog, showPromptDialog } from "../../../lib/app-dialogs";
 import { useMeguminPanel } from "../megumin-panel-context";
-import { MEGUMIN_INPUT_CLASS, MeguminButton, MeguminNumber, MeguminSection, useDraftText } from "../MeguminControls";
+import {
+  MEGUMIN_INPUT_CLASS,
+  MeguminButton,
+  MeguminFeatureBar,
+  MeguminGrid,
+  MeguminNumber,
+  MeguminSection,
+  useDraftText,
+} from "../MeguminControls";
 import { Badge, Callout, PageTabs, PickCard, Segmented, SummaryChip, SwitchRow, engineHas } from "./presetControls";
 import {
   COT_MIGRATIONS,
@@ -92,28 +100,34 @@ export function PresetTab() {
   const thinkingOn = profile.cotEnabled !== false;
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <SummaryChip tone="ok" icon={<Server size="0.625rem" />}>
-          {active ? String(active.label) : String(profile.mode ?? "")}
-        </SummaryChip>
-        <SummaryChip tone={thinkingOn ? "warm" : undefined} icon={<Brain size="0.625rem" />}>
-          {thinkingOn
-            ? t("megumin.preset.summary.thinking", { name: cotLabel })
-            : t("megumin.preset.summary.thinkingOff")}
-        </SummaryChip>
-        <SummaryChip icon={<SlidersHorizontal size="0.625rem" />}>
-          {cfgCount
-            ? t("megumin.preset.summary.configSet", { count: cfgCount })
-            : t("megumin.preset.summary.configDefaults")}
-        </SummaryChip>
-        <MeguminButton
-          icon={<Compass size="0.75rem" />}
-          title={t("megumin.preset.modelSetupTitle")}
-          onClick={() => openTab("setup")}
-        >
-          {t("megumin.preset.modelSetup")}
-        </MeguminButton>
+    <div className="flex flex-col gap-4">
+      {/* Summary chips on the left, the way to Model Setup at the right (Megumin's header button);
+          on a narrow window they all flow in one wrapping row. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 @max-2xl:contents">
+          <SummaryChip tone="ok" icon={<Server size="0.8125rem" className="shrink-0" />}>
+            {active ? String(active.label) : String(profile.mode ?? "")}
+          </SummaryChip>
+          <SummaryChip tone={thinkingOn ? "warm" : undefined} icon={<Brain size="0.8125rem" className="shrink-0" />}>
+            {thinkingOn
+              ? t("megumin.preset.summary.thinking", { name: cotLabel })
+              : t("megumin.preset.summary.thinkingOff")}
+          </SummaryChip>
+          <SummaryChip icon={<SlidersHorizontal size="0.8125rem" className="shrink-0" />}>
+            {cfgCount
+              ? t("megumin.preset.summary.configSet", { count: cfgCount })
+              : t("megumin.preset.summary.configDefaults")}
+          </SummaryChip>
+        </div>
+        <div className="shrink-0 max-sm:[&>button]:min-h-9!">
+          <MeguminButton
+            icon={<Compass size="0.8125rem" />}
+            title={t("megumin.preset.modelSetupTitle")}
+            onClick={() => openTab("setup")}
+          >
+            {t("megumin.preset.modelSetup")}
+          </MeguminButton>
+        </div>
       </div>
 
       <PageTabs
@@ -121,9 +135,21 @@ export function PresetTab() {
         value={page}
         onChange={setPage}
         pages={[
-          { id: "preset", label: t("megumin.preset.page.preset"), icon: <Server size="0.6875rem" /> },
-          { id: "thinking", label: t("megumin.preset.page.thinking"), icon: <Brain size="0.6875rem" /> },
-          { id: "config", label: t("megumin.preset.page.config"), icon: <SlidersHorizontal size="0.6875rem" /> },
+          {
+            id: "preset",
+            label: t("megumin.preset.page.preset"),
+            icon: <Server size="0.875rem" className="shrink-0 max-sm:size-[0.6875rem]" />,
+          },
+          {
+            id: "thinking",
+            label: t("megumin.preset.page.thinking"),
+            icon: <Brain size="0.875rem" className="shrink-0 max-sm:size-[0.6875rem]" />,
+          },
+          {
+            id: "config",
+            label: t("megumin.preset.page.config"),
+            icon: <SlidersHorizontal size="0.875rem" className="shrink-0 max-sm:size-[0.6875rem]" />,
+          },
         ]}
       />
 
@@ -178,48 +204,52 @@ function PresetPageView({
   }, [update, v7Unset]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <Callout tone="gold">{t("megumin.preset.proTip")}</Callout>
 
       {isV7 ? (
         <MeguminSection title={t("megumin.preset.v7.title")} description={t("megumin.preset.v7.description")}>
-          {V7_MODULES.map((mod) => (
-            <SwitchRow
-              key={mod.id}
-              label={mod.label}
-              description={mod.desc}
-              checked={toggles[mod.id] !== false}
-              onChange={(on) =>
-                update((p) => {
-                  p.toggles = { ...(p.toggles ?? {}), [mod.id]: on };
-                })
-              }
-            />
-          ))}
+          <div className="grid grid-cols-1 gap-x-4 gap-y-1 @xl:grid-cols-2">
+            {V7_MODULES.map((mod) => (
+              <SwitchRow
+                key={mod.id}
+                label={mod.label}
+                description={mod.desc}
+                checked={toggles[mod.id] !== false}
+                onChange={(on) =>
+                  update((p) => {
+                    p.toggles = { ...(p.toggles ?? {}), [mod.id]: on };
+                  })
+                }
+              />
+            ))}
+          </div>
         </MeguminSection>
       ) : null}
 
       <MeguminSection title={t("megumin.preset.choose.title")}>
-        <Segmented
-          ariaLabel={t("megumin.preset.choose.filterLabel")}
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { id: "latest", label: t("megumin.preset.choose.latest", { count: latest.length }) },
-            { id: "all", label: t("megumin.preset.choose.all", { count: official.length }) },
-            { id: "mine", label: t("megumin.preset.choose.mine", { count: customModes.length }) },
-          ]}
-        />
-        <div className="grid grid-cols-1 gap-1.5">
+        <div className="w-full @2xl:max-w-md">
+          <Segmented
+            ariaLabel={t("megumin.preset.choose.filterLabel")}
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { id: "latest", label: t("megumin.preset.choose.latest", { count: latest.length }) },
+              { id: "all", label: t("megumin.preset.choose.all", { count: official.length }) },
+              { id: "mine", label: t("megumin.preset.choose.mine", { count: customModes.length }) },
+            ]}
+          />
+        </div>
+        <MeguminGrid layout="cards" className="items-stretch">
           {filter === "mine" && !customModes.length ? (
-            <p className="text-[0.625rem] text-[var(--marinara-chat-chrome-panel-muted)]">
+            <p className="col-span-full text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
               {t("megumin.preset.choose.noneMine")}
             </p>
           ) : null}
           {list.map((m) => (
             <PresetCard key={String(m.id)} engine={m} custom={filter === "mine"} />
           ))}
-        </div>
+        </MeguminGrid>
       </MeguminSection>
     </div>
   );
@@ -241,13 +271,13 @@ function PresetCard({ engine: m, custom }: { engine: MeguminEngine; custom: bool
   const badges = custom ? null : (
     <>
       {m.recommended ? (
-        <Badge tone="rec" icon={<Star size="0.5rem" />}>
+        <Badge tone="rec" icon={<Star size="0.6875rem" />}>
           {t("megumin.preset.badge.recommended")}
         </Badge>
       ) : null}
       {m.isNew && !isLocked ? <Badge tone="new">{t("megumin.preset.badge.new")}</Badge> : null}
       {isLocked ? (
-        <Badge tone="locked" icon={<Lock size="0.5rem" />}>
+        <Badge tone="locked" icon={<Lock size="0.6875rem" />}>
           {t("megumin.preset.badge.comingSoon")}
         </Badge>
       ) : null}
@@ -264,7 +294,7 @@ function PresetCard({ engine: m, custom }: { engine: MeguminEngine; custom: bool
       titleExtra={
         <>
           {isSel ? (
-            <Badge tone="active" icon={<Check size="0.5rem" />}>
+            <Badge tone="active" icon={<Check size="0.6875rem" />}>
               {t("megumin.preset.badge.active")}
             </Badge>
           ) : null}
@@ -275,9 +305,9 @@ function PresetCard({ engine: m, custom }: { engine: MeguminEngine; custom: bool
                 e.stopPropagation();
                 openMeguminDevEngine(String(m.id), openTab);
               }}
-              className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1 text-[0.625rem]"
+              className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1.5 text-xs max-sm:min-h-9!"
             >
-              <Pencil size="0.625rem" />
+              <Pencil size="0.75rem" />
               {t("megumin.preset.edit")}
             </button>
           ) : null}
@@ -303,15 +333,19 @@ function PresetCard({ engine: m, custom }: { engine: MeguminEngine; custom: bool
             });
           }}
           className={cn(
-            "mt-1 flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-left text-[0.625rem]",
-            enhancedOn ? "border-emerald-500/40 bg-emerald-500/10" : "border-[var(--border)]/60",
+            "mt-1 flex min-h-9 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+            enhancedOn
+              ? "border-emerald-500/40 bg-emerald-500/10"
+              : "border-[var(--border)]/60 hover:bg-[var(--accent)]/60",
           )}
         >
-          <span className="inline-flex items-center gap-1 font-medium">
-            <MessageSquareText size="0.625rem" />
+          <span className="inline-flex min-w-0 items-center gap-1.5 text-[0.8125rem] font-medium">
+            <MessageSquareText size="0.875rem" className="shrink-0" />
             {t("megumin.preset.enhancedDialogue.label")}
           </span>
-          <span className={enhancedOn ? "text-emerald-500" : "text-[var(--muted-foreground)]"}>
+          <span
+            className={cn("shrink-0 font-semibold", enhancedOn ? "text-emerald-500" : "text-[var(--muted-foreground)]")}
+          >
             {enhancedOn ? t("megumin.preset.on") : t("megumin.preset.off")}
           </span>
         </button>
@@ -343,15 +377,17 @@ function ThinkingPage({ active, cot }: { active: MeguminEngine | undefined; cot:
   const customEffort = String(profile.customThinkEffort || "100");
 
   return (
-    <div className="flex flex-col gap-3">
-      <MeguminSection title={t("megumin.preset.thinking.title")}>
-        <SwitchRow
-          label={t("megumin.preset.thinking.think")}
+    <div className="flex flex-col gap-4">
+      {/* The page's master switch, drawn as Megumin's highlighted bar. */}
+      <div role="group" aria-label={t("megumin.preset.thinking.title")}>
+        <MeguminFeatureBar
+          title={t("megumin.preset.thinking.think")}
           description={t("megumin.preset.thinking.thinkDescription")}
+          icon={<Brain size="1rem" className="shrink-0" />}
           checked={thinkingOn}
           onChange={(on) => set("cotEnabled", on)}
         />
-      </MeguminSection>
+      </div>
 
       {thinkingOn ? (
         <>
@@ -363,7 +399,7 @@ function ThinkingPage({ active, cot }: { active: MeguminEngine | undefined; cot:
               allowed ? t("megumin.preset.thinking.frameworkMade") : t("megumin.preset.thinking.frameworkAny")
             }
           >
-            <div className="grid grid-cols-1 gap-1.5">
+            <MeguminGrid layout="cards" className="items-stretch">
               {visible.map((x) => {
                 const isSel = cot.type === x.id;
                 const warned = !!allowed && !allowed.includes(x.id);
@@ -375,7 +411,7 @@ function ThinkingPage({ active, cot }: { active: MeguminEngine | undefined; cot:
                     title={x.label}
                     titleExtra={
                       isSel ? (
-                        <Badge tone="custom" icon={<Check size="0.5rem" />}>
+                        <Badge tone="custom" icon={<Check size="0.6875rem" />}>
                           {t("megumin.preset.badge.active")}
                         </Badge>
                       ) : null
@@ -383,7 +419,7 @@ function ThinkingPage({ active, cot }: { active: MeguminEngine | undefined; cot:
                     description={x.desc}
                     badges={
                       warned ? (
-                        <Badge tone="warn" icon={<TriangleAlert size="0.5rem" />}>
+                        <Badge tone="warn" icon={<TriangleAlert size="0.6875rem" />}>
                           {t("megumin.preset.thinking.otherPreset")}
                         </Badge>
                       ) : x.isNew ? (
@@ -393,14 +429,16 @@ function ThinkingPage({ active, cot }: { active: MeguminEngine | undefined; cot:
                   />
                 );
               })}
-            </div>
+            </MeguminGrid>
             {allowed ? (
-              <SwitchRow
-                label={t("megumin.preset.thinking.showAll")}
-                description={t("megumin.preset.thinking.showAllDescription")}
-                checked={showAll}
-                onChange={setShowAll}
-              />
+              <div className="border-t border-[var(--border)]/50 pt-2">
+                <SwitchRow
+                  label={t("megumin.preset.thinking.showAll")}
+                  description={t("megumin.preset.thinking.showAllDescription")}
+                  checked={showAll}
+                  onChange={setShowAll}
+                />
+              </div>
             ) : null}
           </MeguminSection>
 
@@ -413,30 +451,35 @@ function ThinkingPage({ active, cot }: { active: MeguminEngine | undefined; cot:
             </MeguminSection>
           ) : (
             <MeguminSection title={t("megumin.preset.thinking.length")}>
-              <Segmented
-                ariaLabel={t("megumin.preset.thinking.length")}
-                value={effort}
-                onChange={(id) =>
-                  update((p) => {
-                    p.thinkEffort = id;
-                    if (!p.customThinkEffort) p.customThinkEffort = "100";
-                  })
-                }
-                options={[
-                  { id: "100", label: t("megumin.preset.thinking.words", { count: 100 }) },
-                  { id: "250", label: t("megumin.preset.thinking.words", { count: 250 }) },
-                  { id: "450", label: t("megumin.preset.thinking.words", { count: 450 }) },
-                  { id: "custom", label: t("megumin.preset.thinking.custom") },
-                  { id: "unspecified", label: t("megumin.preset.thinking.noLimit") },
-                ]}
-              />
-              {effort === "custom" ? (
-                <MeguminNumber
-                  label={t("megumin.preset.thinking.customWords")}
-                  value={Number(customEffort) || 0}
-                  min={1}
-                  onChange={(n) => set("customThinkEffort", String(n))}
+              {/* Compact on a wide window; on a phone the options wrap at their own width instead of squeezing. */}
+              <div className="w-full @2xl:max-w-xl [&_button]:flex-auto">
+                <Segmented
+                  ariaLabel={t("megumin.preset.thinking.length")}
+                  value={effort}
+                  onChange={(id) =>
+                    update((p) => {
+                      p.thinkEffort = id;
+                      if (!p.customThinkEffort) p.customThinkEffort = "100";
+                    })
+                  }
+                  options={[
+                    { id: "100", label: t("megumin.preset.thinking.words", { count: 100 }) },
+                    { id: "250", label: t("megumin.preset.thinking.words", { count: 250 }) },
+                    { id: "450", label: t("megumin.preset.thinking.words", { count: 450 }) },
+                    { id: "custom", label: t("megumin.preset.thinking.custom") },
+                    { id: "unspecified", label: t("megumin.preset.thinking.noLimit") },
+                  ]}
                 />
+              </div>
+              {effort === "custom" ? (
+                <div className="w-full @2xl:max-w-xs">
+                  <MeguminNumber
+                    label={t("megumin.preset.thinking.customWords")}
+                    value={Number(customEffort) || 0}
+                    min={1}
+                    onChange={(n) => set("customThinkEffort", String(n))}
+                  />
+                </div>
               ) : null}
             </MeguminSection>
           )}
@@ -446,27 +489,33 @@ function ThinkingPage({ active, cot }: { active: MeguminEngine | undefined; cot:
               title={t("megumin.preset.thinking.language")}
               description={t("megumin.preset.thinking.languageDescription")}
             >
-              <Segmented
-                ariaLabel={t("megumin.preset.thinking.language")}
-                value={cot.lang}
-                onChange={(id) => set("model", `cot-${cot.type}-${id}`)}
-                options={THINKING_LANGUAGES.map((l) => ({ id: l.id, label: l.rec ? `${l.label} ★` : l.label }))}
-              />
+              <div className="w-full [&_button]:flex-auto">
+                <Segmented
+                  ariaLabel={t("megumin.preset.thinking.language")}
+                  value={cot.lang}
+                  onChange={(id) => set("model", `cot-${cot.type}-${id}`)}
+                  options={THINKING_LANGUAGES.map((l) => ({ id: l.id, label: l.rec ? `${l.label} ★` : l.label }))}
+                />
+              </div>
             </MeguminSection>
           ) : null}
 
-          <div className="rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/35 px-3 py-2">
+          <div className="rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/35">
             <button
               type="button"
               aria-expanded={advancedOpen}
               onClick={() => setAdvancedOpen(!advancedOpen)}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]"
+              className="flex min-h-11 w-full items-center gap-2 rounded-xl px-4 py-3 text-left text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)] transition-colors hover:bg-[var(--accent)]/40"
             >
-              {advancedOpen ? <ChevronDown size="0.75rem" /> : <ChevronRight size="0.75rem" />}
+              {advancedOpen ? (
+                <ChevronDown size="0.875rem" className="shrink-0" />
+              ) : (
+                <ChevronRight size="0.875rem" className="shrink-0" />
+              )}
               {t("megumin.preset.thinking.advanced")}
             </button>
             {advancedOpen ? (
-              <div className="mt-2 flex flex-col gap-1">
+              <div className="flex flex-col gap-2 border-t border-[var(--border)]/60 px-4 pb-4 pt-3">
                 <SwitchRow
                   label={t("megumin.preset.thinking.gemini")}
                   description={t("megumin.preset.thinking.geminiDescription")}
@@ -585,9 +634,10 @@ function StoryConfigSection() {
     >
       <ConfigSyncRow />
 
-      <div className="flex flex-col gap-1.5">
+      {/* Megumin's preset bar: the picker, then its actions, on one line when there is room. */}
+      <div className="flex flex-col gap-2 @2xl:flex-row @2xl:items-center">
         <select
-          className={MEGUMIN_INPUT_CLASS}
+          className={cn(MEGUMIN_INPUT_CLASS, "@2xl:w-auto @2xl:min-w-0 @2xl:max-w-sm @2xl:flex-1")}
           value={pick}
           aria-label={t("megumin.preset.config.loadPlaceholder")}
           onChange={(e) => setPick(e.target.value)}
@@ -612,11 +662,11 @@ function StoryConfigSection() {
             </optgroup>
           ) : null}
         </select>
-        <div className="flex flex-wrap gap-1.5">
-          <MeguminButton icon={<Download size="0.75rem" />} onClick={load}>
+        <div className="flex flex-1 flex-wrap items-center gap-2 [&>button]:min-h-9!">
+          <MeguminButton icon={<Download size="0.8125rem" />} onClick={load}>
             {t("megumin.preset.config.load")}
           </MeguminButton>
-          <MeguminButton icon={<Save size="0.75rem" />} onClick={() => void saveCurrent()}>
+          <MeguminButton icon={<Save size="0.8125rem" />} onClick={() => void saveCurrent()}>
             {t("megumin.preset.config.saveCurrent")}
           </MeguminButton>
           <button
@@ -624,17 +674,18 @@ function StoryConfigSection() {
             onClick={() => void remove()}
             aria-label={t("megumin.preset.config.delete")}
             title={t("megumin.preset.config.delete")}
-            className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
+            className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger w-9!"
           >
-            <Trash2 size="0.75rem" />
+            <Trash2 size="0.8125rem" />
           </button>
-          <MeguminButton icon={<RotateCcw size="0.75rem" />} onClick={() => void resetAll()}>
+          <span aria-hidden="true" className="hidden flex-1 @2xl:block" />
+          <MeguminButton icon={<RotateCcw size="0.8125rem" />} onClick={() => void resetAll()}>
             {t("megumin.preset.config.resetAll")}
           </MeguminButton>
         </div>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="grid grid-cols-1 items-start gap-x-3 gap-y-2 @2xl:grid-cols-2">
         {fields.map((f) => (
           <ConfigFieldRow
             key={String(f.key)}
@@ -673,13 +724,13 @@ function ConfigSyncRow() {
   };
 
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/40 px-2.5 py-2">
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/40 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <div className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
-          <Earth size="0.6875rem" />
+        <div className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+          <Earth size="0.875rem" className="shrink-0" />
           {t("megumin.preset.config.sync.label")}
         </div>
-        <div className="mt-0.5 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+        <div className="mt-1 text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
           {hostOn
             ? on
               ? t("megumin.preset.config.sync.onDescription")
@@ -692,11 +743,11 @@ function ConfigSyncRow() {
         aria-pressed={on}
         onClick={() => void toggle()}
         className={cn(
-          "mari-chrome-control mari-chrome-control--small inline-flex shrink-0 items-center gap-1 text-[0.625rem]",
+          "mari-chrome-control mari-chrome-control--small inline-flex min-h-9! min-w-16 shrink-0 items-center gap-1.5 text-xs",
           hostOn ? (on ? "text-emerald-500" : "text-amber-500") : "opacity-55",
         )}
       >
-        <Earth size="0.625rem" />
+        <Earth size="0.75rem" />
         {on ? t("megumin.preset.on") : t("megumin.preset.off")}
       </button>
     </div>
@@ -746,27 +797,33 @@ function ConfigFieldRow({
         type="button"
         aria-expanded={open}
         onClick={onToggle}
-        className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left"
+        className="flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--accent)]/40"
       >
         <span
           aria-hidden="true"
-          className="h-2 w-2 shrink-0 rounded-full"
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
           style={{ backgroundColor: typeof f.color === "string" ? f.color : undefined }}
         />
-        <span className="shrink-0 text-[0.6875rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+        <span className="shrink-0 text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
           {String(f.label)}
         </span>
-        <span className="min-w-0 flex-1 truncate text-right text-[0.625rem] text-[var(--marinara-chat-chrome-panel-muted)]">
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-right text-xs",
+            isOn ? "font-medium text-[var(--foreground)]" : "text-[var(--marinara-chat-chrome-panel-muted)]",
+          )}
+        >
           {summary}
         </span>
-        <ChevronDown size="0.75rem" className={cn("shrink-0 transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          size="0.875rem"
+          className={cn("shrink-0 text-[var(--muted-foreground)] transition-transform", open && "rotate-180")}
+        />
       </button>
       {open ? (
-        <div className="flex flex-col gap-1.5 border-t border-[var(--border)]/50 px-2.5 py-2">
+        <div className="flex flex-col gap-2.5 border-t border-[var(--border)]/50 px-3 pb-3 pt-2.5">
           {f.hint ? (
-            <p className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
-              {String(f.hint)}
-            </p>
+            <p className="text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{String(f.hint)}</p>
           ) : null}
           {f.type === "select" ? (
             <ConfigSelect field={f} value={value} standing={standing} onChange={onChange} />
@@ -904,7 +961,7 @@ function ConfigText({
         />
       )}
       {chips.length ? (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {chips.map((chip) => {
             const on = chip.replace ? current === chip.value : parts.includes(chip.value);
             return (
@@ -914,7 +971,7 @@ function ConfigText({
                 aria-pressed={on}
                 onClick={() => clickChip(chip)}
                 className={cn(
-                  "rounded-full px-2 py-0.5 text-[0.625rem] ring-1 transition-colors",
+                  "min-h-7 rounded-full px-3 py-1 text-xs ring-1 transition-colors max-sm:min-h-8",
                   on
                     ? "bg-[var(--primary)]/20 text-[var(--foreground)] ring-[var(--primary)]/45"
                     : "text-[var(--muted-foreground)] ring-[var(--border)]/70 hover:bg-[var(--accent)]",

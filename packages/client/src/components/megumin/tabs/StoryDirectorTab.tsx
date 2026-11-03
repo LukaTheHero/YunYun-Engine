@@ -33,6 +33,8 @@ import { useChatMessageCount } from "../../../hooks/use-chats";
 import { useMeguminPanel } from "../megumin-panel-context";
 import {
   MeguminButton,
+  MeguminFeatureBar,
+  MeguminGrid,
   MeguminHint,
   MeguminNeedsChat,
   MeguminNumber,
@@ -40,9 +42,9 @@ import {
   MeguminSection,
   MeguminSelect,
   MeguminText,
-  MeguminToggle,
 } from "../MeguminControls";
 import { MeguminPromptOverrides } from "./MeguminPromptOverrides";
+import { Callout } from "./presetControls";
 
 /** The select value for "the reader typed their own genre" (storyplan/ui.js SD_CUSTOM_GENRE). */
 const SD_CUSTOM_GENRE = "custom";
@@ -143,69 +145,99 @@ export function StoryDirectorTab() {
   const genreDesc = isCustomGenre ? t("megumin.director.genreCustomDesc") : (genres[sp.primaryGenre]?.desc ?? "");
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-end gap-2">
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold ring-1",
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
             sp.enabled
               ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/25"
               : "bg-[var(--secondary)]/50 text-[var(--muted-foreground)] ring-[var(--border)]",
           )}
         >
-          {sp.enabled ? <CircleCheck size="0.625rem" /> : <CircleX size="0.625rem" />}
+          {sp.enabled ? <CircleCheck size="0.75rem" /> : <CircleX size="0.75rem" />}
           {sp.enabled ? t("megumin.director.enabled") : t("megumin.director.disabled")}
         </span>
       </div>
 
-      <MeguminHint tone="warning">{t("megumin.director.v10Callout")}</MeguminHint>
+      <Callout tone="gold">{t("megumin.director.v10Callout")}</Callout>
 
-      <MeguminToggle
-        label={
-          <span className="inline-flex items-center gap-1.5">
-            <Clapperboard size="0.75rem" className="text-amber-500" />
-            {t("megumin.director.enable")}
-          </span>
-        }
-        help={t("megumin.director.enableHelp")}
+      <MeguminFeatureBar
+        title={t("megumin.director.enable")}
+        icon={<Clapperboard size="1rem" className="shrink-0 text-amber-500" />}
+        description={t("megumin.director.enableHelp")}
         checked={sp.enabled === true}
         onChange={(on) => setSp({ enabled: on })}
       />
 
       {sp.enabled ? (
         <>
-          <MeguminSection title={t("megumin.director.console")} icon={<SlidersHorizontal size="0.875rem" />}>
-            <div className="flex flex-col gap-1">
-              <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
-                {t("megumin.director.contentRating")}
-              </span>
-              <div className="grid grid-cols-3 gap-1" role="radiogroup">
-                {ratings.map((r) => {
-                  const Icon = r.icon;
-                  const active = sp.contentRating === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      aria-pressed={active}
-                      onClick={() => setSp({ contentRating: r.id })}
-                      className="mari-chrome-control mari-chrome-control--card inline-flex items-center justify-center gap-1 text-[0.6875rem]"
-                    >
-                      <Icon size="0.75rem" />
-                      {r.label}
-                    </button>
-                  );
-                })}
+          <MeguminSection
+            title={t("megumin.director.console")}
+            icon={<SlidersHorizontal size="0.875rem" />}
+            contentClassName="gap-5"
+          >
+            <div className="grid grid-cols-1 items-start gap-x-6 gap-y-5 @3xl:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-2">
+                <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+                  {t("megumin.director.contentRating")}
+                </span>
+                <div
+                  className="grid grid-cols-3 gap-1 rounded-lg bg-[var(--background)]/50 p-1 ring-1 ring-[var(--border)]/60"
+                  role="radiogroup"
+                >
+                  {ratings.map((r) => {
+                    const Icon = r.icon;
+                    const active = sp.contentRating === r.id;
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        aria-pressed={active}
+                        onClick={() => setSp({ contentRating: r.id })}
+                        className={cn(
+                          "inline-flex min-h-9 min-w-0 items-center justify-center gap-2 rounded-md px-2 py-1.5 text-[0.8125rem] transition-colors",
+                          active
+                            ? "bg-[var(--primary)]/20 font-semibold text-[var(--foreground)] ring-1 ring-[var(--primary)]/45"
+                            : "text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]",
+                        )}
+                      >
+                        <Icon size="0.875rem" className="shrink-0" />
+                        {r.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex min-w-0 flex-col gap-2">
+                <MeguminSelect
+                  label={t("megumin.director.primaryGenre")}
+                  value={sp.primaryGenre}
+                  options={[
+                    ...Object.entries(genres).map(([id, g]) => ({ value: id, label: g.label })),
+                    { value: SD_CUSTOM_GENRE, label: t("megumin.director.genreCustom") },
+                  ]}
+                  onChange={(v) => setSp({ primaryGenre: v })}
+                />
+                {isCustomGenre ? (
+                  <MeguminText
+                    value={sp.customGenre}
+                    placeholder={t("megumin.director.genreCustomPlaceholder")}
+                    onChange={(v) => setSp({ customGenre: v })}
+                  />
+                ) : null}
+                {genreDesc ? <MeguminHint>{genreDesc}</MeguminHint> : null}
               </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
                 {t("megumin.director.pacingLabel")}
               </span>
-              <div className="grid grid-cols-3 gap-1" role="radiogroup">
+              <div className="grid grid-cols-1 gap-2 @lg:grid-cols-3" role="radiogroup">
                 {pacings.map((p) => {
                   const Icon = p.icon;
                   const active = sp.pacing === p.id;
@@ -217,12 +249,14 @@ export function StoryDirectorTab() {
                       aria-checked={active}
                       aria-pressed={active}
                       onClick={() => setSp({ pacing: p.id })}
-                      className="mari-chrome-control mari-chrome-control--card flex flex-col items-center gap-0.5 text-center text-[0.6875rem]"
+                      className="mari-chrome-control mari-chrome-control--card text-[0.8125rem]"
                     >
-                      <Icon size="0.875rem" />
-                      <span className="font-semibold">{p.label}</span>
-                      <span className="text-[0.5625rem] leading-tight text-[var(--marinara-chat-chrome-panel-muted)]">
-                        {p.desc}
+                      <Icon size="1rem" className="shrink-0" />
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="font-semibold">{p.label}</span>
+                        <span className="text-xs leading-snug text-[var(--marinara-chat-chrome-panel-muted)]">
+                          {p.desc}
+                        </span>
                       </span>
                     </button>
                   );
@@ -230,32 +264,14 @@ export function StoryDirectorTab() {
               </div>
             </div>
 
-            <MeguminSelect
-              label={t("megumin.director.primaryGenre")}
-              value={sp.primaryGenre}
-              options={[
-                ...Object.entries(genres).map(([id, g]) => ({ value: id, label: g.label })),
-                { value: SD_CUSTOM_GENRE, label: t("megumin.director.genreCustom") },
-              ]}
-              onChange={(v) => setSp({ primaryGenre: v })}
-            />
-            {isCustomGenre ? (
-              <MeguminText
-                value={sp.customGenre}
-                placeholder={t("megumin.director.genreCustomPlaceholder")}
-                onChange={(v) => setSp({ customGenre: v })}
-              />
-            ) : null}
-            {genreDesc ? <MeguminHint>{genreDesc}</MeguminHint> : null}
-
-            <div className="flex flex-col gap-1">
-              <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
                 {t("megumin.director.flavorTags")}{" "}
-                <span className="font-normal text-[var(--marinara-chat-chrome-panel-muted)]">
+                <span className="text-xs font-normal text-[var(--marinara-chat-chrome-panel-muted)]">
                   {t("megumin.director.flavorHint", { count: MAX_FLAVORS })}
                 </span>
               </span>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-2">
                 {flavors.map((flavor) => {
                   const active = sp.flavorTags.includes(flavor);
                   return (
@@ -265,10 +281,10 @@ export function StoryDirectorTab() {
                       aria-pressed={active}
                       onClick={() => toggleFlavor(flavor)}
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[0.625rem] ring-1 transition-colors",
+                        "inline-flex min-h-9 items-center rounded-full px-3 py-1.5 text-xs ring-1 transition-colors @xl:min-h-8",
                         active
                           ? "bg-amber-500/15 font-semibold text-amber-500 ring-amber-500/40"
-                          : "text-[var(--muted-foreground)] ring-[var(--border)] hover:bg-[var(--accent)]",
+                          : "text-[var(--muted-foreground)] ring-[var(--border)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]",
                       )}
                     >
                       {flavor}
@@ -279,16 +295,13 @@ export function StoryDirectorTab() {
             </div>
           </MeguminSection>
 
-          <MeguminToggle
-            label={
-              <span className="inline-flex items-center gap-1.5">
-                <LockOpen size="0.75rem" className="text-[var(--destructive)]" />
-                {t("megumin.director.unrestricted")}
-              </span>
-            }
-            help={t("megumin.director.unrestrictedHelp")}
+          <MeguminFeatureBar
+            title={t("megumin.director.unrestricted")}
+            icon={<LockOpen size="1rem" className="shrink-0 text-[var(--destructive)]" />}
+            description={t("megumin.director.unrestrictedHelp")}
             checked={sp.unrestrictedContent === true}
             onChange={(on) => setSp({ unrestrictedContent: on })}
+            tone="danger"
           />
 
           <MeguminSection
@@ -343,50 +356,52 @@ export function StoryDirectorTab() {
           </MeguminSection>
 
           <MeguminSection title={t("megumin.director.engineSettings")} icon={<Settings2 size="0.875rem" />}>
-            <div className="flex items-start gap-2">
-              <Cat size="0.875rem" className="mt-0.5 shrink-0 text-rose-500" />
-              <div className="flex flex-col gap-1">
-                <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+            <div className="flex items-start gap-3">
+              <Cat size="1rem" className="mt-0.5 shrink-0 text-rose-500" />
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
                   {t("megumin.director.backgroundWorker")}
                 </span>
                 <MeguminHint>{t("megumin.director.backgroundWorkerDesc")}</MeguminHint>
-                <div>
+                <div className="pt-1">
                   <MeguminButton onClick={() => openTab("chomusuke")} icon={<Cat size="0.75rem" />}>
                     {t("megumin.director.openChomusuke")}
                   </MeguminButton>
                 </div>
               </div>
             </div>
-            <MeguminSelect
-              label={t("megumin.director.contextLimit")}
-              help={t("megumin.director.contextLimitHelp")}
-              value={String(sp.contextLimit)}
-              options={[
-                { value: "100", label: t("megumin.director.contextLast100") },
-                { value: "0", label: t("megumin.director.contextFull") },
-              ]}
-              onChange={(v) => setSp({ contextLimit: parseInt(v, 10) })}
-            />
-            <MeguminSelect
-              label={t("megumin.director.triggerMode")}
-              help={t("megumin.director.triggerModeHelp")}
-              value={sp.triggerMode}
-              options={[
-                { value: "manual", label: t("megumin.director.triggerManual") },
-                { value: "auto", label: t("megumin.director.triggerAuto") },
-                { value: "frequency", label: t("megumin.director.triggerFrequency") },
-              ]}
-              onChange={(v) => setSp({ triggerMode: v })}
-            />
-            {sp.triggerMode === "frequency" ? (
-              <MeguminNumber
-                label={t("megumin.director.frequency")}
-                help={t("megumin.director.frequencyHelp")}
-                value={Number(sp.autoFreq) || 10}
-                min={1}
-                onChange={(n) => setSp({ autoFreq: Math.max(1, Math.round(n) || 10) })}
+            <MeguminGrid layout="fields" className="gap-x-6 gap-y-4 @4xl:grid-cols-3">
+              <MeguminSelect
+                label={t("megumin.director.contextLimit")}
+                help={t("megumin.director.contextLimitHelp")}
+                value={String(sp.contextLimit)}
+                options={[
+                  { value: "100", label: t("megumin.director.contextLast100") },
+                  { value: "0", label: t("megumin.director.contextFull") },
+                ]}
+                onChange={(v) => setSp({ contextLimit: parseInt(v, 10) })}
               />
-            ) : null}
+              <MeguminSelect
+                label={t("megumin.director.triggerMode")}
+                help={t("megumin.director.triggerModeHelp")}
+                value={sp.triggerMode}
+                options={[
+                  { value: "manual", label: t("megumin.director.triggerManual") },
+                  { value: "auto", label: t("megumin.director.triggerAuto") },
+                  { value: "frequency", label: t("megumin.director.triggerFrequency") },
+                ]}
+                onChange={(v) => setSp({ triggerMode: v })}
+              />
+              {sp.triggerMode === "frequency" ? (
+                <MeguminNumber
+                  label={t("megumin.director.frequency")}
+                  help={t("megumin.director.frequencyHelp")}
+                  value={Number(sp.autoFreq) || 10}
+                  min={1}
+                  onChange={(n) => setSp({ autoFreq: Math.max(1, Math.round(n) || 10) })}
+                />
+              ) : null}
+            </MeguminGrid>
           </MeguminSection>
 
           <MeguminPromptOverrides

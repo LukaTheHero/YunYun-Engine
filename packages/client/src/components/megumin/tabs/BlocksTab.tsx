@@ -186,159 +186,171 @@ function BlocksOverview({ onEdit }: { onEdit: (id: string | null) => void }) {
     });
 
   return (
-    <>
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-3">
         <MeguminHint>{t("megumin.blocks.intro")}</MeguminHint>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/12 px-2 py-0.5 text-[0.625rem] font-semibold text-amber-500 ring-1 ring-amber-500/25">
-          <Layers size="0.625rem" />
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500/12 px-2.5 py-1 text-[0.6875rem] font-semibold text-amber-500 ring-1 ring-amber-500/25">
+          <Layers size="0.75rem" />
           {t("megumin.blocks.inBlockCount", { count: inStack.length })}
         </span>
       </div>
 
-      <MeguminToggle
-        label={
-          <span className="inline-flex flex-wrap items-center gap-1.5">
-            {t("megumin.blocks.hideFromAi.label")}
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/12 px-1.5 py-px text-[0.5625rem] font-semibold text-emerald-500">
-              <Star size="0.5rem" />
-              {t("megumin.blocks.recommended")}
-            </span>
-          </span>
-        }
-        help={t("megumin.blocks.hideFromAi.help")}
-        checked={profile.hideBlocksFromAI !== false}
-        onChange={(v) => update((d) => void (d.hideBlocksFromAI = v))}
-      />
+      {/* Wide: the list and its tools on the left, the live card on the right (Megumin's blk-layout). */}
+      <div className="grid grid-cols-1 items-start gap-4 @4xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/35 px-2 py-1">
+            <MeguminToggle
+              label={
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  {t("megumin.blocks.hideFromAi.label")}
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-0.5 text-[0.6875rem] font-semibold text-emerald-500">
+                    <Star size="0.625rem" />
+                    {t("megumin.blocks.recommended")}
+                  </span>
+                </span>
+              }
+              help={t("megumin.blocks.hideFromAi.help")}
+              checked={profile.hideBlocksFromAI !== false}
+              onChange={(v) => update((d) => void (d.hideBlocksFromAI = v))}
+            />
+          </div>
 
-      <MeguminSection title={t("megumin.blocks.stack.title")} icon={<ListOrdered size="0.875rem" />}>
-        {!inStack.length ? <MeguminHint>{t("megumin.blocks.stack.empty")}</MeguminHint> : null}
-        {inStack.map((b, i) => {
-          const off = BLOCK_REQUIRES[b.id] ? !BLOCK_REQUIRES[b.id]!(profile) : false;
-          const at = stack.order.indexOf(b.id);
-          return (
-            <div key={b.id} className="flex flex-col gap-2">
-              <div
-                title={b.desc || undefined}
-                className={cn(
-                  "flex flex-col gap-1.5 rounded-md border border-[var(--border)]/70 bg-[var(--background)]/40 p-2",
-                  off && "opacity-60",
-                )}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="text-base leading-none">{b.emoji || "📦"}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1 text-xs font-medium">
-                      <span className="truncate">{b.label}</span>
-                      {b.builtin ? null : (
-                        <span className="rounded bg-sky-500/15 px-1 text-[0.5625rem] font-semibold text-sky-500">
-                          {t("megumin.blocks.customFlag")}
-                        </span>
-                      )}
-                      {edited(b) ? (
-                        <span
-                          title={t("megumin.blocks.editedTitle")}
-                          className="rounded bg-purple-500/15 px-1 text-[0.5625rem] font-semibold text-purple-400"
-                        >
-                          {t("megumin.blocks.editedFlag")}
-                        </span>
-                      ) : null}
+          <MeguminSection title={t("megumin.blocks.stack.title")} icon={<ListOrdered size="0.875rem" />}>
+            {!inStack.length ? <MeguminHint>{t("megumin.blocks.stack.empty")}</MeguminHint> : null}
+            {inStack.map((b, i) => {
+              const off = BLOCK_REQUIRES[b.id] ? !BLOCK_REQUIRES[b.id]!(profile) : false;
+              const at = stack.order.indexOf(b.id);
+              return (
+                <div
+                  key={b.id}
+                  className="flex flex-col overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/40"
+                >
+                  <div
+                    title={b.desc || undefined}
+                    className={cn(
+                      "flex flex-col gap-2 px-3 py-2.5 @sm:flex-row @sm:items-center @sm:justify-between @sm:gap-3",
+                      off && "opacity-60",
+                    )}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <span className="text-lg leading-none">{b.emoji || "📦"}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+                          <span className="truncate">{b.label}</span>
+                          {b.builtin ? null : (
+                            <span className="rounded-full bg-sky-500/15 px-2 py-px text-[0.6875rem] font-semibold text-sky-500">
+                              {t("megumin.blocks.customFlag")}
+                            </span>
+                          )}
+                          {edited(b) ? (
+                            <span
+                              title={t("megumin.blocks.editedTitle")}
+                              className="rounded-full bg-purple-500/15 px-2 py-px text-[0.6875rem] font-semibold text-purple-400"
+                            >
+                              {t("megumin.blocks.editedFlag")}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="break-words font-mono text-xs text-[var(--muted-foreground)]">
+                          {tagText(b.tag)}
+                          {off ? t("megumin.blocks.featureOff") : null}
+                        </div>
+                      </div>
                     </div>
-                    <div className="truncate font-mono text-[0.625rem] text-[var(--muted-foreground)]">
-                      {tagText(b.tag)}
-                      {off ? t("megumin.blocks.featureOff") : null}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <IconButton
+                        label={t("megumin.blocks.moveUp")}
+                        disabled={i === 0}
+                        onClick={() => move(at, -1)}
+                        icon={<ArrowUp size="0.875rem" />}
+                      />
+                      <IconButton
+                        label={t("megumin.blocks.moveDown")}
+                        disabled={i === inStack.length - 1}
+                        onClick={() => move(at, 1)}
+                        icon={<ArrowDown size="0.875rem" />}
+                      />
+                      <select
+                        aria-label={t("megumin.blocks.visibility.label")}
+                        className={cn(MEGUMIN_INPUT_CLASS, "w-auto min-w-0 flex-1 py-1.5 @sm:w-32 @sm:flex-none")}
+                        value={visOf(b) === "hidden" ? "hidden" : "open"}
+                        onChange={(e) =>
+                          changeStack((s) => {
+                            s.overrides[b.id] = { ...(s.overrides[b.id] || {}), visibility: e.target.value };
+                          })
+                        }
+                      >
+                        <option value="open" title={t("megumin.blocks.visibility.openHint")}>
+                          {t("megumin.blocks.visibility.open")}
+                        </option>
+                        <option value="hidden" title={t("megumin.blocks.visibility.hiddenHint")}>
+                          {t("megumin.blocks.visibility.hidden")}
+                        </option>
+                      </select>
+                      {b.builtin ? null : (
+                        <IconButton
+                          label={t("megumin.blocks.editCustom")}
+                          onClick={() => onEdit(b.id)}
+                          icon={<Pencil size="0.875rem" />}
+                        />
+                      )}
+                      <IconButton
+                        label={t("megumin.blocks.remove")}
+                        danger
+                        onClick={() => changeStack((s) => void (s.order = s.order.filter((x) => x !== b.id)))}
+                        icon={<X size="0.875rem" />}
+                      />
                     </div>
                   </div>
+                  {b.id === "world" ? <WorldStateSettings /> : null}
+                  {b.id === "bonds" || b.id === "sheet" ? <StatFieldEditor def={b} /> : null}
                 </div>
-                <div className="flex flex-wrap items-center gap-1">
-                  <IconButton
-                    label={t("megumin.blocks.moveUp")}
-                    disabled={i === 0}
-                    onClick={() => move(at, -1)}
-                    icon={<ArrowUp size="0.75rem" />}
-                  />
-                  <IconButton
-                    label={t("megumin.blocks.moveDown")}
-                    disabled={i === inStack.length - 1}
-                    onClick={() => move(at, 1)}
-                    icon={<ArrowDown size="0.75rem" />}
-                  />
-                  <select
-                    aria-label={t("megumin.blocks.visibility.label")}
-                    className={cn(MEGUMIN_INPUT_CLASS, "w-auto flex-1 py-1")}
-                    value={visOf(b) === "hidden" ? "hidden" : "open"}
-                    onChange={(e) =>
-                      changeStack((s) => {
-                        s.overrides[b.id] = { ...(s.overrides[b.id] || {}), visibility: e.target.value };
-                      })
-                    }
-                  >
-                    <option value="open" title={t("megumin.blocks.visibility.openHint")}>
-                      {t("megumin.blocks.visibility.open")}
-                    </option>
-                    <option value="hidden" title={t("megumin.blocks.visibility.hiddenHint")}>
-                      {t("megumin.blocks.visibility.hidden")}
-                    </option>
-                  </select>
-                  {b.builtin ? null : (
-                    <IconButton
-                      label={t("megumin.blocks.editCustom")}
-                      onClick={() => onEdit(b.id)}
-                      icon={<Pencil size="0.75rem" />}
-                    />
-                  )}
-                  <IconButton
-                    label={t("megumin.blocks.remove")}
-                    danger
-                    onClick={() => changeStack((s) => void (s.order = s.order.filter((x) => x !== b.id)))}
-                    icon={<X size="0.75rem" />}
-                  />
-                </div>
-              </div>
-              {b.id === "world" ? <WorldStateSettings /> : null}
-              {b.id === "bonds" || b.id === "sheet" ? <StatFieldEditor def={b} /> : null}
+              );
+            })}
+          </MeguminSection>
+
+          <MeguminSection title={t("megumin.blocks.add.title")} icon={<Plus size="0.875rem" />}>
+            {!available.length ? <MeguminHint>{t("megumin.blocks.add.allIn")}</MeguminHint> : null}
+            <div className="grid grid-cols-1 gap-2 @xs:grid-cols-2 @lg:grid-cols-3">
+              {available.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  title={b.desc || undefined}
+                  className="flex min-h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-dashed border-[var(--marinara-chat-chrome-button-border)] bg-[var(--marinara-chat-chrome-button-bg)] px-3 py-2 text-left text-[0.8125rem] font-semibold transition-colors hover:border-[var(--marinara-chat-chrome-button-border-hover)] hover:bg-[var(--marinara-chat-chrome-button-bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.98] text-[var(--marinara-chat-chrome-button-text)] hover:text-[var(--marinara-chat-chrome-button-text-hover)]"
+                  onClick={() =>
+                    changeStack((s) => {
+                      if (b.preferFirst) s.order.unshift(b.id);
+                      else s.order.push(b.id);
+                    })
+                  }
+                >
+                  <span className="text-base leading-none">{b.emoji || "📦"}</span>
+                  {b.label}
+                  {edited(b) ? (
+                    <span className="rounded-full bg-purple-500/15 px-2 py-px text-[0.6875rem] font-semibold text-purple-400">
+                      {t("megumin.blocks.editedFlag")}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="flex min-h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-dashed bg-[var(--marinara-chat-chrome-button-bg)] px-3 py-2 text-left text-[0.8125rem] font-semibold transition-colors hover:bg-[var(--marinara-chat-chrome-button-bg-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] active:scale-[0.98] border-emerald-500/45 text-emerald-500 hover:border-emerald-500/70"
+                onClick={() => onEdit(null)}
+              >
+                <WandSparkles size="0.875rem" />
+                {t("megumin.blocks.add.createCustom")}
+              </button>
             </div>
-          );
-        })}
-      </MeguminSection>
-
-      <MeguminSection title={t("megumin.blocks.add.title")} icon={<Plus size="0.875rem" />}>
-        {!available.length ? <MeguminHint>{t("megumin.blocks.add.allIn")}</MeguminHint> : null}
-        <div className="flex flex-wrap gap-1.5">
-          {available.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              title={b.desc || undefined}
-              className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1 text-[0.6875rem]"
-              onClick={() =>
-                changeStack((s) => {
-                  if (b.preferFirst) s.order.unshift(b.id);
-                  else s.order.push(b.id);
-                })
-              }
-            >
-              <span>{b.emoji || "📦"}</span>
-              {b.label}
-              {edited(b) ? (
-                <span className="rounded bg-purple-500/15 px-1 text-[0.5625rem] font-semibold text-purple-400">
-                  {t("megumin.blocks.editedFlag")}
-                </span>
-              ) : null}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1 text-[0.6875rem] text-emerald-500"
-            onClick={() => onEdit(null)}
-          >
-            <WandSparkles size="0.75rem" />
-            {t("megumin.blocks.add.createCustom")}
-          </button>
+          </MeguminSection>
         </div>
-      </MeguminSection>
 
-      <BlocksPreview />
-    </>
+        <div className="min-w-0 @4xl:sticky @4xl:top-[5.5rem] @4xl:max-h-[calc(min(92dvh,62rem)-7rem)] @4xl:overflow-y-auto">
+          <BlocksPreview />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -363,8 +375,8 @@ function IconButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "mari-chrome-control mari-chrome-control--small mari-chrome-control--icon active:scale-90",
-        danger && "text-[var(--destructive)]",
+        "mari-chrome-control mari-chrome-control--small mari-chrome-control--icon h-8 w-8! active:scale-90 max-md:h-9 max-md:w-9!",
+        danger && "text-[var(--destructive)]!",
       )}
     >
       {icon}
@@ -417,44 +429,52 @@ function WorldStateSettings() {
   };
 
   return (
-    <div className="ml-3 flex flex-col gap-2 border-l-2 border-amber-500/30 pl-3">
-      <MeguminSelect
-        label={t("megumin.blocks.world.updates")}
-        value={ws.updateMode === "manual" ? "manual" : "inline"}
-        options={[
-          { value: "inline", label: t("megumin.blocks.world.updatesAutomatic") },
-          { value: "manual", label: t("megumin.blocks.world.updatesManual") },
-        ]}
-        onChange={(v) => setWs("updateMode", v)}
-      />
-      <MeguminHint>
-        {view.world?.mode === "sidemodel"
-          ? t("megumin.blocks.world.updatesHintChomusuke")
-          : t("megumin.blocks.world.updatesHintInline")}{" "}
-        {t("megumin.blocks.world.updatesHintManual")}
-      </MeguminHint>
-      <MeguminSelect
-        label={t("megumin.blocks.world.detail")}
-        value={ws.injectionDetail === "scene" ? "scene" : "full"}
-        options={[
-          { value: "full", label: t("megumin.blocks.world.detailFull") },
-          { value: "scene", label: t("megumin.blocks.world.detailScene") },
-        ]}
-        onChange={(v) => setWs("injectionDetail", v)}
-      />
-      <MeguminHint>{t("megumin.blocks.world.detailHint")}</MeguminHint>
-      <MeguminToggle
-        label={t("megumin.blocks.world.showChanges")}
-        help={t("megumin.blocks.world.showChangesHelp")}
-        checked={ws.showChanges !== false}
-        onChange={(v) => setWs("showChanges", v)}
-      />
-      <MeguminToggle
-        label={t("megumin.blocks.world.showReturning")}
-        help={t("megumin.blocks.world.showReturningHelp")}
-        checked={ws.showReturning !== false}
-        onChange={(v) => setWs("showReturning", v)}
-      />
+    <div className="@container flex flex-col gap-3 border-t border-[var(--border)]/60 bg-[var(--background)]/30 px-3 py-3">
+      <div className="grid grid-cols-1 items-start gap-3 @sm:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <MeguminSelect
+            label={t("megumin.blocks.world.updates")}
+            value={ws.updateMode === "manual" ? "manual" : "inline"}
+            options={[
+              { value: "inline", label: t("megumin.blocks.world.updatesAutomatic") },
+              { value: "manual", label: t("megumin.blocks.world.updatesManual") },
+            ]}
+            onChange={(v) => setWs("updateMode", v)}
+          />
+          <MeguminHint>
+            {view.world?.mode === "sidemodel"
+              ? t("megumin.blocks.world.updatesHintChomusuke")
+              : t("megumin.blocks.world.updatesHintInline")}{" "}
+            {t("megumin.blocks.world.updatesHintManual")}
+          </MeguminHint>
+        </div>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <MeguminSelect
+            label={t("megumin.blocks.world.detail")}
+            value={ws.injectionDetail === "scene" ? "scene" : "full"}
+            options={[
+              { value: "full", label: t("megumin.blocks.world.detailFull") },
+              { value: "scene", label: t("megumin.blocks.world.detailScene") },
+            ]}
+            onChange={(v) => setWs("injectionDetail", v)}
+          />
+          <MeguminHint>{t("megumin.blocks.world.detailHint")}</MeguminHint>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-1 @2xl:grid-cols-2">
+        <MeguminToggle
+          label={t("megumin.blocks.world.showChanges")}
+          help={t("megumin.blocks.world.showChangesHelp")}
+          checked={ws.showChanges !== false}
+          onChange={(v) => setWs("showChanges", v)}
+        />
+        <MeguminToggle
+          label={t("megumin.blocks.world.showReturning")}
+          help={t("megumin.blocks.world.showReturningHelp")}
+          checked={ws.showReturning !== false}
+          onChange={(v) => setWs("showReturning", v)}
+        />
+      </div>
       <MeguminRow>
         <MeguminButton
           disabled={!chatId}
@@ -508,9 +528,9 @@ function StatFieldEditor({ def }: { def: BlockDef }) {
     });
 
   return (
-    <div className="ml-3 flex flex-col gap-2 border-l-2 border-rose-500/30 pl-3">
-      <div>
-        <div className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+    <div className="@container flex flex-col gap-3 border-t border-[var(--border)]/60 bg-[var(--background)]/30 px-3 py-3">
+      <div className="flex flex-col gap-0.5">
+        <div className="text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
           {t("megumin.blocks.fields.title")}
         </div>
         <MeguminHint>
@@ -518,30 +538,32 @@ function StatFieldEditor({ def }: { def: BlockDef }) {
         </MeguminHint>
       </div>
       {fields.map((f, i) => (
-        <div key={f.id || i} className="flex flex-col gap-1 rounded-md bg-[var(--background)]/40 p-1.5">
-          <div className="flex items-center gap-1">
-            <FieldLabelInput
-              value={f.label}
-              placeholder={t("megumin.blocks.fields.namePlaceholder")}
-              onCommit={(v) => changeFields((list) => void (list[i] = { ...list[i]!, label: v }))}
-            />
-            <IconButton
-              label={t("megumin.blocks.moveUp")}
-              disabled={i === 0}
-              onClick={() => changeFields((list) => void list.splice(i - 1, 0, list.splice(i, 1)[0]!))}
-              icon={<ArrowUp size="0.75rem" />}
-            />
-            <IconButton
-              label={t("megumin.blocks.fields.remove")}
-              danger
-              onClick={() => changeFields((list) => void list.splice(i, 1))}
-              icon={<X size="0.75rem" />}
-            />
-          </div>
-          <div className="flex items-center gap-1">
+        // Phone: name with its buttons, then type and numbers under it. Wide: all on one line.
+        <div
+          key={f.id || i}
+          className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-[var(--border)]/50 bg-[var(--background)]/40 p-2 @md:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
+        >
+          <FieldLabelInput
+            value={f.label}
+            placeholder={t("megumin.blocks.fields.namePlaceholder")}
+            onCommit={(v) => changeFields((list) => void (list[i] = { ...list[i]!, label: v }))}
+          />
+          <IconButton
+            label={t("megumin.blocks.moveUp")}
+            disabled={i === 0}
+            onClick={() => changeFields((list) => void list.splice(i - 1, 0, list.splice(i, 1)[0]!))}
+            icon={<ArrowUp size="0.875rem" />}
+          />
+          <IconButton
+            label={t("megumin.blocks.fields.remove")}
+            danger
+            onClick={() => changeFields((list) => void list.splice(i, 1))}
+            icon={<X size="0.875rem" />}
+          />
+          <div className="col-span-3 flex items-center gap-2 @md:col-span-1 @md:col-start-2 @md:row-start-1">
             <select
               aria-label={t("megumin.blocks.fields.type")}
-              className={cn(MEGUMIN_INPUT_CLASS, "py-1")}
+              className={cn(MEGUMIN_INPUT_CLASS, "min-w-0 flex-1 py-1.5 @md:w-24 @md:flex-none")}
               value={f.type}
               onChange={(e) => changeFields((list) => void (list[i] = { ...list[i]!, type: e.target.value }))}
             >
@@ -556,7 +578,7 @@ function StatFieldEditor({ def }: { def: BlockDef }) {
                 type="number"
                 title={t("megumin.blocks.fields.max")}
                 aria-label={t("megumin.blocks.fields.max")}
-                className={cn(MEGUMIN_INPUT_CLASS, "w-16 py-1")}
+                className={cn(MEGUMIN_INPUT_CLASS, "w-16 py-1.5")}
                 value={f.max || 100}
                 onChange={(e) =>
                   changeFields((list) => void (list[i] = { ...list[i]!, max: parseInt(e.target.value, 10) || 100 }))
@@ -568,7 +590,7 @@ function StatFieldEditor({ def }: { def: BlockDef }) {
                 type="number"
                 title={t("megumin.blocks.fields.start")}
                 aria-label={t("megumin.blocks.fields.start")}
-                className={cn(MEGUMIN_INPUT_CLASS, "w-16 py-1")}
+                className={cn(MEGUMIN_INPUT_CLASS, "w-16 py-1.5")}
                 value={f.start !== undefined ? f.start : 0}
                 onChange={(e) =>
                   changeFields((list) => void (list[i] = { ...list[i]!, start: parseInt(e.target.value, 10) || 0 }))
@@ -578,7 +600,7 @@ function StatFieldEditor({ def }: { def: BlockDef }) {
           </div>
         </div>
       ))}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         <MeguminButton
           icon={<Plus size="0.75rem" />}
           onClick={() =>
@@ -630,7 +652,7 @@ function FieldLabelInput({
   const { draft, change, flush } = useDraftText(value ?? "", onCommit, 500);
   return (
     <input
-      className={cn(MEGUMIN_INPUT_CLASS, "flex-1 py-1")}
+      className={cn(MEGUMIN_INPUT_CLASS, "min-w-0 py-1.5")}
       value={draft}
       placeholder={placeholder}
       aria-label={placeholder}
@@ -749,35 +771,37 @@ function CustomBlockEditor({ editId, onDone }: { editId: string | null; onDone: 
       description={t("megumin.blocks.custom.intro")}
       icon={<WandSparkles size="0.875rem" />}
     >
-      <LocalField label={t("megumin.blocks.custom.name")} hint={t("megumin.blocks.custom.nameHint")}>
-        <input
-          className={MEGUMIN_INPUT_CLASS}
-          value={label}
-          placeholder={t("megumin.blocks.custom.namePlaceholder")}
-          onChange={(e) => setLabel(e.target.value)}
+      <div className="grid grid-cols-1 items-end gap-3 @lg:grid-cols-[minmax(0,1fr)_auto] @3xl:grid-cols-[minmax(0,2fr)_auto_minmax(0,1fr)]">
+        <LocalField label={t("megumin.blocks.custom.name")} hint={t("megumin.blocks.custom.nameHint")}>
+          <input
+            className={MEGUMIN_INPUT_CLASS}
+            value={label}
+            placeholder={t("megumin.blocks.custom.namePlaceholder")}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        </LocalField>
+        <LocalField label={t("megumin.blocks.custom.emoji")} hint={t("megumin.blocks.custom.emojiHint")}>
+          <input
+            className={cn(MEGUMIN_INPUT_CLASS, "w-16 text-center")}
+            value={emoji}
+            aria-label={t("megumin.blocks.custom.emoji")}
+            onChange={(e) => setEmoji(e.target.value)}
+          />
+        </LocalField>
+        <MeguminSelect
+          label={t("megumin.blocks.custom.shownAs")}
+          help={t("megumin.blocks.custom.shownAsHint")}
+          value={visibility}
+          options={[
+            { value: "open", label: t("megumin.blocks.visibility.open") },
+            { value: "hidden", label: t("megumin.blocks.visibility.hidden") },
+          ]}
+          onChange={setVisibility}
         />
-      </LocalField>
-      <LocalField label={t("megumin.blocks.custom.emoji")} hint={t("megumin.blocks.custom.emojiHint")}>
-        <input
-          className={cn(MEGUMIN_INPUT_CLASS, "w-16 text-center")}
-          value={emoji}
-          aria-label={t("megumin.blocks.custom.emoji")}
-          onChange={(e) => setEmoji(e.target.value)}
-        />
-      </LocalField>
-      <MeguminSelect
-        label={t("megumin.blocks.custom.shownAs")}
-        help={t("megumin.blocks.custom.shownAsHint")}
-        value={visibility}
-        options={[
-          { value: "open", label: t("megumin.blocks.visibility.open") },
-          { value: "hidden", label: t("megumin.blocks.visibility.hidden") },
-        ]}
-        onChange={setVisibility}
-      />
+      </div>
       <LocalField label={t("megumin.blocks.custom.template")} hint={t("megumin.blocks.custom.templateHint")}>
         <textarea
-          className={cn(MEGUMIN_INPUT_CLASS, "min-h-32 resize-y font-mono text-[0.6875rem] leading-relaxed")}
+          className={cn(MEGUMIN_INPUT_CLASS, "min-h-40 resize-y font-mono text-[0.8125rem] leading-relaxed")}
           rows={8}
           value={content}
           placeholder={t("megumin.blocks.custom.templatePlaceholder")}
@@ -802,8 +826,8 @@ function CustomBlockEditor({ editId, onDone }: { editId: string | null; onDone: 
 
 function LocalField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">{label}</span>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">{label}</span>
       {hint ? <MeguminHint>{hint}</MeguminHint> : null}
       {children}
     </div>

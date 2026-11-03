@@ -46,7 +46,7 @@ import {
 import { MeguminSidePanelParsers, MeguminSidePanelSections } from "@marinara-engine/shared/megumin/client";
 import { cn } from "../../../lib/utils";
 import { useChatMessagePeek } from "../../../hooks/use-chats";
-import { useUIStore, type Panel } from "../../../stores/ui.store";
+import { openMeguminWindow } from "../../../lib/megumin-tab-request";
 import {
   useMeguminEnabled,
   useMeguminScope,
@@ -177,10 +177,9 @@ export function useSaveSidePanel() {
   };
 }
 
-/** Opens the Megumin panel on a tab from outside it (the panel listens for this event). */
+/** Opens the Megumin Suite window on a tab from outside it. */
 export function openMeguminTab(tabId: string) {
-  useUIStore.getState().openRightPanel("megumin" as Panel);
-  window.dispatchEvent(new CustomEvent("megumin:open-tab", { detail: { tabId } }));
+  openMeguminWindow(tabId);
 }
 
 // ── What the panel reads ─────────────────────────────────────────────────────

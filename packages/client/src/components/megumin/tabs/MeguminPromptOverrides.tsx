@@ -98,32 +98,35 @@ export function MeguminPromptOverrides({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/35">
-      <div className="flex items-center gap-2 px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]"
-        >
-          <Code size="0.75rem" className="shrink-0" />
-          <span className="truncate">{title ?? t("megumin.promptOverrides.title")}</span>
-          <ChevronDown size="0.75rem" className={cn("ml-auto shrink-0 transition-transform", open && "rotate-180")} />
-        </button>
-      </div>
+    <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/35 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_8%,transparent)]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)] transition-colors hover:bg-[var(--accent)]/40"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--secondary)]/70 text-[var(--marinara-chat-chrome-button-text-active)] ring-1 ring-[var(--border)]">
+          <Code size="0.9375rem" />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{title ?? t("megumin.promptOverrides.title")}</span>
+        <ChevronDown
+          size="1rem"
+          className={cn("shrink-0 text-[var(--muted-foreground)] transition-transform", open && "rotate-180")}
+        />
+      </button>
       {open ? (
-        <div className="flex flex-col gap-3 border-t border-[var(--border)]/60 px-3 pb-3 pt-2.5">
+        <div className="flex flex-col gap-4 border-t border-[var(--border)]/60 px-4 pb-4 pt-3">
           <MeguminToggle
             label={t("megumin.promptOverrides.enable")}
             help={t("megumin.promptOverrides.enableHelp")}
             checked={enabled}
             onChange={toggle}
           />
-          <div className={cn("flex flex-col gap-3", !enabled && "pointer-events-none opacity-50")}>
+          <div className={cn("flex flex-col gap-4", !enabled && "pointer-events-none opacity-50")}>
             {fields.map((field) => (
-              <div key={field.key} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+              <div key={field.key} className="flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0 text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
                     {field.label}
                   </span>
                   <button
@@ -131,9 +134,9 @@ export function MeguminPromptOverrides({
                     disabled={!enabled}
                     onClick={() => saveField(field.key, defaults[field.key] ?? "")}
                     title={t("megumin.promptOverrides.resetField")}
-                    className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1 text-[0.625rem]"
+                    className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1.5 text-xs"
                   >
-                    <RotateCcw size="0.625rem" />
+                    <RotateCcw size="0.75rem" />
                     {t("megumin.promptOverrides.reset")}
                   </button>
                 </div>
@@ -146,13 +149,16 @@ export function MeguminPromptOverrides({
                   onChange={(value) => saveField(field.key, value)}
                 />
                 {field.hint || field.tokens?.length ? (
-                  <div className="flex flex-wrap items-center gap-1 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
                     {field.hint ? <span>{field.hint}</span> : null}
                     {field.tokens?.length ? (
                       <>
                         <span>{t("megumin.promptOverrides.tokens")}</span>
                         {field.tokens.map((token) => (
-                          <code key={token} className="rounded bg-[var(--secondary)]/70 px-1 font-mono text-[0.625rem]">
+                          <code
+                            key={token}
+                            className="rounded bg-[var(--secondary)]/70 px-1.5 py-0.5 font-mono text-[0.6875rem] text-[var(--foreground)]"
+                          >
                             {token}
                           </code>
                         ))}
@@ -162,7 +168,7 @@ export function MeguminPromptOverrides({
                 ) : null}
               </div>
             ))}
-            <div className="flex justify-end">
+            <div className="flex justify-end border-t border-[var(--border)]/50 pt-3">
               <MeguminButton onClick={resetAll} disabled={!enabled} icon={<RotateCcw size="0.75rem" />}>
                 {t("megumin.promptOverrides.resetAll")}
               </MeguminButton>

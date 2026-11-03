@@ -646,6 +646,9 @@ type SettingsSwitchProps = SettingsSwitchAccessibleLabel & {
   anchorId?: string;
   className?: string;
   labelClassName?: string;
+  descriptionClassName?: string;
+  /** A fixed name for the switch itself when the visible label changes with its state. */
+  inputAriaLabel?: string;
   /** Appended last so callers can intentionally override checked-track visuals. */
   switchClassName?: string;
 };
@@ -665,6 +668,8 @@ export function SettingsSwitch({
   anchorId,
   className,
   labelClassName,
+  descriptionClassName,
+  inputAriaLabel,
   switchClassName,
 }: SettingsSwitchProps) {
   const inputId = useId();
@@ -683,7 +688,7 @@ export function SettingsSwitch({
         type="checkbox"
         checked={checked}
         disabled={disabled}
-        aria-label={!label && ariaLabel ? localize(ariaLabel) : undefined}
+        aria-label={inputAriaLabel ?? (!label && ariaLabel ? localize(ariaLabel) : undefined)}
         onChange={(e) => onChange(e.target.checked)}
         className="peer sr-only"
       />
@@ -714,6 +719,7 @@ export function SettingsSwitch({
           className={cn(
             "mt-0.5 block text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]",
             disabled ? "cursor-not-allowed" : "cursor-pointer",
+            descriptionClassName,
           )}
         >
           {localizedDescription}

@@ -43,7 +43,7 @@ import { useDialogStore } from "./stores/dialog.store";
 import { api, requestTimeoutSignal } from "./lib/api-client";
 import { forceRefreshSpa, reloadBrowser } from "./lib/browser-runtime";
 import { recordClientError } from "./lib/client-runtime-diagnostics";
-import { showAppUpdatePrompt } from "./lib/app-update-prompt";
+import { reloadWouldChangeClient, showAppUpdatePrompt } from "./lib/app-update-prompt";
 import { UI_PERSISTENCE_HOST_COPY } from "./lib/ui-persistence";
 import { formatRuntimeBuild, getServerRuntimeBuild, isRuntimeBuildCurrent } from "./lib/runtime-build";
 import {
@@ -1058,6 +1058,10 @@ export function App() {
         if (isRuntimeBuildCurrent(APP_VERSION, CLIENT_BUILD, health)) {
           return;
         }
+
+        // Only offer a refresh that loads a different client; otherwise the prompt returns after every reload.
+        const changes = await reloadWouldChangeClient(requestTimeoutSignal(VERSION_CHECK_TIMEOUT_MS));
+        if (cancelled || changes !== true) return;
 
         showAppUpdatePrompt(() => recoverFromVersionSkew(serverBuild));
       } catch {

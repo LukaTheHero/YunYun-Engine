@@ -532,6 +532,19 @@ test("available app updates wait for confirmation before refreshing", async ({ p
     }),
   );
 
+  // The server serves that newer client too: the index.html it hands out points at another entry, so a
+  // refresh would change something and is offered. The page's own navigations are left alone.
+  const servedIndex = (url: URL) => url.pathname === "/";
+  await page.route(servedIndex, (route) =>
+    route.request().resourceType() === "fetch"
+      ? route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: '<!doctype html><script type="module" crossorigin src="/assets/index-new-build.js"></script>',
+        })
+      : route.continue(),
+  );
+
   await page.goto("/");
   await expect(page.getByText("A YunYun update is ready.", { exact: true })).toBeVisible();
   const refresh = page.getByRole("button", { name: "Refresh", exact: true });
@@ -540,8 +553,36 @@ test("available app updates wait for confirmation before refreshing", async ({ p
   expect(navigationsAtPrompt).toBe(1);
 
   await page.unroute("**/api/health");
+  await page.unroute(servedIndex);
   await Promise.all([page.waitForURL((url) => url.searchParams.get("v") === "99.0.0+new-build"), refresh.click()]);
   expect(mainFrameNavigations).toBe(navigationsAtPrompt + 1);
+});
+
+test("a server that reports another build but serves this client offers no refresh", async ({ page }) => {
+  // Rebuilt but not restarted (2026-11-02): the build label differs, the client served is this one, so a
+  // refresh would load the same client and the prompt used to come back after every refresh.
+  await page.route("**/api/health", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        version: "99.0.0",
+        build: "99.0.0+stale-server",
+      }),
+    }),
+  );
+  const askedServedIndex = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/" && response.request().resourceType() === "fetch",
+  );
+
+  await page.goto("/");
+  await askedServedIndex;
+  // The prompt would follow straight after that answer; give the check a moment to finish.
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)));
+  await expect(page.getByText("A YunYun update is ready.", { exact: true })).toBeHidden();
+  await page.unroute("**/api/health");
 });
 
 test(

@@ -6,7 +6,7 @@
 // left alone, so the preset picker says so here.
 import { useTranslation } from "react-i18next";
 import { WandSparkles } from "lucide-react";
-import { useUIStore } from "../../stores/ui.store";
+import { openMeguminWindow } from "../../lib/megumin-tab-request";
 import { useMeguminEnabled, useMeguminStatus } from "../../hooks/use-megumin";
 
 export function MeguminPresetNote({ promptPresetId }: { promptPresetId: string | null }) {
@@ -36,7 +36,7 @@ export function MeguminPresetNote({ promptPresetId }: { promptPresetId: string |
         <p>{message}</p>
         <button
           type="button"
-          onClick={() => useUIStore.getState().openRightPanel("megumin")}
+          onClick={() => openMeguminWindow()}
           className="mt-1 font-medium text-[var(--primary)] hover:underline"
         >
           {t("megumin.presetNote.openPanel")}

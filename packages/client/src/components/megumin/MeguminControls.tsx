@@ -1,8 +1,11 @@
 // ──────────────────────────────────────────────
-// Megumin panel: shared controls
+// Megumin Suite window: shared controls
 // ──────────────────────────────────────────────
 // Every tab is drawn from these, on top of Settings' own primitives, so the
-// Megumin panel looks and behaves like the rest of YunYun's panels.
+// Megumin Suite window looks and behaves like the rest of YunYun. The window is
+// wide, so the type is a step up from the dense right panels, and the layout
+// helpers (MeguminGrid, a section's own container) put cards in columns when
+// there is room and in one column on a phone.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
@@ -13,14 +16,35 @@ import {
   SETTINGS_CHOICE_CARD_CLASS,
   SETTINGS_COMPACT_PRIMARY_BUTTON_CLASS,
   SETTINGS_PRIMARY_FULL_BUTTON_CLASS,
-  SettingsSection,
-  ToggleSetting,
+  SettingsSwitch,
 } from "../panels/settings/SettingControls";
 
 export const MEGUMIN_INPUT_CLASS =
-  "w-full rounded-md border border-[var(--border)] bg-[var(--background)]/60 px-2 py-1.5 text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60";
+  "w-full rounded-lg border border-[var(--border)] bg-[var(--background)]/60 px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] disabled:opacity-60";
 
-/** A titled group inside a tab (Settings' own section frame). Text is already translated. */
+/**
+ * Column layouts that follow the room they get: the tab's width, or the width of the section they sit in.
+ * `cards` for pickable cards and list items, `sections` for sections side by side, `fields` for form fields.
+ */
+const GRID_LAYOUTS = {
+  cards: "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3",
+  sections: "grid-cols-1 @4xl:grid-cols-2",
+  fields: "grid-cols-1 @lg:grid-cols-2",
+} as const;
+
+export function MeguminGrid({
+  layout = "cards",
+  className,
+  children,
+}: {
+  layout?: keyof typeof GRID_LAYOUTS;
+  className?: string;
+  children: ReactNode;
+}) {
+  return <div className={cn("grid items-start gap-3", GRID_LAYOUTS[layout], className)}>{children}</div>;
+}
+
+/** A titled group inside a tab. Text is already translated. Its body is a container, so grids inside fit it. */
 export function MeguminSection({
   title,
   description,
@@ -28,7 +52,9 @@ export function MeguminSection({
   icon,
   headerAction,
   children,
-  tone,
+  tone = "default",
+  className,
+  contentClassName,
 }: {
   title: string;
   description?: ReactNode;
@@ -37,19 +63,113 @@ export function MeguminSection({
   headerAction?: ReactNode;
   children: ReactNode;
   tone?: "default" | "danger";
+  className?: string;
+  contentClassName?: string;
+}) {
+  const danger = tone === "danger";
+  return (
+    <section
+      className={cn(
+        "min-w-0 overflow-hidden rounded-xl border shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_8%,transparent)]",
+        danger
+          ? "border-[var(--destructive)]/30 bg-[var(--destructive)]/5"
+          : "border-[var(--border)]/70 bg-[var(--background)]/35",
+        className,
+      )}
+    >
+      <div className="flex flex-wrap items-start gap-3 px-4 py-3">
+        {icon ? (
+          <span
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1",
+              danger
+                ? "bg-[var(--destructive)]/10 text-[var(--destructive)] ring-[var(--destructive)]/25"
+                : "bg-[var(--secondary)]/70 text-[var(--marinara-chat-chrome-button-text-active)] ring-[var(--border)]",
+            )}
+          >
+            {icon}
+          </span>
+        ) : null}
+        <div className="min-w-0 flex-1 basis-48">
+          <h3
+            className={cn(
+              "inline-flex items-center gap-1.5 text-sm font-semibold",
+              danger ? "text-[var(--destructive)]" : "text-[var(--marinara-chat-chrome-panel-title)]",
+            )}
+          >
+            {title}
+            {help ? <HelpTooltip text={help} /> : null}
+          </h3>
+          {description ? (
+            <div className="mt-0.5 text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+              {description}
+            </div>
+          ) : null}
+        </div>
+        {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
+      </div>
+      <div
+        className={cn(
+          "@container flex flex-col gap-3 border-t border-[var(--border)]/60 px-4 pb-4 pt-3",
+          contentClassName,
+        )}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A tab's master switch, drawn as Megumin's highlighted bar ("Enable Memory Core"): what it turns on, what that
+ * does, and the switch. Tinted while on.
+ */
+export function MeguminFeatureBar({
+  title,
+  description,
+  icon,
+  checked,
+  onChange,
+  disabled,
+  tone = "default",
+  ariaLabel,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  /** The switch's own name when `title` changes with its state ("Images off" / "Images on"). */
+  ariaLabel?: string;
+  /** `danger` tints red while on, for a switch that takes guard rails away. */
+  tone?: "default" | "danger";
 }) {
   return (
-    <SettingsSection
-      title={title}
+    <SettingsSwitch
+      label={
+        <span className="inline-flex items-center gap-2 font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+          {icon}
+          {title}
+        </span>
+      }
       description={description}
-      help={help}
-      icon={icon}
-      headerAction={headerAction}
-      tone={tone}
-      contentClassName="flex flex-col gap-2"
-    >
-      {children}
-    </SettingsSection>
+      checked={checked}
+      onChange={onChange}
+      disabled={disabled}
+      labelPosition="start"
+      className={cn(
+        "justify-between gap-4 rounded-xl border px-4 py-3",
+        !checked
+          ? "border-[var(--border)]/70 bg-[var(--background)]/35"
+          : tone === "danger"
+            ? "border-[var(--destructive)]/45 bg-[var(--destructive)]/10 hover:bg-[var(--destructive)]/15"
+            : "border-amber-500/45 bg-amber-500/10 hover:bg-amber-500/15",
+      )}
+      labelClassName="text-sm"
+      descriptionClassName="text-xs"
+      inputAriaLabel={ariaLabel}
+    />
   );
 }
 
@@ -66,14 +186,25 @@ export function MeguminToggle({
   onChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
-  return <ToggleSetting label={label} help={help} checked={checked} onChange={onChange} disabled={disabled} />;
+  return (
+    <SettingsSwitch
+      label={label}
+      help={help}
+      checked={checked}
+      onChange={onChange}
+      disabled={disabled}
+      labelPosition="start"
+      className="justify-between gap-3 p-2"
+      labelClassName="text-[0.8125rem]"
+    />
+  );
 }
 
 function FieldLabel({ label, help, htmlFor }: { label: ReactNode; help?: string; htmlFor?: string }) {
   return (
     <label
       htmlFor={htmlFor}
-      className="inline-flex items-center gap-1 text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]"
+      className="inline-flex items-center gap-1 text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]"
     >
       {label}
       {help ? <HelpTooltip text={help} /> : null}
@@ -105,7 +236,7 @@ export function MeguminSelect({
 }) {
   const known = options.some((o) => o.value === value);
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       {label ? <FieldLabel label={label} help={help} /> : null}
       <select
         className={MEGUMIN_INPUT_CLASS}
@@ -187,11 +318,11 @@ export function MeguminText({
 }) {
   const { draft, change, flush } = useDraftText(value ?? "", onChange);
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       {label ? <FieldLabel label={label} help={help} /> : null}
       {multiline ? (
         <textarea
-          className={cn(MEGUMIN_INPUT_CLASS, "min-h-16 resize-y leading-relaxed", mono && "font-mono text-[0.6875rem]")}
+          className={cn(MEGUMIN_INPUT_CLASS, "min-h-20 resize-y leading-relaxed", mono && "font-mono text-[0.8125rem]")}
           rows={rows}
           value={draft}
           placeholder={placeholder}
@@ -243,12 +374,12 @@ export function MeguminNumber({
     return n;
   };
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       {label ? (
         <div className="flex items-center justify-between gap-2">
           <FieldLabel label={label} help={help} />
           {slider ? (
-            <span className="font-mono text-[0.6875rem] text-[var(--muted-foreground)]">
+            <span className="font-mono text-xs text-[var(--muted-foreground)]">
               {value}
               {suffix ?? ""}
             </span>
@@ -282,7 +413,7 @@ export function MeguminNumber({
   );
 }
 
-/** One-of-N (or N-of-M with `multi`) choice cards: engines, CoTs, styles, add-ons. */
+/** One-of-N (or N-of-M with `multi`) choice cards: engines, CoTs, styles, add-ons. More columns as room allows. */
 export function MeguminChoices({
   options,
   value,
@@ -301,7 +432,12 @@ export function MeguminChoices({
   const selected = (v: string) => (Array.isArray(value) ? value.includes(v) : value === v);
   return (
     <div
-      className={cn("grid gap-1.5", columns === 2 ? "grid-cols-2" : "grid-cols-1")}
+      className={cn(
+        "grid gap-2",
+        columns === 2
+          ? "grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4"
+          : "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3",
+      )}
       role={multi ? "group" : "radiogroup"}
     >
       {options.map((o) => (
@@ -313,17 +449,15 @@ export function MeguminChoices({
           aria-pressed={selected(o.value)}
           disabled={disabled || o.disabled}
           onClick={() => onChange(o.value)}
-          className={cn(SETTINGS_CHOICE_CARD_CLASS, "flex flex-col items-start gap-0.5 text-left")}
+          className={cn(SETTINGS_CHOICE_CARD_CLASS, "flex flex-col items-start gap-1 text-left text-[0.8125rem]")}
         >
-          <span className="flex w-full items-center gap-1.5 font-medium">
+          <span className="flex w-full items-center gap-1.5 font-semibold">
             {o.icon}
             <span className="min-w-0 flex-1 truncate">{o.label}</span>
             {o.badge}
           </span>
           {o.hint ? (
-            <span className="text-[0.625rem] leading-snug text-[var(--marinara-chat-chrome-panel-muted)]">
-              {o.hint}
-            </span>
+            <span className="text-xs leading-snug text-[var(--marinara-chat-chrome-panel-muted)]">{o.hint}</span>
           ) : null}
         </button>
       ))}
@@ -339,6 +473,7 @@ export function MeguminButton({
   variant = "secondary",
   title,
   icon,
+  className: extraClassName,
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -347,6 +482,7 @@ export function MeguminButton({
   variant?: "secondary" | "primary" | "primaryFull" | "danger";
   title?: string;
   icon?: ReactNode;
+  className?: string;
 }) {
   const className =
     variant === "primary"
@@ -362,21 +498,35 @@ export function MeguminButton({
       title={title}
       disabled={disabled || pending}
       onClick={onClick}
-      className={cn(className, "inline-flex items-center justify-center gap-1.5")}
+      // The chrome control's own rules sit outside Tailwind's layers, so the phone height needs `!`.
+      className={cn(
+        className,
+        "inline-flex items-center justify-center gap-1.5 text-xs max-sm:min-h-9!",
+        extraClassName,
+      )}
     >
-      {pending ? <Loader2 size="0.75rem" className="animate-spin" /> : icon}
+      {pending ? <Loader2 size="0.8125rem" className="animate-spin" /> : icon}
       {children}
     </button>
   );
 }
 
 /** Muted explanatory text inside a section. */
-export function MeguminHint({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "warning" }) {
+export function MeguminHint({
+  children,
+  tone = "muted",
+  className,
+}: {
+  children: ReactNode;
+  tone?: "muted" | "warning";
+  className?: string;
+}) {
   return (
     <p
       className={cn(
-        "text-[0.625rem] leading-relaxed",
+        "text-xs leading-relaxed",
         tone === "warning" ? "text-[var(--warning,#d97706)]" : "text-[var(--marinara-chat-chrome-panel-muted)]",
+        className,
       )}
     >
       {children}
@@ -392,5 +542,5 @@ export function MeguminNeedsChat() {
 
 /** A small row of buttons. */
 export function MeguminRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("flex flex-wrap items-center gap-1.5", className)}>{children}</div>;
+  return <div className={cn("flex flex-wrap items-center gap-2", className)}>{children}</div>;
 }

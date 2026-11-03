@@ -31,7 +31,8 @@ import { MeguminEngineFlags, MeguminNotebookModel } from "@marinara-engine/share
 import { cn } from "../../../lib/utils";
 import { showConfirmDialog } from "../../../lib/app-dialogs";
 import { useMeguminPanel } from "../megumin-panel-context";
-import { MEGUMIN_INPUT_CLASS, MeguminButton, MeguminHint, MeguminSection, MeguminToggle } from "../MeguminControls";
+import { MEGUMIN_INPUT_CLASS, MeguminButton, MeguminFeatureBar, MeguminHint, MeguminSection } from "../MeguminControls";
+import { Badge, Callout } from "./presetControls";
 import { useMeguminReadAction } from "./use-megumin-read-action";
 
 type Clue = { seq: number; text: string; found?: boolean };
@@ -164,20 +165,21 @@ export function NotebookTab() {
   );
 
   return (
-    <>
-      <MeguminHint>{t("megumin.notebook.intro")}</MeguminHint>
+    <div className="flex flex-col gap-4">
+      {/* Megumin's header: what the notebook does, with its switch beside it. */}
       <div title={v11 ? t("megumin.notebook.v11SwitchTitle") : undefined}>
-        <MeguminToggle
-          label={on ? t("megumin.notebook.switchOn") : t("megumin.notebook.switchOff")}
+        <MeguminFeatureBar
+          icon={<BookOpen size="0.875rem" className="text-purple-400" />}
+          title={on ? t("megumin.notebook.switchOn") : t("megumin.notebook.switchOff")}
+          description={t("megumin.notebook.intro")}
           checked={on}
           onChange={() => void toggle()}
         />
       </div>
 
-      <div className="flex items-start gap-1.5 rounded-md bg-[var(--background)]/40 px-2 py-1.5 text-[0.6875rem] text-[var(--marinara-chat-chrome-panel-muted)]">
-        <Info size="0.75rem" className="mt-0.5 shrink-0" />
+      <Callout tone="muted" icon={<Info size="0.9375rem" className="text-purple-400" />}>
         <span>{status}</span>
-      </div>
+      </Callout>
 
       {state && (liveSorted.length || pastSorted.length) ? (
         <>
@@ -185,16 +187,16 @@ export function NotebookTab() {
             title={t("megumin.notebook.active.title")}
             icon={<VenetianMask size="0.875rem" />}
             headerAction={
-              <span className="text-[0.625rem] text-[var(--muted-foreground)]">
+              <Badge tone="muted">
                 {t("megumin.notebook.active.count", { live: liveSorted.length, cap: LIVE_CAP })}
-              </span>
+              </Badge>
             }
           >
             {!on ? <MeguminHint>{t("megumin.notebook.active.keptWhileOff")}</MeguminHint> : null}
             {liveSorted.length ? (
               <>
-                <div className="flex items-start gap-1.5 text-[0.625rem] leading-relaxed text-amber-500">
-                  <TriangleAlert size="0.75rem" className="mt-0.5 shrink-0" />
+                <div className="flex items-start gap-2 text-xs leading-relaxed text-amber-500">
+                  <TriangleAlert size="0.875rem" className="mt-px shrink-0" />
                   <span>{t("megumin.notebook.active.spoilerWarning")}</span>
                 </div>
                 {liveSorted.map((truth) => (
@@ -236,9 +238,9 @@ export function NotebookTab() {
             <MeguminSection
               title={t("megumin.notebook.past.title")}
               icon={<History size="0.875rem" />}
-              headerAction={<span className="text-[0.625rem] text-[var(--muted-foreground)]">{pastSorted.length}</span>}
+              headerAction={<Badge tone="muted">{pastSorted.length}</Badge>}
             >
-              <div className="flex flex-col gap-2 border-l-2 border-emerald-500/30 pl-3">
+              <div className="ml-1 flex flex-col gap-5 border-l-2 border-emerald-500/30 pl-4">
                 {pastSorted.map((truth) => (
                   <PastTruth
                     key={truth.id}
@@ -260,7 +262,7 @@ export function NotebookTab() {
           ) : null}
         </>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -303,10 +305,10 @@ function ClueList({
   const { t } = useTranslation();
   if (!truth.clues.length) return <MeguminHint>{t("megumin.notebook.noClues")}</MeguminHint>;
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex flex-col gap-1.5">
       {truth.clues.map((clue, i) => (
-        <li key={`${clue.seq}-${i}`} className="flex items-start gap-1.5 text-[0.6875rem]">
-          <span className="shrink-0 rounded bg-[var(--accent)] px-1 font-mono text-[0.5625rem] text-[var(--muted-foreground)]">
+        <li key={`${clue.seq}-${i}`} className="flex items-start gap-2 text-[0.8125rem] leading-relaxed">
+          <span className="mt-0.5 shrink-0 rounded-md bg-[var(--accent)] px-1.5 py-px font-mono text-[0.6875rem] text-[var(--muted-foreground)]">
             {at(clue.seq)}
           </span>
           <span className="min-w-0 flex-1">
@@ -314,9 +316,9 @@ function ClueList({
             {clue.found === false ? (
               <span
                 title={t("megumin.notebook.clueNotFoundTitle")}
-                className="ml-1 inline-flex items-center gap-0.5 text-[0.5625rem] text-amber-500"
+                className="ml-1.5 inline-flex items-center gap-1 text-[0.6875rem] text-amber-500"
               >
-                <TriangleAlert size="0.5625rem" />
+                <TriangleAlert size="0.6875rem" />
                 {t("megumin.notebook.clueNotFound")}
               </span>
             ) : null}
@@ -327,9 +329,9 @@ function ClueList({
               title={t("megumin.notebook.removeClue")}
               aria-label={t("megumin.notebook.removeClue")}
               onClick={() => onRemove(i)}
-              className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon text-[var(--destructive)] active:scale-90"
+              className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon h-7 w-7! shrink-0 text-[var(--destructive)]! active:scale-90 max-md:h-9 max-md:w-9!"
             >
-              <X size="0.625rem" />
+              <X size="0.75rem" />
             </button>
           ) : null}
         </li>
@@ -388,18 +390,19 @@ function LiveTruthCard({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-purple-500/25 bg-[var(--background)]/40 p-2">
-      <div className="flex flex-wrap items-center gap-1.5 text-[0.6875rem]">
-        <b>{truth.id}</b>
-        <span className="text-[0.625rem] text-[var(--muted-foreground)]">
+    // One line when there is room: which truth and when on the left, the reveal button or the actions on the right.
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-purple-500/25 bg-purple-500/[0.04] px-4 py-3">
+      <div className="flex min-w-0 flex-1 basis-48 flex-wrap items-baseline gap-x-3 gap-y-1">
+        <b className="text-sm text-purple-300">{truth.id}</b>
+        <span className="whitespace-nowrap text-xs text-[var(--muted-foreground)]">
           {t("megumin.notebook.written", { where: where(truth.createdSeq) })}
         </span>
-        <span className="text-[0.625rem] text-[var(--muted-foreground)]">
+        <span className="whitespace-nowrap text-xs text-[var(--muted-foreground)]">
           {t("megumin.notebook.clueCount", { count: truth.clues.length })}
         </span>
       </div>
       {isOpen ? (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-2">
           <MeguminButton icon={<EyeOff size="0.75rem" />} onClick={onHide}>
             {t("megumin.notebook.hide")}
           </MeguminButton>
@@ -414,10 +417,17 @@ function LiveTruthCard({
         </div>
       ) : null}
       {isOpen ? (
-        <div className="flex flex-col gap-2">
+        // The truth and who it is hidden from across the card; the three short notes side by side.
+        <div className="grid w-full grid-cols-1 gap-3 border-t border-purple-500/15 pt-3 @2xl:grid-cols-3">
           {FIELDS.map((f) => (
-            <label key={f.key} className="flex flex-col gap-1">
-              <span className="text-[0.625rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+            <label
+              key={f.key}
+              className={cn(
+                "flex min-w-0 flex-col gap-1.5",
+                (f.key === "truth" || f.key === "hiddenFrom") && "@2xl:col-span-3",
+              )}
+            >
+              <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
                 {t(`megumin.notebook.field.${f.key}`)}
               </span>
               {f.rows ? (
@@ -440,8 +450,8 @@ function LiveTruthCard({
               )}
             </label>
           ))}
-          <div className="flex flex-col gap-1">
-            <span className="text-[0.625rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+          <div className="flex min-w-0 flex-col gap-1.5 @2xl:col-span-3">
+            <span className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
               {t("megumin.notebook.field.clues")}
             </span>
             <ClueList
@@ -452,15 +462,17 @@ function LiveTruthCard({
               }
             />
           </div>
-          <MeguminHint>{t("megumin.notebook.savesOnLeave")}</MeguminHint>
+          <div className="@2xl:col-span-3">
+            <MeguminHint>{t("megumin.notebook.savesOnLeave")}</MeguminHint>
+          </div>
         </div>
       ) : (
         <button
           type="button"
           onClick={onOpen}
-          className="flex items-center justify-center gap-1.5 rounded-md border border-dashed border-purple-500/40 bg-purple-500/5 px-2 py-3 text-[0.6875rem] text-purple-400 backdrop-blur hover:bg-purple-500/10"
+          className="flex min-h-10 basis-full items-center justify-center gap-2 rounded-full border border-dashed border-purple-500/40 bg-purple-500/5 px-5 py-2 text-[0.8125rem] font-medium text-purple-400 backdrop-blur hover:bg-purple-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] @sm:basis-auto"
         >
-          <Eye size="0.75rem" />
+          <Eye size="0.875rem" />
           {t("megumin.notebook.showTruth")}
         </button>
       )}
@@ -487,35 +499,40 @@ function PastTruth({
       ? t(`megumin.notebook.how.${truth.revealedHow}`)
       : t("megumin.notebook.how.default");
   return (
-    <div className="relative flex flex-col gap-1">
-      <span className="absolute -left-[1.0625rem] top-1 h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-      <div className="flex flex-wrap items-center gap-1.5 text-[0.6875rem]">
-        <b>{truth.id}</b>
-        <span className="text-[0.625rem] text-[var(--muted-foreground)]">
-          {t("megumin.notebook.written", { where: where(truth.createdSeq) })}
-        </span>
-        <span className="text-[0.625rem] text-[var(--muted-foreground)]">
-          {t("megumin.notebook.cameOut", { where: where(truth.revealedSeq) })}
-        </span>
+    <div className="relative flex flex-col gap-2">
+      <span
+        className="absolute -left-[1.375rem] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/15"
+        aria-hidden="true"
+      />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-1 basis-48 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <b className="text-sm text-emerald-400">{truth.id}</b>
+          <span className="whitespace-nowrap text-xs text-[var(--muted-foreground)]">
+            {t("megumin.notebook.written", { where: where(truth.createdSeq) })}
+          </span>
+          <span className="whitespace-nowrap text-xs text-[var(--muted-foreground)]">
+            {t("megumin.notebook.cameOut", { where: where(truth.revealedSeq) })}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <MeguminButton
+            title={t("megumin.notebook.restoreTitle")}
+            icon={<RotateCcw size="0.75rem" />}
+            onClick={onRestore}
+          >
+            {t("megumin.notebook.restore")}
+          </MeguminButton>
+          <DeleteButton title={t("megumin.notebook.deletePastTitle")} onDelete={onForget} />
+        </div>
       </div>
-      <div className="flex flex-wrap gap-1">
-        <MeguminButton
-          title={t("megumin.notebook.restoreTitle")}
-          icon={<RotateCcw size="0.75rem" />}
-          onClick={onRestore}
-        >
-          {t("megumin.notebook.restore")}
-        </MeguminButton>
-        <DeleteButton title={t("megumin.notebook.deletePastTitle")} onDelete={onForget} />
-      </div>
-      <div className="text-[0.6875rem] leading-relaxed">{truth.truth}</div>
+      <div className="text-sm leading-relaxed text-[var(--foreground)]">{truth.truth}</div>
       {truth.hiddenFrom.length ? (
-        <div className="text-[0.625rem] text-[var(--muted-foreground)]">
+        <div className="text-xs text-[var(--muted-foreground)]">
           <i>{t("megumin.notebook.stillHiddenFrom")}</i> {truth.hiddenFrom.join(", ")}
         </div>
       ) : null}
-      <div className="flex items-center gap-1 text-[0.625rem] italic text-emerald-500">
-        <BookOpen size="0.625rem" />
+      <div className="flex items-center gap-1.5 text-xs italic text-emerald-500">
+        <BookOpen size="0.75rem" />
         {how}
       </div>
       <ClueList truth={truth} at={at} />

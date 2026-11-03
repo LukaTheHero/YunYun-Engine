@@ -1523,3 +1523,15 @@
   color: #38bdf8;
   border-color: rgba(56, 189, 248, 0.45);
 }
+
+/* The Megumin Suite window on phones: its small chrome buttons at a touch size. Kept here because the chrome
+   control's rules (globals.css) sit outside Tailwind's layers, so a utility on the button cannot raise them. */
+@media (max-width: 639.98px) {
+  [data-component="MeguminWindow"] .mari-chrome-control--small {
+    min-height: 2.25rem;
+  }
+
+  [data-component="MeguminWindow"] .mari-chrome-control--icon {
+    width: 2.25rem;
+  }
+}

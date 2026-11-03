@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────
-// Megumin panel: the small pieces the Model Setup, Preset & Thinking, Persona
+// Megumin Suite window: the small pieces the Model Setup, Preset & Thinking, Persona
 // and Language & Add-ons tabs share (Megumin's ui/controls.js and its card,
 // badge and callout styles, drawn with YunYun's tokens).
 // ──────────────────────────────────────────────
@@ -39,7 +39,7 @@ export function Segmented<T extends string>({
             disabled={disabled}
             onClick={() => onChange(o.id)}
             className={cn(
-              "min-w-0 flex-1 rounded-md px-2 py-1 text-[0.6875rem] transition-colors disabled:opacity-60",
+              "min-w-0 flex-auto rounded-md px-3 py-1.5 text-[0.8125rem] transition-colors disabled:opacity-60",
               on
                 ? "bg-[var(--primary)]/20 font-semibold text-[var(--foreground)] ring-1 ring-[var(--primary)]/45"
                 : "text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]",
@@ -69,14 +69,15 @@ export function SwitchRow({
 }) {
   return (
     <SettingsSwitch
-      label={label}
+      label={<span className="font-medium">{label}</span>}
       description={description}
       checked={checked}
       onChange={onChange}
       disabled={disabled}
       labelPosition="start"
-      className="justify-between gap-3 rounded-lg p-1.5"
-      labelClassName="text-xs"
+      className="justify-between gap-3 rounded-lg p-2"
+      labelClassName="text-[0.8125rem]"
+      descriptionClassName="text-xs font-normal"
     />
   );
 }
@@ -155,7 +156,7 @@ export function Badge({
     <span
       title={title}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[0.5625rem] font-semibold leading-none",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold leading-tight",
         BADGE_TONES[tone],
       )}
     >
@@ -176,11 +177,11 @@ const CALLOUT_TONES: Record<CalloutTone, string> = {
 };
 
 const CALLOUT_ICONS: Record<CalloutTone, ReactNode> = {
-  gold: <Lightbulb size="0.75rem" className="text-amber-500" />,
-  green: <ShieldCheck size="0.75rem" className="text-emerald-500" />,
-  blue: <Info size="0.75rem" className="text-sky-500" />,
-  red: <TriangleAlert size="0.75rem" className="text-[var(--destructive)]" />,
-  muted: <Info size="0.75rem" className="text-[var(--muted-foreground)]" />,
+  gold: <Lightbulb size="0.9375rem" className="text-amber-500" />,
+  green: <ShieldCheck size="0.9375rem" className="text-emerald-500" />,
+  blue: <Info size="0.9375rem" className="text-sky-500" />,
+  red: <TriangleAlert size="0.9375rem" className="text-[var(--destructive)]" />,
+  muted: <Info size="0.9375rem" className="text-[var(--muted-foreground)]" />,
 };
 
 /** Megumin's mtab-callout: a tinted note with an icon. */
@@ -188,7 +189,7 @@ export function Callout({ tone, icon, children }: { tone: CalloutTone; icon?: Re
   return (
     <div
       className={cn(
-        "flex items-start gap-2 rounded-lg border px-2.5 py-2 text-[0.6875rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]",
+        "flex items-start gap-2.5 rounded-xl border px-4 py-3 text-[0.8125rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]",
         CALLOUT_TONES[tone],
       )}
     >
@@ -240,9 +241,9 @@ export function PickCard({
           : undefined
       }
       className={cn(
-        "relative flex flex-col gap-1 overflow-hidden rounded-lg border px-2.5 py-2 pl-3 text-left transition-colors",
+        "relative flex h-full min-w-0 flex-col gap-1.5 overflow-hidden rounded-xl border px-4 py-3 text-left transition-colors",
         active
-          ? "border-[var(--primary)]/55 bg-[var(--primary)]/10"
+          ? "border-emerald-500/55 bg-emerald-500/[0.07] shadow-[0_0_0_1px_color-mix(in_srgb,#10b981_35%,transparent)]"
           : "border-[var(--border)]/70 bg-[var(--background)]/35",
         clickable && !active && "cursor-pointer hover:border-[var(--primary)]/35 hover:bg-[var(--accent)]/50",
         clickable && "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
@@ -251,24 +252,19 @@ export function PickCard({
     >
       <span
         aria-hidden="true"
-        className={cn(
-          "absolute inset-y-0 left-0 w-0.5",
-          !accent && (active ? "bg-[var(--primary)]" : "bg-[var(--border)]"),
-        )}
+        className={cn("absolute inset-x-0 top-0 h-0.5", !accent && (active ? "bg-emerald-500" : "bg-transparent"))}
         style={accent ? { backgroundColor: accent } : undefined}
       />
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
           {title}
         </span>
         {titleExtra}
       </div>
       {description ? (
-        <div className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
-          {description}
-        </div>
+        <div className="text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{description}</div>
       ) : null}
-      {badges ? <div className="flex flex-wrap gap-1">{badges}</div> : null}
+      {badges ? <div className="mt-auto flex flex-wrap gap-1 pt-0.5">{badges}</div> : null}
       {children}
     </div>
   );
@@ -279,7 +275,7 @@ export function SummaryChip({ tone, icon, children }: { tone?: "ok" | "warm"; ic
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] ring-1",
+        "inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1",
         tone === "ok"
           ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/30"
           : tone === "warm"
@@ -317,7 +313,7 @@ export function PageTabs<T extends string>({
             aria-selected={on}
             onClick={() => onChange(p.id)}
             className={cn(
-              "-mb-px inline-flex min-w-0 flex-1 items-center justify-center gap-1 border-b-2 px-1.5 py-1.5 text-[0.6875rem] transition-colors",
+              "-mb-px inline-flex min-w-0 items-center justify-center gap-1.5 border-b-2 px-4 py-2 text-[0.8125rem] transition-colors max-sm:flex-1 max-sm:px-2",
               on
                 ? "border-[var(--primary)] font-semibold text-[var(--foreground)]"
                 : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]",

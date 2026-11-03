@@ -36,7 +36,7 @@ export function useMeguminPower() {
 }
 
 /**
- * `large` is the panel's banner; `compact` is the top bar's pill, which stays on phones too.
+ * `large` is the Megumin Suite window's card; `compact` is the top bar's pill, which stays on phones too.
  */
 export function MeguminPowerSwitch({
   size,
@@ -44,7 +44,7 @@ export function MeguminPowerSwitch({
   panelOpen = false,
 }: {
   size: "large" | "compact";
-  /** The top bar shows a button opening the Megumin panel beside the switch. */
+  /** The top bar shows a button opening the Megumin Suite window beside the switch. */
   onOpenPanel?: () => void;
   panelOpen?: boolean;
 }) {
@@ -119,43 +119,56 @@ export function MeguminPowerSwitch({
     <div
       data-component="MeguminPowerBanner"
       className={cn(
-        "flex items-center gap-3 rounded-xl p-3 ring-1 transition-colors",
+        "flex flex-col gap-2 rounded-xl p-3 ring-1 transition-colors",
         enabled ? "mari-megumin-toggle--on ring-transparent" : "bg-[var(--background)]/40 ring-[var(--border)]",
       )}
     >
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-extrabold uppercase tracking-wider">{t("megumin.toggle.name")}</div>
-        <div
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wider">
+            <WandSparkles size="0.875rem" />
+            {t("megumin.toggle.name")}
+          </div>
+          <div
+            className={cn(
+              "text-[0.6875rem] font-semibold",
+              enabled ? "text-white/85" : "text-[var(--muted-foreground)]",
+            )}
+          >
+            {state}
+          </div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label={t("megumin.toggle.aria", { state })}
+          disabled={pending || !!locked}
+          onClick={toggle}
           className={cn(
-            "text-[0.625rem] leading-relaxed",
-            enabled ? "text-white/85" : "text-[var(--muted-foreground)]",
+            "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-60",
+            enabled ? "bg-white/30" : "bg-[var(--border)]",
           )}
         >
-          {enabled ? t("megumin.toggle.descriptionOn") : t("megumin.toggle.descriptionOff")}
-        </div>
-        {locked ? (
-          <div className="mt-1 text-[0.625rem] opacity-80">{t("settings.features.envLocked", { name: locked })}</div>
-        ) : null}
+          <span
+            className={cn(
+              "block h-6 w-6 rounded-full bg-white shadow-md transition-transform",
+              enabled ? "translate-x-5" : "translate-x-0",
+            )}
+          />
+        </button>
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={enabled}
-        aria-label={t("megumin.toggle.aria", { state })}
-        disabled={pending || !!locked}
-        onClick={toggle}
+      <div
         className={cn(
-          "relative inline-flex h-8 w-16 shrink-0 items-center rounded-full p-1 transition-colors disabled:opacity-60",
-          enabled ? "bg-white/30" : "bg-[var(--border)]",
+          "text-[0.6875rem] leading-relaxed [@media(max-height:50rem)]:hidden",
+          enabled ? "text-white/85" : "text-[var(--muted-foreground)]",
         )}
       >
-        <span
-          className={cn(
-            "block h-6 w-6 rounded-full bg-white shadow-md transition-transform",
-            enabled ? "translate-x-8" : "translate-x-0",
-          )}
-        />
-      </button>
+        {enabled ? t("megumin.toggle.descriptionOn") : t("megumin.toggle.descriptionOff")}
+      </div>
+      {locked ? (
+        <div className="text-[0.6875rem] opacity-80">{t("settings.features.envLocked", { name: locked })}</div>
+      ) : null}
     </div>
   );
 }

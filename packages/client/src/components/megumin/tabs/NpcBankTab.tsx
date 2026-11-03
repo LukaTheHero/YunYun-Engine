@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   Anchor,
   ArrowUp,
+  BookUser,
   ChevronDown,
   ChevronRight,
   CircleCheck,
@@ -18,17 +19,21 @@ import {
   Clock,
   Download,
   FileUp,
+  ListChecks,
   Lock,
   Pencil,
   Plus,
   Radar,
   RefreshCw,
   RotateCcw,
+  Settings2,
+  SlidersHorizontal,
   Trash2,
   Undo2,
   Upload,
   UserPlus,
   UserRoundSearch,
+  Users,
   WandSparkles,
   X,
 } from "lucide-react";
@@ -41,6 +46,8 @@ import { useMeguminPanel } from "../megumin-panel-context";
 import {
   MEGUMIN_INPUT_CLASS,
   MeguminButton,
+  MeguminFeatureBar,
+  MeguminGrid,
   MeguminHint,
   MeguminNeedsChat,
   MeguminNumber,
@@ -50,6 +57,7 @@ import {
   MeguminToggle,
   useDraftText,
 } from "../MeguminControls";
+import { Badge } from "./presetControls";
 import { MeguminPromptOverrides } from "./MeguminPromptOverrides";
 import { useMeguminNpcFocus } from "../../../lib/megumin-tab-request";
 
@@ -109,6 +117,31 @@ function cleanImported(raw: unknown): Npc | null {
     ? src.history.filter((e) => e && typeof e === "object" && !Array.isArray(e))
     : [];
   return out as Npc;
+}
+
+// How much room a dossier field gets: one line, a few lines (a list, the image tags), or a paragraph.
+type FieldSize = "short" | "tall" | "paragraph";
+const fieldSize = (f: NpcField): FieldSize =>
+  f.type === "longtext" ? "paragraph" : f.type === "list" || f.system === "imageTags" ? "tall" : "short";
+
+/**
+ * Which dossier fields take a whole row of the two-column grid: paragraphs always, and a one-liner or a list
+ * with no neighbour of its own size to pair with, so no row is left half empty.
+ */
+function fullRowFields(fields: NpcField[]): boolean[] {
+  const sizes = fields.map(fieldSize);
+  const full = sizes.map((s) => s === "paragraph");
+  let run = 0;
+  sizes.forEach((size, i) => {
+    if (size === "paragraph") {
+      run = 0;
+      return;
+    }
+    run = i > 0 && sizes[i - 1] === size ? run + 1 : 1;
+    const runEnds = sizes[i + 1] !== size;
+    if (runEnds && run % 2 === 1) full[i] = true;
+  });
+  return full;
 }
 
 function downloadJson(filename: string, data: unknown) {
@@ -240,77 +273,89 @@ export function NpcBankTab() {
   };
 
   return (
-    <>
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.625rem] font-medium ring-1",
-            nb.enabled
-              ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/30"
-              : "text-[var(--muted-foreground)] ring-[var(--border)]",
-          )}
-        >
-          {nb.enabled ? <CircleCheck size="0.625rem" /> : <CircleX size="0.625rem" />}
-          {nb.enabled ? t("megumin.npc.badge.on") : t("megumin.npc.badge.off")}
-        </span>
-      </div>
-      <MeguminSection title={t("megumin.npc.enable.title")} description={t("megumin.npc.enable.desc")}>
-        <MeguminToggle
-          label={t("megumin.npc.enable.label")}
-          checked={!!nb.enabled}
-          onChange={(on) => editBank((bank) => (bank.enabled = on))}
-        />
-      </MeguminSection>
+    <div className="flex flex-col gap-4">
+      {/* Megumin's "Enable NPC Bank" bar; the window's tab header above already names the tab. */}
+      <MeguminFeatureBar
+        icon={<Users size="1rem" className="shrink-0 text-rose-500" />}
+        title={
+          <>
+            {t("megumin.npc.enable.label")}
+            <Badge
+              tone={nb.enabled ? "active" : "muted"}
+              icon={nb.enabled ? <CircleCheck size="0.6875rem" /> : <CircleX size="0.6875rem" />}
+            >
+              {nb.enabled ? t("megumin.npc.badge.on") : t("megumin.npc.badge.off")}
+            </Badge>
+          </>
+        }
+        description={t("megumin.npc.enable.desc")}
+        checked={!!nb.enabled}
+        onChange={(on) => editBank((bank) => (bank.enabled = on))}
+      />
 
       {nb.enabled ? (
         <>
-          <MeguminSection title={t("megumin.npc.injection.title")}>
-            <MeguminToggle
-              label={t("megumin.npc.injection.ooc")}
-              help={t("megumin.npc.injection.oocHelp")}
-              checked={!!nb.oocTrigger}
-              onChange={(on) => editBank((bank) => (bank.oocTrigger = on))}
-            />
-            <MeguminToggle
-              label={t("megumin.npc.injection.portraits")}
-              help={t("megumin.npc.injection.portraitsHelp")}
-              checked={!!nb.sendPortraitsToAi}
-              onChange={(on) => editBank((bank) => (bank.sendPortraitsToAi = on))}
-            />
-            <MeguminNumber
-              label={t("megumin.npc.injection.limit")}
-              help={t("megumin.npc.injection.limitHelp")}
-              value={injectionLimit}
-              min={1}
-              max={20}
-              onChange={(v) => editBank((bank) => (bank.injectionLimit = Math.max(1, Math.trunc(v) || 3)))}
-            />
-            <MeguminText
-              label={t("megumin.npc.injection.ignore")}
-              help={t("megumin.npc.injection.ignoreHelp")}
-              placeholder={t("megumin.npc.injection.ignorePlaceholder")}
-              value={String(nb.ignoredNames || "")}
-              onChange={(v) => editBank((bank) => (bank.ignoredNames = v))}
-            />
-          </MeguminSection>
+          {/* The injection settings get the wider column, the scanner's one number the narrower. */}
+          <MeguminGrid layout="sections" className="items-stretch gap-4 @4xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <MeguminSection title={t("megumin.npc.injection.title")} icon={<SlidersHorizontal size="0.9375rem" />}>
+              <MeguminGrid layout="fields" className="gap-x-4">
+                <div className="rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/40 px-1">
+                  <MeguminToggle
+                    label={t("megumin.npc.injection.ooc")}
+                    help={t("megumin.npc.injection.oocHelp")}
+                    checked={!!nb.oocTrigger}
+                    onChange={(on) => editBank((bank) => (bank.oocTrigger = on))}
+                  />
+                </div>
+                <div className="rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/40 px-1">
+                  <MeguminToggle
+                    label={t("megumin.npc.injection.portraits")}
+                    help={t("megumin.npc.injection.portraitsHelp")}
+                    checked={!!nb.sendPortraitsToAi}
+                    onChange={(on) => editBank((bank) => (bank.sendPortraitsToAi = on))}
+                  />
+                </div>
+                <MeguminNumber
+                  label={t("megumin.npc.injection.limit")}
+                  help={t("megumin.npc.injection.limitHelp")}
+                  value={injectionLimit}
+                  min={1}
+                  max={20}
+                  onChange={(v) => editBank((bank) => (bank.injectionLimit = Math.max(1, Math.trunc(v) || 3)))}
+                />
+                <MeguminText
+                  label={t("megumin.npc.injection.ignore")}
+                  help={t("megumin.npc.injection.ignoreHelp")}
+                  placeholder={t("megumin.npc.injection.ignorePlaceholder")}
+                  value={String(nb.ignoredNames || "")}
+                  onChange={(v) => editBank((bank) => (bank.ignoredNames = v))}
+                />
+              </MeguminGrid>
+            </MeguminSection>
 
-          <MeguminSection title={t("megumin.npc.scanner.title")}>
-            <MeguminNumber
-              label={t("megumin.npc.scanner.depth")}
-              value={Number(nb.scanDepth) || 60}
-              min={10}
-              onChange={(v) => editBank((bank) => (bank.scanDepth = !Number.isFinite(v) || v < 1 ? 60 : Math.trunc(v)))}
-            />
-            <MeguminHint>{t("megumin.npc.scanner.depthHint")}</MeguminHint>
-            <MeguminHint tone="warning">{t("megumin.npc.scanner.depthWarning")}</MeguminHint>
-          </MeguminSection>
+            <MeguminSection title={t("megumin.npc.scanner.title")} icon={<Settings2 size="0.9375rem" />}>
+              <div className="@2xl:max-w-xs">
+                <MeguminNumber
+                  label={t("megumin.npc.scanner.depth")}
+                  value={Number(nb.scanDepth) || 60}
+                  min={10}
+                  onChange={(v) =>
+                    editBank((bank) => (bank.scanDepth = !Number.isFinite(v) || v < 1 ? 60 : Math.trunc(v)))
+                  }
+                />
+              </div>
+              <MeguminHint>{t("megumin.npc.scanner.depthHint")}</MeguminHint>
+              <MeguminHint tone="warning">{t("megumin.npc.scanner.depthWarning")}</MeguminHint>
+            </MeguminSection>
+          </MeguminGrid>
 
           <FieldEditor fields={fieldList} defaults={defaultFields} editBank={editBank} />
 
           <MeguminSection
             title={t("megumin.npc.list.title", { count: npcs.length })}
+            icon={<BookUser size="0.9375rem" />}
             headerAction={
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <input
                   ref={importRef}
                   type="file"
@@ -325,7 +370,7 @@ export function NpcBankTab() {
                   onClick={() => importRef.current?.click()}
                   className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon text-emerald-500"
                 >
-                  <FileUp size="0.75rem" />
+                  <FileUp size="0.875rem" />
                 </button>
                 <button
                   type="button"
@@ -334,7 +379,7 @@ export function NpcBankTab() {
                   onClick={() => downloadJson("megumin_npc_bank.json", npcs)}
                   className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon text-blue-500"
                 >
-                  <Download size="0.75rem" />
+                  <Download size="0.875rem" />
                 </button>
               </div>
             }
@@ -367,11 +412,11 @@ export function NpcBankTab() {
             </MeguminRow>
             {!chatId ? <MeguminNeedsChat /> : null}
             {npcs.length === 0 ? (
-              <p className="py-4 text-center text-[0.6875rem] text-[var(--muted-foreground)]">
+              <p className="rounded-lg border border-dashed border-[var(--border)]/70 px-4 py-6 text-center text-[0.8125rem] text-[var(--muted-foreground)]">
                 {t("megumin.npc.list.empty")}
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 {[...npcs].reverse().map((npc, revIdx) => {
                   const idx = npcs.length - 1 - revIdx;
                   return (
@@ -418,7 +463,7 @@ export function NpcBankTab() {
           />
         </>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -465,18 +510,26 @@ function FieldEditor({
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/35">
+    <div className="min-w-0 overflow-hidden rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/35 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--foreground)_8%,transparent)]">
+      {/* Folds like the prompt editor at the bottom of the tab, so the tab has one way of folding things. */}
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]"
+        className="flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)] transition-colors hover:bg-[var(--accent)]/40"
       >
-        {open ? <ChevronDown size="0.75rem" /> : <ChevronRight size="0.75rem" />}
-        {t("megumin.npc.fields.title")}
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--secondary)]/70 text-[var(--marinara-chat-chrome-button-text-active)] ring-1 ring-[var(--border)]">
+          <ListChecks size="0.9375rem" />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{t("megumin.npc.fields.title")}</span>
+        {open ? (
+          <ChevronDown size="1rem" className="shrink-0 text-[var(--muted-foreground)]" />
+        ) : (
+          <ChevronRight size="1rem" className="shrink-0 text-[var(--muted-foreground)]" />
+        )}
       </button>
       {open ? (
-        <div className="flex flex-col gap-2 border-t border-[var(--border)]/60 px-3 pb-3 pt-2.5">
+        <div className="@container flex flex-col gap-3 border-t border-[var(--border)]/60 px-4 pb-4 pt-3">
           <MeguminHint>{t("megumin.npc.fields.intro")}</MeguminHint>
           <MeguminHint>
             <span className="font-semibold text-emerald-500">{t("megumin.npc.fields.lasting")}</span>{" "}
@@ -485,93 +538,95 @@ function FieldEditor({
             {t("megumin.npc.fields.updatableHint")}
           </MeguminHint>
           {!editable.length ? <MeguminHint>{t("megumin.npc.fields.none")}</MeguminHint> : null}
-          {editable.map(({ f, realIndex }, i) => (
-            <div
-              key={`${f.id}:${realIndex}`}
-              className="flex flex-col gap-1.5 rounded-md border border-[var(--border)]/60 p-2"
-            >
-              <div className="flex items-center gap-1">
-                <div className="min-w-0 flex-1">
-                  <MeguminText
-                    value={f.label}
-                    placeholder={t("megumin.npc.fields.labelPlaceholder")}
-                    onChange={(v) => editField(realIndex, (x) => (x.label = v))}
-                  />
+          <MeguminGrid className="empty:hidden">
+            {editable.map(({ f, realIndex }, i) => (
+              <div
+                key={`${f.id}:${realIndex}`}
+                className="flex min-w-0 flex-col gap-2 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/40 p-3"
+              >
+                <div className="flex items-center gap-1.5">
+                  <div className="min-w-0 flex-1">
+                    <MeguminText
+                      value={f.label}
+                      placeholder={t("megumin.npc.fields.labelPlaceholder")}
+                      onChange={(v) => editField(realIndex, (x) => (x.label = v))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={i === 0}
+                    title={t("megumin.npc.fields.moveUp")}
+                    aria-label={t("megumin.npc.fields.moveUp")}
+                    className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
+                    onClick={() =>
+                      editBank((bank) => {
+                        // Swap with the previous EDITABLE field: the skeleton between them stays put.
+                        const prev = editable[i - 1];
+                        if (!prev) return;
+                        const tmp = bank.fields[realIndex];
+                        bank.fields[realIndex] = bank.fields[prev.realIndex];
+                        bank.fields[prev.realIndex] = tmp;
+                      })
+                    }
+                  >
+                    <ArrowUp size="0.875rem" />
+                  </button>
+                  <button
+                    type="button"
+                    title={t("megumin.npc.fields.remove")}
+                    aria-label={t("megumin.npc.fields.remove")}
+                    className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
+                    onClick={() => void remove(realIndex, f.label)}
+                  >
+                    <X size="0.875rem" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  disabled={i === 0}
-                  title={t("megumin.npc.fields.moveUp")}
-                  aria-label={t("megumin.npc.fields.moveUp")}
-                  className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
-                  onClick={() =>
-                    editBank((bank) => {
-                      // Swap with the previous EDITABLE field: the skeleton between them stays put.
-                      const prev = editable[i - 1];
-                      if (!prev) return;
-                      const tmp = bank.fields[realIndex];
-                      bank.fields[realIndex] = bank.fields[prev.realIndex];
-                      bank.fields[prev.realIndex] = tmp;
-                    })
-                  }
-                >
-                  <ArrowUp size="0.75rem" />
-                </button>
-                <button
-                  type="button"
-                  title={t("megumin.npc.fields.remove")}
-                  aria-label={t("megumin.npc.fields.remove")}
-                  className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
-                  onClick={() => void remove(realIndex, f.label)}
-                >
-                  <X size="0.75rem" />
-                </button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <select
+                    className={cn(MEGUMIN_INPUT_CLASS, "w-full py-1.5 @xl:w-auto")}
+                    value={f.type || "text"}
+                    title={t("megumin.npc.fields.typeHelp")}
+                    onChange={(e) => editField(realIndex, (x) => (x.type = e.target.value as NpcField["type"]))}
+                  >
+                    {FIELD_TYPES.map((type) => (
+                      <option key={type} value={type} title={t(`megumin.npc.fieldType.${type}.hint`)}>
+                        {t(`megumin.npc.fieldType.${type}.label`)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    title={t("megumin.npc.fields.lastingTitle")}
+                    onClick={() => editField(realIndex, (x) => (x.persistent = !x.persistent))}
+                    className={cn(
+                      "mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1.5 text-xs",
+                      f.persistent ? "text-emerald-500" : "text-[var(--muted-foreground)]",
+                    )}
+                  >
+                    {f.persistent ? <Anchor size="0.75rem" /> : <Clock size="0.75rem" />}
+                    {f.persistent ? t("megumin.npc.fields.lasting") : t("megumin.npc.fields.current")}
+                  </button>
+                  <button
+                    type="button"
+                    title={t("megumin.npc.fields.updatableTitle")}
+                    onClick={() => editField(realIndex, (x) => (x.updatable = !x.updatable))}
+                    className={cn(
+                      "mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1.5 text-xs",
+                      f.updatable ? "text-amber-500" : "text-[var(--muted-foreground)]",
+                    )}
+                  >
+                    {f.updatable ? <Pencil size="0.75rem" /> : <Lock size="0.75rem" />}
+                    {f.updatable ? t("megumin.npc.fields.updatable") : t("megumin.npc.fields.fixed")}
+                  </button>
+                </div>
+                <MeguminText
+                  value={f.placeholder || ""}
+                  placeholder={t("megumin.npc.fields.placeholderPlaceholder")}
+                  onChange={(v) => editField(realIndex, (x) => (x.placeholder = v))}
+                />
               </div>
-              <div className="flex flex-wrap items-center gap-1">
-                <select
-                  className={cn(MEGUMIN_INPUT_CLASS, "w-auto")}
-                  value={f.type || "text"}
-                  title={t("megumin.npc.fields.typeHelp")}
-                  onChange={(e) => editField(realIndex, (x) => (x.type = e.target.value as NpcField["type"]))}
-                >
-                  {FIELD_TYPES.map((type) => (
-                    <option key={type} value={type} title={t(`megumin.npc.fieldType.${type}.hint`)}>
-                      {t(`megumin.npc.fieldType.${type}.label`)}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  title={t("megumin.npc.fields.lastingTitle")}
-                  onClick={() => editField(realIndex, (x) => (x.persistent = !x.persistent))}
-                  className={cn(
-                    "mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1 text-[0.625rem]",
-                    f.persistent ? "text-emerald-500" : "text-[var(--muted-foreground)]",
-                  )}
-                >
-                  {f.persistent ? <Anchor size="0.625rem" /> : <Clock size="0.625rem" />}
-                  {f.persistent ? t("megumin.npc.fields.lasting") : t("megumin.npc.fields.current")}
-                </button>
-                <button
-                  type="button"
-                  title={t("megumin.npc.fields.updatableTitle")}
-                  onClick={() => editField(realIndex, (x) => (x.updatable = !x.updatable))}
-                  className={cn(
-                    "mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1 text-[0.625rem]",
-                    f.updatable ? "text-amber-500" : "text-[var(--muted-foreground)]",
-                  )}
-                >
-                  {f.updatable ? <Pencil size="0.625rem" /> : <Lock size="0.625rem" />}
-                  {f.updatable ? t("megumin.npc.fields.updatable") : t("megumin.npc.fields.fixed")}
-                </button>
-              </div>
-              <MeguminText
-                value={f.placeholder || ""}
-                placeholder={t("megumin.npc.fields.placeholderPlaceholder")}
-                onChange={(v) => editField(realIndex, (x) => (x.placeholder = v))}
-              />
-            </div>
-          ))}
+            ))}
+          </MeguminGrid>
           <MeguminRow>
             <MeguminButton
               icon={<Plus size="0.75rem" />}
@@ -648,6 +703,7 @@ function NpcCard({
   const header = isMale ? "from-blue-500/15 to-blue-700/5" : "from-rose-500/15 to-rose-700/5";
   const date = npc.timestamp ? new Date(npc.timestamp).toLocaleDateString() : "";
   const history = Array.isArray(npc.history) ? npc.history : [];
+  const fullRow = fullRowFields(bodyFields);
 
   const editNpc = (change: (n: Npc) => void) =>
     editBank((bank) => {
@@ -736,8 +792,9 @@ function NpcCard({
   return (
     <div
       ref={cardRef}
-      className={cn("overflow-hidden rounded-xl border bg-[var(--background)]/40 transition-colors", ring)}
+      className={cn("min-w-0 overflow-hidden rounded-xl border bg-[var(--background)]/40 transition-colors", ring)}
     >
+      {/* One row on a wide window (who, then what you can do), two on a phone. */}
       <div
         role="button"
         tabIndex={0}
@@ -749,16 +806,21 @@ function NpcCard({
             setOpen(!open);
           }
         }}
-        className={cn("flex cursor-pointer select-none flex-col gap-1.5 bg-gradient-to-br px-2.5 py-2", header)}
+        className={cn(
+          "flex cursor-pointer select-none flex-col gap-2 bg-gradient-to-br px-4 py-2.5 @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:gap-4",
+          header,
+        )}
       >
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-2">
           {open ? (
-            <ChevronDown size="0.625rem" className={accent} />
+            <ChevronDown size="0.875rem" className={cn("shrink-0", accent)} />
           ) : (
-            <ChevronRight size="0.625rem" className={accent} />
+            <ChevronRight size="0.875rem" className={cn("shrink-0", accent)} />
           )}
-          {pfp ? <img src={pfp} alt="" className="h-7 w-7 shrink-0 rounded-md object-cover" /> : null}
-          <span className={cn("min-w-0 truncate text-[0.8125rem] font-bold", accent)}>{npc.name}</span>
+          {pfp ? (
+            <img src={pfp} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover ring-1 ring-black/25" />
+          ) : null}
+          <span className={cn("min-w-0 truncate text-sm font-bold", accent)}>{npc.name}</span>
           <button
             type="button"
             title={t("megumin.npc.card.rename")}
@@ -767,9 +829,9 @@ function NpcCard({
               e.stopPropagation();
               void rename();
             }}
-            className="shrink-0 p-0.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--muted-foreground)] hover:bg-black/15 hover:text-[var(--foreground)]"
           >
-            <Pencil size="0.625rem" />
+            <Pencil size="0.75rem" />
           </button>
           <button
             type="button"
@@ -778,18 +840,18 @@ function NpcCard({
               e.stopPropagation();
               setVitalsOpen(true);
             }}
-            className="inline-flex shrink-0 items-center gap-1 rounded bg-black/20 px-1.5 py-0.5 text-[0.5625rem] text-[var(--muted-foreground)]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-black/20 px-2 py-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
           >
             {t("megumin.npc.card.vitals", { age: npc.age || "?", sex: npc.sex || "?" })}
-            <Pencil size="0.5rem" className="opacity-60" />
+            <Pencil size="0.625rem" className="opacity-60" />
           </button>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-1.5 pl-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 pl-6 @2xl:shrink-0 @2xl:justify-end @2xl:gap-3 @2xl:pl-0">
           <label
             onClick={(e) => e.stopPropagation()}
             title={t("megumin.npc.card.imageOnlyTitle")}
             className={cn(
-              "inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-black/15 px-1.5 py-0.5 text-[0.5625rem] font-bold",
+              "inline-flex cursor-pointer items-center gap-2 rounded-lg bg-black/15 px-2.5 py-1.5 text-xs font-semibold",
               npc.imageOnly ? "text-emerald-500" : "text-[var(--muted-foreground)]",
             )}
           >
@@ -800,8 +862,8 @@ function NpcCard({
               onChange={toggleImageOnly}
             />
           </label>
-          <div className="flex items-center gap-1">
-            {date ? <span className="text-[0.5625rem] text-[var(--muted-foreground)]">{date}</span> : null}
+          <div className="ml-auto flex items-center gap-1">
+            {date ? <span className="mr-1 text-xs text-[var(--muted-foreground)]">{date}</span> : null}
             <button
               type="button"
               disabled={!chatId || updating}
@@ -811,9 +873,9 @@ function NpcCard({
                 e.stopPropagation();
                 void forceUpdate();
               }}
-              className="p-1 text-amber-500 disabled:opacity-40"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-amber-500 hover:bg-black/15 disabled:opacity-40 @2xl:h-8 @2xl:w-8"
             >
-              <RefreshCw size="0.75rem" className={cn(updating && "animate-spin")} />
+              <RefreshCw size="0.875rem" className={cn(updating && "animate-spin")} />
             </button>
             <button
               type="button"
@@ -826,9 +888,9 @@ function NpcCard({
                   .toLowerCase();
                 downloadJson(`megumin_npc_${safe}.json`, [npc]);
               }}
-              className="p-1 text-blue-500"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-blue-500 hover:bg-black/15 @2xl:h-8 @2xl:w-8"
             >
-              <Download size="0.75rem" />
+              <Download size="0.875rem" />
             </button>
             <button
               type="button"
@@ -838,32 +900,33 @@ function NpcCard({
                 e.stopPropagation();
                 void remove();
               }}
-              className="p-1 text-[var(--destructive)]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--destructive)] hover:bg-black/15 @2xl:h-8 @2xl:w-8"
             >
-              <Trash2 size="0.75rem" />
+              <Trash2 size="0.875rem" />
             </button>
           </div>
         </div>
       </div>
 
       {open ? (
-        <div className="flex flex-col gap-2.5 border-t border-[var(--border)]/40 p-2.5 sm:flex-row">
-          <div className="flex shrink-0 flex-col items-center gap-1.5 sm:w-32">
-            <div className="flex h-44 w-32 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-black/30">
+        // The dossier: the portrait column on the left, the fields on the right (stacked on a phone).
+        <div className="flex flex-col gap-4 border-t border-[var(--border)]/40 p-4 @2xl:flex-row @2xl:items-start @2xl:gap-5">
+          <div className="flex shrink-0 flex-col items-center gap-2.5 @2xl:w-44">
+            <div className="flex aspect-[2/3] w-40 items-center justify-center overflow-hidden rounded-xl border-2 border-[var(--border)] bg-black/30 @2xl:w-44">
               {pfp ? (
                 <img src={pfp} alt={npc.name} className="h-full w-full object-cover" />
               ) : (
-                <UserRoundSearch size="2rem" className={accent} />
+                <UserRoundSearch size="2.5rem" className={accent} />
               )}
             </div>
-            <div className={cn("text-center text-sm font-extrabold", accent)}>{npc.name}</div>
+            <div className={cn("max-w-full break-words text-center text-base font-extrabold", accent)}>{npc.name}</div>
             <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={upload} />
-            <div className="flex w-full flex-col gap-1">
-              <MeguminButton icon={<Upload size="0.6875rem" />} onClick={() => uploadRef.current?.click()}>
+            <div className="grid w-full max-w-xs grid-cols-2 gap-2 @2xl:grid-cols-1">
+              <MeguminButton icon={<Upload size="0.75rem" />} onClick={() => uploadRef.current?.click()}>
                 {t("megumin.npc.card.upload")}
               </MeguminButton>
               <MeguminButton
-                icon={<WandSparkles size="0.6875rem" />}
+                icon={<WandSparkles size="0.75rem" />}
                 disabled={!chatId}
                 pending={writingPortrait || running("npc.portraitRender")}
                 title={t("megumin.npc.card.generateTitle")}
@@ -873,25 +936,28 @@ function NpcCard({
               </MeguminButton>
             </div>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            {bodyFields.map((f) => (
-              <NpcFieldBox
-                key={f.id}
-                field={f}
-                value={String(npc[f.id] ?? "")}
-                onCommit={(v) => editNpc((n) => (n[f.id] = v))}
-              />
-            ))}
+          <div className="@container flex min-w-0 flex-1 flex-col gap-3">
+            <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+              {bodyFields.map((f, i) => (
+                <NpcFieldBox
+                  key={f.id}
+                  field={f}
+                  className={cn(fullRow[i] && "@lg:col-span-2")}
+                  value={String(npc[f.id] ?? "")}
+                  onCommit={(v) => editNpc((n) => (n[f.id] = v))}
+                />
+              ))}
+            </div>
             {history.length ? (
-              <div className="mt-1 flex flex-col gap-1 rounded-md bg-[var(--background)]/40 p-1.5">
-                <div className="text-[0.625rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+              <div className="flex flex-col gap-1.5 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/40 px-3 py-2.5">
+                <div className="text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
                   {t("megumin.npc.card.history")}
                 </div>
                 {history
                   .slice(-6)
                   .reverse()
                   .map((h) => (
-                    <div key={h.id} className="flex items-start justify-between gap-1.5 text-[0.5625rem] leading-snug">
+                    <div key={h.id} className="flex items-start justify-between gap-3 text-xs leading-relaxed">
                       <span className="min-w-0 text-[var(--marinara-chat-chrome-panel-muted)]">
                         <b>{h.label}</b>{" "}
                         {h.op === "+"
@@ -905,9 +971,9 @@ function NpcCard({
                         type="button"
                         title={t("megumin.npc.card.undoTitle")}
                         onClick={() => void act("npc.undo", { entryId: h.id }).catch(() => undefined)}
-                        className="inline-flex shrink-0 items-center gap-0.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                        className="-my-0.5 inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
                       >
-                        <Undo2 size="0.5625rem" />
+                        <Undo2 size="0.75rem" />
                         {t("megumin.npc.card.undo")}
                       </button>
                     </div>
@@ -946,21 +1012,35 @@ function NpcCard({
   );
 }
 
-function NpcFieldBox({ field, value, onCommit }: { field: NpcField; value: string; onCommit: (v: string) => void }) {
+function NpcFieldBox({
+  field,
+  value,
+  onCommit,
+  className,
+}: {
+  field: NpcField;
+  value: string;
+  onCommit: (v: string) => void;
+  className?: string;
+}) {
   const tall = field.type === "longtext" || field.type === "list" || field.system === "imageTags";
   const { draft, change, flush } = useDraftText(value, onCommit);
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="inline-flex items-center gap-1 text-[0.625rem] font-semibold">
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
+      <span className="inline-flex items-center gap-1.5 text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
         <span
           aria-hidden="true"
-          className="h-1.5 w-1.5 rounded-full"
+          className="h-2 w-2 shrink-0 rounded-full"
           style={{ backgroundColor: field.color || "#94a3b8" }}
         />
         {field.label}
       </span>
       <textarea
-        className={cn(MEGUMIN_INPUT_CLASS, "resize-y text-[0.6875rem] leading-snug", tall ? "min-h-16" : "min-h-8")}
+        className={cn(
+          MEGUMIN_INPUT_CLASS,
+          "field-sizing-content max-h-80 resize-y leading-snug",
+          tall ? "min-h-20" : "min-h-10",
+        )}
         rows={tall ? 3 : 1}
         value={draft}
         onChange={(e) => change(e.target.value)}
@@ -987,9 +1067,12 @@ function VitalsModal({
   );
   return (
     <Modal open onClose={onClose} title={t("megumin.npc.vitals.title", { name: npc.name })} width="max-w-sm">
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-3">
         {fields.map((f) => (
-          <label key={f.id} className="flex flex-col gap-1 text-[0.6875rem] text-[var(--muted-foreground)]">
+          <label
+            key={f.id}
+            className="flex flex-col gap-1.5 text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]"
+          >
             {f.label}
             <input
               className={MEGUMIN_INPUT_CLASS}
@@ -1025,10 +1108,10 @@ function PortraitPromptModal({
   const [text, setText] = useState(prompt);
   return (
     <Modal open onClose={onCancel} title={t("megumin.npc.portrait.title", { name })} width="max-w-lg">
-      <div className="flex flex-col gap-2.5">
-        <p className="text-xs text-[var(--muted-foreground)]">{t("megumin.npc.portrait.message")}</p>
+      <div className="flex flex-col gap-3">
+        <p className="text-xs leading-relaxed text-[var(--muted-foreground)]">{t("megumin.npc.portrait.message")}</p>
         <textarea
-          className={cn(MEGUMIN_INPUT_CLASS, "min-h-36 resize-y font-mono text-[0.75rem]")}
+          className={cn(MEGUMIN_INPUT_CLASS, "min-h-40 resize-y font-mono text-[0.8125rem] leading-relaxed")}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />

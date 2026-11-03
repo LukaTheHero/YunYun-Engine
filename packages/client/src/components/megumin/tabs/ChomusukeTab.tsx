@@ -47,9 +47,18 @@ import { MEGUMIN_CURRENT_CONNECTION } from "@marinara-engine/shared/megumin/clie
 import { cn } from "../../../lib/utils";
 import { useConnections } from "../../../hooks/use-connections";
 import { useUIStore } from "../../../stores/ui.store";
+import { closeMeguminWindow } from "../../../lib/megumin-tab-request";
 import { SettingsSwitch } from "../../panels/settings/SettingControls";
 import { useMeguminPanel } from "../megumin-panel-context";
-import { MeguminButton, MeguminHint, MeguminSection, MeguminSelect, type MeguminOption } from "../MeguminControls";
+import {
+  MeguminButton,
+  MeguminFeatureBar,
+  MeguminGrid,
+  MeguminHint,
+  MeguminSection,
+  MeguminSelect,
+  type MeguminOption,
+} from "../MeguminControls";
 import type { MeguminProfile } from "../../../hooks/use-megumin";
 
 type Icon = ComponentType<{ size?: string | number; className?: string }>;
@@ -134,6 +143,7 @@ function RouteRow({
   on,
   onToggle,
   offChip,
+  children,
 }: {
   route: Route;
   title: string;
@@ -142,28 +152,33 @@ function RouteRow({
   on: boolean;
   onToggle: (next: boolean) => void;
   offChip?: ReactNode;
+  /** Drawn under the description, inside the row (the Blocks row's block chips). */
+  children?: ReactNode;
 }) {
   const RouteIcon = route.icon;
   return (
     <div
       className={cn(
-        "flex items-start gap-2 rounded-lg p-1.5 transition-colors hover:bg-[var(--accent)]/50",
-        on && "bg-[var(--primary)]/5",
+        "flex h-full min-w-0 items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors",
+        on
+          ? "border-[var(--primary)]/40 bg-[var(--primary)]/5"
+          : "border-[var(--border)]/70 bg-[var(--background)]/30 hover:bg-[var(--accent)]/40",
       )}
     >
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-[var(--marinara-chat-chrome-panel-title)]">
-          <RouteIcon size="0.8125rem" className={route.color} />
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+          <RouteIcon size="0.9375rem" className={cn("shrink-0", route.color)} />
           <span>{title}</span>
           {offChip}
         </div>
-        <p className="mt-0.5 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{desc}</p>
+        <p className="mt-1 text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{desc}</p>
         {note ? (
-          <p className="mt-0.5 inline-flex items-center gap-1 text-[0.625rem] leading-relaxed text-amber-500">
-            <Star size="0.625rem" />
+          <p className="mt-1.5 inline-flex items-start gap-1.5 text-xs font-medium leading-relaxed text-amber-500">
+            <Star size="0.75rem" className="mt-0.5 shrink-0" />
             {note}
           </p>
         ) : null}
+        {children}
       </div>
       <SettingsSwitch ariaLabel={title} checked={on} onChange={onToggle} />
     </div>
@@ -229,10 +244,10 @@ export function ChomusukeTab() {
           e.stopPropagation();
           openTab(off.tab);
         }}
-        className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[0.5625rem] font-medium text-amber-600 hover:bg-amber-500/25 dark:text-amber-400"
+        className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-amber-600 hover:bg-amber-500/25 dark:text-amber-400"
       >
         {off.text}
-        <ArrowRight size="0.5625rem" />
+        <ArrowRight size="0.6875rem" />
       </button>
     );
   };
@@ -303,36 +318,27 @@ export function ChomusukeTab() {
   const showSetup = setupOpen === null ? connections.length === 0 : setupOpen;
 
   return (
-    <>
-      <div
-        className={cn(
-          "flex items-center justify-between gap-3 rounded-lg p-2.5 ring-1",
-          cfg.enabled ? "bg-rose-500/10 ring-rose-500/40" : "bg-[var(--background)]/40 ring-[var(--border)]",
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-2">
+    <div className="flex flex-col gap-4">
+      <MeguminFeatureBar
+        ariaLabel={t("megumin.chomusuke.master.aria")}
+        icon={
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-rose-500 to-rose-700 text-white">
             <Cat size="0.875rem" />
           </span>
-          <span className="text-xs font-semibold">
-            {cfg.enabled ? t("megumin.chomusuke.master.on") : t("megumin.chomusuke.master.off")}
-          </span>
-        </div>
-        <SettingsSwitch
-          ariaLabel={t("megumin.chomusuke.master.aria")}
-          checked={cfg.enabled}
-          onChange={(next) =>
-            edit((c) => {
-              c.enabled = next;
-            })
-          }
-        />
-      </div>
+        }
+        title={cfg.enabled ? t("megumin.chomusuke.master.on") : t("megumin.chomusuke.master.off")}
+        checked={cfg.enabled}
+        onChange={(next) =>
+          edit((c) => {
+            c.enabled = next;
+          })
+        }
+      />
 
       {busy ? (
-        <div className="flex items-center justify-between gap-2 rounded-lg bg-rose-500/10 px-2.5 py-2 text-[0.6875rem]">
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <Cat size="0.75rem" className="shrink-0 animate-pulse text-rose-500" />
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2.5 text-[0.8125rem]">
+          <span className="inline-flex min-w-0 flex-1 items-center gap-2">
+            <Cat size="0.875rem" className="shrink-0 animate-pulse text-rose-500" />
             <span className="truncate">
               {status?.running
                 ? t("megumin.chomusuke.busy.running", { jobs: status.running.jobs.join(", ") })
@@ -341,7 +347,7 @@ export function ChomusukeTab() {
           </span>
           <MeguminButton
             variant="danger"
-            icon={<Square size="0.625rem" />}
+            icon={<Square size="0.75rem" />}
             pending={running("chomusuke.stop")}
             onClick={() => void run("chomusuke.stop").catch(() => undefined)}
           >
@@ -355,18 +361,18 @@ export function ChomusukeTab() {
         description={t("megumin.chomusuke.connection.sub")}
       >
         {connectionsQuery.isSuccess && !connections.length ? (
-          <Banner tone="danger" icon={<TriangleAlert size="0.75rem" />}>
+          <Banner tone="danger" icon={<TriangleAlert size="0.875rem" />}>
             {t("megumin.chomusuke.connection.none")}
           </Banner>
         ) : null}
         {missingWorker ? (
-          <Banner tone="danger" icon={<TriangleAlert size="0.75rem" />}>
+          <Banner tone="danger" icon={<TriangleAlert size="0.875rem" />}>
             {t("megumin.chomusuke.connection.missing")}
           </Banner>
         ) : null}
-        <Banner icon={<ShieldAlert size="0.75rem" />}>{t("megumin.chomusuke.connection.censorship")}</Banner>
-        <div className="flex items-end gap-1.5">
-          <div className="min-w-0 flex-1">
+        <Banner icon={<ShieldAlert size="0.875rem" />}>{t("megumin.chomusuke.connection.censorship")}</Banner>
+        <div className="flex flex-wrap items-stretch gap-2">
+          <div className="min-w-0 flex-[1_1_16rem] @2xl:max-w-md">
             <MeguminSelect
               value={cfg.profileId}
               options={connectionOptions}
@@ -378,7 +384,7 @@ export function ChomusukeTab() {
             />
           </div>
           <MeguminButton
-            icon={<FlaskConical size="0.75rem" />}
+            icon={<FlaskConical size="0.8125rem" />}
             pending={running("chomusuke.test")}
             onClick={() => void test()}
           >
@@ -388,149 +394,162 @@ export function ChomusukeTab() {
         {testStatus ? (
           <p
             className={cn(
-              "inline-flex items-start gap-1 text-[0.625rem] leading-relaxed",
+              "inline-flex items-start gap-1.5 text-xs leading-relaxed",
               testStatus.ok ? "text-emerald-500" : "text-[var(--destructive)]",
             )}
           >
             {testStatus.ok ? (
-              <CircleCheck size="0.6875rem" className="mt-px shrink-0" />
+              <CircleCheck size="0.875rem" className="mt-px shrink-0" />
             ) : (
-              <CircleX size="0.6875rem" className="mt-px shrink-0" />
+              <CircleX size="0.875rem" className="mt-px shrink-0" />
             )}
             {testStatus.text}
           </p>
         ) : (
           <MeguminHint>{readyText}</MeguminHint>
         )}
-        <button
-          type="button"
-          aria-expanded={showSetup}
-          onClick={() => setSetupOpen(!showSetup)}
-          className="inline-flex items-center gap-1 self-start text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)] hover:underline"
-        >
-          {showSetup ? <ChevronDown size="0.75rem" /> : <ChevronRight size="0.75rem" />}
-          {t("megumin.chomusuke.setup.title")}
-        </button>
-        {showSetup ? (
-          <div className="flex flex-col gap-1.5 rounded-md bg-[var(--background)]/40 p-2">
-            <ol className="ml-4 list-decimal text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
-              <li>{t("megumin.chomusuke.setup.step1")}</li>
-              <li>{t("megumin.chomusuke.setup.step2")}</li>
-              <li>{t("megumin.chomusuke.setup.step3")}</li>
-            </ol>
-            <MeguminButton onClick={() => openRightPanel("connections")}>
-              {t("megumin.chomusuke.setup.openConnections")}
-            </MeguminButton>
-          </div>
-        ) : null}
+        <div className="flex flex-col gap-2 border-t border-[var(--border)]/50 pt-3">
+          <button
+            type="button"
+            aria-expanded={showSetup}
+            onClick={() => setSetupOpen(!showSetup)}
+            className="inline-flex min-h-8 items-center gap-1.5 self-start text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)] hover:underline"
+          >
+            {showSetup ? <ChevronDown size="0.875rem" /> : <ChevronRight size="0.875rem" />}
+            {t("megumin.chomusuke.setup.title")}
+          </button>
+          {showSetup ? (
+            <div className="flex flex-col items-start gap-3 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/40 px-4 py-3">
+              <ol className="ml-5 flex list-decimal flex-col gap-1.5 text-[0.8125rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)] marker:font-semibold marker:text-amber-500">
+                <li>{t("megumin.chomusuke.setup.step1")}</li>
+                <li>{t("megumin.chomusuke.setup.step2")}</li>
+                <li>{t("megumin.chomusuke.setup.step3")}</li>
+              </ol>
+              <MeguminButton
+                onClick={() => {
+                  closeMeguminWindow();
+                  openRightPanel("connections");
+                }}
+              >
+                {t("megumin.chomusuke.setup.openConnections")}
+              </MeguminButton>
+            </div>
+          ) : null}
+        </div>
       </MeguminSection>
 
       <MeguminSection title={t("megumin.chomusuke.perReply.title")} description={t("megumin.chomusuke.perReply.sub")}>
-        <div className="flex items-start gap-1.5 rounded-md bg-[var(--background)]/40 px-2 py-1.5 text-[0.625rem] leading-relaxed">
-          <Receipt size="0.6875rem" className="mt-px shrink-0 text-[var(--muted-foreground)]" />
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[0.8125rem] leading-relaxed">
+          <Receipt size="0.875rem" className="mt-0.5 shrink-0 text-amber-500" />
           <span>{cost}</span>
         </div>
-        {PER_REPLY.map((route) => {
-          const isBlocks = route.key === "blocks";
-          const on = isBlocks ? anyBlockRouted(cfg) : routeOn(cfg, route);
-          return (
-            <div key={route.key} className="flex flex-col gap-1">
-              <RouteRow
-                route={route}
-                title={t(`megumin.chomusuke.route.${route.key}.title`)}
-                desc={t(`megumin.chomusuke.route.${route.key}.desc`)}
-                note={route.note ? t("megumin.chomusuke.route.notebook.note") : undefined}
-                on={on}
-                offChip={offChip(route.key)}
-                onToggle={() =>
-                  edit((c) => {
-                    if (isBlocks) {
-                      // The row turns every block on or off; the chips pick single ones.
-                      c.features.worldState = !on;
-                      c.features.blocks = !on;
-                      if (!on) BLOCK_ROUTES.forEach((b) => (c.blockRoutes[b.id] = true));
-                    } else {
-                      c.features[route.key] = !on;
-                    }
-                  })
-                }
-              />
-              {isBlocks ? (
-                <div className="flex flex-wrap gap-1 pl-5">
-                  <BlockChip
-                    icon={Pin}
-                    label={t("megumin.chomusuke.blocks.world")}
-                    checked={worldRouted(cfg)}
-                    inStack={worldOn}
-                    offTitle={t("megumin.chomusuke.blocks.worldNotOn")}
-                    notOn={t("megumin.chomusuke.blocks.notOn")}
-                    onChange={(checked) =>
-                      edit((c) => {
-                        c.features.worldState = checked;
-                      })
-                    }
-                  />
-                  {BLOCK_ROUTES.map((b) => (
-                    <BlockChip
-                      key={b.id}
-                      icon={b.icon}
-                      label={t(`megumin.chomusuke.blocks.${b.id}`)}
-                      checked={blockRouted(cfg, b.id)}
-                      inStack={stack.includes(b.id)}
-                      offTitle={t("megumin.chomusuke.blocks.blockNotOn")}
-                      notOn={t("megumin.chomusuke.blocks.notOn")}
-                      onChange={(checked) =>
-                        edit((c) => {
-                          if (checked && c.features.blocks !== true) {
-                            // The first block ticked turns the route on with just that block.
-                            c.features.blocks = true;
-                            BLOCK_ROUTES.forEach((x) => (c.blockRoutes[x.id] = x.id === b.id));
-                          } else {
-                            c.blockRoutes[b.id] = checked;
-                            if (!BLOCK_ROUTES.some((x) => c.blockRoutes[x.id] !== false)) c.features.blocks = false;
-                          }
-                        })
+        {/* Blocks takes a full row so its block chips sit side by side; the other two share the next row. */}
+        <div className="grid grid-cols-1 items-stretch gap-3 @2xl:grid-cols-2">
+          {PER_REPLY.map((route) => {
+            const isBlocks = route.key === "blocks";
+            const on = isBlocks ? anyBlockRouted(cfg) : routeOn(cfg, route);
+            return (
+              <div key={route.key} className={cn("flex min-w-0 flex-col", isBlocks && "@2xl:col-span-2")}>
+                <RouteRow
+                  route={route}
+                  title={t(`megumin.chomusuke.route.${route.key}.title`)}
+                  desc={t(`megumin.chomusuke.route.${route.key}.desc`)}
+                  note={route.note ? t("megumin.chomusuke.route.notebook.note") : undefined}
+                  on={on}
+                  offChip={offChip(route.key)}
+                  onToggle={() =>
+                    edit((c) => {
+                      if (isBlocks) {
+                        // The row turns every block on or off; the chips pick single ones.
+                        c.features.worldState = !on;
+                        c.features.blocks = !on;
+                        if (!on) BLOCK_ROUTES.forEach((b) => (c.blockRoutes[b.id] = true));
+                      } else {
+                        c.features[route.key] = !on;
                       }
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
+                    })
+                  }
+                >
+                  {isBlocks ? (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <BlockChip
+                        icon={Pin}
+                        label={t("megumin.chomusuke.blocks.world")}
+                        checked={worldRouted(cfg)}
+                        inStack={worldOn}
+                        offTitle={t("megumin.chomusuke.blocks.worldNotOn")}
+                        notOn={t("megumin.chomusuke.blocks.notOn")}
+                        onChange={(checked) =>
+                          edit((c) => {
+                            c.features.worldState = checked;
+                          })
+                        }
+                      />
+                      {BLOCK_ROUTES.map((b) => (
+                        <BlockChip
+                          key={b.id}
+                          icon={b.icon}
+                          label={t(`megumin.chomusuke.blocks.${b.id}`)}
+                          checked={blockRouted(cfg, b.id)}
+                          inStack={stack.includes(b.id)}
+                          offTitle={t("megumin.chomusuke.blocks.blockNotOn")}
+                          notOn={t("megumin.chomusuke.blocks.notOn")}
+                          onChange={(checked) =>
+                            edit((c) => {
+                              if (checked && c.features.blocks !== true) {
+                                // The first block ticked turns the route on with just that block.
+                                c.features.blocks = true;
+                                BLOCK_ROUTES.forEach((x) => (c.blockRoutes[x.id] = x.id === b.id));
+                              } else {
+                                c.blockRoutes[b.id] = checked;
+                                if (!BLOCK_ROUTES.some((x) => c.blockRoutes[x.id] !== false)) c.features.blocks = false;
+                              }
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </RouteRow>
+              </div>
+            );
+          })}
+        </div>
 
-        <div className="mt-1 border-t border-[var(--border)]/50 pt-2">
-          <div className="text-[0.6875rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-t border-[var(--border)]/50 pt-3">
+          <div className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
             {t("megumin.chomusuke.combine.title")}
           </div>
           {!combineReady ? <MeguminHint>{t("megumin.chomusuke.combine.needs")}</MeguminHint> : null}
         </div>
-        <RouteRow
-          route={{ key: "combineAll", icon: Layers, color: "text-amber-500" }}
-          title={t("megumin.chomusuke.combine.all")}
-          desc={t("megumin.chomusuke.combine.allDesc")}
-          on={cfg.combine.all === true && combineReady}
-          onToggle={(next) => {
-            if (!combineReady) return;
-            edit((c) => {
-              c.combine.all = next;
-              if (!next) c.combine.worldFallback = false;
-            });
-          }}
-        />
-        <div className={cn("pl-4", !(combineReady && cfg.combine.all === true) && "opacity-55")}>
+        <div className="grid grid-cols-1 items-stretch gap-3 @2xl:grid-cols-2">
           <RouteRow
-            route={{ key: "worldFallback", icon: LifeBuoy, color: "text-emerald-500" }}
-            title={t("megumin.chomusuke.combine.fallback")}
-            desc={t("megumin.chomusuke.combine.fallbackDesc")}
-            on={cfg.combine.worldFallback === true && combineReady && cfg.combine.all === true}
+            route={{ key: "combineAll", icon: Layers, color: "text-amber-500" }}
+            title={t("megumin.chomusuke.combine.all")}
+            desc={t("megumin.chomusuke.combine.allDesc")}
+            on={cfg.combine.all === true && combineReady}
             onToggle={(next) => {
-              if (!(combineReady && cfg.combine.all === true)) return;
+              if (!combineReady) return;
               edit((c) => {
-                c.combine.worldFallback = next;
+                c.combine.all = next;
+                if (!next) c.combine.worldFallback = false;
               });
             }}
           />
+          <div className={cn("pl-5 @2xl:pl-0", !(combineReady && cfg.combine.all === true) && "opacity-55")}>
+            <RouteRow
+              route={{ key: "worldFallback", icon: LifeBuoy, color: "text-emerald-500" }}
+              title={t("megumin.chomusuke.combine.fallback")}
+              desc={t("megumin.chomusuke.combine.fallbackDesc")}
+              on={cfg.combine.worldFallback === true && combineReady && cfg.combine.all === true}
+              onToggle={(next) => {
+                if (!(combineReady && cfg.combine.all === true)) return;
+                edit((c) => {
+                  c.combine.worldFallback = next;
+                });
+              }}
+            />
+          </div>
         </div>
       </MeguminSection>
 
@@ -538,33 +557,35 @@ export function ChomusukeTab() {
         title={t("megumin.chomusuke.occasional.title")}
         description={t("megumin.chomusuke.occasional.sub")}
       >
-        {OCCASIONAL.map((route) => {
-          const on = routeOn(cfg, route);
-          return (
-            <RouteRow
-              key={route.key}
-              route={route}
-              title={t(`megumin.chomusuke.route.${route.key}.title`)}
-              desc={t(`megumin.chomusuke.route.${route.key}.desc`)}
-              on={on}
-              offChip={offChip(route.key)}
-              onToggle={() =>
-                edit((c) => {
-                  c.features[route.key] = !on;
-                })
-              }
-            />
-          );
-        })}
+        <MeguminGrid layout="cards" className="items-stretch">
+          {OCCASIONAL.map((route) => {
+            const on = routeOn(cfg, route);
+            return (
+              <RouteRow
+                key={route.key}
+                route={route}
+                title={t(`megumin.chomusuke.route.${route.key}.title`)}
+                desc={t(`megumin.chomusuke.route.${route.key}.desc`)}
+                on={on}
+                offChip={offChip(route.key)}
+                onToggle={() =>
+                  edit((c) => {
+                    c.features[route.key] = !on;
+                  })
+                }
+              />
+            );
+          })}
+        </MeguminGrid>
       </MeguminSection>
 
       <MeguminHint>
-        <span className="inline-flex items-start gap-1">
-          <Cat size="0.6875rem" className="mt-px shrink-0" />
+        <span className="inline-flex items-start gap-1.5">
+          <Cat size="0.875rem" className="mt-px shrink-0 text-rose-500" />
           {t("megumin.chomusuke.direct")}
         </span>
       </MeguminHint>
-    </>
+    </div>
   );
 }
 
@@ -572,14 +593,14 @@ function Banner({ children, icon, tone }: { children: ReactNode; icon: ReactNode
   return (
     <div
       className={cn(
-        "flex items-start gap-1.5 rounded-md px-2 py-1.5 text-[0.625rem] leading-relaxed",
+        "flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-[0.8125rem] leading-relaxed",
         tone === "danger"
-          ? "bg-[var(--destructive)]/10 text-[var(--destructive)]"
-          : "bg-[var(--background)]/50 text-[var(--marinara-chat-chrome-panel-muted)]",
+          ? "border-[var(--destructive)]/35 bg-[var(--destructive)]/10 text-[var(--destructive)]"
+          : "border-[var(--border)]/60 bg-[var(--background)]/50 text-[var(--marinara-chat-chrome-panel-muted)]",
       )}
     >
-      <span className="mt-px shrink-0">{icon}</span>
-      <span>{children}</span>
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <span className="min-w-0">{children}</span>
     </div>
   );
 }
@@ -605,7 +626,7 @@ function BlockChip({
     <label
       title={inStack ? undefined : offTitle}
       className={cn(
-        "inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-[0.625rem] transition-colors",
+        "inline-flex min-h-7 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
         checked
           ? "border-[var(--primary)]/50 bg-[var(--primary)]/10 text-[var(--foreground)]"
           : "border-[var(--border)] text-[var(--muted-foreground)]",
@@ -614,13 +635,13 @@ function BlockChip({
     >
       <input
         type="checkbox"
-        className="h-3 w-3 accent-[var(--primary)]"
+        className="h-3.5 w-3.5 accent-[var(--primary)]"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <ChipIcon size="0.625rem" />
+      <ChipIcon size="0.75rem" />
       {label}
-      {inStack ? null : <small className="opacity-80">{notOn}</small>}
+      {inStack ? null : <small className="text-[0.6875rem] opacity-80">{notOn}</small>}
     </label>
   );
 }

@@ -30,7 +30,7 @@ Right-click any character in the Characters panel — in the main list or inside
 
 ### 💥 Megumin Suite built in (MEGUMINTOGGLE)
 
-[Megumin Suite](https://github.com/Arif-salah/Megumin-Suite) by KazumaONIISAN, originally a SillyTavern preset and extension, runs inside YunYun as its default Roleplay preset. Its engines and chains of thought, Story Config, writing styles, the block card under every reply (World State, Bonds, Character Sheet, Inner Chatter, Story Tracker, dice, choices), The Notebook, the NPC Bank, Story Director, Memory, Banned Phrases, image prompts, the Chomusuke helper model and Dev Mode all work from the **Megumin** panel in the top bar.
+[Megumin Suite](https://github.com/Arif-salah/Megumin-Suite) by KazumaONIISAN, originally a SillyTavern preset and extension, runs inside YunYun as its default Roleplay preset. Its engines and chains of thought, Story Config, writing styles, the block card under every reply (World State, Bonds, Character Sheet, Inner Chatter, Story Tracker, dice, choices), The Notebook, the NPC Bank, Story Director, Memory, Banned Phrases, image prompts, the Chomusuke helper model and Dev Mode all work from the **Megumin Suite** window, opened with the wand beside the switch in the top bar: Megumin's own layout, with its tabs down the side, the profile you are editing on top and room for every tab.
 
 The big **MEGUMINTOGGLE** next to it switches the whole thing: on (the default), Roleplay chats on the stock preset run in Megumin mode; off, every prompt is built exactly as YunYun builds it without Megumin. Your own presets are never swapped. The same switch is in Settings › Advanced › Features.
 

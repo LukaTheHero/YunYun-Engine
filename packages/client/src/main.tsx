@@ -5,7 +5,7 @@ import { App, AppRecoveryBoundary } from "./App";
 import { startKeepAlive } from "./lib/keep-alive";
 import { installCsrfFetchShim } from "./lib/csrf-fetch";
 import { registerPreloadErrorRecovery } from "./lib/browser-runtime";
-import { showAppUpdatePrompt } from "./lib/app-update-prompt";
+import { reloadWouldChangeClient, showAppUpdatePrompt } from "./lib/app-update-prompt";
 import { initializeLocalization } from "./localization/i18n";
 import { LocalizationProvider } from "./localization/LocalizationProvider";
 import { shownMariAppearancePack, useUIStore } from "./stores/ui.store";
@@ -64,9 +64,14 @@ function registerServiceWorker() {
         const updateSW = registerSW({
           immediate: true,
           onNeedRefresh() {
-            showAppUpdatePrompt(() => {
-              recordClientReload("service-worker-update");
-              return updateSW(true);
+            void reloadWouldChangeClient().then((changes) => {
+              // This tab already runs the client the server serves (index.html is never precached), so a refresh
+              // would change nothing. The waiting worker takes over on the next launch; skipping it now reloads.
+              if (changes === false) return;
+              showAppUpdatePrompt(() => {
+                recordClientReload("service-worker-update");
+                return updateSW(true);
+              });
             });
           },
           onRegisteredSW(_swUrl: string, registration?: ServiceWorkerRegistration) {

@@ -10,7 +10,7 @@ import { Check, CodeXml, GitBranch, Lock, LockOpen, Pencil, Star } from "lucide-
 import { MeguminEngineFlags } from "@marinara-engine/shared/megumin/client";
 import { cn } from "../../../lib/utils";
 import { useMeguminPanel } from "../megumin-panel-context";
-import { MeguminNumber, MeguminSection, MeguminSelect, MeguminText } from "../MeguminControls";
+import { MeguminGrid, MeguminNumber, MeguminSection, MeguminSelect, MeguminText } from "../MeguminControls";
 import { Badge, Callout, PickCard, RichText, SwitchRow, engineHas } from "./presetControls";
 import { ADDON_DESCRIPTIONS, FORMAT_BLOCKS_FALLBACK, FORMAT_DESCRIPTIONS, type MeguminEngine } from "./presetData";
 
@@ -27,7 +27,7 @@ function useCustomBadge() {
     const slot = slots.find((s) => s.trigger === trigger);
     if (!slot || !slot.key || !String(fragments[String(slot.key)] ?? "").trim()) return null;
     return (
-      <Badge tone="custom" icon={<Pencil size="0.5rem" />} title={t("megumin.addons.customTitle")}>
+      <Badge tone="custom" icon={<Pencil size="0.75rem" />} title={t("megumin.addons.customTitle")}>
         {t("megumin.addons.custom")}
       </Badge>
     );
@@ -83,7 +83,7 @@ export function AddonsTab() {
     });
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-end">
         <Badge tone="new">{t("megumin.addons.activeModules", { count: addons.length + blocks.length })}</Badge>
       </div>
@@ -95,56 +95,65 @@ export function AddonsTab() {
 
       <MeguminSection title={t("megumin.addons.preferences.title")}>
         {usesRenderLimits ? (
-          <div className="flex flex-col gap-1.5 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/30 p-2">
-            <div className="text-[0.6875rem] font-semibold text-rose-500">{t("megumin.addons.v9.title")}</div>
-            <p className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+          <div className="flex flex-col gap-2 border-b border-[var(--border)]/50 pb-4">
+            <div className="text-sm font-semibold text-rose-500">{t("megumin.addons.v9.title")}</div>
+            <p className="text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
               {t("megumin.addons.v9.description")}
             </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <MeguminGrid layout="fields" className="mt-1">
               {(
                 [
                   ["lean", "leanMin", "leanMax", "text-violet-500"],
                   ["full", "fullMin", "fullMax", "text-emerald-500"],
                 ] as const
               ).map(([kind, min, max, tone]) => (
-                <div key={kind} className="flex flex-col gap-1 rounded-md border border-[var(--border)]/50 p-2">
-                  <div className="text-[0.625rem] font-bold uppercase text-[var(--muted-foreground)]">
+                <div
+                  key={kind}
+                  className="flex h-full flex-col gap-1.5 rounded-xl border border-[var(--border)]/60 bg-[var(--background)]/30 px-4 py-3"
+                >
+                  <div className="text-xs font-bold uppercase tracking-wide text-[var(--muted-foreground)]">
                     {t(`megumin.addons.v9.${kind}`)}
                   </div>
-                  <div className={cn("text-[0.5625rem] leading-snug", tone)}>{t(`megumin.addons.v9.${kind}Hint`)}</div>
-                  <div className="flex items-center gap-1.5">
-                    <MeguminNumber value={limits[min]} onChange={(n) => setLimit(min, n)} />
-                    <span className="text-[0.625rem] text-[var(--muted-foreground)]">{t("megumin.addons.v9.to")}</span>
-                    <MeguminNumber value={limits[max]} onChange={(n) => setLimit(max, n)} />
+                  <div className={cn("text-xs leading-snug", tone)}>{t(`megumin.addons.v9.${kind}Hint`)}</div>
+                  <div className="mt-auto flex items-center gap-2 pt-1">
+                    <div className="min-w-0 flex-1">
+                      <MeguminNumber value={limits[min]} onChange={(n) => setLimit(min, n)} />
+                    </div>
+                    <span className="text-xs text-[var(--muted-foreground)]">{t("megumin.addons.v9.to")}</span>
+                    <div className="min-w-0 flex-1">
+                      <MeguminNumber value={limits[max]} onChange={(n) => setLimit(max, n)} />
+                    </div>
                   </div>
                 </div>
               ))}
-            </div>
+            </MeguminGrid>
           </div>
         ) : null}
-        <MeguminText
-          label={t("megumin.addons.language.label")}
-          help={t("megumin.addons.language.description")}
-          value={String(profile.userLanguage ?? "")}
-          placeholder={t("megumin.addons.language.placeholder")}
-          onChange={(v) => set("userLanguage", v)}
-        />
-        <MeguminSelect
-          label={t("megumin.addons.pronouns.label")}
-          help={t("megumin.addons.pronouns.description")}
-          value={String(profile.userPronouns ?? "off")}
-          onChange={(v) => set("userPronouns", v)}
-          options={[
-            { value: "off", label: t("megumin.addons.pronouns.off") },
-            { value: "male", label: t("megumin.addons.pronouns.male") },
-            { value: "female", label: t("megumin.addons.pronouns.female") },
-          ]}
-        />
+        <MeguminGrid layout="fields">
+          <MeguminText
+            label={t("megumin.addons.language.label")}
+            help={t("megumin.addons.language.description")}
+            value={String(profile.userLanguage ?? "")}
+            placeholder={t("megumin.addons.language.placeholder")}
+            onChange={(v) => set("userLanguage", v)}
+          />
+          <MeguminSelect
+            label={t("megumin.addons.pronouns.label")}
+            help={t("megumin.addons.pronouns.description")}
+            value={String(profile.userPronouns ?? "off")}
+            onChange={(v) => set("userPronouns", v)}
+            options={[
+              { value: "off", label: t("megumin.addons.pronouns.off") },
+              { value: "male", label: t("megumin.addons.pronouns.male") },
+              { value: "female", label: t("megumin.addons.pronouns.female") },
+            ]}
+          />
+        </MeguminGrid>
       </MeguminSection>
 
       <MeguminSection title={t("megumin.addons.gameplay.title")}>
         <Callout tone="gold">{t("megumin.addons.gameplay.fewer")}</Callout>
-        <div className="grid grid-cols-1 gap-1.5">
+        <MeguminGrid className="items-stretch">
           {addonDefs.map((a) => {
             const isSel = addons.includes(String(a.id));
             const v6Locked = a.id === "npc_events" && !isV6;
@@ -157,7 +166,7 @@ export function AddonsTab() {
                 title={String(a.label ?? a.id)}
                 titleExtra={
                   isSel ? (
-                    <Badge tone="active" icon={<Check size="0.5rem" />}>
+                    <Badge tone="active" icon={<Check size="0.75rem" />}>
                       {t("megumin.addons.on")}
                     </Badge>
                   ) : null
@@ -166,18 +175,18 @@ export function AddonsTab() {
                 badges={
                   <>
                     {a.recommended ? (
-                      <Badge tone="rec" icon={<Star size="0.5rem" />}>
+                      <Badge tone="rec" icon={<Star size="0.75rem" />}>
                         {t("megumin.addons.recommended")}
                       </Badge>
                     ) : null}
                     {customBadge(a.trigger)}
                     {a.id === "npc_events" ? (
                       isV6 ? (
-                        <Badge tone="ok" icon={<LockOpen size="0.5rem" />}>
+                        <Badge tone="ok" icon={<LockOpen size="0.75rem" />}>
                           {t("megumin.addons.v6Active")}
                         </Badge>
                       ) : (
-                        <Badge tone="warn" icon={<Lock size="0.5rem" />}>
+                        <Badge tone="warn" icon={<Lock size="0.75rem" />}>
                           {t("megumin.addons.requiresV6")}
                         </Badge>
                       )
@@ -200,7 +209,7 @@ export function AddonsTab() {
             titleExtra={
               <>
                 {ono.enabled ? (
-                  <Badge tone="active" icon={<Check size="0.5rem" />}>
+                  <Badge tone="active" icon={<Check size="0.75rem" />}>
                     {t("megumin.addons.on")}
                   </Badge>
                 ) : null}
@@ -211,7 +220,7 @@ export function AddonsTab() {
           >
             {ono.enabled ? (
               <div
-                className="mt-1 border-t border-dashed border-[var(--border)]/70 pt-1"
+                className="mt-1 border-t border-dashed border-[var(--border)]/70 pt-2"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
@@ -228,29 +237,31 @@ export function AddonsTab() {
               </div>
             ) : null}
           </PickCard>
-        </div>
+        </MeguminGrid>
       </MeguminSection>
 
       {customSettings.length ? (
         <MeguminSection title={t("megumin.addons.customModules")}>
-          {customSettings.map((cs) => (
-            <SwitchRow
-              key={String(cs.id)}
-              label={String(cs.name ?? cs.id)}
-              description={t("megumin.addons.customModuleTarget", { slot: String(cs.attachPoint ?? "") })}
-              checked={!!toggles[String(cs.id)]}
-              onChange={(on) =>
-                update((p) => {
-                  p.toggles = { ...(p.toggles ?? {}), [String(cs.id)]: on };
-                })
-              }
-            />
-          ))}
+          <MeguminGrid layout="fields" className="gap-x-6 gap-y-1">
+            {customSettings.map((cs) => (
+              <SwitchRow
+                key={String(cs.id)}
+                label={String(cs.name ?? cs.id)}
+                description={t("megumin.addons.customModuleTarget", { slot: String(cs.attachPoint ?? "") })}
+                checked={!!toggles[String(cs.id)]}
+                onChange={(on) =>
+                  update((p) => {
+                    p.toggles = { ...(p.toggles ?? {}), [String(cs.id)]: on };
+                  })
+                }
+              />
+            ))}
+          </MeguminGrid>
         </MeguminSection>
       ) : null}
 
-      <MeguminSection title={t("megumin.addons.formats.title")} icon={<CodeXml size="0.875rem" />}>
-        <div className="grid grid-cols-1 gap-1.5">
+      <MeguminSection title={t("megumin.addons.formats.title")} icon={<CodeXml size="1rem" />}>
+        <MeguminGrid className="items-stretch">
           {formatBlocks.map((b) => {
             const isSel = blocks.includes(String(b.id));
             return (
@@ -267,7 +278,7 @@ export function AddonsTab() {
                 titleExtra={
                   <>
                     {isSel ? (
-                      <Badge tone="active" icon={<Check size="0.5rem" />}>
+                      <Badge tone="active" icon={<Check size="0.75rem" />}>
                         {t("megumin.addons.on")}
                       </Badge>
                     ) : null}
@@ -277,7 +288,7 @@ export function AddonsTab() {
                 description={<RichText text={FORMAT_DESCRIPTIONS[String(b.id)] ?? ""} />}
                 badges={
                   engineHas(activeMode, String(b.id)) ? (
-                    <Badge tone="override" icon={<GitBranch size="0.5rem" />}>
+                    <Badge tone="override" icon={<GitBranch size="0.75rem" />}>
                       {t("megumin.addons.engineOverride")}
                     </Badge>
                   ) : null
@@ -285,7 +296,7 @@ export function AddonsTab() {
               />
             );
           })}
-        </div>
+        </MeguminGrid>
       </MeguminSection>
     </div>
   );

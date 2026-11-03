@@ -50,6 +50,7 @@ import { takePendingMeguminDevEngine } from "../megumin-devmode-open";
 import {
   MEGUMIN_INPUT_CLASS,
   MeguminButton,
+  MeguminGrid,
   MeguminHint,
   MeguminRow,
   MeguminSection,
@@ -420,23 +421,26 @@ interface DevCtx {
 // ── Shared chrome ───────────────────────────────────────────────────────────
 
 function Subtitle({ children }: { children: ReactNode }) {
-  return (
-    <p className="-mt-1 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{children}</p>
-  );
+  return <p className="text-[0.8125rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{children}</p>;
 }
 
 function BackBar({ title, onBack, backLabel }: { title: string; onBack: () => void; backLabel?: string }) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-3">
       <MeguminButton icon={<ArrowLeft size="0.75rem" />} onClick={onBack}>
         {backLabel ?? t("megumin.devmode.back")}
       </MeguminButton>
-      <div className="min-w-0 truncate text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+      <div className="min-w-0 truncate text-base font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
         {title}
       </div>
     </div>
   );
+}
+
+/** A sub-view's head: the way back and its name, then what it is for. */
+function ViewHead({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-2">{children}</div>;
 }
 
 function Note({
@@ -453,18 +457,18 @@ function Note({
   return (
     <div
       className={cn(
-        "flex flex-col gap-1.5 rounded-md border px-2.5 py-2 text-[0.625rem] leading-relaxed",
+        "flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-xs leading-relaxed @xl:flex-row @xl:items-center @xl:justify-between @xl:gap-4",
         tone === "off" && "border-[var(--border)] bg-[var(--muted)]/30 text-[var(--muted-foreground)]",
         tone === "shared" && "border-emerald-500/30 bg-emerald-500/5 text-[var(--foreground)]",
         tone === "auto" && "border-violet-500/30 bg-violet-500/5 text-[var(--foreground)]",
         tone === "warn" && "border-amber-500/40 bg-amber-500/10 text-[var(--foreground)]",
       )}
     >
-      <div className="flex items-start gap-1.5">
+      <div className="flex min-w-0 items-start gap-2">
         <span className="mt-0.5 shrink-0">{icon}</span>
         <span className="min-w-0">{children}</span>
       </div>
-      {action ? <div>{action}</div> : null}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -472,7 +476,7 @@ function Note({
 function CacheFriendlyNote() {
   const { t } = useTranslation();
   return (
-    <Note tone="warn" icon={<TriangleAlert size="0.75rem" />}>
+    <Note tone="warn" icon={<TriangleAlert size="0.875rem" />}>
       <b>{t("megumin.devmode.cacheFriendly.title")}</b> {t("megumin.devmode.cacheFriendly.text")}
     </Note>
   );
@@ -481,7 +485,7 @@ function CacheFriendlyNote() {
 function StatusBadge({ kind }: { kind: StatusKind }) {
   const { t } = useTranslation();
   return (
-    <span className={cn("shrink-0 rounded px-1 py-px text-[0.5625rem] font-medium", STATUS_CLASS[kind])}>
+    <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-medium", STATUS_CLASS[kind])}>
       {t(`megumin.devmode.status.${kind}`)}
     </span>
   );
@@ -527,33 +531,36 @@ function Landing({ ctx, customCount }: { ctx: DevCtx; customCount: number }) {
       type="button"
       onClick={() => ctx.go({ name: id })}
       className={cn(
-        "flex flex-col gap-1.5 rounded-lg border p-3 text-left transition-colors hover:bg-[var(--accent)]",
+        "flex h-full flex-col gap-3 rounded-xl border p-5 text-left transition-colors hover:bg-[var(--accent)]",
         tone,
       )}
     >
-      <span className="flex items-center gap-2 text-sm font-semibold">
-        {icon}
+      <span className="flex items-center gap-3 text-lg font-bold text-[var(--marinara-chat-chrome-panel-title)]">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--secondary)]/70 ring-1 ring-[var(--border)]">
+          {icon}
+        </span>
         {title}
       </span>
-      <span className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{desc}</span>
-      <span className="flex items-center justify-between text-[0.625rem]">
+      <span className="flex-1 text-[0.8125rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+        {desc}
+      </span>
+      <span className="flex items-center justify-between gap-3 border-t border-[var(--border)]/50 pt-3 text-xs">
         <span className="text-[var(--muted-foreground)]">{meta}</span>
-        <span className="inline-flex items-center gap-1 font-medium">
+        <span className="inline-flex items-center gap-1 text-[0.8125rem] font-semibold">
           {t("megumin.devmode.landing.open")}
-          <ArrowRight size="0.625rem" />
+          <ArrowRight size="0.875rem" />
         </span>
       </span>
     </button>
   );
 
   return (
-    <>
-      <Subtitle>{t("megumin.devmode.landing.sub")}</Subtitle>
+    <div className="flex flex-col gap-4">
       {ctx.dev.cacheFriendly ? <CacheFriendlyNote /> : null}
-      <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
         {door(
           "addons",
-          <Puzzle size="1rem" className="text-emerald-500" />,
+          <Puzzle size="1.25rem" className="text-emerald-500" />,
           t("megumin.devmode.landing.addonsTitle"),
           <>
             {t("megumin.devmode.landing.addonsDesc")} <b>{t("megumin.devmode.landing.addonsDescStrong")}</b>
@@ -561,24 +568,27 @@ function Landing({ ctx, customCount }: { ctx: DevCtx; customCount: number }) {
           changed
             ? t("megumin.devmode.landing.addonsChanged", { count: changed })
             : t("megumin.devmode.landing.addonsTotal", { count: addonSlots.length }),
-          "border-emerald-500/30",
+          "border-emerald-500/40 bg-emerald-500/5",
         )}
         {door(
           "engines",
-          <Cpu size="1rem" className="text-amber-500" />,
+          <Cpu size="1.25rem" className="text-amber-500" />,
           t("megumin.devmode.landing.enginesTitle"),
           t("megumin.devmode.landing.enginesDesc"),
           customCount
             ? t("megumin.devmode.landing.enginesOwn", { count: customCount })
             : t("megumin.devmode.landing.enginesNone"),
-          "border-amber-500/30",
+          "border-amber-500/40 bg-amber-500/5",
         )}
       </div>
-      <MeguminHint>
-        {t("megumin.devmode.landing.hint")} <b>{t("megumin.devmode.landing.addonsTitle")}</b>
-        {t("megumin.devmode.landing.hintEnd")}
-      </MeguminHint>
-    </>
+      <div className="flex items-start gap-2.5 rounded-lg border border-[var(--border)]/70 px-4 py-3">
+        <CircleHelp size="0.875rem" className="mt-0.5 shrink-0 text-[var(--muted-foreground)]" />
+        <MeguminHint>
+          {t("megumin.devmode.landing.hint")} <b>{t("megumin.devmode.landing.addonsTitle")}</b>
+          {t("megumin.devmode.landing.hintEnd")}
+        </MeguminHint>
+      </div>
+    </div>
   );
 }
 
@@ -592,57 +602,61 @@ function AddonsList({ ctx }: { ctx: DevCtx }) {
   const groups = (catalog.slotGroups as Array<{ id: string; label: string; hint?: string }> | undefined) ?? [];
 
   return (
-    <>
-      <Subtitle>{t("megumin.devmode.addons.sub")}</Subtitle>
-      <BackBar title={t("megumin.devmode.landing.addonsTitle")} onBack={() => ctx.go({ name: "landing" })} />
+    <div className="flex flex-col gap-4">
+      <ViewHead>
+        <BackBar title={t("megumin.devmode.landing.addonsTitle")} onBack={() => ctx.go({ name: "landing" })} />
+        <Subtitle>{t("megumin.devmode.addons.sub")}</Subtitle>
+      </ViewHead>
       {groups.map((group) => {
         const mine = slots.filter((s) => s.group === group.id);
         if (!mine.length) return null;
         return (
           <MeguminSection key={group.id} title={group.label} description={group.hint}>
-            {mine.map((slot) => {
-              const status = statusOf(slot, modeData, ctx.shared);
-              const { value } = resolveSlot(slot, modeData, ctx.shared);
-              return (
-                <button
-                  key={slot.trigger}
-                  type="button"
-                  onClick={() => slot.key && ctx.go({ name: "addon", key: slot.key })}
-                  className={cn(
-                    "flex w-full items-start gap-2 rounded-md border px-2.5 py-2 text-left transition-colors hover:bg-[var(--accent)]",
-                    status === "custom" ? "border-emerald-500/40" : "border-[var(--border)]/60",
-                    status === "off" && "opacity-60",
-                  )}
-                >
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs font-medium">{slot.label}</span>
-                      <StatusBadge kind={status} />
-                      {status === "custom" ? (
-                        <span className="text-[0.5625rem] text-emerald-500">
-                          {t("megumin.devmode.addons.yourVersion")}
+            <div className="grid grid-cols-1 gap-2.5 @2xl:grid-cols-2">
+              {mine.map((slot) => {
+                const status = statusOf(slot, modeData, ctx.shared);
+                const { value } = resolveSlot(slot, modeData, ctx.shared);
+                return (
+                  <button
+                    key={slot.trigger}
+                    type="button"
+                    onClick={() => slot.key && ctx.go({ name: "addon", key: slot.key })}
+                    className={cn(
+                      "flex h-full w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-[var(--accent)]",
+                      status === "custom" ? "border-emerald-500/40" : "border-[var(--border)]/60",
+                      status === "off" && "opacity-70",
+                    )}
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="flex items-start gap-2">
+                        <span className="min-w-0 flex-1 text-sm font-medium">{slot.label}</span>
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <StatusBadge kind={status} />
+                          {status === "custom" ? (
+                            <span className="text-xs text-emerald-500">{t("megumin.devmode.addons.yourVersion")}</span>
+                          ) : null}
+                        </span>
+                      </span>
+                      {slot.hint ? (
+                        <span className="text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+                          {slot.hint}
+                        </span>
+                      ) : null}
+                      {value ? (
+                        <span className="truncate font-mono text-xs text-[var(--muted-foreground)]">
+                          {onelineOf(value)}
                         </span>
                       ) : null}
                     </span>
-                    {slot.hint ? (
-                      <span className="text-[0.625rem] leading-snug text-[var(--marinara-chat-chrome-panel-muted)]">
-                        {slot.hint}
-                      </span>
-                    ) : null}
-                    {value ? (
-                      <span className="truncate font-mono text-[0.5625rem] text-[var(--muted-foreground)]">
-                        {onelineOf(value)}
-                      </span>
-                    ) : null}
-                  </span>
-                  <ChevronRight size="0.75rem" className="mt-0.5 shrink-0 text-[var(--muted-foreground)]" />
-                </button>
-              );
-            })}
+                    <ChevronRight size="0.875rem" className="mt-1 shrink-0 text-[var(--muted-foreground)]" />
+                  </button>
+                );
+              })}
+            </div>
           </MeguminSection>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -657,55 +671,62 @@ function AddonPage({ ctx, slotKey }: { ctx: DevCtx; slotKey: string }) {
 
   if (!slot) {
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <BackBar title={t("megumin.devmode.landing.addonsTitle")} onBack={back} />
         <MeguminHint>{t("megumin.devmode.addon.missing")}</MeguminHint>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <Subtitle>
-        {cameFromEngine
-          ? t("megumin.devmode.addon.subFromEngine", { engine: engine.modeData.label })
-          : t("megumin.devmode.addon.sub")}
-      </Subtitle>
-      <BackBar
-        title={slot.label}
-        onBack={back}
-        backLabel={cameFromEngine ? t("megumin.devmode.addon.backToEngine") : t("megumin.devmode.addon.allAddons")}
-      />
-      <SlotEditor
-        ctx={ctx}
-        slot={slot}
-        modeData={engine?.modeData ?? null}
-        onEngineChange={(key, value) =>
-          ctx.setSession((s) =>
-            s.engine
-              ? { ...s, engine: { ...s.engine, modeData: { ...s.engine.modeData, [key]: value } }, dirty: true }
-              : s,
-          )
-        }
-        onUnshadow={(key) =>
-          ctx.setSession((s) => {
-            if (!s.engine) return s;
-            const modeData = { ...s.engine.modeData };
-            delete modeData[key];
-            return { ...s, engine: { ...s.engine, modeData }, dirty: true };
-          })
-        }
-      />
-      <MeguminSection title={t("megumin.devmode.placement.title")} icon={<MapPin size="0.875rem" />}>
-        <PlacementText dev={ctx.dev} slot={slot} />
-        {ctx.dev.cacheFriendly ? (
-          <Note tone="auto" icon={<CircleHelp size="0.75rem" />}>
-            {t("megumin.devmode.cacheFriendly.positions")}
-          </Note>
-        ) : null}
-        <PlacementMap dev={ctx.dev} slot={slot} />
-      </MeguminSection>
-    </>
+    <div className="flex flex-col gap-4">
+      <ViewHead>
+        <BackBar
+          title={slot.label}
+          onBack={back}
+          backLabel={cameFromEngine ? t("megumin.devmode.addon.backToEngine") : t("megumin.devmode.addon.allAddons")}
+        />
+        <Subtitle>
+          {cameFromEngine
+            ? t("megumin.devmode.addon.subFromEngine", { engine: engine.modeData.label })
+            : t("megumin.devmode.addon.sub")}
+        </Subtitle>
+      </ViewHead>
+      {/* The editor, and beside it on a wide window where its text lands (devmode.js dev-cols). */}
+      <div className="grid grid-cols-1 items-start gap-4 @4xl:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="@container min-w-0">
+          <SlotEditor
+            ctx={ctx}
+            slot={slot}
+            modeData={engine?.modeData ?? null}
+            onEngineChange={(key, value) =>
+              ctx.setSession((s) =>
+                s.engine
+                  ? { ...s, engine: { ...s.engine, modeData: { ...s.engine.modeData, [key]: value } }, dirty: true }
+                  : s,
+              )
+            }
+            onUnshadow={(key) =>
+              ctx.setSession((s) => {
+                if (!s.engine) return s;
+                const modeData = { ...s.engine.modeData };
+                delete modeData[key];
+                return { ...s, engine: { ...s.engine, modeData }, dirty: true };
+              })
+            }
+          />
+        </div>
+        <MeguminSection title={t("megumin.devmode.placement.title")} icon={<MapPin size="0.875rem" />}>
+          <PlacementText dev={ctx.dev} slot={slot} />
+          {ctx.dev.cacheFriendly ? (
+            <Note tone="auto" icon={<CircleHelp size="0.875rem" />}>
+              {t("megumin.devmode.cacheFriendly.positions")}
+            </Note>
+          ) : null}
+          <PlacementMap dev={ctx.dev} slot={slot} />
+        </MeguminSection>
+      </div>
+    </div>
   );
 }
 
@@ -744,7 +765,7 @@ function PlacementText({ dev, slot }: { dev: DevModeData; slot: DevSlot }) {
     else if (before) lines.push(t("megumin.devmode.placement.after", { before }));
     else if (after) lines.push(t("megumin.devmode.placement.before", { after }));
   }
-  return <p className="text-[0.6875rem] leading-relaxed">{lines.join(" ")}</p>;
+  return <p className="text-[0.8125rem] leading-relaxed">{lines.join(" ")}</p>;
 }
 
 /** The outgoing messages, with this slot's position marked (devmode.js renderPlacementMap). */
@@ -753,14 +774,14 @@ function PlacementMap({ dev, slot }: { dev: DevModeData; slot: DevSlot }) {
   const ownTag = slot.carrier && CARRIER_TAGS[slot.carrier] ? CARRIER_TAGS[slot.carrier]! : slot.trigger;
   const byTrigger = new Map(dev.slots.map((s) => [s.trigger, s]));
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-1">
       {dev.skeleton.map((card, i) => {
         const hit = !!p && i === p.cardIndex;
         return (
           <div key={`${card.id}-${i}`} className="flex flex-col gap-1">
             <div
               className={cn(
-                "flex items-center justify-between gap-2 rounded px-2 py-1 text-[0.625rem]",
+                "flex items-center justify-between gap-3 rounded-md px-3 py-1.5 text-[0.8125rem]",
                 hit
                   ? "bg-[var(--primary)]/15 font-semibold ring-1 ring-[var(--primary)]/40"
                   : "bg-[var(--background)]/40",
@@ -768,17 +789,17 @@ function PlacementMap({ dev, slot }: { dev: DevModeData; slot: DevSlot }) {
               )}
             >
               <span className="min-w-0 truncate">{card.name}</span>
-              <span className="shrink-0 font-mono text-[0.5625rem] text-[var(--muted-foreground)]">{card.role}</span>
+              <span className="shrink-0 font-mono text-xs text-[var(--muted-foreground)]">{card.role}</span>
             </div>
             {hit && p ? (
-              <div className="flex flex-wrap gap-1 pl-3">
+              <div className="flex flex-wrap gap-1.5 py-1 pl-3">
                 {p.tags.map((tag, ti) => {
                   const target = tag === ownTag || ti === p.idx;
                   return (
                     <span
                       key={`${tag}-${ti}`}
                       className={cn(
-                        "rounded px-1 py-px text-[0.5625rem]",
+                        "rounded-md px-1.5 py-0.5 text-[0.6875rem]",
                         target
                           ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                           : "bg-[var(--secondary)] text-[var(--muted-foreground)]",
@@ -857,13 +878,13 @@ function SlotEditor({
   const gateWhere = slot.gate?.where ?? "";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {slot.hint ? <MeguminHint>{slot.hint}</MeguminHint> : null}
 
       {!slot.live && slot.gate ? (
         <Note
           tone="off"
-          icon={<CircleHelp size="0.75rem" />}
+          icon={<CircleHelp size="0.875rem" />}
           action={gateWhere ? <WhereLink where={gateWhere} openTab={ctx.openTab} /> : undefined}
         >
           {t("megumin.devmode.slot.offNote", { label: gateLabel, where: gateWhere })}
@@ -871,7 +892,7 @@ function SlotEditor({
       ) : null}
 
       {slot.scope === "shared" ? (
-        <Note tone="shared" icon={<Globe size="0.75rem" />}>
+        <Note tone="shared" icon={<Globe size="0.875rem" />}>
           <b>{t("megumin.devmode.slot.sharedTitle")}</b> {t("megumin.devmode.slot.sharedText")}
         </Note>
       ) : null}
@@ -879,7 +900,7 @@ function SlotEditor({
       {slot.scope === "auto" && slot.overridable ? (
         <Note
           tone="auto"
-          icon={<Wand2 size="0.75rem" />}
+          icon={<Wand2 size="0.875rem" />}
           action={slot.where ? <WhereLink where={slot.where} openTab={ctx.openTab} /> : undefined}
         >
           {slot.where
@@ -891,7 +912,7 @@ function SlotEditor({
       {shadowed ? (
         <Note
           tone="warn"
-          icon={<TriangleAlert size="0.75rem" />}
+          icon={<TriangleAlert size="0.875rem" />}
           action={
             <MeguminButton onClick={() => slot.key && onUnshadow(slot.key)}>
               {t("megumin.devmode.slot.useShared")}
@@ -903,9 +924,12 @@ function SlotEditor({
       ) : null}
 
       <textarea
-        className={cn(MEGUMIN_INPUT_CLASS, "min-h-40 resize-y font-mono text-[0.6875rem] leading-relaxed")}
+        className={cn(
+          MEGUMIN_INPUT_CLASS,
+          "field-sizing-content max-h-[70dvh] min-h-64 resize-y font-mono text-[0.8125rem] leading-relaxed",
+        )}
         spellCheck={false}
-        rows={10}
+        rows={12}
         value={draft}
         placeholder={t("megumin.devmode.slot.placeholder")}
         onFocus={() => {
@@ -923,19 +947,21 @@ function SlotEditor({
       />
 
       {slot.picker && slot.picker.options.length ? (
-        <MeguminSelect
-          label={slot.picker.label}
-          value=""
-          onChange={(index) => {
-            if (index === "") return;
-            const option = slot.picker?.options[Number(index)];
-            if (option) setAndCommit(option.value);
-          }}
-          options={[
-            { value: "", label: t("megumin.devmode.slot.pickerChoose") },
-            ...slot.picker.options.map((o, i) => ({ value: String(i), label: o.label })),
-          ]}
-        />
+        <div className="w-full @xl:max-w-md">
+          <MeguminSelect
+            label={slot.picker.label}
+            value=""
+            onChange={(index) => {
+              if (index === "") return;
+              const option = slot.picker?.options[Number(index)];
+              if (option) setAndCommit(option.value);
+            }}
+            options={[
+              { value: "", label: t("megumin.devmode.slot.pickerChoose") },
+              ...slot.picker.options.map((o, i) => ({ value: String(i), label: o.label })),
+            ]}
+          />
+        </div>
       ) : null}
 
       {presets.length || (source !== "builtin" && builtin) || builtin ? (
@@ -1021,84 +1047,98 @@ function EnginesList({
   };
 
   return (
-    <>
-      <Subtitle>{t("megumin.devmode.engines.sub")}</Subtitle>
-      <BackBar title={t("megumin.devmode.landing.enginesTitle")} onBack={() => ctx.go({ name: "landing" })} />
-      <MeguminRow>
-        <MeguminButton variant="primary" icon={<Wand2 size="0.75rem" />} onClick={onNew}>
-          {t("megumin.devmode.engines.createBlank")}
-        </MeguminButton>
-        <MeguminButton icon={<FileUp size="0.75rem" />} onClick={() => fileRef.current?.click()}>
-          {t("megumin.devmode.engines.import")}
-        </MeguminButton>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) importFile(file);
-            e.target.value = "";
-          }}
-        />
-      </MeguminRow>
+    <div className="flex flex-col gap-4">
+      <ViewHead>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <BackBar title={t("megumin.devmode.landing.enginesTitle")} onBack={() => ctx.go({ name: "landing" })} />
+          <MeguminRow>
+            <MeguminButton variant="primary" icon={<Wand2 size="0.75rem" />} onClick={onNew}>
+              {t("megumin.devmode.engines.createBlank")}
+            </MeguminButton>
+            <MeguminButton icon={<FileUp size="0.75rem" />} onClick={() => fileRef.current?.click()}>
+              {t("megumin.devmode.engines.import")}
+            </MeguminButton>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) importFile(file);
+                e.target.value = "";
+              }}
+            />
+          </MeguminRow>
+        </div>
+        <Subtitle>{t("megumin.devmode.engines.sub")}</Subtitle>
+      </ViewHead>
 
       <MeguminSection title={t("megumin.devmode.engines.yours")} icon={<Cpu size="0.875rem" />}>
         {!customModes.length ? <MeguminHint>{t("megumin.devmode.engines.noneYet")}</MeguminHint> : null}
-        {customModes.map((m) => (
-          <div key={m.id} className="flex flex-col gap-1.5 rounded-md border border-emerald-500/30 px-2.5 py-2">
-            <div className="min-w-0">
-              <div className="truncate text-xs font-semibold text-emerald-500">{m.label}</div>
-              <div className="text-[0.625rem] text-[var(--muted-foreground)]">
-                {m.parentId
-                  ? t("megumin.devmode.engines.copyOf", { id: m.parentId })
-                  : t("megumin.devmode.engines.ownEngine")}
+        <MeguminGrid layout="cards" className="items-stretch empty:hidden">
+          {customModes.map((m) => (
+            <div
+              key={m.id}
+              className="flex h-full flex-col justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-emerald-500">{m.label}</div>
+                <div className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+                  {m.parentId
+                    ? t("megumin.devmode.engines.copyOf", { id: m.parentId })
+                    : t("megumin.devmode.engines.ownEngine")}
+                </div>
               </div>
+              <MeguminRow>
+                <button
+                  type="button"
+                  title={t("megumin.devmode.engines.export")}
+                  aria-label={t("megumin.devmode.engines.export")}
+                  className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
+                  onClick={() => downloadJson(String(m.label || "engine"), m)}
+                >
+                  <Download size="0.75rem" />
+                </button>
+                <MeguminButton variant="primary" icon={<Pencil size="0.75rem" />} onClick={() => onEdit(m)}>
+                  {t("megumin.devmode.engines.edit")}
+                </MeguminButton>
+                <button
+                  type="button"
+                  title={t("megumin.devmode.engines.delete")}
+                  aria-label={t("megumin.devmode.engines.delete")}
+                  className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
+                  onClick={() => void remove(m)}
+                >
+                  <Trash2 size="0.75rem" className="text-[var(--destructive)]" />
+                </button>
+              </MeguminRow>
             </div>
-            <MeguminRow>
-              <button
-                type="button"
-                title={t("megumin.devmode.engines.export")}
-                aria-label={t("megumin.devmode.engines.export")}
-                className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
-                onClick={() => downloadJson(String(m.label || "engine"), m)}
-              >
-                <Download size="0.75rem" />
-              </button>
-              <MeguminButton variant="primary" icon={<Pencil size="0.75rem" />} onClick={() => onEdit(m)}>
-                {t("megumin.devmode.engines.edit")}
-              </MeguminButton>
-              <button
-                type="button"
-                title={t("megumin.devmode.engines.delete")}
-                aria-label={t("megumin.devmode.engines.delete")}
-                className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
-                onClick={() => void remove(m)}
-              >
-                <Trash2 size="0.75rem" className="text-[var(--destructive)]" />
-              </button>
-            </MeguminRow>
-          </div>
-        ))}
+          ))}
+        </MeguminGrid>
       </MeguminSection>
 
       <MeguminSection title={t("megumin.devmode.engines.builtins")}>
-        {builtins.map((m) => (
-          <div key={m.id} className="flex items-center gap-2 rounded-md border border-[var(--border)]/60 px-2.5 py-2">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">{m.label}</div>
-              <div className="text-[0.625rem] text-[var(--muted-foreground)]">
-                {t("megumin.devmode.engines.builtinDesc")}
+        <MeguminGrid layout="cards" className="items-stretch">
+          {builtins.map((m) => (
+            <div
+              key={m.id}
+              className="flex h-full items-center gap-3 rounded-lg border border-[var(--border)]/60 p-3 @xl:flex-col @xl:items-stretch"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{m.label}</div>
+                <div className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+                  {t("megumin.devmode.engines.builtinDesc")}
+                </div>
               </div>
+              <MeguminButton pending={cloning === m.id} disabled={!!cloning} onClick={() => onClone(String(m.id))}>
+                {t("megumin.devmode.engines.makeCopy")}
+              </MeguminButton>
             </div>
-            <MeguminButton pending={cloning === m.id} disabled={!!cloning} onClick={() => onClone(String(m.id))}>
-              {t("megumin.devmode.engines.makeCopy")}
-            </MeguminButton>
-          </div>
-        ))}
+          ))}
+        </MeguminGrid>
       </MeguminSection>
-    </>
+    </div>
   );
 }
 
@@ -1194,9 +1234,9 @@ function EngineEditor({
       return (
         <div
           key={`${card.id}-${ci}`}
-          className="flex items-center justify-between gap-2 rounded-md border border-dashed border-[var(--border)] px-2.5 py-1.5 text-[0.625rem] text-[var(--muted-foreground)]"
+          className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)]"
         >
-          <span className="min-w-0 truncate font-medium">{card.name}</span>
+          <span className="min-w-0 truncate text-[0.8125rem] font-medium">{card.name}</span>
           <span className="shrink-0">{t("megumin.devmode.editor.hostFills")}</span>
         </div>
       );
@@ -1208,7 +1248,7 @@ function EngineEditor({
         parts.push(
           <pre
             key={`t${si}`}
-            className="whitespace-pre-wrap break-words rounded bg-[var(--background)]/50 px-2 py-1 font-mono text-[0.5625rem] leading-relaxed text-[var(--muted-foreground)]"
+            className="whitespace-pre-wrap break-words rounded-md bg-[var(--background)]/50 px-3 py-2 font-mono text-xs leading-relaxed text-[var(--muted-foreground)]"
           >
             {seg.text.replace(/^\n+|\n+$/g, "")}
           </pre>,
@@ -1220,9 +1260,9 @@ function EngineEditor({
         parts.push(
           <div
             key={`u${si}`}
-            className="flex items-start gap-1.5 rounded-md border border-[var(--border)] px-2 py-1.5 text-[0.625rem] text-[var(--muted-foreground)]"
+            className="flex items-start gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-xs leading-relaxed text-[var(--muted-foreground)]"
           >
-            <CircleHelp size="0.75rem" className="mt-0.5 shrink-0" />
+            <CircleHelp size="0.875rem" className="mt-0.5 shrink-0" />
             <span>
               <b>{t("megumin.devmode.editor.unknownSlot")}</b>{" "}
               {t("megumin.devmode.editor.unknownSlotText", { trigger: seg.trigger })}
@@ -1253,7 +1293,7 @@ function EngineEditor({
           .forEach((car) => {
             drawn.add(car.trigger);
             parts.push(
-              <div key={`c${si}-${car.trigger}`} className="border-l-2 border-amber-500/40 pl-2">
+              <div key={`c${si}-${car.trigger}`} className="pl-5">
                 {engineSlot(car)}
               </div>,
             );
@@ -1263,12 +1303,12 @@ function EngineEditor({
         parts.push(
           <div
             key={`x${si}`}
-            className="flex items-start gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/5 px-2 py-1.5 text-[0.625rem]"
+            className="flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-3 py-2 text-xs leading-relaxed"
           >
-            <Wand2 size="0.75rem" className="mt-0.5 shrink-0 text-violet-500" />
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="flex items-center gap-1.5">
-                <span className="font-medium">{slot.label}</span>
+            <Wand2 size="0.875rem" className="mt-0.5 shrink-0 text-violet-500" />
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-[0.8125rem] font-medium">{slot.label}</span>
                 <StatusBadge kind="auto" />
               </span>
               {slot.hint ? <span className="text-[var(--muted-foreground)]">{slot.hint}</span> : null}
@@ -1279,14 +1319,19 @@ function EngineEditor({
     });
     if (!parts.length) return null;
     return (
-      <div key={`${card.id}-${ci}`} className="flex flex-col gap-1.5 rounded-md border border-[var(--border)]/70 p-2">
-        <div className="flex items-center justify-between gap-2 text-[0.625rem]">
-          <span className="min-w-0 truncate font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+      <div
+        key={`${card.id}-${ci}`}
+        className="overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/30"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)]/60 bg-[var(--secondary)]/30 px-3 py-2">
+          <span className="min-w-0 truncate text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
             {card.name}
           </span>
-          <span className="shrink-0 font-mono text-[0.5625rem] text-[var(--muted-foreground)]">{card.role}</span>
+          <span className="shrink-0 rounded-full border border-[var(--border)] px-2 py-0.5 font-mono text-[0.6875rem] text-[var(--muted-foreground)]">
+            {card.role}
+          </span>
         </div>
-        {parts}
+        <div className="flex flex-col gap-2 p-3">{parts}</div>
       </div>
     );
   });
@@ -1295,64 +1340,69 @@ function EngineEditor({
   const orphans = engineSlotsOf(slots).filter((s) => !drawn.has(s.trigger));
 
   return (
-    <>
-      <Subtitle>{t("megumin.devmode.editor.sub")}</Subtitle>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-1.5">
-          <MeguminButton icon={<ArrowLeft size="0.75rem" />} onClick={() => void back()}>
-            {t("megumin.devmode.back")}
-          </MeguminButton>
-          <input
-            className={cn(MEGUMIN_INPUT_CLASS, "min-w-0 flex-1")}
-            value={modeData.label ?? ""}
-            aria-label={t("megumin.devmode.editor.name")}
-            placeholder={t("megumin.devmode.editor.name")}
-            onChange={(e) => setMode((m) => ({ ...m, label: e.target.value }))}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[0.6875rem]">
+    // The engine's bar on the left (kept in view while the document scrolls on a wide window), the document on the right.
+    <div className="grid grid-cols-1 items-start gap-4 @4xl:grid-cols-[18rem_minmax(0,1fr)]">
+      <aside className="flex min-w-0 flex-col gap-4 rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/35 p-4 @4xl:sticky @4xl:top-24 @4xl:max-h-[calc(min(92dvh,62rem)_-_8rem)] @4xl:overflow-y-auto">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <MeguminButton icon={<ArrowLeft size="0.75rem" />} onClick={() => void back()}>
+              {t("megumin.devmode.back")}
+            </MeguminButton>
             <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-[var(--primary)]"
-              checked={ctx.session.showAuto}
-              onChange={(e) => {
-                const on = e.target.checked;
-                ctx.setSession((s) => ({ ...s, showAuto: on }));
-              }}
+              className={cn(MEGUMIN_INPUT_CLASS, "min-w-0 flex-1 basis-40 @4xl:basis-full")}
+              value={modeData.label ?? ""}
+              aria-label={t("megumin.devmode.editor.name")}
+              placeholder={t("megumin.devmode.editor.name")}
+              onChange={(e) => setMode((m) => ({ ...m, label: e.target.value }))}
             />
-            {t("megumin.devmode.editor.showAuto")}
-          </label>
-          <MeguminButton variant="primary" icon={<Save size="0.75rem" />} onClick={save}>
-            {t("megumin.devmode.editor.save")}
-          </MeguminButton>
-        </div>
-        {ctx.session.dirty ? <MeguminHint tone="warning">{t("megumin.devmode.editor.dirty")}</MeguminHint> : null}
-      </div>
-
-      <div className="flex flex-wrap gap-1 text-[0.5625rem]">
-        <span className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5">
-          <Cpu size="0.625rem" /> {t("megumin.devmode.legend.engine")}
-        </span>
-        <span className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5">
-          <Puzzle size="0.625rem" /> {t("megumin.devmode.legend.shared")}
-        </span>
-        <span className="inline-flex items-center gap-1 rounded border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5">
-          <Wand2 size="0.625rem" /> {t("megumin.devmode.legend.auto")}
-        </span>
-      </div>
-
-      {ctx.dev.cacheFriendly ? <CacheFriendlyNote /> : null}
-      <div className="flex flex-col gap-2">{cards}</div>
-      {orphans.length ? (
-        <div className="flex flex-col gap-1.5 rounded-md border border-[var(--border)]/70 p-2">
-          <div className="text-[0.625rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
-            {t("megumin.devmode.editor.otherSettings")}
           </div>
-          {orphans.map(engineSlot)}
+          <Subtitle>{t("megumin.devmode.editor.sub")}</Subtitle>
+          <div className="flex flex-wrap items-center justify-between gap-3 @4xl:flex-col @4xl:items-stretch">
+            <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[0.8125rem]">
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 accent-[var(--primary)]"
+                checked={ctx.session.showAuto}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  ctx.setSession((s) => ({ ...s, showAuto: on }));
+                }}
+              />
+              {t("megumin.devmode.editor.showAuto")}
+            </label>
+            <MeguminButton variant="primary" icon={<Save size="0.75rem" />} onClick={save}>
+              {t("megumin.devmode.editor.save")}
+            </MeguminButton>
+          </div>
+          {ctx.session.dirty ? <MeguminHint tone="warning">{t("megumin.devmode.editor.dirty")}</MeguminHint> : null}
         </div>
-      ) : null}
-    </>
+
+        <div className="flex flex-wrap gap-2 text-xs @4xl:flex-col @4xl:items-start @4xl:border-t @4xl:border-[var(--border)]/60 @4xl:pt-4">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1">
+            <Cpu size="0.75rem" /> {t("megumin.devmode.legend.engine")}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1">
+            <Puzzle size="0.75rem" /> {t("megumin.devmode.legend.shared")}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/40 bg-violet-500/10 px-2 py-1">
+            <Wand2 size="0.75rem" /> {t("megumin.devmode.legend.auto")}
+          </span>
+        </div>
+      </aside>
+
+      <div className="@container flex min-w-0 flex-col gap-3">
+        {ctx.dev.cacheFriendly ? <CacheFriendlyNote /> : null}
+        <div className="flex flex-col gap-3">{cards}</div>
+        {orphans.length ? (
+          <div className="overflow-hidden rounded-lg border border-dashed border-[var(--border)]">
+            <div className="border-b border-[var(--border)]/60 bg-[var(--secondary)]/30 px-3 py-2 text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+              {t("megumin.devmode.editor.otherSettings")}
+            </div>
+            <div className="flex flex-col gap-2 p-3">{orphans.map(engineSlot)}</div>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -1378,36 +1428,34 @@ function EngineSlot({
   const status = statusOf(slot, modeData, ctx.shared);
   const { value } = resolveSlot(slot, modeData, ctx.shared);
   return (
-    <div className={cn("rounded-md border border-amber-500/30", open && "bg-amber-500/5")}>
+    <div className={cn("rounded-lg border border-amber-500/30", open && "bg-amber-500/5")}>
       <button
         type="button"
         aria-expanded={open}
         onClick={onToggle}
-        className="flex w-full items-start gap-1.5 px-2 py-1.5 text-left"
+        className="flex w-full items-start gap-2 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-amber-500/5"
       >
         {open ? (
-          <ChevronDown size="0.75rem" className="mt-0.5 shrink-0" />
+          <ChevronDown size="0.875rem" className="mt-0.5 shrink-0" />
         ) : (
-          <ChevronRight size="0.75rem" className="mt-0.5 shrink-0" />
+          <ChevronRight size="0.875rem" className="mt-0.5 shrink-0" />
         )}
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[0.6875rem] font-medium">{slot.label}</span>
-            <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 py-px text-[0.5625rem] text-amber-600">
-              <Cpu size="0.5625rem" />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-[0.8125rem] font-semibold">{slot.label}</span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[0.6875rem] text-amber-600">
+              <Cpu size="0.75rem" />
               {t("megumin.devmode.legend.engineShort")}
             </span>
             <StatusBadge kind={status} />
           </span>
           {!open && value ? (
-            <span className="truncate font-mono text-[0.5625rem] text-[var(--muted-foreground)]">
-              {onelineOf(value)}
-            </span>
+            <span className="truncate font-mono text-xs text-[var(--muted-foreground)]">{onelineOf(value)}</span>
           ) : null}
         </span>
       </button>
       {open ? (
-        <div className="border-t border-amber-500/20 p-2">
+        <div className="border-t border-amber-500/20 p-3">
           <SlotEditor ctx={ctx} slot={slot} modeData={modeData} onEngineChange={onChange} onUnshadow={onUnshadow} />
         </div>
       ) : null}
@@ -1425,23 +1473,23 @@ function AddonChip({ ctx, slot, modeData }: { ctx: DevCtx; slot: DevSlot; modeDa
       type="button"
       onClick={() => slot.key && ctx.go({ name: "addon", key: slot.key })}
       className={cn(
-        "flex w-full items-start gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-left transition-colors hover:bg-emerald-500/10",
-        status === "off" && "opacity-60",
+        "flex w-full items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 text-left transition-colors hover:bg-emerald-500/10",
+        status === "off" && "opacity-70",
       )}
     >
-      <Puzzle size="0.75rem" className="mt-0.5 shrink-0 text-emerald-500" />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[0.6875rem] font-medium">{slot.label}</span>
+      <Puzzle size="0.875rem" className="mt-0.5 shrink-0 text-emerald-500" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-[0.8125rem] font-semibold">{slot.label}</span>
           <StatusBadge kind={status} />
         </span>
         {value ? (
-          <span className="truncate font-mono text-[0.5625rem] text-[var(--muted-foreground)]">{onelineOf(value)}</span>
+          <span className="truncate font-mono text-xs text-[var(--muted-foreground)]">{onelineOf(value)}</span>
         ) : null}
       </span>
-      <span className="inline-flex shrink-0 items-center gap-0.5 text-[0.625rem] font-medium">
+      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium">
         {t("megumin.devmode.editor.editAddon")}
-        <ArrowRight size="0.625rem" />
+        <ArrowRight size="0.75rem" />
       </span>
     </button>
   );
@@ -1489,7 +1537,7 @@ function Modules({
   };
 
   return (
-    <div className="flex flex-col gap-1 pl-2">
+    <div className="flex flex-col gap-2 pl-5">
       {mods.map((mod) =>
         editing === mod.id ? (
           <ModuleForm
@@ -1499,11 +1547,11 @@ function Modules({
             onSave={(next) => saveModule(next, mod)}
           />
         ) : (
-          <div key={mod.id} className="flex flex-col gap-0.5 rounded-md border border-[var(--border)]/60 px-2 py-1.5">
-            <div className="flex items-center gap-1.5 text-[0.625rem]">
-              <Puzzle size="0.625rem" className="shrink-0" />
+          <div key={mod.id} className="flex flex-col gap-1 rounded-lg border border-[var(--border)]/60 px-3 py-2">
+            <div className="flex items-center gap-2 text-[0.8125rem]">
+              <Puzzle size="0.875rem" className="shrink-0" />
               <span className="min-w-0 flex-1 truncate font-medium">{mod.name}</span>
-              <span className="shrink-0 text-[var(--muted-foreground)]">
+              <span className="shrink-0 text-xs text-[var(--muted-foreground)]">
                 {mod.location === "addons"
                   ? t("megumin.devmode.modules.inGlobal")
                   : t("megumin.devmode.modules.inAddons")}
@@ -1515,7 +1563,7 @@ function Modules({
                 className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
                 onClick={() => setEditing(mod.id)}
               >
-                <Pencil size="0.625rem" />
+                <Pencil size="0.75rem" />
               </button>
               <button
                 type="button"
@@ -1524,12 +1572,10 @@ function Modules({
                 className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon mari-chrome-control--danger"
                 onClick={() => void remove(mod)}
               >
-                <Trash2 size="0.625rem" className="text-[var(--destructive)]" />
+                <Trash2 size="0.75rem" className="text-[var(--destructive)]" />
               </button>
             </div>
-            <div className="truncate font-mono text-[0.5625rem] text-[var(--muted-foreground)]">
-              {onelineOf(mod.content)}
-            </div>
+            <div className="truncate font-mono text-xs text-[var(--muted-foreground)]">{onelineOf(mod.content)}</div>
           </div>
         ),
       )}
@@ -1539,9 +1585,9 @@ function Modules({
         <button
           type="button"
           onClick={() => setEditing("new")}
-          className="inline-flex items-center gap-1 self-start rounded-md border border-dashed border-[var(--border)] px-2 py-1 text-[0.625rem] text-[var(--muted-foreground)] hover:bg-[var(--accent)]"
+          className="inline-flex min-h-9 items-center gap-1.5 self-start rounded-lg border border-dashed border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)]"
         >
-          <Plus size="0.625rem" />
+          <Plus size="0.75rem" />
           {t("megumin.devmode.modules.add")}
         </button>
       )}
@@ -1572,32 +1618,37 @@ function ModuleForm({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-[var(--primary)]/40 p-2">
-      <div className="text-[0.6875rem] font-semibold">
+    <div className="flex flex-col gap-3 rounded-lg border border-[var(--primary)]/40 p-3">
+      <div className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
         {initial ? t("megumin.devmode.modules.editTitle") : t("megumin.devmode.modules.addTitle")}
       </div>
-      <label className="flex flex-col gap-1 text-[0.625rem]">
-        {t("megumin.devmode.modules.nameLabel")}
-        <input
-          className={MEGUMIN_INPUT_CLASS}
-          value={name}
-          placeholder={t("megumin.devmode.modules.namePlaceholder")}
-          onChange={(e) => setName(e.target.value)}
+      <div className="grid grid-cols-1 items-end gap-3 @2xl:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+          {t("megumin.devmode.modules.nameLabel")}
+          <input
+            className={MEGUMIN_INPUT_CLASS}
+            value={name}
+            placeholder={t("megumin.devmode.modules.namePlaceholder")}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <MeguminSelect
+          label={t("megumin.devmode.modules.locationLabel")}
+          value={location}
+          onChange={(v) => setLocation(v === "addons" ? "addons" : "settings")}
+          options={[
+            { value: "settings", label: t("megumin.devmode.modules.locationAddons") },
+            { value: "addons", label: t("megumin.devmode.modules.locationGlobal") },
+          ]}
         />
-      </label>
-      <MeguminSelect
-        label={t("megumin.devmode.modules.locationLabel")}
-        value={location}
-        onChange={(v) => setLocation(v === "addons" ? "addons" : "settings")}
-        options={[
-          { value: "settings", label: t("megumin.devmode.modules.locationAddons") },
-          { value: "addons", label: t("megumin.devmode.modules.locationGlobal") },
-        ]}
-      />
-      <label className="flex flex-col gap-1 text-[0.625rem]">
+      </div>
+      <label className="flex flex-col gap-1.5 text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
         {t("megumin.devmode.modules.contentLabel")}
         <textarea
-          className={cn(MEGUMIN_INPUT_CLASS, "min-h-32 resize-y font-mono text-[0.6875rem]")}
+          className={cn(
+            MEGUMIN_INPUT_CLASS,
+            "field-sizing-content max-h-[60dvh] min-h-40 resize-y font-mono text-[0.8125rem] font-normal leading-relaxed",
+          )}
           rows={7}
           value={content}
           onChange={(e) => setContent(e.target.value)}

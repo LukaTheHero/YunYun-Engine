@@ -15,7 +15,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ArrowLeftRight, BookUser, Minus, Pencil, Plus, RotateCcw } from "lucide-react";
-import { useUIStore, type Panel } from "../../../stores/ui.store";
+import { openMeguminWindow } from "../../../lib/megumin-tab-request";
 import type { MeguminView } from "../../../hooks/use-megumin";
 import { CardButton, stopCardClick, useCardActions, usePaneHost } from "./megumin-card-kit";
 
@@ -148,10 +148,9 @@ export function MeguminNpcUpdatePane({
   );
 }
 
-/** Opens the Megumin panel on the NPC Bank with that character in view. */
+/** Opens the Megumin Suite window on the NPC Bank with that character in view. */
 export function openMeguminNpcBank(index: number, name: string) {
-  useUIStore.getState().openRightPanel("megumin" as string as Panel);
-  window.dispatchEvent(new CustomEvent("megumin:open-tab", { detail: "npc" }));
+  openMeguminWindow("npc");
   window.dispatchEvent(new CustomEvent("megumin:open-npc", { detail: { index, name } }));
 }
 
