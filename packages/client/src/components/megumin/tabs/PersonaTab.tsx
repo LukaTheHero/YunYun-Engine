@@ -7,16 +7,16 @@ import { useTranslation } from "react-i18next";
 import { Check, Star, UserLock } from "lucide-react";
 import { MeguminEngineFlags } from "@marinara-engine/shared/megumin/client";
 import { useMeguminPanel } from "../megumin-panel-context";
-import { MeguminSection } from "../MeguminControls";
+import { MeguminGrid, MeguminSection } from "../MeguminControls";
 import { Badge, PickCard, SwitchRow } from "./presetControls";
 import { PERSONA_DESCRIPTIONS, type MeguminEngine } from "./presetData";
 
 function LockedState({ title, children, tone }: { title: string; children: string; tone: string }) {
   return (
-    <div className="flex flex-col items-center gap-1.5 rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/35 px-3 py-4 text-center">
-      <UserLock size="1.25rem" className={tone} />
-      <div className="text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]">{title}</div>
-      <p className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{children}</p>
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/35 px-6 py-8 text-center">
+      <UserLock size="1.75rem" className={tone} />
+      <div className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">{title}</div>
+      <p className="max-w-xl text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{children}</p>
     </div>
   );
 }
@@ -38,7 +38,7 @@ export function PersonaTab() {
   const engineName = engine?.label ? String(engine.label) : t("megumin.persona.thisEngine");
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-end">
         <Badge tone="custom">{isLocked ? t("megumin.persona.locked") : String(profile.personality ?? "")}</Badge>
       </div>
@@ -59,7 +59,7 @@ export function PersonaTab() {
             </LockedState>
           ) : (
             <MeguminSection title={t("megumin.persona.select")}>
-              <div className="grid grid-cols-1 gap-1.5">
+              <MeguminGrid className="items-stretch">
                 {personalities.map((p) => {
                   const isSel = profile.personality === p.id;
                   return (
@@ -70,7 +70,7 @@ export function PersonaTab() {
                       title={String(p.label ?? p.id)}
                       titleExtra={
                         isSel ? (
-                          <Badge tone="active" icon={<Check size="0.5rem" />}>
+                          <Badge tone="active" icon={<Check size="0.75rem" />}>
                             {t("megumin.persona.active")}
                           </Badge>
                         ) : null
@@ -78,7 +78,7 @@ export function PersonaTab() {
                       description={PERSONA_DESCRIPTIONS[String(p.id)] ?? ""}
                       badges={
                         p.recommended ? (
-                          <Badge tone="rec" icon={<Star size="0.5rem" />}>
+                          <Badge tone="rec" icon={<Star size="0.75rem" />}>
                             {t("megumin.persona.recommended")}
                           </Badge>
                         ) : null
@@ -86,24 +86,26 @@ export function PersonaTab() {
                     />
                   );
                 })}
-              </div>
+              </MeguminGrid>
             </MeguminSection>
           )}
 
           <MeguminSection title={t("megumin.persona.extraToggles")}>
-            {toggleDefs.map((tog) => (
-              <SwitchRow
-                key={String(tog.id)}
-                label={String(tog.label ?? tog.id)}
-                description={tog.recommendedOff ? t("megumin.persona.recommendedOff") : undefined}
-                checked={!!toggles[String(tog.id)]}
-                onChange={(on) =>
-                  update((d) => {
-                    d.toggles = { ...(d.toggles ?? {}), [String(tog.id)]: on };
-                  })
-                }
-              />
-            ))}
+            <MeguminGrid layout="fields" className="gap-x-6 gap-y-1">
+              {toggleDefs.map((tog) => (
+                <SwitchRow
+                  key={String(tog.id)}
+                  label={String(tog.label ?? tog.id)}
+                  description={tog.recommendedOff ? t("megumin.persona.recommendedOff") : undefined}
+                  checked={!!toggles[String(tog.id)]}
+                  onChange={(on) =>
+                    update((d) => {
+                      d.toggles = { ...(d.toggles ?? {}), [String(tog.id)]: on };
+                    })
+                  }
+                />
+              ))}
+            </MeguminGrid>
           </MeguminSection>
         </>
       )}

@@ -55,7 +55,10 @@ const SettingsPanel = lazy(() =>
 const BotBrowserPanel = lazy(() =>
   import("../panels/BotBrowserPanel").then((module) => ({ default: module.BotBrowserPanel })),
 );
-const MeguminPanel = lazy(() => import("../megumin/MeguminPanel").then((module) => ({ default: module.MeguminPanel })));
+// Megumin Suite moved to its own window; a saved "megumin" panel opens that instead.
+const MeguminPanel = lazy(() =>
+  import("../megumin/MeguminMounts").then((module) => ({ default: module.MeguminPanelRedirect })),
+);
 const PersonalExtensionPanel = lazy(() =>
   import("../panels/PersonalExtensionPanel").then((module) => ({ default: module.PersonalExtensionPanel })),
 );

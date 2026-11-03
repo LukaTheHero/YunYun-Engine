@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { useMeguminPanel } from "../megumin-panel-context";
-import { MEGUMIN_INPUT_CLASS, MeguminButton, MeguminSection } from "../MeguminControls";
+import { MEGUMIN_INPUT_CLASS, MeguminButton, MeguminGrid, MeguminRow, MeguminSection } from "../MeguminControls";
 import { Badge, Callout, PickCard, RichText, Segmented, SwitchRow } from "./presetControls";
 import {
   LOADOUT_SETTINGS,
@@ -58,9 +58,9 @@ const LOADOUT_ICONS: Record<string, ComponentType<{ size?: string | number; clas
   "fa-house-laptop": Laptop,
 };
 
-function LoadoutIcon({ icon }: { icon: unknown }) {
+function LoadoutIcon({ icon, size = "0.875rem" }: { icon: unknown; size?: string }) {
   const Icon = LOADOUT_ICONS[String(icon)] ?? Cpu;
-  return <Icon size="0.75rem" className="shrink-0" />;
+  return <Icon size={size} className="shrink-0" />;
 }
 
 type Loadout = MeguminEngine & {
@@ -112,14 +112,14 @@ export function ModelSetupTab() {
   const current = byId(picked) ?? byId(fallback);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <Callout tone="green">
         <strong className="font-semibold text-[var(--foreground)]">{t("megumin.setup.optionalLead")}</strong>{" "}
         {t("megumin.setup.optionalBody")}
       </Callout>
 
       <MeguminSection title={t("megumin.setup.pick.title")} description={t("megumin.setup.pick.description")}>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        <MeguminGrid className="items-stretch">
           {loadouts.map((l) => (
             <PickCard
               key={l.id}
@@ -133,7 +133,7 @@ export function ModelSetupTab() {
               }
               titleExtra={
                 profile.loadout === l.id ? (
-                  <Badge tone="active" icon={<Check size="0.5rem" />}>
+                  <Badge tone="active" icon={<Check size="0.75rem" />}>
                     {t("megumin.setup.inUse")}
                   </Badge>
                 ) : null
@@ -153,13 +153,13 @@ export function ModelSetupTab() {
               }
               description={String(l.models ?? "")}
               badges={
-                <Badge tone="locked" icon={<Lock size="0.5rem" />}>
+                <Badge tone="locked" icon={<Lock size="0.75rem" />}>
                   {t("megumin.setup.comingSoon")}
                 </Badge>
               }
             />
           ))}
-        </div>
+        </MeguminGrid>
       </MeguminSection>
 
       {current ? <LoadoutCard key={current.id} loadout={current} /> : null}
@@ -219,16 +219,16 @@ function LoadoutCard({ loadout: l }: { loadout: Loadout }) {
   };
 
   return (
-    <MeguminSection title={l.name} icon={<LoadoutIcon icon={l.icon} />} description={l.why}>
+    <MeguminSection title={l.name} icon={<LoadoutIcon icon={l.icon} size="1rem" />} description={l.why}>
       {(l.notes ?? []).map((n, i) => (
         <Callout
           key={i}
           tone={n.tone === "red" ? "red" : "gold"}
           icon={
             n.tone === "red" ? (
-              <TriangleAlert size="0.75rem" className="text-[var(--destructive)]" />
+              <TriangleAlert size="0.9375rem" className="text-[var(--destructive)]" />
             ) : (
-              <Lightbulb size="0.75rem" className="text-amber-500" />
+              <Lightbulb size="0.9375rem" className="text-amber-500" />
             )
           }
         >
@@ -237,7 +237,7 @@ function LoadoutCard({ loadout: l }: { loadout: Loadout }) {
             <>
               {" "}
               {t("megumin.setup.chomusukeNotSet")}
-              <div className="mt-1">
+              <div className="mt-2">
                 <MeguminButton icon={<ArrowRight size="0.75rem" />} onClick={() => openTab("chomusuke")}>
                   {t("megumin.setup.setUpChomusuke")}
                 </MeguminButton>
@@ -248,13 +248,13 @@ function LoadoutCard({ loadout: l }: { loadout: Loadout }) {
       ))}
 
       {!inUse ? (
-        <Callout tone="muted" icon={<Eye size="0.75rem" className="text-[var(--muted-foreground)]" />}>
+        <Callout tone="muted" icon={<Eye size="0.9375rem" className="text-[var(--muted-foreground)]" />}>
           <strong className="font-semibold text-[var(--foreground)]">{t("megumin.setup.notInUseLead")}</strong>{" "}
           {t("megumin.setup.notInUseBody")}
         </Callout>
       ) : null}
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col divide-y divide-[var(--border)]/50 border-y border-[var(--border)]/50">
         {Object.keys(l.settings).map((key) => {
           const def = LOADOUT_SETTINGS.find((s) => s.key === key);
           if (!def) return null;
@@ -280,21 +280,25 @@ function LoadoutCard({ loadout: l }: { loadout: Loadout }) {
         })}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-[var(--border)]/50 pt-2">
-        <SwitchRow
-          label={t("megumin.setup.onlyThis")}
-          description={onlyThis ? t("megumin.setup.onlyThisOn") : t("megumin.setup.onlyThisOff")}
-          checked={onlyThis}
-          onChange={setOnlyThis}
-        />
-        <MeguminButton
-          variant="primaryFull"
-          icon={<Check size="0.8125rem" />}
-          pending={running("loadout.apply")}
-          onClick={() => void applyLoadout()}
-        >
-          {t("megumin.setup.use")}
-        </MeguminButton>
+      <div className="flex flex-col gap-3 rounded-xl border border-[var(--primary)]/35 bg-[var(--primary)]/[0.06] p-3 @2xl:flex-row @2xl:items-center @2xl:gap-4">
+        <div className="min-w-0 flex-1">
+          <SwitchRow
+            label={t("megumin.setup.onlyThis")}
+            description={onlyThis ? t("megumin.setup.onlyThisOn") : t("megumin.setup.onlyThisOff")}
+            checked={onlyThis}
+            onChange={setOnlyThis}
+          />
+        </div>
+        <div className="w-full shrink-0 @2xl:w-64 [&>button]:min-h-11 [&>button]:px-5 [&>button]:text-sm">
+          <MeguminButton
+            variant="primaryFull"
+            icon={<Check size="1rem" />}
+            pending={running("loadout.apply")}
+            onClick={() => void applyLoadout()}
+          >
+            {t("megumin.setup.use")}
+          </MeguminButton>
+        </div>
       </div>
     </MeguminSection>
   );
@@ -424,10 +428,13 @@ function SettingRow({
     );
   }
 
+  // Megumin's msx-row. Wide: label and description | control | open-tab button. Phone: label | button, then
+  // the description and the control across the row. Margins rather than a row gap, so a row with no
+  // description has no empty band.
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/30 px-2.5 py-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[0.6875rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-3 [grid-template-areas:'label_open'_'desc_desc'_'ctl_ctl'] @2xl:grid-cols-[minmax(10rem,1fr)_minmax(0,2fr)_auto] @2xl:grid-rows-[1fr_auto] @2xl:[grid-template-areas:'label_ctl_open'_'desc_ctl_open']">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 [grid-area:label]">
+        <span className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
           {t(`megumin.setup.row.${settingKey}.label`)}
         </span>
         {value === "mixed" ? <Badge tone="warn">{t("megumin.setup.mixed")}</Badge> : null}
@@ -436,22 +443,22 @@ function SettingRow({
             {t("megumin.setup.changed")}
           </Badge>
         ) : null}
-        <button
-          type="button"
-          onClick={onOpen}
-          title={t("megumin.setup.openTab", { tab: t(TAB_TITLE_KEYS[def.tab] ?? "megumin.tabs.preset.title") })}
-          className="mari-chrome-control mari-chrome-control--small ml-auto inline-flex items-center gap-1 text-[0.625rem]"
-        >
-          <SquareArrowOutUpRight size="0.625rem" />
-          {t(TAB_TITLE_KEYS[def.tab] ?? "megumin.tabs.preset.title")}
-        </button>
       </div>
       {hasDesc ? (
-        <p className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+        <p className="mt-1 text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)] [grid-area:desc]">
           {t(`megumin.setup.row.${settingKey}.description`)}
         </p>
       ) : null}
-      {control}
+      <div className="mt-2 min-w-0 [grid-area:ctl] @2xl:mt-0 @2xl:max-w-md">{control}</div>
+      <button
+        type="button"
+        onClick={onOpen}
+        title={t("megumin.setup.openTab", { tab: t(TAB_TITLE_KEYS[def.tab] ?? "megumin.tabs.preset.title") })}
+        className="mari-chrome-control mari-chrome-control--small inline-flex items-center gap-1.5 justify-self-end text-xs [grid-area:open]"
+      >
+        <SquareArrowOutUpRight size="0.75rem" />
+        {t(TAB_TITLE_KEYS[def.tab] ?? "megumin.tabs.preset.title")}
+      </button>
     </div>
   );
 }
@@ -464,7 +471,7 @@ function StyleCard() {
   const directStyles = (catalog.directStyles ?? []) as MeguminEngine[];
   return (
     <MeguminSection title={t("megumin.setup.style.title")} description={t("megumin.setup.style.description")}>
-      <div className="grid grid-cols-1 gap-1.5">
+      <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2">
         {V11_STYLE_IDS.map((id) => {
           const ds = directStyles.find((s) => s.id === id);
           if (!ds) return null;
@@ -481,25 +488,27 @@ function StyleCard() {
                 })
               }
               className={cn(
-                "flex flex-col items-start gap-0.5 rounded-lg border px-2.5 py-2 text-left transition-colors",
+                "flex h-full flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-colors",
                 on
                   ? "border-[var(--primary)]/55 bg-[var(--primary)]/10"
                   : "border-[var(--border)]/70 bg-[var(--background)]/35 hover:bg-[var(--accent)]/50",
               )}
             >
-              <span className="text-xs font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+              <span className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
                 {String(ds.name)}
               </span>
-              <span className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+              <span className="text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
                 {String(ds.desc ?? "")}
               </span>
             </button>
           );
         })}
       </div>
-      <MeguminButton icon={<SquareArrowOutUpRight size="0.75rem" />} onClick={() => openTab("style")}>
-        {t("megumin.tabs.style.title")}
-      </MeguminButton>
+      <MeguminRow>
+        <MeguminButton icon={<SquareArrowOutUpRight size="0.75rem" />} onClick={() => openTab("style")}>
+          {t("megumin.tabs.style.title")}
+        </MeguminButton>
+      </MeguminRow>
     </MeguminSection>
   );
 }
@@ -512,18 +521,18 @@ const HABITS = ["fewer", "hideBlocks", "combine"] as const;
 function Fold({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/30">
+    <div className="rounded-xl border border-[var(--border)]/60 bg-[var(--background)]/30">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[0.6875rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]"
+        className="flex min-h-10 w-full items-center gap-2 px-4 py-2.5 text-left text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]"
       >
         {icon}
         <span className="flex-1">{title}</span>
-        <ChevronDown size="0.75rem" className={cn("transition-transform", open && "rotate-180")} />
+        <ChevronDown size="0.875rem" className={cn("transition-transform", open && "rotate-180")} />
       </button>
-      {open ? <div className="border-t border-[var(--border)]/50 px-2.5 py-2">{children}</div> : null}
+      {open ? <div className="border-t border-[var(--border)]/50 px-4 py-3">{children}</div> : null}
     </div>
   );
 }
@@ -532,28 +541,30 @@ function HelpCard() {
   const { t } = useTranslation();
   return (
     <MeguminSection title={t("megumin.setup.help.title")}>
-      <Fold icon={<Cat size="0.75rem" />} title={t("megumin.setup.help.chomusuke")}>
-        <ol className="flex list-decimal flex-col gap-1 pl-4 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
-          {SETUP_STEPS.map((step) => (
-            <li key={step}>{t(`megumin.setup.help.steps.${step}`)}</li>
-          ))}
-        </ol>
-        <p className="mt-1.5 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
-          {t("megumin.setup.help.modelAdvice")}
-        </p>
-      </Fold>
-      <Fold icon={<Sprout size="0.75rem" />} title={t("megumin.setup.help.habits")}>
-        <ul className="flex list-disc flex-col gap-1 pl-4 text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
-          {HABITS.map((habit) => (
-            <li key={habit}>
-              <strong className="font-semibold text-[var(--foreground)]">
-                {t(`megumin.setup.help.habit.${habit}.lead`)}
-              </strong>{" "}
-              {t(`megumin.setup.help.habit.${habit}.body`)}
-            </li>
-          ))}
-        </ul>
-      </Fold>
+      <MeguminGrid layout="sections" className="@3xl:grid-cols-2">
+        <Fold icon={<Cat size="0.875rem" />} title={t("megumin.setup.help.chomusuke")}>
+          <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[0.8125rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+            {SETUP_STEPS.map((step) => (
+              <li key={step}>{t(`megumin.setup.help.steps.${step}`)}</li>
+            ))}
+          </ol>
+          <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+            {t("megumin.setup.help.modelAdvice")}
+          </p>
+        </Fold>
+        <Fold icon={<Sprout size="0.875rem" />} title={t("megumin.setup.help.habits")}>
+          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[0.8125rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">
+            {HABITS.map((habit) => (
+              <li key={habit}>
+                <strong className="font-semibold text-[var(--foreground)]">
+                  {t(`megumin.setup.help.habit.${habit}.lead`)}
+                </strong>{" "}
+                {t(`megumin.setup.help.habit.${habit}.body`)}
+              </li>
+            ))}
+          </ul>
+        </Fold>
+      </MeguminGrid>
     </MeguminSection>
   );
 }

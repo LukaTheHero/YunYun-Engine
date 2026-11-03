@@ -1,10 +1,22 @@
-// Requests to show part of the Megumin panel from elsewhere: a tab ("Open in NPC Bank" on a card, the side
-// panel's "Open NPC Book") and the dossier to open in the NPC Bank. The panel may not be mounted yet when
-// the request is made, so the last one is kept until the panel takes it.
+// Requests to show part of the Megumin Suite window from elsewhere: a tab ("Open in NPC Bank" on a card, the
+// side panel's "Open NPC Book") and the dossier to open in the NPC Bank. The window may not be mounted yet
+// when the request is made, so the last one is kept until the window takes it.
 import { useEffect } from "react";
+import { useMeguminWindowStore } from "../stores/megumin-window.store";
 
 export const MEGUMIN_OPEN_TAB_EVENT = "megumin:open-tab";
 export const MEGUMIN_OPEN_NPC_EVENT = "megumin:open-npc";
+
+/** Closes the Megumin Suite window, before showing something it would cover (a right panel, an editor). */
+export function closeMeguminWindow() {
+  useMeguminWindowStore.getState().setOpen(false);
+}
+
+/** Opens the Megumin Suite window, on `tabId` when given. */
+export function openMeguminWindow(tabId?: string) {
+  if (tabId) window.dispatchEvent(new CustomEvent(MEGUMIN_OPEN_TAB_EVENT, { detail: tabId }));
+  useMeguminWindowStore.getState().setOpen(true);
+}
 
 let pendingTab: string | null = null;
 let pendingNpc: { index: number | null; name: string } | null = null;

@@ -5,16 +5,28 @@
 // apply to every character and chat, the background prompt log, the card
 // submission form, and the about card. Everything here lives in the suite's
 // globalSettings, saved once for the whole install.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { ClipboardCopy, Earth, ExternalLink, Inbox, ListTree, Trash2 } from "lucide-react";
+import {
+  ClipboardCopy,
+  ExternalLink,
+  Inbox,
+  Info,
+  ListTree,
+  Power,
+  Save,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import { cn } from "../../../lib/utils";
 import { useClearMeguminBackgroundLog, useMeguminBackgroundLog } from "../../../hooks/use-megumin";
 import { useMeguminPanel } from "../megumin-panel-context";
 import { useMeguminPower } from "../MeguminPowerSwitch";
 import {
   MeguminButton,
+  MeguminFeatureBar,
+  MeguminGrid,
   MeguminHint,
   MeguminNeedsChat,
   MeguminRow,
@@ -47,6 +59,25 @@ const FALLBACK_BG_JOBS = [
   "director",
   "style",
 ].map((id) => ({ id, label: id }));
+
+/** One setting of the Behaviour section (Megumin's mtab-toggle-row): the switch, then what it does. */
+function SettingTile({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-col gap-1 rounded-xl border border-[var(--border)]/60 bg-[var(--background)]/30 p-2",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** The hints under a tile's switch, lined up with its label. */
+function TileHints({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-1.5 px-2 pb-1.5">{children}</div>;
+}
 
 interface BackgroundLogEntry {
   at: number;
@@ -112,177 +143,196 @@ export function SettingsTab() {
   };
 
   return (
-    <>
-      <div className="flex items-center justify-end">
-        <span className="inline-flex items-center gap-1 rounded-full border border-[var(--primary)]/30 bg-[var(--primary)]/10 px-2 py-0.5 text-[0.625rem] font-medium text-[var(--primary)]">
-          <Earth size="0.625rem" />
-          {t("megumin.settings.savedGlobally")}
-        </span>
-      </div>
-
-      <MeguminSection title={t("megumin.settings.behaviour.title")}>
-        <MeguminToggle
-          label={t("megumin.settings.suite.label")}
+    <div className="flex flex-col gap-4">
+      <MeguminSection title={t("megumin.settings.behaviour.title")} icon={<SlidersHorizontal size="1rem" />}>
+        <MeguminFeatureBar
+          icon={<Power size="0.875rem" />}
+          title={t("megumin.settings.suite.label")}
+          description={t("megumin.settings.suite.desc")}
           checked={power.enabled}
           disabled={power.pending || !!power.locked}
           onChange={(value) => power.setEnabled(value, { failed: t("megumin.toggle.saveFailed") })}
         />
-        <MeguminHint>{t("megumin.settings.suite.desc")}</MeguminHint>
         {power.locked ? (
           <MeguminHint tone="warning">{t("settings.features.envLocked", { name: power.locked })}</MeguminHint>
         ) : null}
 
-        <MeguminToggle
-          label={t("megumin.settings.promptPreview.label")}
-          checked={gs.promptPreview === true}
-          onChange={(value) => saveGs({ promptPreview: value })}
-        />
-        <MeguminHint>{t("megumin.settings.promptPreview.desc")}</MeguminHint>
-        <MeguminHint tone="warning">{t("megumin.settings.promptPreview.yunyun")}</MeguminHint>
+        <div className="grid grid-cols-1 items-stretch gap-3 @3xl:grid-cols-2">
+          <SettingTile>
+            <MeguminToggle
+              label={t("megumin.settings.promptPreview.label")}
+              checked={gs.promptPreview === true}
+              onChange={(value) => saveGs({ promptPreview: value })}
+            />
+            <TileHints>
+              <MeguminHint>{t("megumin.settings.promptPreview.desc")}</MeguminHint>
+              <MeguminHint tone="warning">{t("megumin.settings.promptPreview.yunyun")}</MeguminHint>
+            </TileHints>
+          </SettingTile>
 
-        <MeguminToggle
-          label={t("megumin.settings.bgPreview.label")}
-          checked={gs.bgPreview === true}
-          onChange={(value) => saveGs({ bgPreview: value })}
-        />
-        <MeguminHint>{t("megumin.settings.bgPreview.desc")}</MeguminHint>
-        <MeguminHint tone="warning">{t("megumin.settings.bgPreview.yunyun")}</MeguminHint>
-        {gs.bgPreview === true ? (
-          <fieldset className="flex flex-col gap-1 rounded-md border border-[var(--border)]/60 px-2.5 py-2">
-            <legend className="px-1 text-[0.625rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
-              {t("megumin.settings.bgPreview.jobsTitle")}
-            </legend>
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-              {jobs.map((job) => (
-                <label key={job.id} className="flex cursor-pointer items-center gap-1.5 text-[0.6875rem]">
-                  <input
-                    type="checkbox"
-                    className="h-3.5 w-3.5 accent-[var(--primary)]"
-                    checked={bgJobWanted(gs.bgPreviewJobs, job.id)}
-                    onChange={(e) =>
-                      saveGs({ bgPreviewJobs: { ...(gs.bgPreviewJobs || {}), [job.id]: e.target.checked } })
-                    }
-                  />
-                  <span className="min-w-0 truncate">{job.label}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        ) : null}
+          <SettingTile>
+            <MeguminToggle
+              label={t("megumin.settings.bgPreview.label")}
+              checked={gs.bgPreview === true}
+              onChange={(value) => saveGs({ bgPreview: value })}
+            />
+            <TileHints>
+              <MeguminHint>{t("megumin.settings.bgPreview.desc")}</MeguminHint>
+              <MeguminHint tone="warning">{t("megumin.settings.bgPreview.yunyun")}</MeguminHint>
+              {gs.bgPreview === true ? (
+                <fieldset className="mt-1 flex flex-col gap-1 rounded-lg border border-[var(--border)]/60 px-3 pb-2.5 pt-1.5">
+                  <legend className="px-1 text-xs font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+                    {t("megumin.settings.bgPreview.jobsTitle")}
+                  </legend>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {jobs.map((job) => (
+                      <label
+                        key={job.id}
+                        className="flex min-w-0 cursor-pointer items-center gap-2 py-1 text-[0.8125rem]"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 accent-[var(--primary)]"
+                          checked={bgJobWanted(gs.bgPreviewJobs, job.id)}
+                          onChange={(e) =>
+                            saveGs({ bgPreviewJobs: { ...(gs.bgPreviewJobs || {}), [job.id]: e.target.checked } })
+                          }
+                        />
+                        <span className="min-w-0 truncate">{job.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+            </TileHints>
+          </SettingTile>
 
-        <div className="flex flex-col gap-1.5 rounded-md border border-[var(--border)]/60 px-2.5 py-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="text-xs font-medium text-[var(--marinara-chat-chrome-panel-title)]">
-                {t("megumin.settings.bgLog.title")}
+          <SettingTile className={cn("gap-2", logOpen && chatId && "@3xl:col-span-2")}>
+            <div className="flex items-start justify-between gap-3 px-2 py-1.5">
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="text-[0.8125rem] text-[var(--marinara-chat-chrome-panel-title)]">
+                  {t("megumin.settings.bgLog.title")}
+                </div>
+                <MeguminHint>{t("megumin.settings.bgLog.desc")}</MeguminHint>
               </div>
-              <MeguminHint>{t("megumin.settings.bgLog.desc")}</MeguminHint>
+              <MeguminButton
+                icon={<ListTree size="0.75rem" />}
+                disabled={!chatId}
+                onClick={() => setLogOpen((open) => !open)}
+              >
+                {logOpen ? t("megumin.settings.bgLog.hide") : t("megumin.settings.bgLog.show")}
+              </MeguminButton>
             </div>
-            <MeguminButton
-              icon={<ListTree size="0.75rem" />}
-              disabled={!chatId}
-              onClick={() => setLogOpen((open) => !open)}
-            >
-              {logOpen ? t("megumin.settings.bgLog.hide") : t("megumin.settings.bgLog.show")}
-            </MeguminButton>
-          </div>
-          {!chatId ? <MeguminNeedsChat /> : null}
-          {logOpen && chatId ? <BackgroundLog chatId={chatId} jobs={jobs} /> : null}
+            <div className="flex flex-col gap-2 px-2 pb-1.5 empty:hidden">
+              {!chatId ? <MeguminNeedsChat /> : null}
+              {logOpen && chatId ? <BackgroundLog chatId={chatId} jobs={jobs} /> : null}
+            </div>
+          </SettingTile>
+
+          <SettingTile>
+            <MeguminToggle
+              label={t("megumin.settings.utilityPrefill.label")}
+              checked={gs.enableUtilityPrefill === true}
+              onChange={(value) => saveGs({ enableUtilityPrefill: value })}
+            />
+            <TileHints>
+              <MeguminHint>{t("megumin.settings.utilityPrefill.desc")}</MeguminHint>
+            </TileHints>
+          </SettingTile>
+
+          <SettingTile>
+            <MeguminToggle
+              label={t("megumin.settings.chomusukeSwitch.label")}
+              checked={gs.chomusukeSwitchConnection === true}
+              disabled
+              onChange={(value) => saveGs({ chomusukeSwitchConnection: value })}
+            />
+            <TileHints>
+              <MeguminHint>{t("megumin.settings.chomusukeSwitch.desc")}</MeguminHint>
+              <MeguminHint tone="warning">{t("megumin.settings.chomusukeSwitch.yunyun")}</MeguminHint>
+            </TileHints>
+          </SettingTile>
+
+          <SettingTile>
+            <MeguminToggle
+              label={t("megumin.settings.loreInTasks.label")}
+              checked={loreInTasks}
+              onChange={(value) => saveGs({ loreInTasks: value })}
+            />
+            <TileHints>
+              <MeguminHint>{t("megumin.settings.loreInTasks.desc")}</MeguminHint>
+            </TileHints>
+          </SettingTile>
         </div>
-
-        <MeguminToggle
-          label={t("megumin.settings.utilityPrefill.label")}
-          checked={gs.enableUtilityPrefill === true}
-          onChange={(value) => saveGs({ enableUtilityPrefill: value })}
-        />
-        <MeguminHint>{t("megumin.settings.utilityPrefill.desc")}</MeguminHint>
-
-        <MeguminToggle
-          label={t("megumin.settings.chomusukeSwitch.label")}
-          checked={gs.chomusukeSwitchConnection === true}
-          disabled
-          onChange={(value) => saveGs({ chomusukeSwitchConnection: value })}
-        />
-        <MeguminHint>{t("megumin.settings.chomusukeSwitch.desc")}</MeguminHint>
-        <MeguminHint tone="warning">{t("megumin.settings.chomusukeSwitch.yunyun")}</MeguminHint>
-
-        <MeguminToggle
-          label={t("megumin.settings.loreInTasks.label")}
-          checked={loreInTasks}
-          onChange={(value) => saveGs({ loreInTasks: value })}
-        />
-        <MeguminHint>{t("megumin.settings.loreInTasks.desc")}</MeguminHint>
       </MeguminSection>
 
-      <MeguminSection title={t("megumin.settings.data.title")}>
-        <MeguminSelect
-          label={t("megumin.settings.saveMode.label")}
-          value={saveMode}
-          onChange={(next) => void changeSaveMode(next)}
-          options={[
-            { value: "character", label: t("megumin.settings.saveMode.character") },
-            { value: "chat", label: t("megumin.settings.saveMode.chat") },
-          ]}
-        />
-        <MeguminHint>{t("megumin.settings.saveMode.desc")}</MeguminHint>
-      </MeguminSection>
-
-      {SUBMIT_FORM_URL ? (
-        <MeguminSection title={t("megumin.settings.submit.title")} icon={<Inbox size="0.875rem" />}>
-          <div className="text-xs font-medium text-[var(--marinara-chat-chrome-panel-title)]">
-            {t("megumin.settings.submit.heading")}
+      <MeguminGrid layout="sections" className="items-stretch">
+        <MeguminSection title={t("megumin.settings.data.title")} icon={<Save size="1rem" />} className="h-full">
+          <div className="@2xl:max-w-md">
+            <MeguminSelect
+              label={t("megumin.settings.saveMode.label")}
+              value={saveMode}
+              onChange={(next) => void changeSaveMode(next)}
+              options={[
+                { value: "character", label: t("megumin.settings.saveMode.character") },
+                { value: "chat", label: t("megumin.settings.saveMode.chat") },
+              ]}
+            />
           </div>
-          <MeguminHint>{t("megumin.settings.submit.text")}</MeguminHint>
-          <a
-            href={SUBMIT_FORM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mari-chrome-control mari-chrome-control--primary inline-flex w-full items-center justify-center gap-1.5 text-xs"
-          >
-            <ExternalLink size="0.75rem" />
-            {t("megumin.settings.submit.open")}
-          </a>
-          <MeguminHint>{t("megumin.settings.submit.note")}</MeguminHint>
+          <MeguminHint>{t("megumin.settings.saveMode.desc")}</MeguminHint>
         </MeguminSection>
-      ) : null}
 
-      <MeguminSection title={t("megumin.settings.about.title")}>
-        <div>
-          <div className="text-sm font-bold text-[var(--marinara-chat-chrome-panel-title)]">
+        {SUBMIT_FORM_URL ? (
+          <MeguminSection title={t("megumin.settings.submit.title")} icon={<Inbox size="1rem" />} className="h-full">
+            <div className="text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+              {t("megumin.settings.submit.heading")}
+            </div>
+            <MeguminHint>{t("megumin.settings.submit.text")}</MeguminHint>
+            <a
+              href={SUBMIT_FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mari-chrome-control mari-chrome-control--primary inline-flex w-full items-center justify-center gap-1.5 text-xs @xl:w-auto @xl:self-start @xl:px-6"
+            >
+              <ExternalLink size="0.875rem" />
+              {t("megumin.settings.submit.open")}
+            </a>
+            <MeguminHint>{t("megumin.settings.submit.note")}</MeguminHint>
+          </MeguminSection>
+        ) : null}
+      </MeguminGrid>
+
+      <MeguminSection title={t("megumin.settings.about.title")} icon={<Info size="1rem" />}>
+        <div className="flex flex-col gap-0.5">
+          <div className="text-base font-bold text-[var(--marinara-chat-chrome-panel-title)]">
             {t("megumin.settings.about.name", { version: SUITE_VERSION })}
           </div>
-          <div className="text-[0.6875rem] text-[var(--muted-foreground)]">{t("megumin.settings.about.by")}</div>
+          <div className="text-xs text-[var(--muted-foreground)]">{t("megumin.settings.about.by")}</div>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-3">
           <a
             href={MEGUMIN_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-md border border-[var(--border)]/60 px-2.5 py-2 transition-colors hover:bg-[var(--accent)]"
+            className="flex min-w-0 items-center gap-3 rounded-xl border border-[var(--border)]/60 px-4 py-3 transition-colors hover:bg-[var(--accent)]"
           >
-            <ExternalLink size="0.875rem" className="shrink-0 text-[var(--muted-foreground)]" />
-            <span className="flex min-w-0 flex-col">
-              <span className="text-xs font-semibold">{t("megumin.settings.about.github")}</span>
-              <span className="text-[0.625rem] text-[var(--muted-foreground)]">
-                {t("megumin.settings.about.githubHint")}
-              </span>
+            <ExternalLink size="1rem" className="shrink-0 text-[var(--muted-foreground)]" />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-sm font-semibold">{t("megumin.settings.about.github")}</span>
+              <span className="text-xs text-[var(--muted-foreground)]">{t("megumin.settings.about.githubHint")}</span>
             </span>
           </a>
-          <div className="flex flex-col rounded-md border border-[var(--border)]/60 px-2.5 py-2">
-            <span className="text-xs font-semibold">{t("megumin.settings.about.paypal")}</span>
-            <span className="select-all break-all font-mono text-[0.625rem] text-[var(--muted-foreground)]">
-              {PAYPAL}
-            </span>
+          <div className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-[var(--border)]/60 px-4 py-3">
+            <span className="text-sm font-semibold">{t("megumin.settings.about.paypal")}</span>
+            <span className="select-all break-all font-mono text-xs text-[var(--muted-foreground)]">{PAYPAL}</span>
           </div>
-          <div className="flex flex-col rounded-md border border-[var(--border)]/60 px-2.5 py-2">
-            <span className="text-xs font-semibold">{t("megumin.settings.about.litecoin")}</span>
-            <span className="select-all break-all font-mono text-[0.625rem] text-[var(--muted-foreground)]">
-              {LITECOIN}
-            </span>
+          <div className="flex min-w-0 flex-col gap-0.5 rounded-xl border border-[var(--border)]/60 px-4 py-3">
+            <span className="text-sm font-semibold">{t("megumin.settings.about.litecoin")}</span>
+            <span className="select-all break-all font-mono text-xs text-[var(--muted-foreground)]">{LITECOIN}</span>
           </div>
         </div>
-        <div className="flex flex-col gap-1 border-t border-[var(--border)]/50 pt-2">
-          <div className="text-[0.6875rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+        <div className="flex flex-col gap-1.5 border-t border-[var(--border)]/50 pt-3">
+          <div className="text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
             {t("megumin.settings.about.licenseTitle")}
           </div>
           <MeguminHint>{t("megumin.settings.about.license")}</MeguminHint>
@@ -291,14 +341,14 @@ export function SettingsTab() {
             href={LICENSE_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[0.625rem] text-[var(--primary)] underline-offset-2 hover:underline"
+            className="inline-flex items-center gap-1.5 self-start text-xs text-[var(--primary)] underline-offset-2 hover:underline"
           >
-            <ExternalLink size="0.625rem" />
+            <ExternalLink size="0.75rem" />
             {t("megumin.settings.about.licenseLink")}
           </a>
         </div>
       </MeguminSection>
-    </>
+    </div>
   );
 }
 
@@ -315,7 +365,7 @@ function BackgroundLog({ chatId, jobs }: { chatId: string; jobs: Array<{ id: str
   if (!entries.length) return <MeguminHint>{t("megumin.settings.bgLog.empty")}</MeguminHint>;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       {entries.map((entry, i) => {
         const size = entry.messages.reduce((n, m) => n + String(m.text ?? "").length, 0);
         const text = entry.messages
@@ -330,21 +380,21 @@ function BackgroundLog({ chatId, jobs }: { chatId: string; jobs: Array<{ id: str
           }
         };
         return (
-          <details key={`${entry.at}-${i}`} className="group rounded-md border border-[var(--border)]/60">
-            <summary className="flex cursor-pointer list-none flex-col gap-0.5 px-2 py-1.5 text-[0.6875rem]">
-              <span className="flex items-center gap-1.5">
+          <details key={`${entry.at}-${i}`} className="group rounded-lg border border-[var(--border)]/60">
+            <summary className="flex cursor-pointer list-none flex-col gap-1 px-3 py-2 text-[0.8125rem]">
+              <span className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold">{labelOf(entry.job)}</span>
                 {entry.status === "cancelled" ? (
-                  <span className="rounded bg-[var(--destructive)]/15 px-1 text-[0.5625rem] text-[var(--destructive)]">
+                  <span className="rounded-full bg-[var(--destructive)]/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-[var(--destructive)]">
                     {t("megumin.settings.bgLog.cancelled")}
                   </span>
                 ) : entry.edited ? (
-                  <span className="rounded bg-[var(--primary)]/15 px-1 text-[0.5625rem] text-[var(--primary)]">
+                  <span className="rounded-full bg-[var(--primary)]/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-[var(--primary)]">
                     {t("megumin.settings.bgLog.edited")}
                   </span>
                 ) : null}
               </span>
-              <span className="text-[0.625rem] text-[var(--muted-foreground)]">
+              <span className="text-xs text-[var(--muted-foreground)]">
                 {t("megumin.settings.bgLog.meta", {
                   time: timeOf(entry.at),
                   connection: entry.connection ?? "",
@@ -352,7 +402,7 @@ function BackgroundLog({ chatId, jobs }: { chatId: string; jobs: Array<{ id: str
                 })}
               </span>
             </summary>
-            <div className="flex flex-col gap-1.5 border-t border-[var(--border)]/50 p-2">
+            <div className="flex flex-col gap-2 border-t border-[var(--border)]/50 p-3">
               <MeguminRow>
                 <MeguminButton icon={<ClipboardCopy size="0.75rem" />} onClick={() => void copy()}>
                   {t("megumin.settings.bgLog.copy")}
@@ -360,8 +410,8 @@ function BackgroundLog({ chatId, jobs }: { chatId: string; jobs: Array<{ id: str
               </MeguminRow>
               <pre
                 className={cn(
-                  "max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-[var(--background)]/60 p-2",
-                  "font-mono text-[0.625rem] leading-relaxed text-[var(--foreground)]",
+                  "max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[var(--background)]/60 p-3",
+                  "font-mono text-xs leading-relaxed text-[var(--foreground)]",
                 )}
               >
                 {text}

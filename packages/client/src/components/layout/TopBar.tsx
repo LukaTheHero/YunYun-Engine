@@ -54,6 +54,7 @@ import {
   PersonalExtensionTopbarButtons,
 } from "./PersonalExtensionContributionsMenu";
 import { MeguminPowerSwitch } from "../megumin/MeguminPowerSwitch";
+import { useMeguminWindowStore } from "../../stores/megumin-window.store";
 
 // English source text for `localize()` - the lookup matches on the literal string, not the key.
 const MARI_EDGE_GLOW_LABEL: Record<Exclude<MariEdgeGlow, null>, string> = {
@@ -134,6 +135,8 @@ export function TopBar({ mobileTopbarNavigation }: { mobileTopbarNavigation: boo
   const closeRightPanel = useUIStore((s) => s.closeRightPanel);
   const rightPanel = useUIStore((s) => s.rightPanel);
   const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
+  const meguminWindowOpen = useMeguminWindowStore((s) => s.open);
+  const setMeguminWindowOpen = useMeguminWindowStore((s) => s.setOpen);
   const activeChatId = useChatStore((s) => s.activeChatId);
   const setActiveChatId = useChatStore((s) => s.setActiveChatId);
   const closeAllDetails = useUIStore((s) => s.closeAllDetails);
@@ -504,8 +507,8 @@ export function TopBar({ mobileTopbarNavigation }: { mobileTopbarNavigation: boo
         <div className="mr-1 flex shrink-0 items-center max-sm:mr-0.5">
           <MeguminPowerSwitch
             size="compact"
-            onOpenPanel={() => handleRightPanelClick("megumin")}
-            panelOpen={rightPanelOpen && rightPanel === "megumin"}
+            onOpenPanel={() => setMeguminWindowOpen(!meguminWindowOpen)}
+            panelOpen={meguminWindowOpen}
           />
         </div>
         <button

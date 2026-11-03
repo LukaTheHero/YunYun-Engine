@@ -21,6 +21,7 @@ import {
   Dice5,
   Feather,
   IdCard,
+  Image as ImageIcon,
   Lock,
   LockOpen,
   MessageSquareText,
@@ -44,12 +45,15 @@ import {
   useTestImageGeneration,
 } from "../../../hooks/use-connections";
 import { useUIStore } from "../../../stores/ui.store";
+import { closeMeguminWindow } from "../../../lib/megumin-tab-request";
 import { Modal } from "../../ui/Modal";
 import { SettingsSwitch } from "../../panels/settings/SettingControls";
 import { useMeguminPanel } from "../megumin-panel-context";
 import {
   MEGUMIN_INPUT_CLASS,
   MeguminButton,
+  MeguminFeatureBar,
+  MeguminGrid,
   MeguminHint,
   MeguminNeedsChat,
   MeguminNumber,
@@ -62,6 +66,7 @@ import {
   type MeguminOption,
 } from "../MeguminControls";
 import { MeguminPromptOverrides } from "./MeguminPromptOverrides";
+import { Callout, SummaryChip } from "./presetControls";
 import type { MeguminProfile } from "../../../hooks/use-megumin";
 
 type ImageSettings = Record<string, any>;
@@ -275,25 +280,35 @@ function Tiles<T extends string>({
   onPick: (o: T) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-1.5" role="radiogroup">
-      {options.map((o) => (
-        <button
-          key={o}
-          type="button"
-          role="radio"
-          aria-checked={value === o}
-          aria-pressed={value === o}
-          onClick={() => onPick(o)}
-          className="mari-chrome-control mari-chrome-control--card flex flex-col items-start gap-0.5 text-left text-xs"
-        >
-          <b className="font-medium">{label(o)}</b>
-          {desc ? (
-            <span className="text-[0.625rem] leading-snug text-[var(--marinara-chat-chrome-panel-muted)]">
-              {desc(o)}
-            </span>
-          ) : null}
-        </button>
-      ))}
+    <div className="@container">
+      <div
+        className={cn(
+          "grid gap-2",
+          options.length >= 4
+            ? "grid-cols-1 @sm:grid-cols-2 @3xl:grid-cols-4"
+            : options.length === 3
+              ? "grid-cols-1 @md:grid-cols-3"
+              : "grid-cols-1 @sm:grid-cols-2",
+        )}
+        role="radiogroup"
+      >
+        {options.map((o) => (
+          <button
+            key={o}
+            type="button"
+            role="radio"
+            aria-checked={value === o}
+            aria-pressed={value === o}
+            onClick={() => onPick(o)}
+            className="mari-chrome-control mari-chrome-control--card flex min-h-16 flex-col items-start gap-1 text-left text-[0.8125rem]"
+          >
+            <b className="font-semibold">{label(o)}</b>
+            {desc ? (
+              <span className="text-xs leading-snug text-[var(--marinara-chat-chrome-panel-muted)]">{desc(o)}</span>
+            ) : null}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -310,7 +325,10 @@ function Segmented<T extends string | number>({
   onPick: (o: T) => void;
 }) {
   return (
-    <div className="inline-flex flex-wrap overflow-hidden rounded-md border border-[var(--border)]" role="radiogroup">
+    <div
+      className="inline-flex max-w-full flex-wrap gap-1 self-start rounded-lg bg-[var(--background)]/50 p-1 ring-1 ring-[var(--border)]/60"
+      role="radiogroup"
+    >
       {options.map((o) => (
         <button
           key={String(o)}
@@ -319,10 +337,10 @@ function Segmented<T extends string | number>({
           aria-checked={String(value) === String(o)}
           onClick={() => onPick(o)}
           className={cn(
-            "px-2.5 py-1 text-[0.6875rem] transition-colors",
+            "min-h-8 min-w-9 rounded-md px-3 py-1.5 text-[0.8125rem] transition-colors",
             String(value) === String(o)
-              ? "bg-[var(--primary)]/20 font-semibold text-[var(--foreground)]"
-              : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]",
+              ? "bg-[var(--primary)]/20 font-semibold text-[var(--foreground)] ring-1 ring-[var(--primary)]/45"
+              : "text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]",
           )}
         >
           {label(o)}
@@ -334,11 +352,11 @@ function Segmented<T extends string | number>({
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">
         {label}
         {hint ? (
-          <small className="ml-1 font-normal text-[var(--marinara-chat-chrome-panel-muted)]">{hint}</small>
+          <small className="ml-1.5 text-xs font-normal text-[var(--marinara-chat-chrome-panel-muted)]">{hint}</small>
         ) : null}
       </div>
       {children}
@@ -360,11 +378,16 @@ function SwitchRow({
   onChange: (on: boolean) => void;
 }) {
   return (
-    <div className={cn("flex items-start gap-2 rounded-lg p-1.5", disabled && "opacity-55")}>
+    <div
+      className={cn(
+        "flex h-full min-w-0 items-start gap-3 rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/30 px-3.5 py-3",
+        disabled && "opacity-55",
+      )}
+    >
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium">{label}</div>
+        <div className="text-[0.8125rem] font-medium text-[var(--marinara-chat-chrome-panel-title)]">{label}</div>
         {desc ? (
-          <p className="text-[0.625rem] leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{desc}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-[var(--marinara-chat-chrome-panel-muted)]">{desc}</p>
         ) : null}
       </div>
       <SettingsSwitch ariaLabel={label} checked={checked} disabled={disabled} onChange={onChange} />
@@ -406,20 +429,23 @@ function ListInput({
   );
 }
 
+/** A square icon button that sits beside a text box at the box's height. */
+const ICON_BUTTON_CLASS = "mari-chrome-control mari-chrome-control--small h-[2.375rem] w-[2.375rem] shrink-0";
+
 function Fold({ label, children, defaultOpen = false }: { label: string; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1 self-start text-[0.6875rem] font-medium text-[var(--marinara-chat-chrome-panel-title)] hover:underline"
+        className="inline-flex min-h-8 items-center gap-1.5 self-start text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)] hover:underline"
       >
-        {open ? <ChevronDown size="0.75rem" /> : <ChevronRight size="0.75rem" />}
+        {open ? <ChevronDown size="0.875rem" /> : <ChevronRight size="0.875rem" />}
         {label}
       </button>
-      {open ? <div className="flex flex-col gap-2">{children}</div> : null}
+      {open ? <div className="flex flex-col gap-3">{children}</div> : null}
     </div>
   );
 }
@@ -499,66 +525,53 @@ export function ImagesTab() {
   };
 
   return (
-    <>
-      <div
-        className={cn(
-          "flex items-center justify-between gap-3 rounded-lg p-2.5 ring-1",
-          s.enabled ? "bg-cyan-500/10 ring-cyan-500/40" : "bg-[var(--background)]/40 ring-[var(--border)]",
-        )}
-      >
-        <span className="text-xs font-semibold">
-          {s.enabled ? t("megumin.images.master.on") : t("megumin.images.master.off")}
-        </span>
-        <SettingsSwitch
-          ariaLabel={t("megumin.images.master.aria")}
-          checked={!!s.enabled}
-          onChange={(on) => edit((ig) => (ig.enabled = on))}
-        />
-      </div>
+    <div className="flex flex-col gap-4">
+      <MeguminFeatureBar
+        ariaLabel={t("megumin.images.master.aria")}
+        icon={<ImageIcon size="0.9375rem" className="text-cyan-500" />}
+        title={s.enabled ? t("megumin.images.master.on") : t("megumin.images.master.off")}
+        checked={!!s.enabled}
+        onChange={(on) => edit((ig) => (ig.enabled = on))}
+      />
 
       <MeguminSection title={t("megumin.images.version.title")}>
-        <Segmented
-          options={["classic", "v2"] as const}
-          value={engine}
-          label={(o) => t(`megumin.images.version.${o}`)}
-          onPick={(o) => void pickEngine(o)}
-        />
-        <div className="flex flex-wrap gap-1">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.5625rem] font-medium",
-              connection
-                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-            )}
-          >
-            <span className={cn("h-1.5 w-1.5 rounded-full", connection ? "bg-emerald-500" : "bg-amber-500")} />
-            {connection
-              ? t("megumin.images.chip.connection", { name: connection.name })
-              : t("megumin.images.chip.noConnection")}
-          </span>
-          <button
-            type="button"
-            title={t("megumin.images.chip.chomusukeTitle")}
-            onClick={() => openTab("chomusuke")}
-            className="inline-flex items-center gap-1 rounded-full bg-[var(--background)]/60 px-2 py-0.5 text-[0.5625rem] font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-          >
-            {viaChomusuke ? <Cat size="0.5625rem" /> : <Feather size="0.5625rem" />}
-            {viaChomusuke ? t("megumin.images.chip.byChomusuke") : t("megumin.images.chip.byStory")}
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Segmented
+            options={["classic", "v2"] as const}
+            value={engine}
+            label={(o) => t(`megumin.images.version.${o}`)}
+            onPick={(o) => void pickEngine(o)}
+          />
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <SummaryChip
+              tone={connection ? "ok" : "warm"}
+              icon={<span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />}
+            >
+              {connection
+                ? t("megumin.images.chip.connection", { name: connection.name })
+                : t("megumin.images.chip.noConnection")}
+            </SummaryChip>
+            <button
+              type="button"
+              title={t("megumin.images.chip.chomusukeTitle")}
+              onClick={() => openTab("chomusuke")}
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-[var(--background)]/40 px-2.5 py-1 text-xs text-[var(--muted-foreground)] ring-1 ring-[var(--border)]/60 transition-colors hover:text-[var(--foreground)] hover:ring-[var(--border)]"
+            >
+              {viaChomusuke ? <Cat size="0.75rem" /> : <Feather size="0.75rem" />}
+              {viaChomusuke ? t("megumin.images.chip.byChomusuke") : t("megumin.images.chip.byStory")}
+            </button>
+          </div>
         </div>
         <MeguminHint>{t(`megumin.images.version.${engine}Desc`)}</MeguminHint>
         {v2Inactive ? (
-          <div className="flex flex-col gap-1.5 rounded-md bg-[var(--destructive)]/10 p-2 text-[0.625rem] text-[var(--destructive)]">
-            <span className="inline-flex items-start gap-1">
-              <TriangleAlert size="0.6875rem" className="mt-px shrink-0" />
-              <span>
-                <b>{t("megumin.images.v2.needsWorld")}</b> {t("megumin.images.v2.needsWorldDesc")}
+          <Callout tone="red" icon={<TriangleAlert size="0.9375rem" className="text-[var(--destructive)]" />}>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="min-w-0 flex-[1_1_16rem]">
+                <b className="font-semibold text-[var(--foreground)]">{t("megumin.images.v2.needsWorld")}</b>{" "}
+                {t("megumin.images.v2.needsWorldDesc")}
               </span>
-            </span>
-            <div>
               <MeguminButton
-                icon={<Pin size="0.6875rem" />}
+                icon={<Pin size="0.75rem" />}
                 onClick={() => {
                   if (enableWorldState()) toast.success(t("megumin.images.v2.worldOn"));
                 }}
@@ -566,26 +579,24 @@ export function ImagesTab() {
                 {t("megumin.images.v2.turnOnWorld")}
               </MeguminButton>
             </div>
-          </div>
+          </Callout>
         ) : null}
         {connectionsQuery.isSuccess && !imageConnections.length ? (
-          <div className="flex flex-col gap-1.5 rounded-md bg-[var(--background)]/50 p-2 text-[0.625rem] text-[var(--marinara-chat-chrome-panel-muted)]">
-            <span className="inline-flex items-start gap-1">
-              <Plug size="0.6875rem" className="mt-px shrink-0" />
-              <span>
-                <b>{t("megumin.images.notConnected.title")}</b> {t("megumin.images.notConnected.desc")}
+          <Callout tone="muted" icon={<Plug size="0.9375rem" className="text-[var(--muted-foreground)]" />}>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="min-w-0 flex-[1_1_16rem]">
+                <b className="font-semibold text-[var(--foreground)]">{t("megumin.images.notConnected.title")}</b>{" "}
+                {t("megumin.images.notConnected.desc")}
               </span>
-            </span>
-            <div>
               <MeguminButton onClick={() => setPage("gen")}>
                 {t("megumin.images.notConnected.openGenerator")}
               </MeguminButton>
             </div>
-          </div>
+          </Callout>
         ) : null}
-        <div className="flex flex-col gap-1 border-t border-[var(--border)]/50 pt-2">
+        <div className="flex flex-col gap-2 border-t border-[var(--border)]/50 pt-3">
           <Field label={t("megumin.images.now.title")} hint={t("megumin.images.now.hint")}>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-stretch gap-2 @3xl:max-w-3xl">
               <input
                 className={MEGUMIN_INPUT_CLASS}
                 value={extra}
@@ -594,7 +605,7 @@ export function ImagesTab() {
               />
               <MeguminButton
                 variant="primary"
-                icon={<WandSparkles size="0.75rem" />}
+                icon={<WandSparkles size="0.8125rem" />}
                 disabled={!chatId || !s.enabled}
                 pending={running("image.generate")}
                 onClick={() => void generateNow()}
@@ -611,7 +622,7 @@ export function ImagesTab() {
         </div>
       </MeguminSection>
 
-      <div className="flex gap-1" role="tablist">
+      <div className="flex gap-1 border-b border-[var(--border)]/60" role="tablist">
         {pages.map((p) => {
           const PageIcon = p === "chars" ? Users : p === "when" ? WandSparkles : SlidersHorizontal;
           return (
@@ -622,14 +633,14 @@ export function ImagesTab() {
               aria-selected={current === p}
               onClick={() => setPage(p)}
               className={cn(
-                "inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[0.6875rem] transition-colors",
+                "-mb-px inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 border-b-2 px-1 py-2 text-[0.8125rem] transition-colors @sm:gap-1.5 @sm:px-2 @xl:flex-none @xl:px-4",
                 current === p
-                  ? "bg-[var(--primary)]/15 font-semibold ring-1 ring-[var(--primary)]/40"
-                  : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]",
+                  ? "border-[var(--primary)] font-semibold text-[var(--foreground)]"
+                  : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]",
               )}
             >
-              <PageIcon size="0.75rem" />
-              {t(`megumin.images.page.${p}`)}
+              <PageIcon size="0.875rem" className="shrink-0" />
+              <span className="truncate">{t(`megumin.images.page.${p}`)}</span>
             </button>
           );
         })}
@@ -637,7 +648,7 @@ export function ImagesTab() {
 
       {current === "chars" ? <CharactersPage /> : current === "when" ? <WhenHowPage engine={engine} /> : null}
       {current === "gen" ? <GeneratorPage connections={imageConnections} /> : null}
-    </>
+    </div>
   );
 }
 
@@ -656,123 +667,131 @@ function WhenHowPage({ engine }: { engine: "v2" | "classic" }) {
 
   return (
     <>
-      <MeguminSection title={t("megumin.images.when.title")}>
-        <Tiles
-          options={WHEN}
-          value={triggerMode}
-          label={(o) => t(`megumin.images.when.${o}`)}
-          desc={(o) => t(`megumin.images.when.${o}Desc`)}
-          onPick={(o) => edit((ig) => (ig.triggerMode = o))}
-        />
-        {triggerMode === "frequency" ? (
-          <MeguminNumber
-            label={t("megumin.images.when.freq")}
-            value={Number(s.autoGenFreq) || 1}
-            min={1}
-            onChange={(v) => edit((ig) => (ig.autoGenFreq = v >= 1 ? Math.trunc(v) : 1))}
+      <MeguminGrid layout="sections" className="items-stretch">
+        <MeguminSection title={t("megumin.images.when.title")}>
+          <Tiles
+            options={WHEN}
+            value={triggerMode}
+            label={(o) => t(`megumin.images.when.${o}`)}
+            desc={(o) => t(`megumin.images.when.${o}Desc`)}
+            onPick={(o) => edit((ig) => (ig.triggerMode = o))}
           />
-        ) : null}
-      </MeguminSection>
+          {triggerMode === "frequency" ? (
+            <div className="@sm:max-w-xs">
+              <MeguminNumber
+                label={t("megumin.images.when.freq")}
+                value={Number(s.autoGenFreq) || 1}
+                min={1}
+                onChange={(v) => edit((ig) => (ig.autoGenFreq = v >= 1 ? Math.trunc(v) : 1))}
+              />
+            </div>
+          ) : null}
+        </MeguminSection>
 
-      <MeguminSection title={t("megumin.images.where.title")}>
-        <Tiles
-          options={WHERE}
-          value={injectMode}
-          label={(o) => t(`megumin.images.where.${camel(o)}`)}
-          desc={(o) => t(`megumin.images.where.${camel(o)}Desc`)}
-          onPick={(o) => edit((ig) => (ig.injectMode = o))}
-        />
-        <div className="flex flex-wrap gap-3">
-          {injectMode === "inline" ? (
-            <Field label={t("megumin.images.where.place")} hint={t("megumin.images.where.placeHint")}>
+        <MeguminSection title={t("megumin.images.where.title")}>
+          <Tiles
+            options={WHERE}
+            value={injectMode}
+            label={(o) => t(`megumin.images.where.${camel(o)}`)}
+            desc={(o) => t(`megumin.images.where.${camel(o)}Desc`)}
+            onPick={(o) => edit((ig) => (ig.injectMode = o))}
+          />
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            {injectMode === "inline" ? (
+              <Field label={t("megumin.images.where.place")} hint={t("megumin.images.where.placeHint")}>
+                <Segmented
+                  options={["end", "random"] as const}
+                  value={s.autoPlacement === "random" ? "random" : "end"}
+                  label={(o) =>
+                    t(o === "random" ? "megumin.images.where.placeRandom" : "megumin.images.where.placeEnd")
+                  }
+                  onPick={(o) => edit((ig) => (ig.autoPlacement = o))}
+                />
+              </Field>
+            ) : null}
+            <Field label={t("megumin.images.where.count")}>
               <Segmented
-                options={["end", "random"] as const}
-                value={s.autoPlacement === "random" ? "random" : "end"}
-                label={(o) => t(o === "random" ? "megumin.images.where.placeRandom" : "megumin.images.where.placeEnd")}
-                onPick={(o) => edit((ig) => (ig.autoPlacement = o))}
+                options={COUNTS}
+                value={(Number(s.imageCount) || 1) as (typeof COUNTS)[number]}
+                label={(o) => String(o)}
+                onPick={(o) => edit((ig) => (ig.imageCount = o))}
               />
             </Field>
-          ) : null}
-          <Field label={t("megumin.images.where.count")}>
-            <Segmented
-              options={COUNTS}
-              value={(Number(s.imageCount) || 1) as (typeof COUNTS)[number]}
-              label={(o) => String(o)}
-              onPick={(o) => edit((ig) => (ig.imageCount = o))}
-            />
-          </Field>
-        </div>
-      </MeguminSection>
+          </div>
+        </MeguminSection>
+      </MeguminGrid>
 
       <MeguminSection title={t("megumin.images.look.title")}>
-        {engine === "v2" ? (
-          <>
-            <Field label={t("megumin.images.look.shot")}>
-              <Tiles
-                options={SHOTS}
-                value={String(v2.shot || "cinematic")}
-                label={(o) => t(`megumin.images.shot.${o}`)}
-                desc={(o) => t(`megumin.images.shot.${o}Desc`)}
-                onPick={(o) => setV2({ shot: o })}
+        <MeguminGrid layout="fields" className="items-stretch gap-x-5 gap-y-4">
+          {engine === "v2" ? (
+            <>
+              <Field label={t("megumin.images.look.shot")}>
+                <Tiles
+                  options={SHOTS}
+                  value={String(v2.shot || "cinematic")}
+                  label={(o) => t(`megumin.images.shot.${o}`)}
+                  desc={(o) => t(`megumin.images.shot.${o}Desc`)}
+                  onPick={(o) => setV2({ shot: o })}
+                />
+              </Field>
+              <Field label={t("megumin.images.look.style")} hint={t("megumin.images.look.styleHint")}>
+                <Tiles
+                  options={STYLES}
+                  value={String(v2.style || "tags")}
+                  label={(o) => t(`megumin.images.style.${o}`)}
+                  desc={(o) => t(`megumin.images.style.${o}Desc`)}
+                  onPick={(o) =>
+                    edit((ig) => {
+                      ig.v2 = { ...(catalog.images?.v2Defaults ?? {}), ...(ig.v2 ?? {}), style: o };
+                      ig.promptPrefix = prefixForStyle(o, ig.promptPrefix);
+                    })
+                  }
+                />
+              </Field>
+              <MeguminText
+                label={t("megumin.images.look.extra")}
+                help={t("megumin.images.look.extraHint")}
+                placeholder={t("megumin.images.look.extraPlaceholderV2")}
+                value={String(v2.extra || "")}
+                onChange={(v) => setV2({ extra: v })}
               />
-            </Field>
-            <Field label={t("megumin.images.look.style")} hint={t("megumin.images.look.styleHint")}>
-              <Tiles
-                options={STYLES}
-                value={String(v2.style || "tags")}
-                label={(o) => t(`megumin.images.style.${o}`)}
-                desc={(o) => t(`megumin.images.style.${o}Desc`)}
-                onPick={(o) =>
+            </>
+          ) : (
+            <>
+              <MeguminSelect
+                label={t("megumin.images.look.template")}
+                help={t("megumin.images.look.templateHint")}
+                value={String(s.promptTemplate || "illus_cinematic")}
+                options={TEMPLATES.map((id) => ({ value: id, label: t(`megumin.images.template.${camel(id)}`) }))}
+                onChange={(v) =>
                   edit((ig) => {
-                    ig.v2 = { ...(catalog.images?.v2Defaults ?? {}), ...(ig.v2 ?? {}), style: o };
-                    ig.promptPrefix = prefixForStyle(o, ig.promptPrefix);
+                    ig.promptTemplate = v;
+                    ig.promptPrefix = prefixForStyle(styleOfTemplate(v), ig.promptPrefix);
                   })
                 }
               />
-            </Field>
-            <MeguminText
-              label={t("megumin.images.look.extra")}
-              help={t("megumin.images.look.extraHint")}
-              placeholder={t("megumin.images.look.extraPlaceholderV2")}
-              value={String(v2.extra || "")}
-              onChange={(v) => setV2({ extra: v })}
-            />
-          </>
-        ) : (
-          <>
-            <MeguminSelect
-              label={t("megumin.images.look.template")}
-              help={t("megumin.images.look.templateHint")}
-              value={String(s.promptTemplate || "illus_cinematic")}
-              options={TEMPLATES.map((id) => ({ value: id, label: t(`megumin.images.template.${camel(id)}`) }))}
-              onChange={(v) =>
-                edit((ig) => {
-                  ig.promptTemplate = v;
-                  ig.promptPrefix = prefixForStyle(styleOfTemplate(v), ig.promptPrefix);
-                })
-              }
-            />
-            <MeguminText
-              label={t("megumin.images.look.extra")}
-              help={t("megumin.images.look.extraHint")}
-              placeholder={t("megumin.images.look.extraPlaceholderClassic")}
-              value={String(s.promptExtra || "")}
-              onChange={(v) => edit((ig) => (ig.promptExtra = v))}
-            />
-          </>
-        )}
-        <SwitchRow
-          label={t("megumin.images.look.preview")}
-          desc={t("megumin.images.look.previewDesc")}
-          checked={!!s.previewPrompt}
-          onChange={(on) => edit((ig) => (ig.previewPrompt = on))}
-        />
+              <MeguminText
+                label={t("megumin.images.look.extra")}
+                help={t("megumin.images.look.extraHint")}
+                placeholder={t("megumin.images.look.extraPlaceholderClassic")}
+                value={String(s.promptExtra || "")}
+                onChange={(v) => edit((ig) => (ig.promptExtra = v))}
+              />
+            </>
+          )}
+          <SwitchRow
+            label={t("megumin.images.look.preview")}
+            desc={t("megumin.images.look.previewDesc")}
+            checked={!!s.previewPrompt}
+            onChange={(on) => edit((ig) => (ig.previewPrompt = on))}
+          />
+        </MeguminGrid>
       </MeguminSection>
 
       <MeguminSection title={t("megumin.images.advanced.title")}>
         <Fold label={t("megumin.images.advanced.fold")}>
           {engine === "v2" ? (
-            <>
+            <MeguminGrid layout="fields" className="items-stretch gap-x-5 gap-y-4">
               <Field label={t("megumin.images.v2adv.focus")} hint={t("megumin.images.v2adv.focusHint")}>
                 <Segmented
                   options={FOCUS}
@@ -818,27 +837,29 @@ function WhenHowPage({ engine }: { engine: "v2" | "classic" }) {
                   onChange={(v) => setV2({ lookPriority: v })}
                 />
               ) : null}
-            </>
+            </MeguminGrid>
           ) : (
             <>
-              <SwitchRow
-                label={t("megumin.images.classic.examples")}
-                desc={t("megumin.images.classic.examplesDesc")}
-                checked={!!s.includeExamples}
-                onChange={(on) => edit((ig) => (ig.includeExamples = on))}
-              />
-              <SwitchRow
-                label={t("megumin.images.classic.booru")}
-                desc={t("megumin.images.classic.booruDesc")}
-                checked={!!s.directLanguage}
-                onChange={(on) => edit((ig) => (ig.directLanguage = on))}
-              />
-              <SwitchRow
-                label={t("megumin.images.classic.npcTags")}
-                desc={t("megumin.images.classic.npcTagsDesc")}
-                checked={!!s.injectNpcTags}
-                onChange={(on) => edit((ig) => (ig.injectNpcTags = on))}
-              />
+              <MeguminGrid layout="cards" className="items-stretch">
+                <SwitchRow
+                  label={t("megumin.images.classic.examples")}
+                  desc={t("megumin.images.classic.examplesDesc")}
+                  checked={!!s.includeExamples}
+                  onChange={(on) => edit((ig) => (ig.includeExamples = on))}
+                />
+                <SwitchRow
+                  label={t("megumin.images.classic.booru")}
+                  desc={t("megumin.images.classic.booruDesc")}
+                  checked={!!s.directLanguage}
+                  onChange={(on) => edit((ig) => (ig.directLanguage = on))}
+                />
+                <SwitchRow
+                  label={t("megumin.images.classic.npcTags")}
+                  desc={t("megumin.images.classic.npcTagsDesc")}
+                  checked={!!s.injectNpcTags}
+                  onChange={(on) => edit((ig) => (ig.injectNpcTags = on))}
+                />
+              </MeguminGrid>
               <MeguminPromptOverrides
                 module="imageGen"
                 title={t("megumin.images.prompts.title")}
@@ -969,12 +990,20 @@ function GeneratorPage({ connections }: { connections: Array<{ id: string; name:
         title={t("megumin.images.gen.connectionTitle")}
         description={t("megumin.images.gen.connectionSub")}
       >
-        <div className="flex items-end gap-1.5">
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-stretch gap-2">
+          <div className="min-w-0 flex-[1_1_16rem] @2xl:max-w-md">
             <MeguminSelect value={chosen} options={connectionOptions} onChange={pickConnection} />
           </div>
-          <MeguminButton icon={<Plug size="0.75rem" />} pending={testImage.isPending} onClick={test}>
+          <MeguminButton icon={<Plug size="0.8125rem" />} pending={testImage.isPending} onClick={test}>
             {t("megumin.images.gen.test")}
+          </MeguminButton>
+          <MeguminButton
+            onClick={() => {
+              closeMeguminWindow();
+              openRightPanel("connections");
+            }}
+          >
+            {t("megumin.images.gen.openConnections")}
           </MeguminButton>
         </div>
         {chosen && !connections.some((c) => c.id === chosen) ? (
@@ -984,93 +1013,106 @@ function GeneratorPage({ connections }: { connections: Array<{ id: string; name:
         {testResult ? (
           <div
             className={cn(
-              "flex flex-col gap-1 text-[0.625rem]",
+              "flex flex-col gap-2 text-xs leading-relaxed",
               testResult.ok ? "text-emerald-500" : "text-[var(--destructive)]",
             )}
           >
             <span>{testResult.text}</span>
-            {testResult.image ? <img src={testResult.image} alt="" className="max-h-40 self-start rounded-md" /> : null}
+            {testResult.image ? (
+              <img
+                src={testResult.image}
+                alt=""
+                className="max-h-56 max-w-full self-start rounded-lg ring-1 ring-[var(--border)]/60"
+              />
+            ) : null}
           </div>
         ) : null}
-        <MeguminRow>
-          <MeguminButton onClick={() => openRightPanel("connections")}>
-            {t("megumin.images.gen.openConnections")}
-          </MeguminButton>
-        </MeguminRow>
-        <Fold label={t("megumin.images.gen.placeholdersFold")}>
-          <MeguminHint>{t("megumin.images.gen.placeholdersIntro")}</MeguminHint>
-          <div className="flex flex-col gap-0.5">
-            {placeholders.map((p) => (
-              <div key={p.key} className="flex items-baseline justify-between gap-2 text-[0.625rem]">
-                <code className="font-mono text-[0.5625rem]">{p.key}</code>
-                <span className="text-right text-[var(--marinara-chat-chrome-panel-muted)]">{p.desc}</span>
-              </div>
-            ))}
-          </div>
-          <MeguminHint>{t("megumin.images.gen.placeholdersFilled", { list: MEGUMIN_FILLED.join(", ") })}</MeguminHint>
-        </Fold>
+        <div className="border-t border-[var(--border)]/50 pt-3">
+          <Fold label={t("megumin.images.gen.placeholdersFold")}>
+            <MeguminHint>{t("megumin.images.gen.placeholdersIntro")}</MeguminHint>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-1.5 @2xl:grid-cols-2">
+              {placeholders.map((p) => (
+                <div key={p.key} className="flex min-w-0 items-baseline gap-3 text-xs">
+                  <code className="shrink-0 rounded bg-[var(--secondary)]/70 px-1.5 py-0.5 font-mono text-[0.6875rem] text-[var(--foreground)]">
+                    {p.key}
+                  </code>
+                  <span className="min-w-0 text-[var(--marinara-chat-chrome-panel-muted)]">{p.desc}</span>
+                </div>
+              ))}
+            </div>
+            <MeguminHint>{t("megumin.images.gen.placeholdersFilled", { list: MEGUMIN_FILLED.join(", ") })}</MeguminHint>
+          </Fold>
+        </div>
       </MeguminSection>
 
       <MeguminSection title={t("megumin.images.gen.imageTitle")}>
-        <Field label={t("megumin.images.gen.model")} hint={t("megumin.images.gen.modelHint")}>
-          <div className="flex items-center gap-1.5">
-            <div className="min-w-0 flex-1">
-              <ListInput
-                listId="megumin-image-models"
-                value={String(s.selectedModel || "")}
-                options={modelNames}
-                placeholder={t("megumin.images.gen.noModel")}
-                onCommit={(v) => edit((ig) => (ig.selectedModel = v))}
-              />
+        <MeguminGrid layout="fields" className="items-end gap-x-5 gap-y-4">
+          <Field label={t("megumin.images.gen.model")} hint={t("megumin.images.gen.modelHint")}>
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <ListInput
+                  listId="megumin-image-models"
+                  value={String(s.selectedModel || "")}
+                  options={modelNames}
+                  placeholder={t("megumin.images.gen.noModel")}
+                  onCommit={(v) => edit((ig) => (ig.selectedModel = v))}
+                />
+              </div>
+              <button
+                type="button"
+                disabled={!effectiveId || refreshModels.isPending}
+                title={t("megumin.images.gen.refreshModels")}
+                aria-label={t("megumin.images.gen.refreshModels")}
+                onClick={() => effectiveId && refreshModels.mutate(effectiveId)}
+                className={ICON_BUTTON_CLASS}
+              >
+                <RefreshCw size="0.875rem" className={cn(refreshModels.isPending && "animate-spin")} />
+              </button>
             </div>
-            <button
-              type="button"
-              disabled={!effectiveId || refreshModels.isPending}
-              title={t("megumin.images.gen.refreshModels")}
-              aria-label={t("megumin.images.gen.refreshModels")}
-              onClick={() => effectiveId && refreshModels.mutate(effectiveId)}
-              className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
-            >
-              <RefreshCw size="0.75rem" className={cn(refreshModels.isPending && "animate-spin")} />
-            </button>
-          </div>
-        </Field>
-        <Field label={t("megumin.images.gen.size")} hint={t("megumin.images.gen.sizeHint")}>
-          <select
-            className={MEGUMIN_INPUT_CLASS}
-            value=""
-            onChange={(e) => {
-              const r = resolutions[Number(e.target.value)];
-              if (r)
-                edit((ig) => {
-                  ig.imgWidth = r.w;
-                  ig.imgHeight = r.h;
-                });
-            }}
-          >
-            <option value="">{t("megumin.images.gen.pickSize")}</option>
-            {resolutions.map((r, i) => (
-              <option key={r.label} value={i}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-1.5">
-            <MeguminNumber
-              value={num(s.imgWidth, 1024)}
-              min={64}
-              step={8}
-              onChange={(v) => edit((ig) => (ig.imgWidth = Math.trunc(v)))}
-            />
-            <span className="text-xs text-[var(--muted-foreground)]">×</span>
-            <MeguminNumber
-              value={num(s.imgHeight, 1024)}
-              min={64}
-              step={8}
-              onChange={(v) => edit((ig) => (ig.imgHeight = Math.trunc(v)))}
-            />
-          </div>
-        </Field>
+          </Field>
+          <Field label={t("megumin.images.gen.size")} hint={t("megumin.images.gen.sizeHint")}>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className={cn(MEGUMIN_INPUT_CLASS, "min-w-0 flex-[1_1_12rem]")}
+                value=""
+                onChange={(e) => {
+                  const r = resolutions[Number(e.target.value)];
+                  if (r)
+                    edit((ig) => {
+                      ig.imgWidth = r.w;
+                      ig.imgHeight = r.h;
+                    });
+                }}
+              >
+                <option value="">{t("megumin.images.gen.pickSize")}</option>
+                {resolutions.map((r, i) => (
+                  <option key={r.label} value={i}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <MeguminNumber
+                    value={num(s.imgWidth, 1024)}
+                    min={64}
+                    step={8}
+                    onChange={(v) => edit((ig) => (ig.imgWidth = Math.trunc(v)))}
+                  />
+                </div>
+                <span className="text-sm text-[var(--muted-foreground)]">×</span>
+                <div className="min-w-0 flex-1">
+                  <MeguminNumber
+                    value={num(s.imgHeight, 1024)}
+                    min={64}
+                    step={8}
+                    onChange={(v) => edit((ig) => (ig.imgHeight = Math.trunc(v)))}
+                  />
+                </div>
+              </div>
+            </div>
+          </Field>
+        </MeguminGrid>
         <SwitchRow
           label={t("megumin.images.gen.expert")}
           desc={t("megumin.images.gen.expertDesc")}
@@ -1078,82 +1120,88 @@ function GeneratorPage({ connections }: { connections: Array<{ id: string; name:
           onChange={(on) => edit((ig) => (ig.showExpert = on))}
         />
         {s.showExpert ? (
-          <div className="flex flex-col gap-2.5 border-t border-[var(--border)]/50 pt-2">
-            <Field label={t("megumin.images.gen.sampler")} hint={t("megumin.images.gen.comfyOnly")}>
-              <ListInput
-                listId="megumin-image-samplers"
-                value={String(s.selectedSampler || "")}
-                options={SAMPLERS}
-                placeholder={t("megumin.images.gen.defaultSampler")}
-                onCommit={(v) => edit((ig) => (ig.selectedSampler = v))}
-              />
-            </Field>
-            <MeguminNumber
-              slider
-              label={t("megumin.images.gen.steps")}
-              value={num(s.steps, 20)}
-              min={1}
-              max={100}
-              step={1}
-              onChange={(v) => edit((ig) => (ig.steps = Math.trunc(v)))}
-            />
-            <MeguminNumber
-              slider
-              label={t("megumin.images.gen.cfg")}
-              value={num(s.cfg, 7)}
-              min={1}
-              max={30}
-              step={0.5}
-              onChange={(v) => edit((ig) => (ig.cfg = v))}
-            />
-            <MeguminNumber
-              slider
-              label={t("megumin.images.gen.denoise")}
-              value={num(s.denoise, 0.5)}
-              min={0}
-              max={1}
-              step={0.05}
-              onChange={(v) => edit((ig) => (ig.denoise = v))}
-            />
-            <MeguminNumber
-              slider
-              label={t("megumin.images.gen.clipSkip")}
-              value={num(s.clipSkip, 1)}
-              min={1}
-              max={12}
-              step={1}
-              onChange={(v) => edit((ig) => (ig.clipSkip = Math.trunc(v)))}
-            />
-            <Field label={t("megumin.images.gen.seed")} hint={t("megumin.images.gen.seedHint")}>
-              <div className="flex items-center gap-1.5">
-                <MeguminNumber
-                  value={num(s.customSeed, -1)}
-                  onChange={(v) => edit((ig) => (ig.customSeed = Math.trunc(v)))}
+          <div className="flex flex-col gap-5 border-t border-[var(--border)]/50 pt-4">
+            <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 @lg:grid-cols-2 @3xl:grid-cols-3">
+              <Field label={t("megumin.images.gen.sampler")} hint={t("megumin.images.gen.comfyOnly")}>
+                <ListInput
+                  listId="megumin-image-samplers"
+                  value={String(s.selectedSampler || "")}
+                  options={SAMPLERS}
+                  placeholder={t("megumin.images.gen.defaultSampler")}
+                  onCommit={(v) => edit((ig) => (ig.selectedSampler = v))}
                 />
-                <button
-                  type="button"
-                  title={t("megumin.images.gen.seedRandom")}
-                  aria-label={t("megumin.images.gen.seedRandom")}
-                  onClick={() => edit((ig) => (ig.customSeed = -1))}
-                  className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
-                >
-                  <Dice5 size="0.75rem" />
-                </button>
-              </div>
-            </Field>
-            <MeguminText
-              label={t("megumin.images.gen.prefix")}
-              help={t("megumin.images.gen.prefixHint")}
-              placeholder={t("megumin.images.gen.prefixPlaceholder")}
-              value={String(s.promptPrefix || "")}
-              onChange={(v) => edit((ig) => (ig.promptPrefix = v))}
-            />
-            <MeguminText
-              label={t("megumin.images.gen.negative")}
-              help={t("megumin.images.gen.negativeHint")}
-              value={String(s.customNegative || "")}
-              onChange={(v) => edit((ig) => (ig.customNegative = v))}
-            />
+              </Field>
+              <MeguminNumber
+                slider
+                label={t("megumin.images.gen.steps")}
+                value={num(s.steps, 20)}
+                min={1}
+                max={100}
+                step={1}
+                onChange={(v) => edit((ig) => (ig.steps = Math.trunc(v)))}
+              />
+              <MeguminNumber
+                slider
+                label={t("megumin.images.gen.cfg")}
+                value={num(s.cfg, 7)}
+                min={1}
+                max={30}
+                step={0.5}
+                onChange={(v) => edit((ig) => (ig.cfg = v))}
+              />
+              <MeguminNumber
+                slider
+                label={t("megumin.images.gen.denoise")}
+                value={num(s.denoise, 0.5)}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v) => edit((ig) => (ig.denoise = v))}
+              />
+              <MeguminNumber
+                slider
+                label={t("megumin.images.gen.clipSkip")}
+                value={num(s.clipSkip, 1)}
+                min={1}
+                max={12}
+                step={1}
+                onChange={(v) => edit((ig) => (ig.clipSkip = Math.trunc(v)))}
+              />
+              <Field label={t("megumin.images.gen.seed")} hint={t("megumin.images.gen.seedHint")}>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <MeguminNumber
+                      value={num(s.customSeed, -1)}
+                      onChange={(v) => edit((ig) => (ig.customSeed = Math.trunc(v)))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    title={t("megumin.images.gen.seedRandom")}
+                    aria-label={t("megumin.images.gen.seedRandom")}
+                    onClick={() => edit((ig) => (ig.customSeed = -1))}
+                    className={ICON_BUTTON_CLASS}
+                  >
+                    <Dice5 size="0.875rem" />
+                  </button>
+                </div>
+              </Field>
+            </div>
+            <MeguminGrid layout="fields" className="gap-x-6 gap-y-4">
+              <MeguminText
+                label={t("megumin.images.gen.prefix")}
+                help={t("megumin.images.gen.prefixHint")}
+                placeholder={t("megumin.images.gen.prefixPlaceholder")}
+                value={String(s.promptPrefix || "")}
+                onChange={(v) => edit((ig) => (ig.promptPrefix = v))}
+              />
+              <MeguminText
+                label={t("megumin.images.gen.negative")}
+                help={t("megumin.images.gen.negativeHint")}
+                value={String(s.customNegative || "")}
+                onChange={(v) => edit((ig) => (ig.customNegative = v))}
+              />
+            </MeguminGrid>
             <Field label={t("megumin.images.gen.loras")} hint={t("megumin.images.gen.lorasHint")}>
               <div className="flex flex-col gap-2">
                 {LORA_SLOTS.map((i) => {
@@ -1161,7 +1209,10 @@ function GeneratorPage({ connections }: { connections: Array<{ id: string; name:
                   const wtKey = i === 1 ? "selectedLoraWt" : `selectedLoraWt${i}`;
                   const trigKey = i === 1 ? "loraTrigger1" : `loraTrigger${i}`;
                   return (
-                    <div key={i} className="flex flex-col gap-1 rounded-md border border-[var(--border)]/60 p-1.5">
+                    <div
+                      key={i}
+                      className="grid grid-cols-1 items-center gap-2 rounded-lg border border-[var(--border)]/60 bg-[var(--background)]/25 p-3 @2xl:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1.3fr)] @2xl:gap-3 @2xl:px-3 @2xl:py-2.5"
+                    >
                       <ListInput
                         listId="megumin-image-loras"
                         value={String(s[key] || "")}
@@ -1303,31 +1354,37 @@ function CharactersPage() {
         type="button"
         onClick={() => setEditing(m.name)}
         className={cn(
-          "flex flex-col items-start gap-1 rounded-lg border border-[var(--border)]/70 bg-[var(--background)]/40 p-2 text-left transition-colors hover:border-[var(--primary)]/50",
-          !inStory(m) && "opacity-70",
+          "flex h-full min-w-0 flex-col items-start gap-1.5 rounded-xl border border-[var(--border)]/70 bg-[var(--background)]/35 px-3.5 py-3 text-left transition-colors hover:border-[var(--primary)]/50 hover:bg-[var(--accent)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]",
+          !inStory(m) && "border-dashed opacity-70",
         )}
       >
-        <span className="flex w-full items-center justify-between gap-1.5">
-          <b className="min-w-0 truncate text-xs">{m.name}</b>
-          <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[0.5625rem]", whereClass(m))}>
+        <span className="flex w-full items-center justify-between gap-2">
+          <b className="min-w-0 truncate text-sm font-semibold text-[var(--marinara-chat-chrome-panel-title)]">
+            {m.name}
+          </b>
+          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-medium", whereClass(m))}>
             {t(`megumin.images.whereNow.${whereOf(m)}`)}
           </span>
         </span>
-        <span className="text-[0.625rem] leading-snug">
-          <em className="mr-1 not-italic text-[var(--muted-foreground)]">{t("megumin.images.chars.look")}</em>
+        <span className="text-xs leading-relaxed">
+          <em className="mr-1.5 font-medium not-italic text-[var(--muted-foreground)]">
+            {t("megumin.images.chars.look")}
+          </em>
           {lookText || <i className="text-[var(--muted-foreground)]">{t("megumin.images.chars.noneYet")}</i>}
         </span>
         {inStory(m) ? (
-          <span className="text-[0.625rem] leading-snug">
-            <em className="mr-1 not-italic text-[var(--muted-foreground)]">{t("megumin.images.chars.wearing")}</em>
+          <span className="text-xs leading-relaxed">
+            <em className="mr-1.5 font-medium not-italic text-[var(--muted-foreground)]">
+              {t("megumin.images.chars.wearing")}
+            </em>
             {m.outfitText || m.outfit || (
               <i className="text-[var(--muted-foreground)]">{t("megumin.images.chars.notInWorld")}</i>
             )}
           </span>
         ) : null}
         {stored?.locked ? (
-          <span className="inline-flex items-center gap-1 text-[0.5625rem] text-[var(--muted-foreground)]">
-            <Lock size="0.5625rem" />
+          <span className="mt-auto inline-flex items-center gap-1 pt-0.5 text-xs text-[var(--muted-foreground)]">
+            <Lock size="0.75rem" />
             {t("megumin.images.chars.locked")}
           </span>
         ) : null}
@@ -1341,7 +1398,7 @@ function CharactersPage() {
     <MeguminSection title={t("megumin.images.chars.title")} description={t("megumin.images.chars.sub")}>
       <MeguminRow>
         <MeguminButton
-          icon={<IdCard size="0.75rem" />}
+          icon={<IdCard size="0.8125rem" />}
           title={t("megumin.images.chars.readCardTitle")}
           pending={running("images.scanLooks")}
           onClick={() => void after("images.scanLooks", { from: "sheet" })}
@@ -1349,7 +1406,7 @@ function CharactersPage() {
           {t("megumin.images.chars.readCard")}
         </MeguminButton>
         <MeguminButton
-          icon={<MessageSquareText size="0.75rem" />}
+          icon={<MessageSquareText size="0.8125rem" />}
           title={t("megumin.images.chars.readChatTitle")}
           pending={running("images.scanLooks")}
           onClick={() => void readFromChat()}
@@ -1358,7 +1415,7 @@ function CharactersPage() {
         </MeguminButton>
         {v2.style === "natural" ? (
           <MeguminButton
-            icon={<Feather size="0.75rem" />}
+            icon={<Feather size="0.8125rem" />}
             title={t("megumin.images.chars.describeTitle")}
             pending={running("images.describeLooks")}
             onClick={() => void after("images.describeLooks")}
@@ -1366,7 +1423,7 @@ function CharactersPage() {
             {t("megumin.images.chars.describe")}
           </MeguminButton>
         ) : null}
-        <MeguminButton variant="primary" icon={<Plus size="0.75rem" />} onClick={() => void add()}>
+        <MeguminButton variant="primary" icon={<Plus size="0.8125rem" />} onClick={() => void add()}>
           {t("megumin.images.chars.add")}
         </MeguminButton>
         <button
@@ -1377,22 +1434,22 @@ function CharactersPage() {
           onClick={() => void load()}
           className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
         >
-          <RefreshCw size="0.75rem" className={cn(loading && "animate-spin")} />
+          <RefreshCw size="0.8125rem" className={cn(loading && "animate-spin")} />
         </button>
       </MeguminRow>
-      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+      <MeguminGrid layout="cards" className="items-stretch">
         {castNow.map(card)}
         {!castNow.length && !loading ? <MeguminHint>{t("megumin.images.chars.nobody")}</MeguminHint> : null}
-      </div>
+      </MeguminGrid>
       {castAway.length ? (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-3 border-t border-[var(--border)]/50 pt-3">
           <button
             type="button"
             aria-expanded={awayOpen}
             onClick={() => setAwayOpen(!awayOpen)}
-            className="inline-flex items-center gap-1 self-start text-[0.6875rem] font-medium hover:underline"
+            className="inline-flex min-h-8 items-center gap-1.5 self-start text-[0.8125rem] font-semibold text-[var(--marinara-chat-chrome-panel-title)] hover:underline"
           >
-            {awayOpen ? <ChevronDown size="0.75rem" /> : <ChevronRight size="0.75rem" />}
+            {awayOpen ? <ChevronDown size="0.875rem" /> : <ChevronRight size="0.875rem" />}
             {awayOpen
               ? t("megumin.images.chars.hideAway", { count: castAway.length })
               : t("megumin.images.chars.showAway", { count: castAway.length })}
@@ -1400,7 +1457,9 @@ function CharactersPage() {
           {awayOpen ? (
             <>
               <MeguminHint>{t("megumin.images.chars.awayNote")}</MeguminHint>
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">{castAway.map(card)}</div>
+              <MeguminGrid layout="cards" className="items-stretch">
+                {castAway.map(card)}
+              </MeguminGrid>
             </>
           ) : null}
         </div>
@@ -1501,8 +1560,8 @@ function LookEditor({
 
   return (
     <Modal open onClose={onClose} title={member.name} width="max-w-lg">
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-start justify-between gap-2 text-[0.6875rem] text-[var(--muted-foreground)]">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3 text-xs leading-relaxed text-[var(--muted-foreground)]">
           <span>
             {member.lookSource
               ? t("megumin.images.editor.writtenAsWithSource", {
@@ -1511,7 +1570,7 @@ function LookEditor({
                 })
               : t("megumin.images.editor.writtenAs", { name: member.name })}
           </span>
-          <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[0.5625rem]", whereClass(member))}>
+          <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-medium", whereClass(member))}>
             {t(`megumin.images.whereNow.${whereOf(member)}`)}
           </span>
         </div>
@@ -1574,7 +1633,7 @@ function LookEditor({
           />
         ) : null}
         <Field label={t("megumin.images.editor.wearing")} hint={t("megumin.images.editor.wearingHint")}>
-          <div className="rounded-md bg-[var(--background)]/50 px-2 py-1.5 text-[0.6875rem]">
+          <div className="rounded-lg border border-dashed border-[var(--border)]/70 bg-[var(--background)]/50 px-3 py-2 text-[0.8125rem] leading-relaxed">
             {member.outfitText || member.outfit || (
               <i className="text-[var(--muted-foreground)]">{t("megumin.images.editor.wearingNone")}</i>
             )}
@@ -1585,7 +1644,7 @@ function LookEditor({
             label={t("megumin.images.editor.outfitTags")}
             hint={member.outfitStale ? t("megumin.images.editor.outfitStale") : t("megumin.images.editor.outfitFresh")}
           >
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <MeguminText
                   value={member.outfitStale ? "" : member.outfit}
@@ -1614,16 +1673,18 @@ function LookEditor({
                   }
                   withLook((look) => (look.outfitTags = { ...cur, locked: !cur.locked }));
                 }}
-                className="mari-chrome-control mari-chrome-control--small mari-chrome-control--icon"
+                className={ICON_BUTTON_CLASS}
               >
-                {outfitLocked ? <Lock size="0.75rem" /> : <LockOpen size="0.75rem" />}
+                {outfitLocked ? <Lock size="0.875rem" /> : <LockOpen size="0.875rem" />}
               </button>
             </div>
           </Field>
         ) : null}
         {member.position ? (
           <Field label={t("megumin.images.editor.where")}>
-            <div className="rounded-md bg-[var(--background)]/50 px-2 py-1.5 text-[0.6875rem]">{member.position}</div>
+            <div className="rounded-lg border border-dashed border-[var(--border)]/70 bg-[var(--background)]/50 px-3 py-2 text-[0.8125rem] leading-relaxed">
+              {member.position}
+            </div>
           </Field>
         ) : null}
         <MeguminToggle
@@ -1635,7 +1696,7 @@ function LookEditor({
         <MeguminRow>
           {hasCard ? (
             <MeguminButton
-              icon={<IdCard size="0.75rem" />}
+              icon={<IdCard size="0.8125rem" />}
               title={t("megumin.images.editor.rescanCardTitle")}
               pending={running("images.scanLooks")}
               onClick={() => void onRescan("sheet")}
@@ -1644,19 +1705,19 @@ function LookEditor({
             </MeguminButton>
           ) : null}
           <MeguminButton
-            icon={<ScanSearch size="0.75rem" />}
+            icon={<ScanSearch size="0.8125rem" />}
             pending={running("images.scanLooks")}
             onClick={() => void onRescan("chat")}
           >
             {t("megumin.images.editor.rescanChat")}
           </MeguminButton>
           {stored ? (
-            <MeguminButton variant="danger" icon={<Trash2 size="0.75rem" />} onClick={forget}>
+            <MeguminButton variant="danger" icon={<Trash2 size="0.8125rem" />} onClick={forget}>
               {armed ? t("megumin.images.editor.deleteArmed") : t("megumin.images.editor.delete")}
             </MeguminButton>
           ) : null}
         </MeguminRow>
-        <MeguminRow className="justify-end">
+        <MeguminRow className="justify-end border-t border-[var(--border)]/50 pt-3">
           <MeguminButton variant="primary" onClick={onClose}>
             {t("megumin.images.editor.done")}
           </MeguminButton>

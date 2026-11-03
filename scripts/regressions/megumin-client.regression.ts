@@ -85,3 +85,25 @@ assert.equal(profile.worldState, nested);
 assert.deepEqual(profile.worldState, { enabled: false, mode: "update" });
 
 console.log("megumin-client profile patch cases passed");
+
+// ── The Megumin Suite window: an "open on this tab" request opens it and lands on the tab ──
+// A card's "Open in NPC Bank" asks before the window may exist; the request waits until the window takes it.
+const fakeWindow = new EventTarget();
+Object.assign(globalThis, { window: fakeWindow });
+const { openMeguminWindow, takeRequestedMeguminTab } =
+  await import("../../packages/client/src/lib/megumin-tab-request.ts");
+const { useMeguminWindowStore } = await import("../../packages/client/src/stores/megumin-window.store.ts");
+assert.equal(useMeguminWindowStore.getState().open, false, "the window starts closed");
+openMeguminWindow("npc");
+assert.equal(useMeguminWindowStore.getState().open, true, "asking for a tab opens the window");
+assert.equal(takeRequestedMeguminTab(), "npc", "the window finds the tab it was asked for");
+assert.equal(takeRequestedMeguminTab(), null, "a request is taken once");
+// The side panel sends the object form.
+fakeWindow.dispatchEvent(new CustomEvent("megumin:open-tab", { detail: { tabId: "memory" } }));
+assert.equal(takeRequestedMeguminTab(), "memory");
+useMeguminWindowStore.getState().setOpen(false);
+openMeguminWindow();
+assert.equal(takeRequestedMeguminTab(), null, "opening without a tab leaves the current tab alone");
+assert.equal(useMeguminWindowStore.getState().open, true);
+
+console.log("megumin-client window cases passed");

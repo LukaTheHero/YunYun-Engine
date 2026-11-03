@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ChatSidebar } from "./ChatSidebar";
 import { TopBar } from "./TopBar";
 import { GlobalOmnibar } from "./GlobalOmnibarHost";
-import { MeguminSidePanelMount, MeguminWorldEditorMount } from "../megumin/MeguminMounts";
+import { MeguminSidePanelMount, MeguminWindowMount, MeguminWorldEditorMount } from "../megumin/MeguminMounts";
 import { SpotifyMobileWidget } from "../spotify/SpotifyMiniPlayer";
 import { YouTubeMobileWidget } from "../chat/YouTubePlayer";
 import { LocalMusicMobileWidget } from "../chat/LocalMusicPlayer";
@@ -1646,6 +1646,7 @@ export function AppShell({
       <GlobalOmnibar />
       <MeguminSidePanelMount />
       <MeguminWorldEditorMount />
+      <MeguminWindowMount />
       <div data-component="MobileMusicWidgetLayer" className="contents">
         {isMobile && musicDjInstalled ? (
           <>
